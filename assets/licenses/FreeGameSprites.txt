@@ -1,0 +1,11 @@
+Asset: Tentacle Horror Deep (512 x 512 PNG)
+Publisher: FreeGameSprites (operated by yoyo)
+Source: https://freegamesprites.com/en/assets/tentacle-horror-deep-gothic
+Downloaded: 2026-10-07
+File: https://freegamesprites.com/images/ai-sprites/generated/tentacle-horror-deep-gothic.png
+License on asset page: CC0
+Publisher license page: https://freegamesprites.com/en/about
+Publisher license statement: CC0 1.0 - Public Domain
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Provenance: existing public asset served from the publisher's AI sprites/generated collection.
+The included PNG is unmodified. Runtime coloring, pixel sampling and wing geometry are project additions.

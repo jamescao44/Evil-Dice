@@ -1,0 +1,68 @@
+# Asset credits
+
+## Dungeon Crawl Stone Soup — active fantasy art
+
+Source: [Dungeon Crawl 32×32 Tiles Supplemental on OpenGameArt](https://opengameart.org/content/dungeon-crawl-32x32-tiles-supplemental), **Dungeon Crawl Stone Soup Full.zip**, plus the [original collection page](https://opengameart.org/content/dungeon-crawl-32x32-tiles). License: **CC0 / public domain**. The collection includes work by the Crawl/Stone Soup and rltiles artists, with individual contributors listed in the unmodified [original README and credits](licenses/DCSS-README.txt). The full [CC0 license](licenses/DCSS-CC0.txt) is retained.
+
+Selected PNGs are copied unchanged to `art/fantasy/`. The complete source-to-project mapping is in [sources.json](art/fantasy/sources.json).
+
+| Game role | Original file in the public archive |
+| --- | --- |
+| The Horror | `monster/abyss/worldbinder.png` |
+| Vanguard | `monster/vault/vault_guard_new.png` |
+| Elf Archer | `monster/deep_elf_master_archer.png` |
+| Mage | `monster/deep_elf_mage.png` |
+| Fleeing civilians | `monster/human_new.png`, `monster/human_old.png` |
+| Fleeing aristocrats | `monster/enchantress_human.png` |
+| Courtyard paving | `dungeon/floor/limestone_0.png` through `_3.png` |
+| Interface stone texture | `dungeon/wall/stone_gray_0.png` |
+| Ruined arch | `dungeon/gateways/stone_arch.png` |
+| Broken column | `dungeon/statues/crumbled_column.png` |
+| Trees and grass | `dungeon/trees/mangrove_1.png`, `dungeon/floor/grass/grass_full_new.png` |
+| Grimoire icon | `item/book/book_of_the_dead_new.png` |
+| Boon and effect icons | `gui/skills/`: shields, fighting, transmutations, necromancy, invocations, spellcasting |
+
+The actors use 32×32 source images with nearest-neighbor sampling and stepped idle motion. Apparent scale changes with growth; death poses rotate and flatten the same sprite. City troops and inhabitants lean and hop while running; civilians and aristocrats emerge when houses become rubble. Scene and UI textures are tiled, cropped, and tinted at runtime. These are existing public pixel-art tiles; no custom image generation was used for this redesign.
+
+## Silkscreen — all active text and numbers
+
+Copyright 2001 The Silkscreen Project Authors. Source: [Google Fonts Silkscreen](https://github.com/google/fonts/tree/main/ofl/silkscreen). License: **SIL Open Font License 1.1**. Original notice: [Silkscreen OFL](licenses/Silkscreen-OFL.txt).
+
+`fonts/Silkscreen-Regular.ttf` is unmodified. The game disables font smoothing and subpixel positioning and uses whole-pixel baselines for all UI, guide text, and floating damage numbers. It uses no fallback body font.
+
+## Interface Sounds — restored dice and reveal audio
+
+Creator: **Kenney**. Source: [Interface Sounds](https://kenney.nl/assets/interface-sounds). License: **CC0**. Original notice: [Kenney Interface Sounds](licenses/Kenney-Interface-Sounds.txt).
+
+Five unchanged clips are active again: `click_001` for tumbling, `drop_001` for landings, `confirmation_002` for pairs, `bong_001` for triple reveals, and `pluck_001` for the rising reveal chime. Runtime pitch variations match the earlier prototype. The other three interface clips remain unused.
+
+## Impact Sounds and RPG Audio — active combat effects
+
+Creator: **Kenney**. Sources: [Impact Sounds](https://kenney.nl/assets/impact-sounds) and [RPG Audio](https://kenney.nl/assets/rpg-audio). Both packs are **CC0**. Original notices are retained: [Impact Sounds license](licenses/Kenney-Impact-Sounds.txt), [RPG Audio license](licenses/Kenney-RPG-Audio.txt).
+
+Nine OGG clips are copied unchanged into `audio/combat/`; [source mapping](audio/combat/sources.json) records the original archive paths. Seven are used for weapon strikes, spells, boons, feeding, and destruction; the heavier dice landing/rattle clips are retained but unused. A Combat bus limiter bounds the mix.
+
+| Project clip | Original clip | Use |
+| --- | --- | --- |
+| land | impactWood_heavy_000 | Unused; original dice landing restored |
+| hit | impactPunch_heavy_001 | Attack impact |
+| crash | impactGlass_heavy_001 | Ultimate and city destruction |
+| rumble | impactMetal_heavy_000 | Spell impact and feeding resonance |
+| bell | impactBell_heavy_000 | Boons, enemy magic, victory |
+| slash | knifeSlice | Weapon and attack sweep |
+| chop | chop | Falling enemy |
+| roll | handleCoins2 | Unused; original dice rattle restored |
+| book | bookOpen | Debug selection |
+
+## Earlier prototype assets — retained, unused
+
+These files remain on disk for reference; the battle scene does not load them.
+
+- **Gothicvania Town**, Luis Zuno / Ansimuz, [source](https://opengameart.org/content/gothicvania-town), **CC0**, [original notice](licenses/Gothicvania.txt). `art/battleground.png` is `PNG/environment/environment-preview.png`; `art/recruit.png`, `art/investigator.png`, and `art/medic.png` are the bearded-idle, hat-man-idle, and oldman-idle strips. No music from this pack is used.
+- **Tentacle Horror Deep**, FreeGameSprites, [source](https://freegamesprites.com/en/assets/tentacle-horror-deep-gothic), publisher-listed **CC0**, [saved source/license record](licenses/FreeGameSprites.txt). `art/cthulhu.png` is the unmodified public PNG. Provenance: the publisher serves it from its `images/ai-sprites/generated/` collection. The previous palette shader also remains unused.
+- **Rajdhani**, Copyright (c) 2014 Indian Type Foundry, [source](https://github.com/google/fonts/tree/main/ofl/rajdhani), **OFL 1.1**, [notice](licenses/Rajdhani-OFL.txt). `fonts/Rajdhani-SemiBold.ttf` is unmodified and unused.
+- **Kenney Tiny Dungeon**, [source](https://kenney.nl/assets/tiny-dungeon), **CC0**, [notice](licenses/Kenney-Tiny-Dungeon.txt). `sprites/tiny-dungeon.png` is unused.
+
+## Project visuals
+
+Bone dice and pips, magic-circle runes, textured framing, health bars, animated combo/skill labels, castle-city layout, roofs, circular walls, moat, bridges, a few icons, particles, slashes, feeding, and spells are implemented in project code. The city combines public stone, grass, tree, and rubble textures with pixel geometry. The user's castle-city reference guides the composition; its image is not redistributed as a game asset. No paid assets are used.

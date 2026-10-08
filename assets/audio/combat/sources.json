@@ -1,0 +1,11 @@
+{
+  "land": "impact-sounds/Audio/impactWood_heavy_000.ogg",
+  "hit": "impact-sounds/Audio/impactPunch_heavy_001.ogg",
+  "crash": "impact-sounds/Audio/impactGlass_heavy_001.ogg",
+  "rumble": "impact-sounds/Audio/impactMetal_heavy_000.ogg",
+  "bell": "impact-sounds/Audio/impactBell_heavy_000.ogg",
+  "slash": "rpg-audio/Audio/knifeSlice.ogg",
+  "chop": "rpg-audio/Audio/chop.ogg",
+  "roll": "rpg-audio/Audio/handleCoins2.ogg",
+  "book": "rpg-audio/Audio/bookOpen.ogg"
+}

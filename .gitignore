@@ -1,0 +1,19 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+.asset-cache/
+test-output/
+
+# Generated desktop/web builds and upload archives.
+/export/
+/export-web/
+/*.zip
+
+# Local credentials and editor state.
+.env
+.env.*
+!.env.example
+export_credentials.cfg
+*.p12
+*.pfx
+*.keystore
