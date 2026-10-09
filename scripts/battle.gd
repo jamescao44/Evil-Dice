@@ -112,6 +112,11 @@ var cinematic_pause: float = 0
 var cinematic_speed: float = 1
 var cinematic_dim: float = 0
 var cinematic_recovery: float = 0.25
+const AUTO_CLAIM_DURATION := 2.4
+const CHEST_NAMES := ["", "Common", "Rare", "Epic"]
+var auto_claim_tier: int = 0
+var auto_claim_remaining: float = 0
+var auto_claim_notice: Node2D
 
 func _ready() -> void:
 	_configure_layout()
@@ -140,6 +145,10 @@ func _ready() -> void:
 	add_child(saved_bubble)
 	chest = RewardChest.new()
 	add_child(chest)
+	auto_claim_notice = Node2D.new()
+	auto_claim_notice.z_index = 100
+	add_child(auto_claim_notice)
+	auto_claim_notice.draw.connect(_draw_auto_claim)
 	chest.ticked.connect(func(): _sound("click_001", 0.9 + chest.elapsed * 0.08, -16))
 	chest.opened.connect(func():
 		_sound("book", 0.65, -10)
@@ -154,6 +163,12 @@ func _ready() -> void:
 			start_snapshot = arg.trim_prefix("--capture=")
 	for key in ["eldritch", "vanguard", "archer", "mage", "civilian", "civilian_gray", "aristocrat", "floor0", "floor1", "floor2", "floor3", "stone", "arch", "column", "mangrove", "grass", "book", "shield", "attack", "heal", "feast", "crown", "fx"]:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
+	for key in ["vanguard", "archer", "mage"]:
+		var silhouette: Image = art[key].get_image()
+		for y in range(silhouette.get_height()):
+			for x in range(silhouette.get_width()):
+				silhouette.set_pixel(x, y, Color(1, 1, 1, silhouette.get_pixel(x, y).a))
+		art[key+"_glow"] = ImageTexture.create_from_image(silhouette)
 	for key in ["hit", "crash", "rumble", "bell", "slash", "chop", "book"]:
 		sounds[key] = load("res://assets/audio/combat/" + key + ".ogg")
 	for key in ["click_001", "drop_001", "confirmation_002", "bong_001", "pluck_001"]:
@@ -173,6 +188,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not guide and not debug_open:
 		cinematic_remaining = maxf(0, cinematic_remaining - delta)
+		auto_claim_remaining = maxf(0, auto_claim_remaining - delta)
 	var world_delta: float = delta * _world_time_scale()
 	clock_time += world_delta
 	_update_charge()
@@ -184,6 +200,8 @@ func _process(delta: float) -> void:
 	for index in fallen:
 		fallen[index] += delta
 	var modal: bool = guide or debug_open
+	auto_claim_notice.visible = not modal and view_phase == "over" and auto_claim_remaining > 0
+	auto_claim_notice.queue_redraw()
 	for die in dice:
 		die.visible = not modal and view_phase not in ["over", "feeding", "transition", "reward", "forming", "skill", "targeting", "resolving"]
 		die.set_process(not modal)
@@ -352,7 +370,7 @@ func _skill_reveal_point() -> Vector2:
 	return Vector2(402, 668) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 340)
 
 func _skill_rest_point() -> Vector2:
-	return Vector2(402, 1260) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 440)
+	return Vector2(402, 1320) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 440)
 
 func _skill_center() -> Vector2:
 	return skill_bubble.center_at() if is_instance_valid(skill_bubble) else _skill_rest_point()
@@ -692,7 +710,6 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 	model.record_perfect(throw_perfect)
 	if not debug_repeat:
 		debug_choice = -1
-		debug_perfect = false
 	last_result = {}
 	status_title = "ROLLING"
 	status_color = CREAM
@@ -739,6 +756,13 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 		if not _valid_turn(token): return
 	view_phase = "skill"
 	status_title = "SKILL READY"
+	if model.is_city():
+		# City rolls cast as soon as their reveal finishes; menus still pause the action.
+		while guide or debug_open:
+			await get_tree().process_frame
+			if not _valid_turn(token): return
+		skill_source = "current"
+		_activate_skill(-2)
 
 func _combo_chime(ultimate: bool, token: int) -> bool:
 	for pitch in [1.0, 1.25, 1.5, 2.0]:
@@ -751,10 +775,10 @@ func _skill_caption(roll: Dictionary) -> Dictionary:
 	var description: String = "attack"
 	if roll.kind == Rules.Kind.PAIR:
 		label = Rules.PAIR_NAMES[roll.face - 1]
-		description = ["attack x1.5 +%d", "regen 5, %d turns", "power x1.5, %d turns", "attack all +%d", "random attack +%d", "invincible, %d turns"][roll.face - 1] % roll.spare
+		description = ["attack x1.5 +%d", "regen 5 for %d turns", "power x1.5 for %d turns", "attack all +%d", "random attack +%d", "invincible for %d turns"][roll.face - 1] % roll.spare
 	elif roll.kind >= Rules.Kind.SPECIAL:
 		label = Rules.SPECIAL_NAMES[roll.face - 1]
-		description = ["instant kill", "full heal", "power x3, 3 turns", "attack all x2", "random attack", ""][roll.face - 1]
+		description = ["instant kill", "full heal", "power x3 for 3 turns", "attack all x2", "random attack", ""][roll.face - 1]
 		if model.is_city() and roll.face == 1: description = "attack x5"
 	if model.is_city() and roll.kind != Rules.Kind.NORMAL and roll.face == 5: description = description.replace("random attack", "city attack")
 	return {"name": label, "description": description}
@@ -916,6 +940,8 @@ func _check_over() -> bool:
 	for die in dice: die.stop_charge()
 	active_human = -1
 	if outcome == "victory":
+		auto_claim_tier = model.auto_claim_victory_chest()
+		auto_claim_remaining = AUTO_CLAIM_DURATION if auto_claim_tier > 0 else 0.0
 		fx.activate_circle(CITY_POINT, GOLD, 200, 1.5)
 		fx.burst(CITY_POINT, GOLD, 120, 320)
 		_sound("crash", 0.55, -8)
@@ -966,6 +992,8 @@ func _restart() -> void:
 	run_id += 1
 	_clear_skill()
 	chest.cancel()
+	auto_claim_tier = 0
+	auto_claim_remaining = 0
 	fx.z_index = 0
 	if transition_tween and transition_tween.is_running(): transition_tween.kill()
 	model.reset_run()
@@ -989,7 +1017,6 @@ func _restart() -> void:
 	debug_open = false
 	debug_choice = -1
 	debug_repeat = false
-	debug_perfect = false
 	shake = 0
 	get_viewport().canvas_transform = Transform2D.IDENTITY
 	hit_times.fill(0.0)
@@ -1107,9 +1134,15 @@ func _wrapped(at: Vector2, value: String, width: float, color: Color = MUTED, si
 	_text(Vector2(at.x, y), row, size, color)
 	return y
 
+func _buff_drag_active() -> bool:
+	if view_phase != "targeting" or not skill_dragging or guide or debug_open: return false
+	var roll: Dictionary = _source_roll(skill_source)
+	return not roll.is_empty() and not Rules.is_attack(roll)
+
 func _art(key: String, rect: Rect2, tint: Color = Color.WHITE) -> void:
+	if _buff_drag_active() and key.trim_suffix("_glow") in ["vanguard", "archer", "mage"]:
+		tint *= Color(0.38, 0.38, 0.38, 1)
 	if art.has(key):
-		if key in ["eldritch", "vanguard", "archer", "mage"]: tint *= _actor_tint(key == "eldritch")
 		draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, tint)
 
 func _stone(rect: Rect2, tint: Color, key: String = "stone", unit: int = 64) -> void:
@@ -1158,16 +1191,8 @@ func _backdrop_dim() -> float:
 	if guide or debug_open: return 0.0
 	return maxf(0.58 if view_phase == "targeting" else 0.0, _cinematic_gloom())
 
-func _actor_tint(horror: bool) -> Color:
-	if guide or debug_open: return Color.WHITE
-	var focused: Dictionary = {}
-	if view_phase == "targeting": focused = _source_roll(skill_source)
-	elif view_phase == "resolving" and not casting_source.is_empty(): focused = _source_bubble(casting_source).roll
-	if focused.is_empty(): return Color.WHITE
-	return Color(0.36, 0.36, 0.42) if horror == Rules.is_attack(focused) else Color.WHITE
-
 func _draw_backdrop_shade() -> void:
-	# Actors receive their own tint according to the selected skill's recipients.
+	# Draw beneath the actors so targeting and cast anticipation never dim them.
 	var amount: float = _backdrop_dim()
 	if amount > 0: draw_rect(ARENA, Color(0.035,0.025,0.065,amount))
 
@@ -1265,7 +1290,7 @@ func _draw_player() -> void:
 	var bob: float = 0 if reduced else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
 	var dx: float = snappedf(sin(clock_time * 45) * hurt * 5, 2) if not reduced else 0.0
 	_shadow(Vector2(259, 413), monster_side * 0.48, 0.27)
-	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45)*_actor_tint(true), 4)
+	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
 	_art("eldritch", Rect2(Vector2(259 - monster_side / 2 + dx, 414 - monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
 	_hp_plate(Rect2(129, 422, 260, 56), "HORROR %d" % (model.stage+1), model.hp, model.max_hp, model.shield, TEAL)
 
@@ -1275,7 +1300,6 @@ func _draw_human(index: int) -> void:
 	var point: Vector2 = _enemy_point(index)
 	var floor_y: float = _enemy_feet(index).y
 	var side: float = _enemy_side()
-	var width: float = 128 if model.enemies.size() == 3 else 168
 	var key: String = ["vanguard", "archer", "mage"][human.role]
 	var selected: bool = attack_target == index and view_phase == "resolving"
 	if human.hp <= 0:
@@ -1295,20 +1319,22 @@ func _draw_human(index: int) -> void:
 	var bob: float = 0 if reduced else snappedf(sin(clock_time * 2 + index * 2) * minf(2,side/64.0), 2)
 	_shadow(Vector2(point.x, floor_y-1), side * 0.25, 0.25)
 	if human.elite:
-		var glow: Color = _elite_color(human.role)*_actor_tint(false)
-		var alpha: float = 0.42 if reduced else 0.4 + sin(clock_time * 3 + index) * 0.14
-		for offset in [Vector2(-3,0),Vector2(3,0),Vector2(0,-3),Vector2(0,3)]:
-			_art(key, Rect2(Vector2(point.x-side/2, floor_y-side+bob)+offset, Vector2.ONE*side), Color(glow, alpha))
-		Pixel.disc(self, Vector2(point.x, floor_y), maxf(12,side*0.35), Color(glow,0.35), 3, 0.25)
+		var glow: Color = _elite_color(human.role)
+		var pulse: float = 1.0 if reduced else 0.9 + sin(clock_time * 3 + index) * 0.1
+		var sprite := Rect2(Vector2(point.x-side/2+dx, floor_y-side+bob), Vector2.ONE*side)
+		# White alpha silhouettes keep the halo bright even around dark sprite pixels.
+		for ring in [2, 1]:
+			var spread: float = ring * maxf(3, side * 0.045)
+			for ray in range(8):
+				var offset := Vector2.from_angle(ray*TAU/8)*spread
+				_art(key+"_glow", Rect2(sprite.position+offset, sprite.size), Color(glow.lightened(0.2 if ring == 1 else 0), pulse*(0.6 if ring == 1 else 0.12)))
+		var ground_glow: Color = glow.darkened(0.62) if _buff_drag_active() else glow
+		Pixel.disc(self, Vector2(point.x, floor_y), maxf(16,side*0.42), Color(ground_glow,0.65*pulse), 3, 0.25)
 	_art(key, Rect2(Vector2(point.x - side / 2 + dx, floor_y - side + bob), Vector2.ONE * side), Color.WHITE.lerp(RED, hurt * 0.6))
 	if human.attack_boost: _glyph(point - Vector2(0, side*0.6), "attack", PURPLE)
 	if human.canceled: _glyph(point - Vector2(0, side * 0.5), "close", PURPLE)
 	elif active_human == index: _glyph(point - Vector2(0, side * 0.62), human.intent.type, RED if human.intent.type == "attack" else TEAL)
-	if model.enemies.size() >= 4:
-		_draw_small_enemy_health(index)
-		return
-	var title: String = ["VANGUARD", "ARCHER", "MAGE"][human.role] if model.enemies.size() == 5 else human.name.to_upper()
-	_hp_plate(Rect2(point.x - width / 2, floor_y + 8, width, 56), title, human.hp, human.max_hp, human.shield, _elite_color(human.role) if human.elite else RED)
+	_draw_enemy_health(index)
 
 func _elite_color(role: int) -> Color:
 	return [GOLD, Color("80d8c6"), PURPLE][role]
@@ -1321,35 +1347,61 @@ func _diamond_center(index: int) -> Vector2:
 
 func _chest_milestone_rect(tier: int) -> Rect2:
 	var side: float = 88 if _reward_scale() > 1 else 48
-	return Rect2(_diamond_center(tier*3-1)-Vector2.ONE*side/2,Vector2.ONE*side)
+	return Rect2(_diamond_center(tier*3-1)-Vector2.ONE*side/2,Vector2(side,side/2+45*_reward_scale()))
 
 func _chest_tier_at(point: Vector2) -> int:
 	if not _can_claim_chest(): return 0
-	for tier in range(1,4):
-		if model.chest_tier() >= tier and _chest_milestone_rect(tier).has_point(point): return tier
-	return 0
+	var tier: int = model.chest_tier()
+	return tier if _chest_milestone_rect(tier).has_point(point) else 0
 
 func _draw_reward_progress(at: Vector2, scale_factor: float) -> void:
 	_center(at + Vector2(0,-35)*scale_factor, "PERFECT TREASURE", roundi(18*scale_factor), GOLD)
+	var available_tier: int = model.chest_tier() if _can_claim_chest() else 0
 	for i in range(9):
 		var group: int = i / 3
+		var claimable: bool = available_tier == group+1
 		var p := _diamond_center(i)
 		var milestone: bool = i % 3 == 2
 		var filled: bool = i < model.perfect_progress
 		var radius: float = (15 if milestone else 10)*scale_factor
 		var tint: Color = [GOLD,PURPLE,Color("9dcedb")][group]
 		if milestone and filled:
-			var pulse: float = 0.7 if reduced else 0.65+sin(clock_time*3.5)*0.25
-			for j in range(3,0,-1):
-				var glow_radius: float = radius+j*4*scale_factor
+			var pulse: float = 0.9 if reduced else 0.85+sin(clock_time*4.5)*0.15
+			for j in range(5,0,-1):
+				var glow_radius: float = radius+j*3.5*scale_factor
 				var glow := PackedVector2Array([p+Vector2(0,-glow_radius),p+Vector2(glow_radius,0),p+Vector2(0,glow_radius),p+Vector2(-glow_radius,0)])
-				draw_colored_polygon(glow,Color(tint,pulse*0.07))
+				draw_colored_polygon(glow,Color(tint,pulse*(0.2 if claimable else 0.1)))
+			if claimable:
+				var halo: float = radius+(7+pulse*3)*scale_factor
+				var corners := PackedVector2Array([p+Vector2(0,-halo),p+Vector2(halo,0),p+Vector2(0,halo),p+Vector2(-halo,0)])
+				for edge in range(4): Pixel.line(self,corners[edge],corners[(edge+1)%4],Color(tint.lightened(0.5),pulse*0.8),2)
 		var points := PackedVector2Array([p+Vector2(0,-radius),p+Vector2(radius,0),p+Vector2(0,radius),p+Vector2(-radius,0)])
 		draw_colored_polygon(points,tint if filled else INK)
 		for edge in range(4): Pixel.line(self,points[edge],points[(edge+1)%4],CREAM if milestone and filled else tint if filled else EDGE,3 if milestone else 2)
 		if filled: draw_rect(Rect2(p-Vector2.ONE*(3 if milestone else 2),Vector2.ONE*(6 if milestone else 4)),CREAM)
-		if milestone and filled and _can_claim_chest():
-			_center(p+Vector2(0,34*scale_factor), "CLAIM", roundi(11*scale_factor), tint)
+		if milestone and filled and claimable:
+			var label := Rect2(p+Vector2(-25,24)*scale_factor,Vector2(50,21)*scale_factor)
+			draw_rect(label, tint.darkened(0.68))
+			draw_rect(label,tint.lightened(0.25),false,2)
+			_center(p+Vector2(0,39*scale_factor), "CLAIM", roundi(12*scale_factor), CREAM)
+
+func _draw_auto_claim() -> void:
+	if view_phase != "over" or auto_claim_tier == 0 or auto_claim_remaining <= 0: return
+	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
+	var rect := Rect2(82,476,640,92) if portrait else Rect2(380,143,520,64)
+	var alpha: float = minf(1.0, minf((AUTO_CLAIM_DURATION-auto_claim_remaining)/0.12,auto_claim_remaining/0.35))
+	var color: Color = [GOLD,PURPLE,Color("9dcedb")][auto_claim_tier-1]
+	for i in range(3,0,-1): auto_claim_notice.draw_rect(rect.grow(i*4),Color(color,0.055*alpha))
+	auto_claim_notice.draw_rect(rect,Color(INK,0.97*alpha))
+	auto_claim_notice.draw_rect(rect,Color(color,alpha),false,3)
+	var side: float = 64 if portrait else 44
+	var icon_at := Vector2(rect.position.x+side*0.65,rect.get_center().y)
+	auto_claim_notice.draw_texture_rect(chest.art.chest_open,Rect2(icon_at-Vector2.ONE*side/2,Vector2.ONE*side),false,Color(1,1,1,alpha))
+	var label: String = CHEST_NAMES[auto_claim_tier]+" chest auto claimed"
+	var font_size: int = 26 if portrait else 20
+	var width: float = pixel_font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+	var baseline: Vector2 = (rect.get_center()+Vector2((side-width)/2,9 if portrait else 7)).round()
+	auto_claim_notice.draw_string(pixel_font,baseline,label,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,Color(color.lightened(0.35),alpha))
 
 func _draw_currencies(at: Vector2, scale_factor: float = 1.0) -> void:
 	var side: float = 32*scale_factor
@@ -1359,16 +1411,29 @@ func _draw_currencies(at: Vector2, scale_factor: float = 1.0) -> void:
 	RewardIcons.paint(self,chest.art,"shard",Rect2(shard_at-Vector2.ONE*side/2,Vector2.ONE*side))
 	_text(shard_at+Vector2(23,7)*scale_factor,str(model.summon_shards),roundi(18*scale_factor),PURPLE)
 
-func _draw_small_enemy_health(index: int) -> void:
+func _enemy_health_rect(index: int) -> Rect2:
+	var count: int = model.enemies.size()
+	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
+	var feet: Vector2 = _enemy_feet(index)
+	var width: float = (168 if count < 4 else 60) if portrait else (148 if count < 4 else 40 if count > 5 else 52)
+	# Include an explicit gutter between adjacent bars, including their borders.
+	if count > 1:
+		var spacing: float = absf(_enemy_feet(1).x-_enemy_feet(0).x)
+		width = minf(width, spacing-16)
+	var height: float = (30 if count < 4 else 24) if portrait else (20 if count < 4 else 14)
+	var y: float = feet.y+8
+	if count > 5 and index < 5: y = feet.y-_enemy_side()-height-8
+	return Rect2(feet.x-width/2, y, width, height)
+
+func _draw_enemy_health(index: int) -> void:
 	var human: Dictionary = model.enemies[index]
-	var point: Vector2 = _enemy_point(index)
-	var floor_y: float = _enemy_feet(index).y
-	var bar_width: float = 40 if model.enemies.size() > 5 else 52
-	var bar := Rect2(point.x-bar_width/2, floor_y-_enemy_side()-19 if model.enemies.size()>5 and index<5 else floor_y+7, bar_width,14)
+	var bar: Rect2 = _enemy_health_rect(index)
+	var color: Color = _elite_color(human.role) if human.elite else RED
+	var size: int = 16 if model.enemies.size() < 4 else 12
 	draw_rect(bar.grow(2), EDGE)
 	draw_rect(bar, INK)
-	draw_rect(Rect2(bar.position+Vector2(2,2),Vector2((bar_width-4)*human.hp/float(human.max_hp),10)),(_elite_color(human.role) if human.elite else RED).darkened(0.3))
-	_center(bar.get_center()+Vector2(0,5), str(human.hp), 12, CREAM)
+	draw_rect(Rect2(bar.position+Vector2(2,2),Vector2((bar.size.x-4)*human.hp/float(human.max_hp),bar.size.y-4)),color.darkened(0.3))
+	_center(bar.get_center()+Vector2(0,size*0.4), str(human.hp), size, CREAM)
 	if human.shield > 0:
 		_glyph(bar.position+Vector2(5,-10),"shield",TEAL)
 		_text(bar.position+Vector2(17,-5),str(human.shield),12,TEAL)
@@ -1584,7 +1649,7 @@ func _draw_guide() -> void:
 	_text(Vector2(116, 126), "DICE GRIMOIRE", 32, GOLD)
 	_button(GUIDE_CLOSE, "X")
 	if home_enabled: _button(_home_rect(), "HOME")
-	_text(Vector2(116, 165), "Drag skills to the field. Targeted skills can tap to aim. Store one skill in the SAVE seal." if model.is_city() else "Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.", 16, CREAM)
+	_text(Vector2(116, 165), "City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast." if model.is_city() else "Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.", 16, CREAM)
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage,3)]
 	_text(Vector2(116, 194), "CITY: 666 deals 800 damage and clears troops. Buff durations count rolls." if model.is_city() else "Damage x1.5 + growth. Normal cap %s HP. Skills ignore caps; 666 clears the wave." % caps, 16, MUTED)
 	_text(Vector2(116, 238), "PAIRS / SKILLS", 16, TEAL)

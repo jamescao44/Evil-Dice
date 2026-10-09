@@ -94,6 +94,15 @@ func close_chest() -> bool:
 	claimed_slots.clear()
 	return true
 
+func auto_claim_victory_chest() -> int:
+	if outcome() != "victory" or not open_rewards.is_empty(): return 0
+	var tier: int = chest_tier()
+	if tier == 0: return 0
+	var outcomes: Array = open_chest(tier)
+	for slot in range(outcomes.size()): claim_reward(slot)
+	close_chest()
+	return tier
+
 func is_city() -> bool:
 	return stage == WAVE_COUNTS.size()
 
@@ -128,6 +137,7 @@ func outcome() -> String:
 func advance_wave() -> bool:
 	if outcome() != "wave_clear":
 		return false
+	_end_buff_turn()
 	stage += 1
 	max_hp += 30
 	heal(55) # Increased capacity plus a modest recovery from feeding.
@@ -143,17 +153,35 @@ func begin_round() -> Array:
 	round_number += 1
 	var events: Array = []
 	if buffs[2] > 0:
-		buffs[2] -= 1
+		buff_ticks[2] = true
 		events.append(event(-1, heal(5), "heal", "REGROWTH"))
 	phase = "roll"
 	return events
 
-func siege_damage(result: Dictionary) -> int:
+func is_instant_kill(result: Dictionary) -> bool:
+	return not is_city() and super.is_instant_kill(result)
+
+func attack_base(result: Dictionary) -> float:
+	if not is_city(): return super.attack_base(result)
+	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE
+	# A city is not a humanoid: triple 1 deals five regular attacks instead.
+	return regular_attack_power() * 5 if result.kind == Kind.SPECIAL and result.face == 1 else super.attack_base(result)
+
+func attack_damage(result: Dictionary, target: int = -1) -> int:
+	if not is_city(): return super.attack_damage(result, target)
 	if not is_attack(result): return 0
 	if result.kind == Kind.ULTIMATE: return mini(city_hp, CITY_ULTIMATE_DAMAGE)
-	# A city is not a humanoid: triple 1 deals five regular attacks instead.
-	var base: float = regular_attack_power() * 5 if result.kind == Kind.SPECIAL and result.face == 1 else attack_base(result)
-	return mini(city_hp, floori(base * damage_multiplier() * power * attack_multiplier() * 2.0))
+	return mini(city_hp, floori(attack_base(result) * damage_multiplier() * power * attack_multiplier() * 2.0))
+
+func siege_damage(result: Dictionary) -> int:
+	return attack_damage(result, -2)
+
+func damage_caption(result: Dictionary, primary: int = -1) -> String:
+	if not is_city(): return super.damage_caption(result, primary)
+	if not is_attack(result): return ""
+	var base: int = floori(attack_base(result))
+	var modifier: int = siege_damage(result)-base
+	return "%d + %s (x%d)" % [base, "(%d)" % modifier if modifier < 0 else str(modifier), hit_count(result)]
 
 func player_target() -> int:
 	if not is_city(): return super.player_target()
@@ -162,11 +190,12 @@ func player_target() -> int:
 func _finish_player_action(result: Dictionary) -> void:
 	var bonus: bool = not bonus_resume.is_empty()
 	super._finish_player_action(result)
-	if bonus:
-		# City immunity already protects the live interval before the next roll completes.
-		if is_city(): bonus_immunity_guard = false
-		return
-	if is_city(): phase = "round_end" if outcome().is_empty() else "finished"
+	if bonus: return
+	if is_city():
+		# Siege has no discrete enemy phase: preserve its complete roll intervals.
+		if result.kind == Kind.PAIR and result.face == 6: buff_ticks.erase(6)
+		_end_buff_turn()
+		phase = "round_end" if outcome().is_empty() else "finished"
 
 func apply_player_step(primary: int = -1) -> Array:
 	if not is_city(): return super.apply_player_step(primary)

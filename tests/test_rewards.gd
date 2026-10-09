@@ -66,6 +66,25 @@ func test_model() -> void:
 	model.close_chest()
 	model.reset_run()
 
+	for progress in range(10):
+		model.reset_run()
+		model.perfect_progress = progress
+		check(model.auto_claim_victory_chest() == 0 and model.perfect_progress == progress,"Active runs never auto-claim treasure")
+		for e in model.enemies: e.hp = 0
+		check(model.auto_claim_victory_chest() == 0 and model.perfect_progress == progress,"Squad wave clears preserve the bank")
+		model.stage = 9
+		model.city_hp = 0
+		model.hp = 0
+		check(model.auto_claim_victory_chest() == 0 and model.perfect_progress == progress,"Defeat never auto-claims treasure")
+		model.hp = 1
+		model.reward_weights = [1,0,0,0,0,0,0]
+		var tier: int = progress / 3
+		check(model.auto_claim_victory_chest() == tier,"Victory claims the highest complete tier")
+		check(model.rubies == Run.CHEST_COUNTS[tier]*100 and model.reward_history.size() == Run.CHEST_COUNTS[tier],"Victory applies every reward exactly once")
+		check(model.open_rewards.is_empty() and model.claimed_slots.is_empty() and model.perfect_progress == (0 if tier > 0 else progress),"Auto-claim closes rewards and consumes the whole eligible bank")
+		check(model.auto_claim_victory_chest() == 0 and model.rubies == Run.CHEST_COUNTS[tier]*100,"Repeated victory checks cannot duplicate rewards")
+	model.reset_run()
+
 	var roles: Dictionary = {}
 	for stage in range(9):
 		model.stage = stage
@@ -128,6 +147,13 @@ func test_scene(game) -> void:
 	game.model.begin_round()
 	game.model.perfect_progress = 9
 	game.view_phase = "ready"
+	for progress in range(3,10):
+		game.model.perfect_progress = progress
+		for tier in range(1,4):
+			var expected: int = tier if tier == game.model.chest_tier() else 0
+			check(game._chest_tier_at(game._diamond_center(tier*3-1)) == expected,"Only the rarest available diamond is claimable")
+			check(game._chest_tier_at(game._diamond_center(tier*3-1)+Vector2(0,38)*game._reward_scale()) == expected,"Only the rarest CLAIM label is interactive")
+	game.model.perfect_progress = 9
 	game._handle_click(game._diamond_center(8 if game.model.chest_tier() == 3 else 5 if game.model.chest_tier() == 2 else 2))
 	var city_clock: float = game.model.volley_clock
 	game._handle_click(game.DICE_CENTER)
@@ -158,7 +184,7 @@ func test_scene(game) -> void:
 	game._start_charge()
 	game._release_charge()
 	game._handle_click(game._diamond_center(8 if game.model.chest_tier() == 3 else 5 if game.model.chest_tier() == 2 else 2))
-	check(game.throw_perfect and game.throw_power == 1 and not game.debug_perfect and game.view_phase != "reward", "Earning throw cannot be interrupted to claim")
+	check(game.throw_perfect and game.throw_power == 1 and game.debug_perfect and game.view_phase != "reward", "Earning throw cannot be interrupted to claim")
 	var deadline: int = Time.get_ticks_msec()+12000
 	while (game.model.stage == 0 or game.view_phase != "ready") and Time.get_ticks_msec() < deadline:
 		Driver.cast_pending(game)
@@ -176,6 +202,38 @@ func test_scene(game) -> void:
 	check(not game._home_rect().intersects(game._chest_milestone_rect(2)) and not game.REPLAY_RECT.intersects(game._chest_milestone_rect(2)), "Ending controls do not cover the claim diamonds")
 	game._handle_click(game._diamond_center(8 if game.model.chest_tier() == 3 else 5 if game.model.chest_tier() == 2 else 2))
 	check(game.view_phase == "reward" and game.model.open_rewards.size() == 3, "Bank remains claimable on ending screen")
+	game._restart()
+
+	for tier in range(1,4):
+		game.model.stage = 9
+		game.model._load_wave()
+		game._start_round()
+		game.model.city_hp = 1
+		game.model.perfect_progress = tier*3-1
+		game.model.reward_weights = [0,0,0,0,0,0,1]
+		game.debug_choice = 7
+		game.debug_perfect = true
+		game.reduced = tier == 2
+		await game._roll()
+		await Driver.resolve_held(game)
+		check(game.view_phase == "over" and game.model.outcome() == "victory","Final cast reaches the success screen")
+		check(game.auto_claim_tier == tier and game.auto_claim_remaining > 2,"Winning Perfect counts toward the correct auto-claimed tier")
+		check(game.model.summon_shards == Run.CHEST_COUNTS[tier] and game.model.perfect_progress == 0,"Victory delivers the complete chest immediately")
+		check(not game.chest.visible and game.model.open_rewards.is_empty(),"Auto-claim keeps the success screen without reels or manual pickups")
+		game._check_over()
+		check(game.model.reward_history.size() == Run.CHEST_COUNTS[tier],"Success-screen checks cannot repeat the claim")
+		game._process(0.5)
+		check(game.auto_claim_remaining > 1.8 and game.auto_claim_notice.visible,"City speed does not shorten the visible message")
+		check(game.auto_claim_notice.z_index > game.fx.z_index and game.auto_claim_notice.z_index > game.chest.z_index,"Claim message is above victory and reward effects")
+		game._process(2.4)
+		check(game.auto_claim_remaining == 0 and not game.auto_claim_notice.visible and game.view_phase == "over","Message expires quickly while victory stays visible")
+		game._handle_click(game.REPLAY_RECT.get_center())
+		check(game.auto_claim_tier == 0 and game.auto_claim_remaining == 0 and game.model.reward_history.is_empty(),"Restart clears the message and run rewards")
+	game.model.stage = 9
+	game.model.city_hp = 0
+	game.model.perfect_progress = 2
+	game._check_over()
+	check(game.auto_claim_tier == 0 and game.auto_claim_remaining == 0 and game.model.reward_history.is_empty(),"Victory without a complete chest has no claim message")
 	game._restart()
 
 	game.queue_free()

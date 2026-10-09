@@ -25,6 +25,12 @@ func fresh():
 	game.begin_round()
 	return game
 
+func finish_round(game) -> void:
+	for i in game.living():
+		game.enemies[i].intent = {"type":"attack", "target":-1, "amount":0}
+		game.enemy_act(i)
+	game.end_round()
+
 func _test_classification() -> void:
 	var counts := [0, 0, 0, 0]
 	for a in range(1, 7):
@@ -80,10 +86,13 @@ func _test_buffs() -> void:
 	game.set_test_roll([2,2,3])
 	game.apply_player()
 	check(game.hp == 40, "Regen does not heal on granting turn")
+	finish_round(game)
 	for expected in [45,50,55,55]:
-		game.phase = "round_end"
 		game.begin_round()
 		check(game.hp == expected, "Regen heals 5 for exactly three starts")
+		game.set_test_roll([3,3,1])
+		game.apply_player()
+		finish_round(game)
 	game.phase = "roll"
 	game.set_test_roll([2,2,2])
 	game.apply_player()
@@ -92,14 +101,18 @@ func _test_buffs() -> void:
 	game.set_test_roll([3,3,2])
 	game.apply_player()
 	check(game.buffs[3] == 2 and game.attack_multiplier() == 1.5, "Pair attack boon starts with all turns available")
-	game.phase = "roll"
+	finish_round(game)
+	game.begin_round()
 	game.set_test_roll([3,3,3])
 	game.apply_player()
 	check(game.buffs[33] == 3 and game.attack_multiplier() == 3.0, "Triple boost overrides weaker boon without multiplying it")
+	finish_round(game)
 	for remaining in [2,1,0]:
-		game.phase = "roll"
+		game.begin_round()
 		game.set_test_roll([2,2,2])
 		game.apply_player()
+		check(game.buffs[33] == remaining+1, "Boost countdown waits for enemy skills")
+		finish_round(game)
 		check(game.buffs[33] == remaining, "Boost durations count turns, including support turns")
 	check(game.attack_multiplier() == 1.0, "Power returns to normal after expiration")
 

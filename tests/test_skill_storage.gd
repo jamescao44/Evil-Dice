@@ -29,8 +29,9 @@ func model_checks() -> void:
 	var rng: int = m.rng.state
 	check(m.save_pending_skill(),"First skill fits in the empty slot")
 	check(m.saved_skill == bank and m.pending.is_empty() and m.phase == "enemy", "Saving stores the exact dice and passes the turn")
-	check(m.buffs[3] == 1 and m.rng.state == rng,"Saving ticks the existing boon without granting the stored boon or drawing RNG")
+	check(m.buffs[3] == 2 and m.rng.state == rng,"Saving defers the existing boon countdown until enemies finish without granting the stored boon or drawing RNG")
 	next_round(m)
+	check(m.buffs[3] == 1,"Saving consumes one boon turn after the enemy phase")
 	var current: Dictionary = m.set_test_roll([1,2,3]).duplicate(true)
 	check(not m.save_pending_skill() and m.pending == current and m.saved_skill == bank,"Full slot cannot overwrite either skill")
 	var turn: int = m.round_number
@@ -39,7 +40,9 @@ func model_checks() -> void:
 	check(m.pending == current and m.phase == "player" and m.round_number == turn,"Bonus restores the waiting roll without spending a turn")
 	check(m.buffs[3] == 5 and m.saved_skill.is_empty() and m.bonus_resume.is_empty(),"Saved boon applies once and empties the slot")
 	m.apply_player(0)
-	check(m.buffs[3] == 4,"Next normal action consumes one attack-boon turn")
+	check(m.buffs[3] == 5,"Normal action keeps the bonus boon active until enemies finish")
+	next_round(m)
+	check(m.buffs[3] == 4,"The full turn consumes one attack-boon turn")
 	m.reset_run()
 	m.begin_round()
 	m.enemies[0].hp = 500
@@ -81,7 +84,7 @@ func model_checks() -> void:
 	m.saved_skill = Rules.classify([6,6,1])
 	m.begin_saved_cast()
 	m.apply_player()
-	check(m.buffs[6] == 1 and not m.bonus_immunity_guard,"City saved immunity covers the live interval without an extra squad-phase exemption")
+	check(m.buffs[6] == 1,"City saved immunity covers the live interval")
 	m.apply_player()
 	check(m.phase == "round_end" and m.buffs[6] == 0,"Normal city roll completes once after bonus use")
 	m.saved_skill = Rules.classify([3,3,2])
@@ -125,6 +128,44 @@ func layout_checks(g) -> void:
 	g.speed = 20
 	g.model.enemies[0].hp = 500
 	g.model.enemies[0].max_hp = 500
+	force_roll(g,[5,5,3])
+	check(g.skill_bubble.value_text() == "13 + 6 (x3)","Held combo shows actual per-hit damage and three hits")
+	check(g.skill_bubble.description_text() == "random attack +3" and g.skill_bubble.value_color().r > g.skill_bubble.value_color().g,"Attack descriptions remain separate from the red value line")
+	g.model.buffs[3] = 2
+	check(g.skill_bubble.value_text() == "13 + 16 (x3)","Held preview updates immediately when attack buffs change")
+	g.model.buffs[3] = 0
+	g.model.phase = "roll"
+	force_roll(g,[1,1,6])
+	tap(g,g._skill_center())
+	g._handle_motion(g._enemy_point(0))
+	check(g.skill_bubble.value_text() == "21 + 10 (x1)","Selected targeted skill shows a single-hit damage preview")
+	check(not g._buff_drag_active(),"Attack selection does not dim enemies")
+	g._cancel_targeting()
+	g.model.phase = "roll"
+	force_roll(g,[1,1,1])
+	tap(g,g._skill_center())
+	check(g.skill_bubble.value_text().is_empty() and g.skill_bubble.description_text() == "instant kill","Instant kill retains its description without a numeric damage value")
+	g._cancel_targeting()
+	for values in [[2,2,4],[3,3,4],[6,6,4],[3,3,3]]:
+		var caption: Dictionary = g._skill_caption(Rules.classify(values))
+		check(" for " in caption.description and "," not in caption.description,"Buff captions say for N turns without a comma")
+	g.model.phase = "roll"
+	force_roll(g,[2,2,4])
+	check(g.skill_bubble.value_text() == "5 HP (x4)" and g.skill_bubble.value_color().g > g.skill_bubble.value_color().r,"Regeneration shows green per-turn healing above its preserved description")
+	g._handle_click(g._skill_center())
+	g._handle_motion(g.ARENA.get_center())
+	check(g._buff_drag_active(),"Dragging support dims enemies")
+	g._cancel_targeting()
+	check(not g._buff_drag_active(),"Canceling support drag restores enemy brightness")
+	g.model.phase = "roll"
+	force_roll(g,[2,2,2])
+	var before_hp: int = g.model.hp
+	g.model.hp = g.model.max_hp-37
+	check(g.skill_bubble.value_text() == "+37 HP","Full heal shows actual missing health")
+	g.model.hp = g.model.max_hp
+	check(g.skill_bubble.value_text() == "+0 HP","Full heal cannot advertise overhealing")
+	g.model.hp = before_hp
+	g.model.phase = "roll"
 	force_roll(g,[3,3,2])
 	var turn: int = g.model.round_number
 	drag(g,g._skill_center(),g._saved_slot_center())
@@ -144,21 +185,32 @@ func layout_checks(g) -> void:
 	turn = g.model.round_number
 	g._handle_click(g._saved_slot_center())
 	check(g.skill_bubble.is_suspended() and g.saved_bubble.display_radius() == g._skill_radius(),"Selecting storage dims the waiting skill and restores the saved seal to full size")
-	check(g._actor_tint(true) == Color.WHITE and g._actor_tint(false).r < 0.5,"Support selection dims foes while keeping the Horror lit")
+	g.saved_bubble._process(0)
+	check(g.saved_bubble.self_modulate == Color.WHITE,"Selected saved skill is fully visible before casting")
 	g._handle_click(g._skill_center())
 	check(g.skill_source == "saved" and g.view_phase == "targeting","Suspended current bubble cannot interrupt saved-skill targeting")
+	g._handle_motion(g.ARENA.get_center())
+	check(g._buff_drag_active(),"Saved support also dims enemies while dragging")
 	g._cancel_targeting()
 	drag(g,g._saved_slot_center(),g.ARENA.get_center())
+	check(not g._buff_drag_active(),"Casting restores enemies to full brightness")
 	check(g.casting_source == "saved" and g.view_phase == "resolving" and g.model.saved_skill.is_empty(),"Field drop consumes the saved skill exactly once")
 	check(g.saved_bubble.center_at() == g.ARENA.get_center() and not g.skill_bubble.roll.is_empty() and g.skill_bubble.is_suspended(),"Saved cast stays at its drop location and keeps the dimmed waiting skill present")
+	g.saved_bubble._process(0)
+	check(g.saved_bubble.self_modulate.a < 0.35 and g.saved_bubble.self_modulate.r == 1,"Saved cast becomes transparent without darkening its colors")
 	while not g.saved_bubble.dissolving and g.view_phase == "resolving": await process_frame
 	check(g.saved_bubble.dissolving and not g.saved_bubble.fragments.is_empty(),"Cast skill dissolves into pixel fragments")
 	check(g.saved_bubble.center_at() == g.ARENA.get_center(),"Dissolving never snaps back to the summon point")
+	check(g.saved_bubble.self_modulate.a < 0.35,"Dissolve retains cast transparency")
 	await settle(g)
 	check(g.view_phase == "skill" and g.result == pending and g.model.pending == pending and g.model.round_number == turn,"Bonus restores the displayed and model versions of the waiting skill")
 	check(g.model.buffs[3] == 2 and g.saved_bubble.roll.is_empty(),"Bonus boon retains its duration and the slot empties")
-	check(not g.skill_bubble.is_suspended() and g._actor_tint(false) == Color.WHITE,"Bonus completion restores waiting skill interaction and actor lighting")
+	check(g.skill_bubble.value_text() == "7 + 10 (x1)","Waiting skill preview reflects the just-cast saved power boon")
+	g.skill_bubble._process(0)
+	check(not g.skill_bubble.is_suspended() and g.skill_bubble.self_modulate == Color.WHITE,"Bonus completion restores waiting skill interaction and opacity")
 	Driver.cast_pending(g)
+	g.skill_bubble._process(0)
+	check(g.skill_bubble.self_modulate.a < 0.35,"Ordinary cast also becomes transparent")
 	await settle(g)
 	check(g.view_phase == "ready" and g.model.round_number == turn+1 and g.model.buffs[3] == 1,"Waiting skill then uses the bonus and advances exactly one turn")
 	force_roll(g,[5,5,3])
@@ -184,7 +236,8 @@ func layout_checks(g) -> void:
 	g._sync_saved_bubble()
 	tap(g,g._saved_slot_center())
 	check(g.view_phase == "targeting" and g.skill_source == "saved","Stored targeted skill supports tap then choose a foe")
-	check(g._actor_tint(true).r < 0.5 and g._actor_tint(false) == Color.WHITE,"Attack selection dims only the Horror")
+	g.saved_bubble._process(0)
+	check(g.saved_bubble.self_modulate == Color.WHITE,"Selecting the next stored skill restores full opacity")
 	g._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
 	check(g.view_phase == "ready" and not g.model.saved_skill.is_empty(),"Focus loss returns a saved skill without consuming it")
 	g.guide = true

@@ -67,7 +67,7 @@ func _initialize() -> void:
 	game.hp = 100
 	force(game, [2,2,4])
 	game.begin_round()
-	check(game.hp == 105 and game.buffs[2] == 3, "City regen ticks on next roll start")
+	check(game.hp == 105 and game.buffs[2] == 4, "City regen heals on next roll start and retains its count until the roll ends")
 	game.begin_round()
 	check(game.hp == 105, "Duplicate start cannot repeat regen")
 	game.set_test_roll([6,6,2])

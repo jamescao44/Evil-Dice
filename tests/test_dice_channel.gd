@@ -149,7 +149,7 @@ func test_layout(game) -> void:
 	Driver.cast_pending(game)
 	check(game.view_phase == "resolving" and game._world_time_scale() == 0,"Support field drop starts casting")
 	await wait_resolved(game)
-	check(game.model.buffs[2] == 3,"Buff applies once and duration advances normally")
+	check(game.model.buffs[2] == 4,"New regeneration keeps its count until its first healing turn ends")
 	prepare(game,[4,4,1])
 	Driver.cast_pending(game)
 	await wait_resolved(game)
@@ -164,18 +164,27 @@ func test_layout(game) -> void:
 		for i in range(game.model.enemies.size()):
 			var rect: Rect2 = game._target_rect(i)
 			check(game.ARENA.encloses(rect),"Enemy target stays inside battlefield")
+			var health: Rect2 = game._enemy_health_rect(i).grow(3)
+			check(game.ARENA.encloses(health),"Health bar remains inside battlefield")
+			for j in range(i):
+				check(not health.intersects(game._enemy_health_rect(j).grow(3)),"Health bar borders never overlap in any squad formation")
 			for item in game._active_statuses():
 				check(not rect.intersects(game._status_rect(item.id)),"Enemy target never overlaps Horror status input")
 	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[9] == 320,"Mid-game visual growth is slower; city scale preserved")
 	game._restart()
 	game.model.perfect_progress = 9
 	tap(game,game._diamond_center(2))
-	check(game.view_phase == "reward" and game.model.open_rewards.size() == 1 and game.model.perfect_progress == 0,"Third diamond chooses common chest and empties even a full bank")
+	tap(game,game._diamond_center(5))
+	check(game.view_phase == "ready" and game.model.perfect_progress == 9,"Lower chest tiers cannot spend a full bank")
+	tap(game,game._diamond_center(8))
+	check(game.view_phase == "reward" and game.model.open_rewards.size() == 5 and game.model.perfect_progress == 0,"Full bank claims only the epic chest")
 	game._restart()
 	game.model.perfect_progress = 5
 	tap(game,game._diamond_center(5))
 	check(game.view_phase == "ready" and game.model.perfect_progress == 5,"Unfilled milestone cannot spend treasure")
 	game.model.perfect_progress = 8
+	tap(game,game._diamond_center(2))
+	check(game.view_phase == "ready" and game.model.perfect_progress == 8,"Common chest is unavailable once rare is earned")
 	tap(game,game._diamond_center(5))
 	check(game.model.open_rewards.size() == 3 and game.model.perfect_progress == 0,"Sixth diamond chooses rare chest and clears remainder")
 	game._restart()
@@ -224,6 +233,22 @@ func test_layout(game) -> void:
 	check(game.view_phase == "ready" and game._can_claim_chest(),"Whole city combo releases the dice and treasure lock")
 	game._restart()
 	check(game._world_time_scale() == 1 and game.fx.time_factor == 1,"Restart restores normal time")
+	for choice in [0, 2, 7, 11, 12]:
+		game._restart()
+		game.model.stage = 9
+		game.model._load_wave()
+		game._start_round()
+		game.model.hp = 1000
+		game.model.spawn_clock = 999
+		game.model.volley_clock = 999
+		game.model.troop_clock = 999
+		game.debug_choice = choice
+		await game._roll()
+		check(game.view_phase == "resolving" and game.casting_source == "current","City rolls start casting automatically after their reveal")
+		await wait_resolved(game)
+		check(game.view_phase == "ready" and game.model.pending.is_empty(),"City auto-cast finishes without a click or drag and permits the next throw")
+		check(game.model.buffs[2] > 0 if choice == 2 else game.model.city_hp < game.Run.CITY_MAX_HP,"City auto-cast applies both support and attack results")
+	game._restart()
 	# Isolate real-time cast beats, including city simulation and menu suspension.
 	game.model.stage = 9
 	game.model._load_wave()

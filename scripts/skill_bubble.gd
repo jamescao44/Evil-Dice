@@ -19,6 +19,7 @@ var used: int = 0
 var pops: Array = []
 var cast_age: float = 10
 const DISSOLVE_TIME := 0.48
+const CAST_OPACITY := 0.28
 var cast_position := Vector2.INF
 var dissolving: bool = false
 var dissolve_age: float = 0
@@ -63,6 +64,9 @@ func is_active_saved() -> bool:
 
 func is_suspended() -> bool:
 	return not stored and (battle.casting_source == "saved" or (battle.view_phase == "targeting" and battle.skill_source == "saved"))
+
+func is_casting() -> bool:
+	return battle.view_phase == "resolving" and battle.casting_source == ("saved" if stored else "current")
 
 func display_radius() -> float:
 	if stored: return battle._skill_radius() if is_active_saved() else battle._saved_slot_radius()*0.84
@@ -139,19 +143,18 @@ func _process(delta: float) -> void:
 		if dissolving: dissolve_age += delta
 		for pop in pops: pop.age += delta
 		pops = pops.filter(func(pop): return pop.age < 0.4)
-	self_modulate = Color(0.38,0.38,0.44,0.7) if is_suspended() else Color.WHITE
+	self_modulate = Color(0.38,0.38,0.44,0.7) if is_suspended() else Color(1,1,1,CAST_OPACITY if is_casting() else 1.0)
 	queue_redraw()
 
 func _draw() -> void:
 	if not is_instance_valid(battle) or battle.guide or battle.debug_open: return
 	var source: String = "saved" if stored else "current"
 	var selected: bool = battle.skill_source == source
-	var casting: bool = battle.casting_source == source and battle.view_phase == "resolving"
+	var casting: bool = is_casting()
 	var aiming: bool = battle.view_phase == "targeting" and selected
 	var held: bool = not roll.is_empty() and (stored or battle.view_phase in ["forming", "skill", "targeting", "resolving"])
 	if battle.view_phase in ["over", "reward"]: return
 	if not held: return
-	var home: Vector2 = center_at()
 	var at: Vector2 = display_center()
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	var radius: float = display_radius()
@@ -161,9 +164,6 @@ func _draw() -> void:
 		return
 	var progress: float = 1 if stored else clampf(age*entrance_speed/converge,0,1)
 	var dragging: bool = battle.skill_dragging and selected
-	if dragging:
-		Pixel.circle(self, home, radius * 0.7, Color(color, 0.35), 3)
-		Pixel.line(self, home, at, Color(color, 0.25), 2)
 	if aiming:
 		if battle._skill_needs_target(roll):
 			for target in battle._skill_targets(): _draw_target(target, target == battle.hover_target, color)
@@ -181,7 +181,7 @@ func _draw() -> void:
 	var pulse: float = 0.5 if battle.reduced else (sin(rotation_clock * 3.6) + 1) * 0.5
 	for i in range(5, 0, -1):
 		Pixel.circle(self, at, radius + i*4, Color(color, (0.035 + pulse*0.025)*appear), 4)
-	Pixel.disc(self, at, radius - 5, Color("151b25", appear * 0.96), 3)
+	if not casting: Pixel.disc(self, at, radius - 5, Color("151b25", appear * 0.96), 3)
 	Pixel.disc(self, at, radius * 0.62, Color(color, (0.06+pulse*0.06)*appear), 3)
 	Pixel.circle(self, at, radius, Color(color, appear), 3)
 	Pixel.circle(self, at, radius * 0.81, Color(color, 0.65*appear), 2)
@@ -225,22 +225,48 @@ func _draw_uses(at: Vector2, radius: float, color: Color) -> void:
 				var direction := Vector2.from_angle(ray*TAU/6)
 				Pixel.line(self,p+direction*(8+q*20),p+direction*(14+q*30),Color(color,1-q),2)
 
+func description_text() -> String:
+	return caption.get("description", "")
+
+func value_text() -> String:
+	if roll.is_empty() or age < formation or is_suspended(): return ""
+	var selected: bool = battle.view_phase == "targeting" and battle.skill_source == ("saved" if stored else "current")
+	var held: bool = battle.view_phase == "skill" and not stored
+	if not selected and not (held and not battle._skill_needs_target(roll)): return ""
+	if Rules.is_attack(roll): return battle.model.damage_caption(roll, battle.hover_target if selected else -1)
+	if roll.face == 2:
+		if roll.kind == Rules.Kind.PAIR: return "5 HP (x%d)" % roll.spare
+		return "+%d HP" % maxi(0, battle.model.max_hp-battle.model.hp)
+	return ""
+
+func value_color() -> Color:
+	return Color("ff827c") if Rules.is_attack(roll) else Color("94eb9c")
+
+func _draw_value(at: Vector2, radius: float, portrait: bool) -> void:
+	var value: String = value_text()
+	if value.is_empty(): return
+	var size: int = 30 if portrait else 20
+	var width: float = battle.pixel_font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
+	var baseline := Vector2(clampf(at.x,width/2+16,battle.fx.canvas_size.x-width/2-16),maxf(size+16,at.y-radius-(32 if portrait else 24)))
+	_center(baseline,value,size,value_color(),true)
+
 func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, color: Color) -> void:
+	_draw_value(at, radius, portrait)
+	var description: String = description_text()
 	var title_size: int = 32 if portrait else 24
 	var width: float = 700 if portrait else 500
 	while title_size > 16 and battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x > width: title_size -= 2
 	var baseline: Vector2 = at+Vector2(0,radius+(64 if portrait else 48))
-	var caption_width: float = maxf(battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x,battle.pixel_font.get_string_size(caption.description,HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 16).x)
+	var caption_width: float = maxf(battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x,battle.pixel_font.get_string_size(description,HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 16).x)
 	baseline.x = clampf(baseline.x,caption_width/2+16,battle.fx.canvas_size.x-caption_width/2-16)
 	_center(baseline,caption.name,title_size,color,true)
 	var next: float = 34 if portrait else 26
-	if not caption.description.is_empty():
-		_center(baseline+Vector2(0,next),caption.description,24 if portrait else 16,Color("eee0b9"),true)
+	if not description.is_empty():
+		_center(baseline+Vector2(0,next),description,24 if portrait else 16,Color("eee0b9"),true)
 		next += 30 if portrait else 25
 	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended(): return
 	var hint: String = "CHOOSE A FOE" if aiming and battle._skill_needs_target(roll) else "TAP / DRAG TO AIM" if battle._skill_needs_target(roll) else "DRAG TO FIELD"
 	_center(baseline+Vector2(0,next),hint,19 if portrait else 12,Color("b8b7b2"),true)
-	if aiming: _center(baseline+Vector2(0,next+(25 if portrait else 19)),"TAP SKILL TO CANCEL",16 if portrait else 11,Color("b8b7b2"),true)
 
 func _draw_target(target: int, selected: bool, color: Color) -> void:
 	var rect: Rect2 = battle._target_rect(target)

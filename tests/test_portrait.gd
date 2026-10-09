@@ -85,7 +85,7 @@ func run() -> void:
 	tap(game.DICE_CENTER)
 	var regeneration_turns: int = game.result.spare
 	await settle()
-	check(game.model.round_number == 2 and game.model.buffs[2] == regeneration_turns-1, "Touch applies pair regeneration and consumes its first turn")
+	check(game.model.round_number == 2 and game.model.buffs[2] == regeneration_turns, "Touch applies regeneration and preserves its count until a healing turn ends")
 	for stage in range(9):
 		game.debug_choice = 12
 		await game._roll()

@@ -29,7 +29,7 @@ var round_number: int = 0
 var pending: Dictionary = {}
 var saved_skill: Dictionary = {}
 var bonus_resume: Dictionary = {}
-var bonus_immunity_guard: bool = false
+var buff_ticks: Dictionary = {}
 var phase: String = "new"
 var category_weights: Array = [1.0, 1.0, 1.0] # normal, pair, triple; relic hooks
 var pair_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
@@ -60,7 +60,7 @@ func reset() -> void:
 	pending = {}
 	saved_skill = {}
 	bonus_resume = {}
-	bonus_immunity_guard = false
+	buff_ticks.clear()
 	phase = "new"
 	category_weights = [1.0, 1.0, 1.0]
 	pair_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
@@ -193,7 +193,7 @@ func begin_round() -> Array:
 	var events: Array = []
 	if buffs[2] > 0:
 		var healed := heal(5)
-		buffs[2] -= 1
+		buff_ticks[2] = true
 		events.append(event(-1, healed, "heal", "Regrowth +%d" % healed))
 	for i in living():
 		enemies[i].canceled = false
@@ -262,6 +262,26 @@ func regular_attack_power() -> float:
 func damage_multiplier() -> float:
 	return DAMAGE_MULTIPLIER + reward_damage_multiplier
 
+func is_instant_kill(result: Dictionary) -> bool:
+	return result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
+
+func attack_damage(result: Dictionary, target: int = -1) -> int:
+	var damage: int = floori(attack_base(result) * damage_multiplier() * power * attack_multiplier())
+	if result.kind == Kind.NORMAL and target in living(): damage = mini(damage, damage_cap(result.kind, target))
+	return damage
+
+func damage_caption(result: Dictionary, primary: int = -1) -> String:
+	if not is_attack(result) or is_instant_kill(result): return ""
+	var base: int = floori(attack_base(result))
+	var targets: Array = [primary] if primary in living() else living()
+	if targets.is_empty(): return ""
+	var modifiers: Array = targets.map(func(i): return attack_damage(result, i) - base)
+	var low: int = modifiers.min()
+	var high: int = modifiers.max()
+	var modifier: String = str(low) if low == high else "%d to %d" % [low, high]
+	if low < 0 or low != high: modifier = "("+modifier+")"
+	return "%d + %s (x%d)" % [base, modifier, hit_count(result)]
+
 func player_target() -> int:
 	if phase not in ["player", "executing"] or not is_attack(pending) or not outcome().is_empty(): return -1
 	if not pending.has("target") or pending.target not in living():
@@ -276,9 +296,8 @@ func preview(result: Dictionary, primary: int) -> Array:
 	if not is_attack(result) or primary not in living(): return hits
 	var targets: Array = living() if hits_all(result) else [primary]
 	for i in targets:
-		var execute: bool = result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
-		var damage: int = enemies[i].hp if execute else floori(attack_base(result) * damage_multiplier() * power * attack_multiplier())
-		if result.kind == Kind.NORMAL: damage = mini(damage, damage_cap(result.kind, i))
+		var execute: bool = is_instant_kill(result)
+		var damage: int = enemies[i].hp if execute else attack_damage(result, i)
 		var hp_loss: int = 0 if enemies[i].shield > 0 and not execute else mini(enemies[i].hp, damage)
 		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss})
 	return hits
@@ -286,6 +305,7 @@ func preview(result: Dictionary, primary: int) -> Array:
 func _apply_support(result: Dictionary) -> Array:
 	if result.kind == Kind.PAIR:
 		buffs[result.face] = result.spare
+		buff_ticks.erase(result.face)
 		return [event(-1, 0, "buff", PAIR_NAMES[result.face - 1])]
 	if result.face == 2:
 		return [event(-1, heal(max_hp), "heal", "FULL HEAL")]
@@ -295,7 +315,6 @@ func _apply_support(result: Dictionary) -> Array:
 func _finish_player_action(result: Dictionary) -> void:
 	if not bonus_resume.is_empty():
 		# A banked skill is a bonus: preserve the current roll and its turn clocks.
-		if result.kind == Kind.PAIR and result.face == 6: bonus_immunity_guard = true
 		var resume: Dictionary = bonus_resume
 		bonus_resume = {}
 		if outcome() == "wave_clear" and not resume.pending.is_empty():
@@ -305,15 +324,18 @@ func _finish_player_action(result: Dictionary) -> void:
 		pending = resume.pending if outcome().is_empty() else {}
 		phase = resume.phase if outcome().is_empty() else "finished"
 		return
-	# Attack boosts count complete subsequent actions, not individual impacts.
-	# Immunity protects the granting enemy phase / city interval, then expires
-	# after the specified number of subsequent completed actions.
-	for face in [3, 6, 33]:
+	# Keep counters and effects active until every enemy has finished acting.
+	for face in [3, 33]:
 		var refreshed: bool = (result.kind == Kind.PAIR and result.face == face) or (result.kind == Kind.SPECIAL and result.face == 3 and face == 33)
-		if not refreshed and not (face == 6 and bonus_immunity_guard): buffs[face] = maxi(0, buffs[face] - 1)
-	bonus_immunity_guard = false
+		if not refreshed: buff_ticks[face] = true
+	buff_ticks[6] = true
 	pending = {}
 	phase = "enemy" if outcome().is_empty() else "finished"
+	if phase == "finished": _end_buff_turn()
+
+func _end_buff_turn() -> void:
+	for face in buff_ticks: buffs[face] = maxi(0, buffs[face] - 1)
+	buff_ticks.clear()
 
 func save_pending_skill() -> bool:
 	if phase != "player" or pending.is_empty() or not saved_skill.is_empty() or not bonus_resume.is_empty() or not outcome().is_empty(): return false
@@ -442,6 +464,7 @@ func end_round() -> void:
 	for i in living():
 		if not enemies[i].acted:
 			return
+	_end_buff_turn()
 	phase = "round_end"
 
 static func event(target: int, amount: int, type: String, text: String) -> Dictionary:

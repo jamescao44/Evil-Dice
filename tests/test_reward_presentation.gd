@@ -40,11 +40,25 @@ func test_layout(game) -> void:
 	game.debug_repeat = true
 	game.debug_choice = 2
 	await game._roll()
-	var expected_turns: int = game.result.spare - 1
+	var expected_turns: int = game.result.spare
 	await Driver.resolve_held(game)
 	check(game.debug_perfect and game.model.perfect_total == 1 and game.model.buffs[2] == expected_turns, "Repeat retains Perfect and the chosen combination")
 	game._restart()
-	check(not game.debug_perfect, "New run clears Perfect override")
+	check(game.debug_perfect, "Perfect toggle stays enabled across restart until switched off")
+	for i in range(2):
+		game.debug_choice = 2
+		await game._roll()
+		check(game.throw_perfect and game.debug_perfect and game.debug_choice == -1,"Perfect stays on across throws without Repeat while the forced dice choice clears")
+		await Driver.resolve_held(game)
+	game._handle_click(game.DEBUG_RECT.get_center())
+	game._handle_click(game.DEBUG_PERFECT.get_center())
+	game._handle_click(game.DEBUG_CLOSE.get_center())
+	check(not game.debug_perfect,"Debug button switches the persistent Perfect toggle off")
+	game.debug_choice = 2
+	await game._roll()
+	check(not game.throw_perfect,"Turning the toggle off restores natural throw power")
+	await Driver.resolve_held(game)
+	game._restart()
 	game.model.stage = 9
 	game.model._load_wave()
 	game.model.begin_round()

@@ -191,7 +191,7 @@ func _draw_player() -> void:
 	var dx: float = 0 if reduced else snappedf(sin(clock_time * 45) * hurt * 5, 2)
 	var feet := _player_feet()
 	_shadow(feet, monster_side * 0.48, 0.27)
-	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45)*_actor_tint(true), 4)
+	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
 	_art("eldritch", Rect2(feet + Vector2(-monster_side / 2 + dx, -monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
 	if skill_bubble.roll.is_empty() or skill_bubble.age >= skill_bubble.formation:
 		_text(Vector2(492, 910), "%.2fx" % model.power, 32, TEAL)
@@ -201,26 +201,14 @@ func _draw_player() -> void:
 		_glyph(Vector2(625, 934), "shield", TEAL, 2)
 		_text(Vector2(654, 944), str(model.shield), 28, TEAL)
 
-func _draw_small_enemy_health(index: int) -> void:
+func _draw_enemy_health(index: int) -> void:
 	var human: Dictionary = model.enemies[index]
-	var feet := _enemy_feet(index)
-	var y: float = feet.y - _enemy_side() - 30 if model.enemies.size() > 5 and index < 5 else feet.y + 8
-	var bar := Rect2(feet.x - 30, y, 60, 24)
+	var bar: Rect2 = _enemy_health_rect(index)
 	_meter(bar, human.hp / float(human.max_hp), _elite_color(human.role) if human.elite else RED)
 	_center(bar.get_center() + Vector2(0, 8), str(human.hp), 22)
 	if human.shield > 0:
 		_glyph(bar.position + Vector2(3, -15), "shield", TEAL)
-		_text(bar.position + Vector2(16, -8), str(human.shield), 20, INK)
-
-func _hp_plate(rect: Rect2, title: String, hp: int, maximum: int, shield: int, color: Color) -> void:
-	var width: float = maxf(rect.size.x, 156)
-	var bar := Rect2(rect.get_center().x - width / 2, rect.position.y + 10, width, 30)
-	_meter(bar, hp / float(maximum), color)
-	_center(bar.get_center() + Vector2(0, 9), str(hp), 24)
-	if model.enemies.size() == 1: _center(bar.get_center() + Vector2(0, 48), title, 24, INK)
-	if shield > 0:
-		_glyph(bar.position + Vector2(10, -16), "shield", TEAL)
-		_text(bar.position + Vector2(24, -8), str(shield), 22, TEAL)
+		_text(bar.position + Vector2(16, -8), str(human.shield), 20, TEAL)
 
 func _meter(rect: Rect2, ratio: float, color: Color) -> void:
 	draw_rect(rect.grow(3), EDGE)
@@ -269,7 +257,7 @@ func _draw_guide() -> void:
 	var intro: String = "Tap twice to throw. Drag skills to the field, or tap targeted skills to choose a foe. SAVE banks a bonus cast."
 	var rule: String = "Perfect: pair or triple. Normal: sum. 666 clears the squad."
 	if model.is_city():
-		intro = "Drag skills to the field. Aim single attacks at the city. SAVE banks a bonus cast. Troops keep attacking!"
+		intro = "Tap twice to throw. City skills cast automatically after the reveal. Drag saved skills out for a bonus cast."
 		rule = "Perfect: triple. 666: 800 city damage; clear troops; +12 HP."
 	_wrapped(Vector2(40, 274), intro, 718, CREAM, 28)
 	_wrapped(Vector2(40, 370), rule, 718, MUTED, 24)

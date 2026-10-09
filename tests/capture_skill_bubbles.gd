@@ -60,6 +60,11 @@ func run() -> void:
 	game._handle_motion(game.ARENA.get_center())
 	await shot("support-selected")
 	game._cancel_targeting()
+	game.result = game.Rules.classify([2,2,4])
+	game.skill_bubble.begin(game.result)
+	game.skill_bubble.age = 4
+	await shot("regen-held")
+	game._cancel_targeting()
 	game.result = game.Rules.classify([5,5,3])
 	game.skill_bubble.begin(game.result)
 	game.skill_bubble.age = 4
@@ -75,11 +80,20 @@ func run() -> void:
 	game.skill_bubble.begin(game.result)
 	game.skill_bubble.age = 4
 	game.view_phase = "resolving"
+	game.casting_source = "current"
+	game.skill_bubble.lock_cast_position(game._enemy_point(4))
 	game._begin_cast_cinematic(game.Rules.Kind.SPECIAL)
 	await shot("cast-pause")
 	game.cinematic_remaining = game.cinematic_duration-game.cinematic_pause-0.08
 	await shot("cast-slow")
 	game.cinematic_remaining = 0
+	game.casting_source = ""
+	game.result = game.Rules.classify([1,1,6])
+	game.skill_bubble.begin(game.result)
+	game.skill_bubble.age = 4
+	game.view_phase = "targeting"
+	game.hover_target = 4
+	await shot("damage-selected")
 	game.result = game.Rules.classify([1,1,1])
 	game.skill_bubble.begin(game.result)
 	game.skill_bubble.age = 4
@@ -96,7 +110,16 @@ func run() -> void:
 	game._begin_cinematic(true)
 	game.fx.flashes.clear()
 	await shot("omen")
+	for stage in [1, 4, 8]:
+		game._clear_skill()
+		game.model.stage = stage
+		game.model._load_wave()
+		game.visual_stage = stage
+		game.monster_side = game.HORROR_SIZES[stage]
+		game.view_phase = "ready"
+		await shot("enemy-bars-%d" % stage)
 	game._clear_skill()
+	game.model.pending = {}
 	game.view_phase = "ready"
 	await shot("milestones")
 	game.model._load_wave()
@@ -105,6 +128,17 @@ func run() -> void:
 	game.throw_meter.elapsed = game.ThrowMeter.PERIOD*0.225
 	game.charge_stamp = Time.get_ticks_usec()
 	await shot("short-meter")
+	for tier in range(1,4):
+		game._restart()
+		game.model.stage = 9
+		game.model._load_wave()
+		game.model.city_hp = 0
+		game.model.perfect_progress = tier*3
+		game.visual_stage = 9
+		game.monster_side = game.HORROR_SIZES[9]
+		game._check_over()
+		game.auto_claim_remaining = 2.0
+		await shot("auto-claim-"+game.CHEST_NAMES[tier].to_lower())
 	game.queue_free()
 	await process_frame
 	quit()
