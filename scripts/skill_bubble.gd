@@ -1,0 +1,285 @@
+extends Node2D
+## Presentation only. The battle owns targeting, consumption and combat time.
+const Pixel = preload("res://scripts/pixel_paint.gd")
+const Rules = preload("res://scripts/battle_rules.gd")
+var battle
+var stored: bool = false
+var roll: Dictionary = {}
+var age: float = 0
+var formation: float = 0.45
+var rotation_clock: float = 0
+var entrance_speed: float = 1
+var converge: float = 0.32
+const RISE := 0.26
+const HOLD := 0.26
+const SETTLE := 0.28
+const ENTRANCE_SCALE := 1.75
+var caption: Dictionary = {}
+var used: int = 0
+var pops: Array = []
+var cast_age: float = 10
+const DISSOLVE_TIME := 0.48
+var cast_position := Vector2.INF
+var dissolving: bool = false
+var dissolve_age: float = 0
+var fragments: Array = []
+
+func _ready() -> void:
+	z_index = 40
+
+func begin(value: Dictionary) -> void:
+	roll = value.duplicate(true)
+	age = 0
+	entrance_speed = battle._roll_speed()
+	converge = 0.32 if roll.kind < Rules.Kind.SPECIAL else 0.38 if roll.kind == Rules.Kind.SPECIAL else 0.48
+	formation = (converge + RISE + HOLD + SETTLE) / entrance_speed
+	caption = battle._skill_caption(roll)
+	used = 0
+	pops.clear()
+	cast_age = 10
+	cast_position = Vector2.INF
+	dissolving = false
+	dissolve_age = 0
+	fragments.clear()
+
+func clear() -> void:
+	roll.clear()
+	caption.clear()
+	pops.clear()
+	used = 0
+	age = 0
+	cast_position = Vector2.INF
+	dissolving = false
+	dissolve_age = 0
+	fragments.clear()
+	self_modulate = Color.WHITE
+	queue_redraw()
+
+func lock_cast_position(at: Vector2) -> void:
+	cast_position = at
+
+func is_active_saved() -> bool:
+	return stored and (battle.casting_source == "saved" or (battle.view_phase == "targeting" and battle.skill_source == "saved"))
+
+func is_suspended() -> bool:
+	return not stored and (battle.casting_source == "saved" or (battle.view_phase == "targeting" and battle.skill_source == "saved"))
+
+func display_radius() -> float:
+	if stored: return battle._skill_radius() if is_active_saved() else battle._saved_slot_radius()*0.84
+	return battle._skill_radius()*radius_scale()*(0.7 if battle.skill_dragging and battle.skill_source == "current" else 1.0)
+
+func display_center() -> Vector2:
+	if cast_position != Vector2.INF: return cast_position
+	if not battle.skill_dragging or battle.skill_source != ("saved" if stored else "current"): return center_at()
+	var at: Vector2 = battle.skill_pointer-Vector2(0,78 if battle.fx.canvas_size.y > battle.fx.canvas_size.x and battle.active_touch >= 0 else 0)
+	var radius: float = display_radius()
+	at.x = clampf(at.x,radius+16,battle.fx.canvas_size.x-radius-16)
+	return at
+
+func dissolve() -> void:
+	dissolving = true
+	dissolve_age = 0
+	var radius: float = display_radius()
+	var count: int = 16 if battle.reduced else 64
+	for i in range(count):
+		var direction := Vector2.from_angle(i*TAU/count+rotation_clock*0.55)
+		var offset: Vector2 = direction*radius*(1.0 if i%3 == 0 else 0.81 if i%3 == 1 else battle.fx.cosmetic.randf_range(0.05,0.4))
+		fragments.append({"p":offset,"v":direction*battle.fx.cosmetic.randf_range(36,130)+Vector2(0,-70),"size":battle.fx.cosmetic.randf_range(3,7)})
+	queue_redraw()
+
+func _draw_dissolve(at: Vector2, radius: float, color: Color) -> void:
+	var t: float = clampf(dissolve_age/DISSOLVE_TIME,0,1)
+	var alpha: float = 1-t
+	Pixel.circle(self,at,radius*(1+t*0.12),Color(color,alpha*alpha),3)
+	_draw_icon(at,radius*0.66,Color(1,1,1,alpha*alpha))
+	for fragment in fragments:
+		var p: Vector2 = at+fragment.p+fragment.v*dissolve_age*(0.25 if battle.reduced else 1.0)
+		var size: float = maxf(2,fragment.size*alpha)
+		draw_rect(Rect2(p.snapped(Vector2.ONE*2),Vector2.ONE*size),Color(color.lightened(0.35),alpha))
+
+func consume_use() -> void:
+	cast_age = 0
+	if Rules.hit_count(roll) > 1:
+		pops.append({"index": used, "age": 0.0})
+	used += 1
+
+func uses_left() -> int:
+	return maxi(0, Rules.hit_count(roll)-used) if not roll.is_empty() else 0
+
+func center_at() -> Vector2:
+	if cast_position != Vector2.INF: return cast_position
+	if stored: return battle._saved_slot_center()
+	var t: float = age*entrance_speed
+	var start: Vector2 = battle.DICE_CENTER
+	var reveal: Vector2 = battle._skill_reveal_point()
+	var rest: Vector2 = battle._skill_rest_point()
+	if t < converge: return start
+	if t < converge+RISE:
+		return start.lerp(reveal, 1-pow(1-clampf((t-converge)/RISE,0,1),3))
+	if t < converge+RISE+HOLD: return reveal
+	if t < converge+RISE+HOLD+SETTLE:
+		return reveal.lerp(rest, smoothstep(0,1,(t-converge-RISE-HOLD)/SETTLE))
+	var bob: float = 0 if battle.reduced else sin((age-formation)*2.6)*(6 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 4)
+	return rest+Vector2(0,bob)
+
+func radius_scale() -> float:
+	if stored: return 1.0
+	var t: float = age*entrance_speed
+	var appear: float = smoothstep(converge*0.2,converge,t)
+	var flourish: float = ENTRANCE_SCALE if t < converge+RISE+HOLD else lerpf(ENTRANCE_SCALE,1.0,smoothstep(0,1,(t-converge-RISE-HOLD)/SETTLE))
+	var cast_pulse: float = 0 if battle.reduced or cast_age >= 0.3 else sin(cast_age/0.3*PI)*0.08
+	return lerpf(0.35,flourish,appear)+cast_pulse
+
+func _process(delta: float) -> void:
+	if not is_instance_valid(battle): return
+	if not battle.guide and not battle.debug_open:
+		age += delta
+		rotation_clock += delta * battle._world_time_scale()
+		cast_age += delta
+		if dissolving: dissolve_age += delta
+		for pop in pops: pop.age += delta
+		pops = pops.filter(func(pop): return pop.age < 0.4)
+	self_modulate = Color(0.38,0.38,0.44,0.7) if is_suspended() else Color.WHITE
+	queue_redraw()
+
+func _draw() -> void:
+	if not is_instance_valid(battle) or battle.guide or battle.debug_open: return
+	var source: String = "saved" if stored else "current"
+	var selected: bool = battle.skill_source == source
+	var casting: bool = battle.casting_source == source and battle.view_phase == "resolving"
+	var aiming: bool = battle.view_phase == "targeting" and selected
+	var held: bool = not roll.is_empty() and (stored or battle.view_phase in ["forming", "skill", "targeting", "resolving"])
+	if battle.view_phase in ["over", "reward"]: return
+	if not held: return
+	var home: Vector2 = center_at()
+	var at: Vector2 = display_center()
+	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
+	var radius: float = display_radius()
+	var color: Color = [battle.CREAM,battle.TEAL,battle.PURPLE,battle.GOLD][roll.kind]
+	if dissolving:
+		_draw_dissolve(at,radius,color)
+		return
+	var progress: float = 1 if stored else clampf(age*entrance_speed/converge,0,1)
+	var dragging: bool = battle.skill_dragging and selected
+	if dragging:
+		Pixel.circle(self, home, radius * 0.7, Color(color, 0.35), 3)
+		Pixel.line(self, home, at, Color(color, 0.25), 2)
+	if aiming:
+		if battle._skill_needs_target(roll):
+			for target in battle._skill_targets(): _draw_target(target, target == battle.hover_target, color)
+		elif dragging:
+			draw_rect(battle.ARENA.grow(-8), Color(color,0.85 if battle._field_drop_valid(battle.skill_pointer) else 0.35),false,3)
+	if progress < 1:
+		var travel: float = 1.0 - pow(1.0 - progress, 3)
+		for i in range(3):
+			var start: Vector2 = battle.DICE_POSITIONS[i]
+			var p: Vector2 = start.lerp(battle.DICE_CENTER, travel)
+			Pixel.line(self, start.lerp(p, 0.65), p, Color(color, (1.0-progress)*0.7), 3)
+			_mini_die(p, int(roll.dice[i]), lerpf(38 if portrait else 24, 8, travel), 1.0-progress)
+	var appear: float = smoothstep(0.25, 0.85, progress)
+	if appear <= 0: return
+	var pulse: float = 0.5 if battle.reduced else (sin(rotation_clock * 3.6) + 1) * 0.5
+	for i in range(5, 0, -1):
+		Pixel.circle(self, at, radius + i*4, Color(color, (0.035 + pulse*0.025)*appear), 4)
+	Pixel.disc(self, at, radius - 5, Color("151b25", appear * 0.96), 3)
+	Pixel.disc(self, at, radius * 0.62, Color(color, (0.06+pulse*0.06)*appear), 3)
+	Pixel.circle(self, at, radius, Color(color, appear), 3)
+	Pixel.circle(self, at, radius * 0.81, Color(color, 0.65*appear), 2)
+	var angle: float = 0 if battle.reduced else rotation_clock * 0.55
+	for offset in [0.0, PI]:
+		for i in range(3):
+			var a: Vector2 = at + Vector2.from_angle(angle+offset+i*TAU/3)*radius*0.8
+			var b: Vector2 = at + Vector2.from_angle(angle+offset+(i+1)*TAU/3)*radius*0.8
+			Pixel.line(self, a, b, Color(color, 0.35*appear), 2)
+	for i in range(8):
+		var direction := Vector2.from_angle(-angle+i*TAU/8)
+		var p := at + direction*radius*0.92
+		Pixel.line(self, p-direction*5, p+direction*5, Color(color, appear), 3)
+		if i % 2 == 0: Pixel.line(self, p-direction.orthogonal()*4, p+direction.orthogonal()*4, Color(color, appear), 2)
+	_draw_icon(at, radius*0.66, Color(1,1,1,appear))
+	if progress >= 1:
+		if Rules.hit_count(roll) > 1: _draw_uses(at, radius, color)
+		if not stored or aiming or casting: _draw_caption(at,radius,portrait,aiming,color)
+
+func _draw_uses(at: Vector2, radius: float, color: Color) -> void:
+	var total: int = Rules.hit_count(roll)
+	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
+	var side: float = 12 if portrait else 9
+	var orbit: float = radius+(18 if portrait else 16)
+	if stored and not is_active_saved():
+		side = 7 if portrait else 5
+		orbit = radius+11
+	for i in range(total):
+		var p := at+Vector2.from_angle(-PI/2+i*TAU/total)*orbit
+		if i >= used:
+			for glow in range(3,0,-1): Pixel.disc(self,p,side+glow*3,Color(color,0.06),2)
+			Pixel.disc(self,p,side,Color("eee0b9"),2)
+			Pixel.disc(self,p,side*0.5,color,2)
+		else: Pixel.circle(self,p,side*0.6,Color(color,0.18),2)
+	for pop in pops:
+		var p := at+Vector2.from_angle(-PI/2+pop.index*TAU/total)*orbit
+		var q: float = pop.age/0.4
+		Pixel.circle(self,p,side+q*22,Color(color,1-q),2)
+		if not battle.reduced:
+			for ray in range(6):
+				var direction := Vector2.from_angle(ray*TAU/6)
+				Pixel.line(self,p+direction*(8+q*20),p+direction*(14+q*30),Color(color,1-q),2)
+
+func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, color: Color) -> void:
+	var title_size: int = 32 if portrait else 24
+	var width: float = 700 if portrait else 500
+	while title_size > 16 and battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x > width: title_size -= 2
+	var baseline: Vector2 = at+Vector2(0,radius+(64 if portrait else 48))
+	var caption_width: float = maxf(battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x,battle.pixel_font.get_string_size(caption.description,HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 16).x)
+	baseline.x = clampf(baseline.x,caption_width/2+16,battle.fx.canvas_size.x-caption_width/2-16)
+	_center(baseline,caption.name,title_size,color,true)
+	var next: float = 34 if portrait else 26
+	if not caption.description.is_empty():
+		_center(baseline+Vector2(0,next),caption.description,24 if portrait else 16,Color("eee0b9"),true)
+		next += 30 if portrait else 25
+	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended(): return
+	var hint: String = "CHOOSE A FOE" if aiming and battle._skill_needs_target(roll) else "TAP / DRAG TO AIM" if battle._skill_needs_target(roll) else "DRAG TO FIELD"
+	_center(baseline+Vector2(0,next),hint,19 if portrait else 12,Color("b8b7b2"),true)
+	if aiming: _center(baseline+Vector2(0,next+(25 if portrait else 19)),"TAP SKILL TO CANCEL",16 if portrait else 11,Color("b8b7b2"),true)
+
+func _draw_target(target: int, selected: bool, color: Color) -> void:
+	var rect: Rect2 = battle._target_rect(target)
+	var tint := Color(color, 1.0 if selected else 0.38)
+	var size: float = 17 if selected else 10
+	if selected:
+		draw_rect(rect, Color(color, 0.11))
+		Pixel.disc(self, Vector2(rect.get_center().x, rect.end.y), rect.size.x*0.55, Color(color,0.3),3,0.18)
+	for x in [rect.position.x, rect.end.x]:
+		for y in [rect.position.y, rect.end.y]:
+			var p := Vector2(x,y)
+			Pixel.line(self,p,p+Vector2(size if x == rect.position.x else -size,0),tint,3)
+			Pixel.line(self,p,p+Vector2(0,size if y == rect.position.y else -size),tint,3)
+	if selected:
+		var p := Vector2(rect.get_center().x,rect.position.y-12)
+		Pixel.line(self,p-Vector2(9,8),p,tint,3)
+		Pixel.line(self,p+Vector2(9,-8),p,tint,3)
+
+func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
+	var kind: int = roll.kind
+	var face: int = roll.face
+	var key: String = "attack"
+	if kind != Rules.Kind.NORMAL:
+		key = "heal" if face == 2 else "book" if face == 3 else "shield" if face == 6 and kind == Rules.Kind.PAIR else "feast" if face == 1 and kind == Rules.Kind.SPECIAL else "crown" if kind == Rules.Kind.ULTIMATE else "attack"
+	if battle.art.has(key): draw_texture_rect(battle.art[key], Rect2(at-Vector2.ONE*side/2, Vector2.ONE*side),false,tint)
+	if Rules.hits_all(roll):
+		for i in range(4):
+			var d := Vector2.from_angle(i*PI/2)
+			Pixel.line(self,at+d*side*0.57,at+d*side*0.76,Color("eee0b9",tint.a),3)
+
+func _mini_die(at: Vector2, face: int, half: float, alpha: float) -> void:
+	draw_rect(Rect2(at-Vector2.ONE*(half+2),Vector2.ONE*(half+2)*2),Color("201c29",alpha))
+	draw_rect(Rect2(at-Vector2.ONE*half,Vector2.ONE*half*2),Color("eee0b9",alpha))
+	var pips: Array = [[],[Vector2(0,0)],[Vector2(-1,-1),Vector2(1,1)],[Vector2(-1,-1),Vector2(0,0),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(-1,1),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(0,0),Vector2(-1,1),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(-1,0),Vector2(1,0),Vector2(-1,1),Vector2(1,1)]]
+	for pip in pips[face]:
+		var width: float = maxf(2,half*0.25)
+		draw_rect(Rect2(at+pip*half*0.55-Vector2.ONE*width/2,Vector2.ONE*width),Color("271c35",alpha))
+
+func _center(at: Vector2, value: String, size: int, color: Color, outline: bool = false) -> void:
+	var width: float = battle.pixel_font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
+	if outline: draw_string_outline(battle.pixel_font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,4,Color("15151b"))
+	draw_string(battle.pixel_font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)

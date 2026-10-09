@@ -71,11 +71,13 @@ func run() -> void:
 	await create_timer(0.65).timeout
 	await snapshot("advancing")
 	await settle()
-	await snapshot("growth-1v5")
+	await snapshot("growth-first-elite")
 	game.speed = 4
 	await clear_wave()
 	await create_timer(0.7).timeout
-	await snapshot("growth-1v8")
+	await snapshot("growth-1v5")
+	while game.model.stage < 8: await clear_wave()
+	await snapshot("growth-5n5e")
 	await clear_wave()
 	await create_timer(2.9).timeout
 	await snapshot("city-fever")

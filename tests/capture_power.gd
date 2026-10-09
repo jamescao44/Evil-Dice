@@ -38,12 +38,12 @@ func capture(portrait: bool) -> void:
 	await snapshot("throw")
 	while game.view_phase not in ["ready", "over"]: await process_frame
 	game._restart()
-	game.model.stage = 4
+	game.model.stage = 9
 	game.model.power = 6.75
 	game.model.max_hp = 220
 	game.model.hp = 220
 	game.model._load_wave()
-	game.visual_stage = 4
+	game.visual_stage = 9
 	game.monster_side = 320
 	game._start_round()
 	frozen_charge(0.6)

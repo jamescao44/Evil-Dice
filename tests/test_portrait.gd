@@ -1,4 +1,5 @@
 extends SceneTree
+const Driver = preload("res://tests/scene_driver.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Battle = preload("res://scripts/battle.gd")
 var game
@@ -28,6 +29,7 @@ func tap(point: Vector2) -> void:
 func settle() -> void:
 	var deadline: int = Time.get_ticks_msec() + 10000
 	while game.view_phase not in ["ready", "over"] and Time.get_ticks_msec() < deadline:
+		Driver.cast_pending(game)
 		await process_frame
 	check(Time.get_ticks_msec() < deadline, "Roll settles")
 
@@ -38,9 +40,12 @@ func run() -> void:
 	game.speed = 20
 	game.reduced = true
 	var safe := Rect2(24, 124, 756, 1560)
-	var controls: Array = [game.DEBUG_RECT, game.SPEED_RECT, game.AUDIO_RECT, game.FX_RECT, game.GUIDE_RECT, game.GUIDE_CLOSE, game.DEBUG_CLOSE, game.DEBUG_REPEAT, game.REPLAY_RECT, game.GUIDE_PAIRS, game.GUIDE_TRIPLES]
+	var controls: Array = [game.DEBUG_RECT, game.SPEED_RECT, game.AUDIO_RECT, game.FX_RECT, game.GUIDE_RECT, game.GUIDE_CLOSE, game.DEBUG_CLOSE, game.DEBUG_REPEAT, game.REPLAY_RECT, game.GUIDE_PAIRS, game.GUIDE_TRIPLES, game._chest_milestone_rect(1), game._chest_milestone_rect(2), game._chest_milestone_rect(3)]
 	for i in range(-1, 13): controls.append(game._debug_option_rect(i))
-	for i in game.BOON_INDICES: controls.append(game._boon_rect(i))
+	controls.append(game.DEBUG_PERFECT)
+	for id in [2,3,33,6]: game.model.buffs[id] = 2
+	for item in game._active_statuses(): controls.append(game._status_rect(item.id))
+	for id in game.model.buffs: game.model.buffs[id] = 0
 	for rect in controls:
 		check(safe.encloses(rect), "Portrait control stays inside safe area: %s" % rect)
 		check(rect.size.x >= 88 and rect.size.y >= 88, "Touch target is at least 44 points: %s" % rect)
@@ -61,8 +66,10 @@ func run() -> void:
 	tap(game.DEBUG_REPEAT.get_center())
 	tap(game._debug_option_rect(2).get_center())
 	check(game.debug_repeat and game.debug_choice == 2 and not game.debug_open, "Debug touch queues repeating pair")
-	tap(game._boon_rect(1).get_center())
-	check(game.selected_boon == 1, "Boon descriptions available without hover")
+	game.model.buffs[2] = 2
+	tap(game._status_rect(2).get_center())
+	check(game.selected_status == 2, "Active status descriptions available without hover")
+	game.model.buffs[2] = 0
 	touch(game.DICE_CENTER, true)
 	var pending: Dictionary = game.model.pending.duplicate(true)
 	touch(game.AUDIO_RECT.get_center(), true, 1)
@@ -76,11 +83,13 @@ func run() -> void:
 	check(game.muted and game.model.pending == pending, "Synthetic mouse does not double-fire touch")
 	touch(game.DICE_CENTER, false)
 	tap(game.DICE_CENTER)
+	var regeneration_turns: int = game.result.spare
 	await settle()
-	check(game.model.round_number == 2 and game.model.buffs[2] > 0, "Touch performs the same automatic pair turn")
-	for stage in range(4):
+	check(game.model.round_number == 2 and game.model.buffs[2] == regeneration_turns-1, "Touch applies pair regeneration and consumes its first turn")
+	for stage in range(9):
 		game.debug_choice = 12
 		await game._roll()
+		await Driver.resolve_held(game)
 		await settle()
 		check(game.model.stage == stage + 1, "Portrait advances to stage %d" % (stage + 2))
 	tap(game.DEBUG_RECT.get_center())
@@ -109,6 +118,7 @@ func run() -> void:
 	for i in range(3):
 		game.debug_choice = 12
 		await game._roll()
+		await Driver.resolve_held(game)
 	check(game.model.outcome() == "victory", "Portrait city retains three-ultimate health balance")
 	tap(game.REPLAY_RECT.get_center())
 	check(game.model.stage == 0 and game.model.hp == 100 and game.view_phase == "ready", "Touch restart resets the whole run")

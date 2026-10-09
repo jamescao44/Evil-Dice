@@ -2,7 +2,8 @@ extends RefCounted
 ## Layout-independent meter coordinates. One reference pixel is 1/288 of the track.
 const WIDTH := 288.0
 const PERFECT_TOLERANCE := 2.0
-const PERIOD := 2.4
+const PERIOD := 2.4 / 0.9 # Ten percent slower across the whole timing curve.
+const CENTER_EASING := 0.35
 var elapsed: float = 0.0
 
 func reset() -> void:
@@ -12,8 +13,11 @@ func advance(delta: float) -> void:
 	elapsed = fposmod(elapsed + maxf(0, delta), PERIOD)
 
 func position_ratio() -> float:
-	# Cosine easing: slow at the ends, fastest through the center, no frame stepping.
-	return (1.0 - cos(elapsed * TAU / PERIOD)) * 0.5
+	# Keep the same cycle, but soften the center acceleration: peak speed is 24% lower.
+	var phase: float = fposmod(elapsed, PERIOD) / PERIOD
+	var linear: float = 1.0 - absf(phase * 2.0 - 1.0)
+	var eased: float = (1.0 - cos(phase * TAU)) * 0.5
+	return lerpf(linear, eased, CENTER_EASING)
 
 func sample() -> Dictionary:
 	return sample_at(position_ratio())

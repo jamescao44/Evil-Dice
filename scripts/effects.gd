@@ -17,6 +17,7 @@ var dice_power: Dictionary = {}
 var font: Font
 var cosmetic = RandomNumberGenerator.new()
 var reduced: bool = false
+var time_factor: float = 1.0
 var canvas_size := Vector2(1280, 800)
 var skill_anchor := Vector2(640, 280)
 var skill_max_width: float = 1200
@@ -98,6 +99,8 @@ func clear() -> void:
 	dice_power.clear()
 
 func _process(delta: float) -> void:
+	var real_delta: float = delta
+	delta *= time_factor
 	if not dice_power.is_empty():
 		dice_power.age += delta
 		if dice_power.age >= dice_power.duration: dice_power.clear()
@@ -128,7 +131,7 @@ func _process(delta: float) -> void:
 		f.p.y -= 25 * delta
 	floats = floats.filter(func(f): return f.life > 0)
 	for f in flashes:
-		f.life -= delta
+		f.life -= real_delta
 	flashes = flashes.filter(func(f): return f.life > 0)
 	if not spell.is_empty():
 		spell.life -= delta

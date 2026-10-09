@@ -1,0 +1,13 @@
+{
+  "chest_closed": "dungeon/chest_2_closed.png",
+  "chest_open": "dungeon/chest_2_open.png",
+  "coins": "item/gold/gold_pile_23.png",
+  "relic": "item/amulet/face_1_gold.png",
+  "curse": "monster/undead/curse_skull.png",
+  "damage": "item/weapon/golden_sword.png",
+  "multiplier": "item/misc/misc_orb_2.png",
+  "potion": "item/potion/ruby_new.png",
+  "shard": "item/misc/misc_crystal_new.png",
+  "ruby": "item/amulet/crystal_red.png (gem region displayed; source unchanged)",
+  "contract": "item/scroll/blank_paper.png (code-drawn summoning seal overlay)"
+}

@@ -18,7 +18,7 @@ func clear_wave(game) -> void:
 
 func city():
 	var game = Run.new(13)
-	for i in range(Run.WAVE_ROLES.size()): clear_wave(game)
+	for i in range(Run.WAVE_COUNTS.size()): clear_wave(game)
 	return game
 
 func tick(game, seconds: float, step: float = 0.05) -> void:
@@ -33,8 +33,8 @@ func _initialize() -> void:
 	var game = Run.new(13)
 	check(game.enemies.size() == 1 and game.max_hp == 100, "Run starts 1v1")
 	check(not game.advance_wave(), "Living enemies prevent growth")
-	for wave in range(4):
-		check(game.enemies.size() == [1, 3, 5, 8][wave], "Wave size progression")
+	for wave in range(9):
+		check(game.enemies.size() == [1, 3, 1, 5, 3, 5, 7, 4, 10][wave], "Wave size progression")
 		game.begin_round()
 		game.buffs[2] = 1
 		game.buffs[33] = 3
@@ -48,21 +48,21 @@ func _initialize() -> void:
 		game.buffs[3] = 2
 		check(game.advance_wave(), "Growth once per clear")
 		check(game.hp == 95 and game.max_hp == 130 + wave * 30, "Feeding increases capacity and heals 55")
-		check(game.power == [1.5,3.0,5.625,6.75][wave], "Later growth includes cumulative 1.5x boosts")
+		check(game.power == [1.5,3.0,5.625,6.75,7.875,9.0,10.125,11.25,12.375][wave], "Later growth includes cumulative 1.5x boosts")
 		check(game.buffs[3] == 2 and game.shield == 7, "Buffs and shield carry between areas")
 		check(not game.advance_wave(), "Repeated advance cannot grow again")
 	check(game.is_city() and game.enemies.is_empty(), "Final battle uses city rather than squad")
 	var boosted = Run.new(13)
-	for wave in range(4):
+	for wave in range(9):
 		var normal: Dictionary = Rules.classify([4,5,6])
-		check(boosted.preview(normal,0)[0].damage == [10,13,25,46][wave], "Existing normal stage caps remain")
+		check(boosted.preview(normal,0)[0].damage == mini(floori(22.5 * boosted.power), boosted.damage_cap(Rules.Kind.NORMAL,0)), "Existing normal stage caps remain")
 		var special: Dictionary = Rules.classify([4,4,4])
 		check(boosted.preview(special,0)[0].damage == floori(30.0 * boosted.power), "Skills now ignore former stage caps")
 		clear_wave(boosted)
-	check(boosted.siege_damage(Rules.classify([1,2,3])) == 121, "Normal city damage stays unchanged")
+	check(boosted.siege_damage(Rules.classify([1,2,3])) == floori(6 * 1.5 * boosted.power * 2), "Normal city damage follows extended growth")
 	for values in [[1,1,1],[4,4,4],[5,5,5]]:
 		var base: float = 50 if values[0] == 1 else 20 if values[0] == 4 else 10
-		check(boosted.siege_damage(Rules.classify(values)) == floori(base * 20.25), "City skill damage uses fixed regular power")
+		check(boosted.siege_damage(Rules.classify(values)) == floori(base * 1.5 * boosted.power * 2), "City skill damage uses fixed regular power")
 	game = city()
 	game.hp = 100
 	force(game, [2,2,4])
@@ -112,6 +112,7 @@ func _initialize() -> void:
 	game = Run.new(19)
 	clear_wave(game)
 	clear_wave(game)
+	clear_wave(game)
 	game.enemies[1].hp = 0
 	game.enemies[3].hp = 0
 	var selected: Dictionary = {}
@@ -135,7 +136,7 @@ func _initialize() -> void:
 	check(game.player_target() == -1 and game.rng.state == pair_rng, "Pairs do not choose a foe or consume target RNG")
 	var wins := 0
 	var total_rolls := 0
-	var defeats := [0, 0, 0, 0, 0]
+	var defeats := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 	for seed_value in range(100):
 		game = Run.new(seed_value)
 		for turn in range(200):

@@ -7,12 +7,17 @@ var selected_dice_id: String = "bone"
 
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
+const SkillBubble = preload("res://scripts/skill_bubble.gd")
 const Die = preload("res://scripts/die.gd")
 const Effects = preload("res://scripts/effects.gd")
 const Pixel = preload("res://scripts/pixel_paint.gd")
 const City = preload("res://scripts/city_paint.gd")
 const CityLife = preload("res://scripts/city_life.gd")
 const ThrowMeter = preload("res://scripts/throw_meter.gd")
+const RewardChest = preload("res://scripts/reward_chest.gd")
+const RewardIcons = preload("res://scripts/reward_icons.gd")
+const Rewards = preload("res://scripts/reward_catalog.gd")
+const Statuses = preload("res://scripts/status_catalog.gd")
 const INK := Color("171b1a")
 const PANEL := Color("30352c")
 const EDGE := Color("776448")
@@ -22,7 +27,6 @@ const TEAL := Color("aed085")
 const GOLD := Color("dfb866")
 const PURPLE := Color("c5a4de")
 const RED := Color("e99b81")
-const BOON_INDICES := [1, 2, 5] # Pair faces 2, 3 and 6; attacks stay in the grimoire.
 # Layout geometry is instance-local; the portrait scene overrides it before setup.
 var ARENA := Rect2(24, 80, 1232, 409)
 var DICE_CENTER := Vector2(639, 640)
@@ -37,10 +41,13 @@ var REPLAY_RECT := Rect2(531, 433, 218, 53)
 var GUIDE_CLOSE := Rect2(1132, 96, 40, 36)
 var DEBUG_CLOSE := Rect2(1120, 121, 42, 36)
 var DEBUG_REPEAT := Rect2(888, 176, 252, 40)
+var DEBUG_PERFECT := Rect2(888, 228, 252, 40)
+var REWARD_CENTER := Vector2(195, 625)
 var CITY_POINT := Vector2(925, 282)
-const HUMAN_SIZES := [192.0, 96.0, 48.0, 24.0, 16.0]
-const PAVING_SIZES := [96.0, 48.0, 24.0, 16.0, 16.0]
-const SCENERY_SIZES := [128.0, 64.0, 32.0, 16.0, 12.0]
+const HORROR_SIZES := [224.0, 248.0, 260.0, 272.0, 280.0, 288.0, 296.0, 308.0, 320.0, 320.0]
+const HUMAN_SIZES := [192.0, 96.0, 88.0, 64.0, 56.0, 48.0, 40.0, 32.0, 24.0, 16.0]
+const PAVING_SIZES := [96.0, 56.0, 48.0, 40.0, 32.0, 28.0, 24.0, 20.0, 16.0, 16.0]
+const SCENERY_SIZES := [128.0, 80.0, 64.0, 56.0, 48.0, 40.0, 32.0, 24.0, 16.0, 12.0]
 
 var model = Run.new()
 var pixel_font: FontFile = preload("res://assets/fonts/Silkscreen-Regular.ttf").duplicate()
@@ -60,10 +67,12 @@ var guide: bool = false
 var debug_open: bool = false
 var debug_choice: int = -1 # -1 natural; 0 all-different; 1..6 pairs; 7..12 triples.
 var debug_repeat: bool = false
+var debug_perfect: bool = false
 var status_title: String = "READY"
 var status_color: Color = TEAL
 var active_human: int = -1
-var hit_times: Array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+var hit_times: Array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+var chest: Node2D
 var fallen: Dictionary = {}
 var city_corpses: Array = []
 var city_life = CityLife.new()
@@ -86,6 +95,23 @@ var charge_stamp: int = 0
 var throw_power: float = 0
 var throw_perfect: bool = false
 var power_lock_until: float = 0
+var skill_bubble: Node2D
+var saved_bubble: Node2D
+var skill_source: String = "current"
+var skill_return_phase: String = "skill"
+var casting_source: String = ""
+var skill_pressed: bool = false
+var skill_dragging: bool = false
+var skill_press_origin := Vector2.ZERO
+var skill_pointer := Vector2.ZERO
+var hover_target: int = -1
+var cinematic_remaining: float = 0
+var cinematic_duration: float = 0
+var cinematic_ultimate: bool = false
+var cinematic_pause: float = 0
+var cinematic_speed: float = 1
+var cinematic_dim: float = 0
+var cinematic_recovery: float = 0.25
 
 func _ready() -> void:
 	_configure_layout()
@@ -105,6 +131,24 @@ func _ready() -> void:
 	fx.font = pixel_font
 	add_child(fx)
 	_configure_effects()
+	skill_bubble = SkillBubble.new()
+	skill_bubble.battle = self
+	add_child(skill_bubble)
+	saved_bubble = SkillBubble.new()
+	saved_bubble.battle = self
+	saved_bubble.stored = true
+	add_child(saved_bubble)
+	chest = RewardChest.new()
+	add_child(chest)
+	chest.ticked.connect(func(): _sound("click_001", 0.9 + chest.elapsed * 0.08, -16))
+	chest.opened.connect(func():
+		_sound("book", 0.65, -10)
+		_sound("crash", 1.25, -20)
+		_sound("bell", 1.4, -15))
+	chest.landed.connect(func(index):
+		_sound("drop_001", 0.8, -9)
+		_sound("pluck_001", 1.0 + index * 0.3, -10)
+		_sound("bell", 1.0 + index * 0.2, -17))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="):
 			start_snapshot = arg.trim_prefix("--capture=")
@@ -127,7 +171,10 @@ func _ready() -> void:
 		get_tree().quit()
 
 func _process(delta: float) -> void:
-	clock_time += delta
+	if not guide and not debug_open:
+		cinematic_remaining = maxf(0, cinematic_remaining - delta)
+	var world_delta: float = delta * _world_time_scale()
+	clock_time += world_delta
 	_update_charge()
 	shake = maxf(0, shake - delta * 24)
 	var camera_offset := Vector2.ZERO if reduced else (Vector2(sin(clock_time * 67), cos(clock_time * 83)) * shake).snapped(Vector2.ONE * 2)
@@ -138,18 +185,20 @@ func _process(delta: float) -> void:
 		fallen[index] += delta
 	var modal: bool = guide or debug_open
 	for die in dice:
-		die.visible = not modal and view_phase not in ["over", "feeding", "transition"]
+		die.visible = not modal and view_phase not in ["over", "feeding", "transition", "reward", "forming", "skill", "targeting", "resolving"]
 		die.set_process(not modal)
 		die.reduced = reduced
 		die.playback_rate = _roll_speed() / 2.0 if model.is_city() else 1.0
 	fx.visible = not modal
 	fx.set_process(not modal)
-	if model.is_city() and not modal and view_phase in ["ready", "charging", "rolling", "resolving"]:
-		_show_events(model.tick_city(delta))
-		city_life.tick(delta, model.city_hp / float(Run.CITY_MAX_HP))
+	fx.time_factor = _world_time_scale()
+	if model.is_city() and not modal and view_phase in ["ready", "charging", "rolling", "forming", "skill", "targeting", "resolving"]:
+		_show_events(model.tick_city(world_delta))
+		city_life.tick(world_delta, model.city_hp / float(Run.CITY_MAX_HP))
 		if model.outcome() == "defeat" or view_phase != "resolving":
 			_check_over()
 	var mouse := _pointer_position()
+	if view_phase == "targeting": hover_target = _target_at(skill_pointer if skill_dragging else mouse)
 	if view_phase == "charging" and not modal:
 		rattle_clock -= delta
 		if rattle_clock <= 0:
@@ -167,11 +216,15 @@ func _process(delta: float) -> void:
 	if guide:
 		interactive = GUIDE_CLOSE.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
 	elif debug_open:
-		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse)
+		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse)
 		for i in range(-1, 13):
 			interactive = interactive or _debug_option_rect(i).has_point(mouse)
 	elif view_phase == "over":
 		interactive = interactive or REPLAY_RECT.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
+	if view_phase in ["skill", "targeting"]:
+		interactive = interactive or _in_skill_bubble(mouse) or (view_phase == "targeting" and _target_at(mouse) != -1)
+	interactive = interactive or (_can_use_saved() and _in_saved_slot(mouse))
+	interactive = interactive or _chest_tier_at(mouse) > 0
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if interactive else Input.CURSOR_ARROW)
 	queue_redraw()
 
@@ -182,9 +235,11 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		active_touch = -1
 		_cancel_charge()
+		_cancel_targeting()
 	if what == NOTIFICATION_APPLICATION_PAUSED:
 		active_touch = -1
 		_cancel_charge()
+		_cancel_targeting()
 
 func _configure_layout() -> void:
 	pass
@@ -204,26 +259,35 @@ func _input(event: InputEvent) -> void:
 			touch_position = get_global_transform_with_canvas().affine_inverse() * event.position
 			_handle_click(touch_position)
 		elif not event.pressed and event.index == active_touch:
+			touch_position = get_global_transform_with_canvas().affine_inverse() * event.position
+			_handle_release(touch_position)
 			active_touch = -1
 		return
 	if event is InputEventScreenDrag:
 		if event.index == active_touch:
 			touch_position = get_global_transform_with_canvas().affine_inverse() * event.position
+			_handle_motion(touch_position)
+		return
+	if event is InputEventMouseMotion:
+		if event.device != -1 and active_touch < 0:
+			_handle_motion(get_global_transform_with_canvas().affine_inverse() * event.position)
 		return
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	# Touch is handled directly: ignore its synthesized mouse events.
 	if event.device == -1 or active_touch >= 0:
 		return
-	if not event.pressed:
-		return
 	var mouse: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
-	_handle_click(mouse)
+	if event.pressed: _handle_click(mouse)
+	else: _handle_release(mouse)
 
 func _in_dice_range(mouse: Vector2) -> bool:
 	return mouse.distance_squared_to(DICE_CENTER) <= DICE_RADIUS * DICE_RADIUS
 
 func _handle_click(mouse: Vector2) -> void:
+	if view_phase == "reward":
+		_pick_reward(mouse)
+		return
 	_update_charge()
 	if home_enabled and (guide or (view_phase == "over" and not debug_open)) and _home_rect().has_point(mouse):
 		_cancel_charge()
@@ -235,6 +299,7 @@ func _handle_click(mouse: Vector2) -> void:
 	if debug_open:
 		if DEBUG_CLOSE.has_point(mouse): debug_open = false
 		elif DEBUG_REPEAT.has_point(mouse): debug_repeat = not debug_repeat
+		elif DEBUG_PERFECT.has_point(mouse): debug_perfect = not debug_perfect
 		else:
 			for i in range(-1, 13):
 				if _debug_option_rect(i).has_point(mouse):
@@ -253,23 +318,238 @@ func _handle_click(mouse: Vector2) -> void:
 		fx.reduced = reduced
 		if reduced: shake = 0
 		return
-	if view_phase in ["ready", "charging", "over"]:
+	if view_phase in ["ready", "charging", "skill", "targeting", "over"]:
 		if GUIDE_RECT.has_point(mouse):
+			_cancel_targeting()
 			guide = true
 			_sound("book", 1.0, -14)
 			return
 		if DEBUG_RECT.has_point(mouse):
+			_cancel_targeting()
 			debug_open = true
 			return
+	var tier: int = _chest_tier_at(mouse)
+	if tier > 0:
+		_reward_sequence(tier)
+		return
 	if view_phase == "over":
 		if REPLAY_RECT.has_point(mouse): _restart()
 		return
 	if SPEED_RECT.has_point(mouse) and not model.is_city():
 		speed = 2.0 if speed == 1.0 else 1.0
 		return
+	if view_phase in ["skill", "targeting"] or (view_phase == "ready" and _can_use_saved() and _in_saved_slot(mouse)):
+		_handle_skill_click(mouse)
+		return
 	if _in_dice_range(mouse):
 		if view_phase == "ready": _start_charge()
 		elif view_phase == "charging": _release_charge()
+
+func _skill_radius() -> float:
+	return 104.0 if fx.canvas_size.y > fx.canvas_size.x else 74.0
+
+func _skill_reveal_point() -> Vector2:
+	return Vector2(402, 668) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 340)
+
+func _skill_rest_point() -> Vector2:
+	return Vector2(402, 1260) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 440)
+
+func _skill_center() -> Vector2:
+	return skill_bubble.center_at() if is_instance_valid(skill_bubble) else _skill_rest_point()
+
+func _in_skill_bubble(point: Vector2) -> bool:
+	return point.distance_to(_skill_center()) <= _skill_radius() + 12
+
+func _skill_needs_target(roll: Dictionary = {}) -> bool:
+	if roll.is_empty(): roll = _source_roll(skill_source)
+	return not roll.is_empty() and Rules.is_attack(roll) and not Rules.hits_all(roll) and Rules.hit_count(roll) == 1
+
+func _saved_slot_center() -> Vector2:
+	return Vector2(676, 1272) if fx.canvas_size.y > fx.canvas_size.x else Vector2(834, 548)
+
+func _saved_slot_radius() -> float:
+	return 56.0 if fx.canvas_size.y > fx.canvas_size.x else 40.0
+
+func _in_saved_slot(point: Vector2) -> bool:
+	return point.distance_to(_saved_slot_center()) <= _saved_slot_radius()+12
+
+func _can_use_saved() -> bool:
+	return not model.saved_skill.is_empty() and view_phase in ["ready", "skill", "targeting"] and not guide and not debug_open and model.outcome().is_empty()
+
+func _source_roll(source: String) -> Dictionary:
+	return model.saved_skill if source == "saved" else result
+
+func _source_bubble(source: String) -> Node2D:
+	return saved_bubble if source == "saved" else skill_bubble
+
+func _sync_saved_bubble() -> void:
+	if not is_instance_valid(saved_bubble): return
+	if model.saved_skill.is_empty(): saved_bubble.clear()
+	elif saved_bubble.roll != model.saved_skill:
+		saved_bubble.begin(model.saved_skill)
+		saved_bubble.age = saved_bubble.formation
+
+func _field_drop_valid(point: Vector2) -> bool:
+	return ARENA.grow(-8).has_point(point)
+
+func _skill_targets() -> Array:
+	if model.is_city(): return [-2] if model.city_hp > 0 else []
+	return model.living()
+
+func _target_rect(target: int) -> Rect2:
+	if target == -2:
+		var size := Vector2(560, 360) if fx.canvas_size.y > fx.canvas_size.x else Vector2(530, 260)
+		return Rect2(CITY_POINT-size/2, size)
+	var side: float = _enemy_side()
+	var minimum: float = 88 if fx.canvas_size.y > fx.canvas_size.x else 48
+	return Rect2(_enemy_point(target)-Vector2(maxf(minimum,side*0.82),maxf(minimum,side+30))/2,Vector2(maxf(minimum,side*0.82),maxf(minimum,side+30)))
+
+func _target_at(point: Vector2) -> int:
+	var closest: int = -1
+	var distance: float = INF
+	for target in _skill_targets():
+		var rect: Rect2 = _target_rect(target)
+		var d: float = point.distance_squared_to(rect.get_center())
+		if rect.has_point(point) and d < distance:
+			closest = target
+			distance = d
+	return closest
+
+func _handle_skill_click(point: Vector2) -> void:
+	var source: String = "saved" if _in_saved_slot(point) and _can_use_saved() else "current" if not result.is_empty() and _in_skill_bubble(point) else ""
+	if view_phase == "targeting" and skill_source == "saved" and source == "current": return
+	if not source.is_empty():
+		if view_phase == "targeting" and skill_source == source:
+			_cancel_targeting()
+			return
+		if view_phase == "targeting": _cancel_targeting()
+		skill_return_phase = view_phase
+		skill_source = source
+		view_phase = "targeting"
+		status_title = "CHOOSE A FOE" if _skill_needs_target() else "DRAG TO CAST"
+		skill_pressed = true
+		skill_press_origin = point
+		skill_pointer = point
+		_sound("book", 1.3, -19)
+	elif view_phase == "targeting" and _skill_needs_target():
+		var target: int = _target_at(point)
+		if target != -1: _activate_skill(target)
+		else: _cancel_targeting()
+
+func _handle_motion(point: Vector2) -> void:
+	if view_phase != "targeting": return
+	skill_pointer = point
+	if skill_pressed and point.distance_to(skill_press_origin) > (14 if fx.canvas_size.y > fx.canvas_size.x else 8): skill_dragging = true
+	hover_target = _target_at(point)
+
+func _handle_release(point: Vector2) -> void:
+	if not skill_pressed: return
+	_handle_motion(point)
+	var dragged: bool = skill_dragging
+	var cast_point: Vector2 = _source_bubble(skill_source).display_center()
+	skill_pressed = false
+	skill_dragging = false
+	if view_phase != "targeting": return
+	if not dragged:
+		if not _skill_needs_target(): _cancel_targeting()
+		return
+	if skill_source == "current" and _in_saved_slot(point):
+		if model.saved_skill.is_empty(): _save_skill()
+		else: _cancel_targeting()
+		return
+	var target: int = _target_at(point)
+	if _skill_needs_target():
+		if target != -1: _activate_skill(target, cast_point)
+		else: _cancel_targeting()
+	elif _field_drop_valid(point): _activate_skill(-1, cast_point)
+	else: _cancel_targeting()
+
+func _cancel_targeting() -> void:
+	skill_pressed = false
+	skill_dragging = false
+	hover_target = -1
+	if view_phase == "targeting":
+		view_phase = skill_return_phase
+		status_title = "SKILL READY" if view_phase == "skill" else "FEVER" if model.is_city() else "READY"
+	skill_source = "current"
+
+func _save_skill() -> void:
+	if not model.save_pending_skill():
+		_cancel_targeting()
+		return
+	_cancel_targeting()
+	_clear_skill()
+	result = {}
+	last_result = {}
+	fx.activate_circle(_saved_slot_center(), GOLD, _saved_slot_radius()+8, 0.6)
+	_sound("book", 1.1, -14)
+	view_phase = "resolving"
+	status_title = "SAVED"
+	if model.is_city():
+		view_phase = "ready"
+		status_title = "FEVER"
+	else: await _enemy_phase()
+
+func _activate_skill(target: int, cast_point: Vector2 = Vector2.INF) -> void:
+	if view_phase not in ["skill", "targeting"] or guide or debug_open or not model.outcome().is_empty(): return
+	var source: String = skill_source
+	var roll: Dictionary = _source_roll(source)
+	if roll.is_empty(): return
+	if source == "current" and model.phase != "player": return
+	if _skill_needs_target() and target not in _skill_targets(): return
+	var bubble: Node2D = _source_bubble(source)
+	if cast_point == Vector2.INF: cast_point = bubble.display_center()
+	_cancel_targeting()
+	if source == "saved" and not model.begin_saved_cast(): return
+	casting_source = source
+	bubble.lock_cast_position(cast_point)
+	status_color = [CREAM, TEAL, PURPLE, GOLD][roll.kind]
+	fx.burst(cast_point, status_color, 20, 150)
+	fx.activate_circle(_player_point(), status_color, monster_side*0.4, 0.4)
+	_sound("confirmation_002", 0.85, -18)
+	_resolve_player(target, source)
+
+func _begin_cinematic(ultimate: bool) -> void:
+	cinematic_ultimate = ultimate
+	cinematic_pause = 0
+	cinematic_speed = 0.12 if ultimate else 0.25
+	cinematic_dim = 0.58 if ultimate else 0.0
+	cinematic_recovery = 0.25
+	cinematic_duration = 1.65 if ultimate else 0.9
+	cinematic_remaining = cinematic_duration
+	fx.flash(Color.WHITE, 0.6 if ultimate else 0.42)
+
+func _begin_cast_cinematic(kind: int) -> void:
+	# Real-time anticipation stays perceptible at 2x fever speed, including each rapid cast.
+	cinematic_ultimate = kind == Rules.Kind.ULTIMATE
+	cinematic_pause = [0.06, 0.08, 0.10, 0.16][kind]
+	cinematic_speed = [0.5, 0.45, 0.3, 0.18][kind]
+	cinematic_dim = [0.4, 0.44, 0.52, 0.62][kind]
+	cinematic_recovery = 0.18
+	cinematic_duration = cinematic_pause + [0.16, 0.20, 0.26, 0.44][kind] + cinematic_recovery
+	cinematic_remaining = cinematic_duration
+	fx.time_factor = 0
+
+func _world_time_scale() -> float:
+	if cinematic_remaining <= 0: return 1.0
+	if cinematic_duration-cinematic_remaining < cinematic_pause: return 0.0
+	return lerpf(cinematic_speed, 1.0, 1.0-clampf(cinematic_remaining/cinematic_recovery,0,1))
+
+func _cinematic_gloom() -> float:
+	if cinematic_remaining <= 0: return 0.0
+	return cinematic_dim * minf(1, cinematic_remaining/(0.4 if cinematic_pause == 0 else cinematic_recovery))
+
+func _clear_skill() -> void:
+	_cancel_targeting()
+	cinematic_remaining = 0
+	cinematic_ultimate = false
+	cinematic_pause = 0
+	cinematic_speed = 1
+	cinematic_dim = 0
+	if is_instance_valid(skill_bubble): skill_bubble.clear()
+	casting_source = ""
+	_sync_saved_bubble()
+	if is_instance_valid(fx): fx.time_factor = 1.0
 
 func _start_charge() -> void:
 	if view_phase != "ready" or guide or debug_open or not model.outcome().is_empty(): return
@@ -294,6 +574,7 @@ func _update_charge() -> void:
 func _release_charge() -> void:
 	if view_phase != "charging" or guide or debug_open: return
 	_update_charge()
+	if debug_perfect: throw_meter.elapsed = ThrowMeter.PERIOD / 4.0
 	var stopped: Dictionary = throw_meter.sample()
 	power_lock_until = clock_time + 0.65
 	for die in dice: die.stop_charge()
@@ -335,7 +616,7 @@ func _draw_power_meter(rect: Rect2, text_size: int = 16) -> void:
 	_center(Vector2(center, rect.position.y - 12), "POWER %d%%" % roundi(stopped.power * 100), text_size, GOLD)
 
 func _stage_size(sizes: Array) -> float:
-	var stage: float = clampf(visual_stage, 0, sizes.size()-1)
+	var stage: float = clampf(visual_stage / float(Run.WAVE_NAMES.size()-1) * (sizes.size()-1), 0, sizes.size()-1)
 	var index: int = floori(stage)
 	return lerpf(sizes[index], sizes[mini(index+1,sizes.size()-1)], stage-index)
 
@@ -344,16 +625,16 @@ func _enemy_side() -> float:
 
 func _enemy_feet(index: int) -> Vector2:
 	var count: int = model.enemies.size()
-	if count == 8:
-		return [Vector2(834,366),Vector2(884,359),Vector2(936,368),Vector2(986,362),Vector2(856,408),Vector2(907,415),Vector2(958,405),Vector2(1011,411)][index]
-	if count == 5:
-		return [Vector2(777,397),Vector2(855,369),Vector2(936,412),Vector2(1017,382),Vector2(1095,406)][index]
-	if count == 3:
-		return [Vector2(760,405),Vector2(935,379),Vector2(1100,417)][index]
-	return Vector2(946,414)
+	if count == 1: return Vector2(946,414)
+	var cols: int = mini(5, count)
+	var spacing: float = clampf(_enemy_side() * 1.65, 76, 132)
+	return Vector2(946 + ((index % cols) - (cols-1)/2.0) * spacing, (340 if count > 5 else 396) + floori(index / float(cols)) * 76 + [0,-15,12,-6,7][index % 5])
 
 func _enemy_point(index: int) -> Vector2:
 	return _enemy_feet(index) - Vector2(0,_enemy_side()*0.48)
+
+func _player_feet() -> Vector2:
+	return Vector2(259, 414)
 
 func _player_point() -> Vector2:
 	return Vector2(259, 414 - monster_side * 0.48)
@@ -368,6 +649,7 @@ func _roll_speed() -> float:
 	return 2.0 if model.is_city() else speed
 
 func _start_round() -> void:
+	_clear_skill()
 	_show_events(model.begin_round())
 	result = {}
 	view_phase = "ready"
@@ -401,12 +683,16 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 	var token: int = run_id
 	if model.is_city() and model.phase == "round_end": _show_events(model.begin_round())
 	if model.phase != "roll": return
-	throw_power = clampf(strength, 0, 1)
-	throw_perfect = perfect
+	throw_power = 1.0 if debug_perfect else clampf(strength, 0, 1)
+	throw_perfect = perfect or debug_perfect
 	view_phase = "rolling"
 	var forced: Array = _debug_values()
 	result = model.roll(throw_power, throw_perfect) if forced.is_empty() else model.set_test_roll(forced)
-	if not debug_repeat: debug_choice = -1
+	if result.is_empty(): return
+	model.record_perfect(throw_perfect)
+	if not debug_repeat:
+		debug_choice = -1
+		debug_perfect = false
 	last_result = {}
 	status_title = "ROLLING"
 	status_color = CREAM
@@ -440,18 +726,19 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 			_sound("confirmation_002", 1.1, -12)
 			if not await _wait(0.35, token): return
 		else:
-			fx.flash(status_color, 0.1)
 			_sound("bong_001", 0.8 if kind == Rules.Kind.SPECIAL else 0.55, -8)
 			if not await _combo_chime(kind == Rules.Kind.ULTIMATE, token): return
-	fx.channel_dice(result.dice, DICE_POSITIONS, DICE_CENTER, _player_point(), 0 if kind == Rules.Kind.NORMAL else result.face, status_color, 0.85 / _roll_speed())
+			_begin_cinematic(kind == Rules.Kind.ULTIMATE)
+	view_phase = "forming"
+	last_result.clear()
+	fx.skill.clear()
+	skill_bubble.begin(result)
 	_sound("bell", 1.2, -20)
-	if not await _wait(0.85, token): return
-	fx.activate_circle(_player_point(), status_color, monster_side * 0.4, 0.45)
-	fx.burst(_player_point(), status_color, 25, 100)
-	_sound("confirmation_002", 0.85, -18)
-	_reveal_skill(result)
-	attack_target = model.player_target()
-	await _resolve_player(attack_target)
+	while skill_bubble.age < skill_bubble.formation:
+		await get_tree().process_frame
+		if not _valid_turn(token): return
+	view_phase = "skill"
+	status_title = "SKILL READY"
 
 func _combo_chime(ultimate: bool, token: int) -> bool:
 	for pitch in [1.0, 1.25, 1.5, 2.0]:
@@ -459,45 +746,50 @@ func _combo_chime(ultimate: bool, token: int) -> bool:
 		if not await _wait(0.09, token): return false
 	return true
 
-func _reveal_skill(roll: Dictionary) -> void:
+func _skill_caption(roll: Dictionary) -> Dictionary:
 	var label: String = Rules.NORMAL_NAME
 	var description: String = "attack"
 	if roll.kind == Rules.Kind.PAIR:
 		label = Rules.PAIR_NAMES[roll.face - 1]
-		description = ["attack x1.5 +%d", "regen 5, %d turns", "power x1.5, %d turns", "attack all +%d", "3 hits +%d", "invincible, %d turns"][roll.face - 1] % roll.spare
+		description = ["attack x1.5 +%d", "regen 5, %d turns", "power x1.5, %d turns", "attack all +%d", "random attack +%d", "invincible, %d turns"][roll.face - 1] % roll.spare
 	elif roll.kind >= Rules.Kind.SPECIAL:
 		label = Rules.SPECIAL_NAMES[roll.face - 1]
-		description = ["instant kill", "full heal", "power x3, 3 turns", "attack all x2", "6 quick hits", ""][roll.face - 1]
+		description = ["instant kill", "full heal", "power x3, 3 turns", "attack all x2", "random attack", ""][roll.face - 1]
 		if model.is_city() and roll.face == 1: description = "attack x5"
-	fx.reveal_skill(label, description, status_color)
+	if model.is_city() and roll.kind != Rules.Kind.NORMAL and roll.face == 5: description = description.replace("random attack", "city attack")
+	return {"name": label, "description": description}
 
 func _die_landed(index: int) -> void:
 	_sound("drop_001", 0.95 + index * 0.13 - throw_power * 0.25, -17 + throw_power * 7)
 	fx.burst(dice[index].position + Vector2(0, 35), GOLD, roundi(12 + throw_power * 18), 90 + throw_power * 70)
 
-func _resolve_player(target: int) -> void:
-	if model.phase != "player" or result.is_empty() or view_phase == "resolving" or not model.outcome().is_empty(): return
+func _resolve_player(target: int, source: String = "current") -> void:
+	if model.phase != "player" or model.pending.is_empty() or view_phase == "resolving" or not model.outcome().is_empty(): return
 	var token: int = run_id
+	var roll: Dictionary = model.pending.duplicate(true)
+	var bubble: Node2D = _source_bubble(source)
 	view_phase = "resolving"
-	var kind: int = result.kind
-	var attacking: bool = Rules.is_attack(result)
+	var kind: int = roll.kind
+	var attacking: bool = Rules.is_attack(roll)
+	_begin_cast_cinematic(kind)
 	status_title = "CASTING" if kind >= Rules.Kind.SPECIAL else "ATTACKING" if attacking else "BLESSED"
 	if not attacking:
+		bubble.consume_use()
 		fx.activate_circle(_player_point(), TEAL, monster_side * 0.45, 0.85)
 		fx.burst(_player_point(), TEAL, 30)
 		_sound("bell", 1.6, -16)
 		if not await _wait(0.3, token): return
 		_show_events(model.apply_player_step())
 	else:
-		var count: int = Rules.hit_count(result)
+		var count: int = Rules.hit_count(roll)
 		for impact in range(count):
-			if not _valid_turn(token) or not model.outcome().is_empty(): break
-			if impact > 0: target = model.player_target()
+			if count > 1 or (not model.is_city() and target not in model.living()): target = model.player_target()
+			bubble.consume_use()
 			attack_target = target
 			var targets: Array = [CITY_POINT] if model.is_city() else []
 			if not model.is_city():
-				for hit in model.preview(result, target): targets.append(_enemy_point(hit.target))
-			var face: int = result.face if kind >= Rules.Kind.SPECIAL or kind == Rules.Kind.PAIR else 0
+				for hit in model.preview(roll, target): targets.append(_enemy_point(hit.target))
+			var face: int = roll.face if kind >= Rules.Kind.SPECIAL or kind == Rules.Kind.PAIR else 0
 			var duration: float = 0.18 if count > 1 else 1.6 if kind == Rules.Kind.ULTIMATE else 0.7 if kind >= Rules.Kind.SPECIAL else 0.38
 			fx.cast(face, _player_point(), targets, duration / _roll_speed())
 			_sound("slash", 1.0 + impact * 0.08 if count > 1 else 0.8, -9)
@@ -512,10 +804,22 @@ func _resolve_player(target: int) -> void:
 			_show_events(model.apply_player_step(target))
 			_sync_corpses()
 			if model.phase != "executing": break
-			if not await _wait(0.10, token): return
-	if not await _wait(0.75 if kind == Rules.Kind.ULTIMATE else 0.27, token): return
+			if not await _wait(0.12, token): return
+	bubble.dissolve()
+	# The particle finish uses presentation time so it stays readable at fever speed.
+	while bubble.dissolving and bubble.dissolve_age < bubble.DISSOLVE_TIME:
+		await get_tree().process_frame
+		if not _valid_turn(token): return
+	if not await _wait(0.25 if kind == Rules.Kind.ULTIMATE else 0.05, token): return
 	attack_target = -1
 	if _check_over(): return
+	bubble.clear()
+	casting_source = ""
+	if source == "saved":
+		view_phase = "skill" if model.phase == "player" else "ready"
+		status_title = "SKILL READY" if view_phase == "skill" else "FEVER" if model.is_city() else "READY"
+		status_color = [CREAM, TEAL, PURPLE, GOLD][result.kind] if not result.is_empty() else GOLD if model.is_city() else TEAL
+		return
 	if model.is_city():
 		result = {}
 		view_phase = "ready"
@@ -538,7 +842,8 @@ func _enemy_phase() -> void:
 			if not await _wait(0.18, token): return
 		var events: Array = model.enemy_act(i)
 		if not human.canceled and human.intent.type != "attack" and events.size() > 0:
-			fx.activate_circle(_enemy_point(human.intent.target), TEAL, maxf(12,_enemy_side()*0.22), 0.4)
+			for event in events:
+				if event.target >= 0: fx.activate_circle(_enemy_point(event.target), PURPLE if human.intent.type == "empower" else TEAL, maxf(12,_enemy_side()*0.22), 0.4)
 			_sound("bell", 1.7, -20)
 		_show_events(events)
 		_sync_corpses()
@@ -547,6 +852,50 @@ func _enemy_phase() -> void:
 	active_human = -1
 	model.end_round()
 	_start_round()
+
+func _can_claim_chest() -> bool:
+	if model.chest_tier() == 0 or guide or debug_open: return false
+	if view_phase == "over": return true
+	# This also blocks claims between individual casts of a multi-use skill.
+	return view_phase == "ready" and model.pending.is_empty() and skill_bubble.roll.is_empty()
+
+func _pick_reward(point: Vector2) -> void:
+	var index: int = chest.pickup_at(point)
+	if index < 0: return
+	var item: Dictionary = model.claim_reward(index)
+	if item.is_empty(): return
+	chest.collected.append(index)
+	chest.celebrate(index)
+	fx.reveal_skill(item.name, item.text, item.color)
+	_sound("rumble" if item.id == "curse" else "confirmation_002", 0.65 if item.id == "curse" else 1.0, -12)
+
+func _reward_sequence(tier: int = 0) -> void:
+	if not _can_claim_chest(): return
+	var token: int = run_id
+	var previous_phase: String = view_phase
+	var previous_title: String = status_title
+	var outcomes: Array = model.open_chest(tier)
+	if outcomes.is_empty(): return
+	view_phase = "reward"
+	status_title = "TREASURE"
+	fx.skill.clear()
+	# Banked treasure can only open between actions, including the ending screen.
+	if not await _wait(0.38 * _roll_speed(), token): return
+	fx.z_index = 90
+	fx.flash(Color.WHITE, 0.65)
+	_sound("bong_001", 0.7, -12)
+	if not await _wait(0.18 * _roll_speed(), token): return
+	chest.start(outcomes, fx.canvas_size, pixel_font, reduced)
+	_sound("rumble", 0.7, -18)
+	while chest.active or not model.rewards_collected():
+		await get_tree().process_frame
+		if not _valid_turn(token): return
+	if not await _wait(1.65 * _roll_speed(), token): return
+	model.close_chest()
+	chest.cancel()
+	fx.z_index = 0
+	view_phase = previous_phase
+	status_title = previous_title
 
 func _sync_corpses() -> void:
 	for i in range(model.enemies.size()):
@@ -558,6 +907,7 @@ func _sync_corpses() -> void:
 func _check_over() -> bool:
 	var outcome: String = model.outcome()
 	if outcome.is_empty(): return false
+	_clear_skill()
 	if outcome == "wave_clear":
 		if view_phase not in ["feeding", "transition"]: _advance_wave()
 		return true
@@ -602,7 +952,7 @@ func _advance_wave() -> void:
 	status_title = "ADVANCING"
 	travel_progress = 0
 	transition_tween = create_tween().set_parallel(true)
-	transition_tween.tween_property(self, "monster_side", minf(320,224.0 + model.stage * 32), 1.65 / speed).set_trans(Tween.TRANS_SINE)
+	transition_tween.tween_property(self, "monster_side", HORROR_SIZES[model.stage], 1.65 / speed).set_trans(Tween.TRANS_SINE)
 	transition_tween.tween_property(self, "visual_stage", float(model.stage), 1.65 / speed).set_trans(Tween.TRANS_SINE)
 	transition_tween.tween_property(self, "background_offset", background_offset + 960, 1.65 / speed).set_trans(Tween.TRANS_SINE)
 	transition_tween.tween_property(self, "travel_progress", 1.0, 1.65 / speed)
@@ -614,6 +964,9 @@ func _advance_wave() -> void:
 
 func _restart() -> void:
 	run_id += 1
+	_clear_skill()
+	chest.cancel()
+	fx.z_index = 0
 	if transition_tween and transition_tween.is_running(): transition_tween.kill()
 	model.reset_run()
 	fx.clear()
@@ -636,6 +989,7 @@ func _restart() -> void:
 	debug_open = false
 	debug_choice = -1
 	debug_repeat = false
+	debug_perfect = false
 	shake = 0
 	get_viewport().canvas_transform = Transform2D.IDENTITY
 	hit_times.fill(0.0)
@@ -669,6 +1023,11 @@ func _show_events(events: Array) -> void:
 				fx.burst(_troop_point(i), RED, 8, 70)
 			while city_corpses.size() > 24: city_corpses.pop_front()
 			continue
+		if event.type == "shield_hit":
+			fx.floating(point-Vector2(0,45), event.text, PURPLE)
+			fx.activate_circle(point, PURPLE, maxf(18,_enemy_side()*0.3), 0.3)
+			_sound("bell", 0.7, -14)
+			continue
 		var color: Color = RED if event.type == "damage" else PURPLE if event.type == "cancel" else TEAL
 		var label: String = "INVINCIBLE" if event.type == "immune" else "-%d" % event.amount if event.type == "damage" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "+ BOON"
 		var offset: int = offsets.get(event.target, 0)
@@ -687,7 +1046,12 @@ func _valid_turn(token: int) -> bool:
 	return token == run_id and is_inside_tree() and view_phase != "over"
 
 func _wait(seconds: float, token: int = -1) -> bool:
-	await get_tree().create_timer(seconds / _roll_speed()).timeout
+	var remaining: float = seconds
+	while remaining > 0:
+		await get_tree().process_frame
+		if token != -1 and not _valid_turn(token): return false
+		if guide or debug_open: continue
+		remaining -= get_process_delta_time() * _roll_speed() * _world_time_scale()
 	return token == -1 or _valid_turn(token)
 
 func _sound(clip: String, pitch: float = 1.0, volume: float = -15.0) -> void:
@@ -706,10 +1070,12 @@ func _draw() -> void:
 	_stone(Rect2(0, 0, 1280, 800), Color("303129"))
 	_draw_header()
 	_draw_arena()
+	_draw_statuses()
 	_draw_console()
 	_draw_dice_circle()
 	if view_phase == "over":
 		_draw_ending()
+		_draw_reward_progress(REWARD_CENTER,1.0)
 	if guide:
 		_draw_guide()
 	elif debug_open:
@@ -743,6 +1109,7 @@ func _wrapped(at: Vector2, value: String, width: float, color: Color = MUTED, si
 
 func _art(key: String, rect: Rect2, tint: Color = Color.WHITE) -> void:
 	if art.has(key):
+		if key in ["eldritch", "vanguard", "archer", "mage"]: tint *= _actor_tint(key == "eldritch")
 		draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, tint)
 
 func _stone(rect: Rect2, tint: Color, key: String = "stone", unit: int = 64) -> void:
@@ -772,6 +1139,7 @@ func _button(rect: Rect2, value: String, enabled: bool = true) -> void:
 
 func _draw_header() -> void:
 	_text(Vector2(42, 53), "%d / %d" % [model.stage + 1, Run.WAVE_NAMES.size()], 32, GOLD)
+	_draw_currencies(Vector2(284, 40))
 	_button(SPEED_RECT, "%.1f" % _roll_speed() if model.is_city() else "2x" if speed == 2 else "1x")
 	_button(DEBUG_RECT, "DBG")
 	for rect in [AUDIO_RECT, FX_RECT, GUIDE_RECT]:
@@ -786,13 +1154,31 @@ func _arena_art(key: String, rect: Rect2, tint: Color = Color.WHITE) -> void:
 	var ratio: Vector2 = Vector2(art[key].get_size()) / rect.size
 	draw_texture_rect_region(art[key], clipped, Rect2((clipped.position - rect.position) * ratio, clipped.size * ratio), tint)
 
+func _backdrop_dim() -> float:
+	if guide or debug_open: return 0.0
+	return maxf(0.58 if view_phase == "targeting" else 0.0, _cinematic_gloom())
+
+func _actor_tint(horror: bool) -> Color:
+	if guide or debug_open: return Color.WHITE
+	var focused: Dictionary = {}
+	if view_phase == "targeting": focused = _source_roll(skill_source)
+	elif view_phase == "resolving" and not casting_source.is_empty(): focused = _source_bubble(casting_source).roll
+	if focused.is_empty(): return Color.WHITE
+	return Color(0.36, 0.36, 0.42) if horror == Rules.is_attack(focused) else Color.WHITE
+
+func _draw_backdrop_shade() -> void:
+	# Actors receive their own tint according to the selected skill's recipients.
+	var amount: float = _backdrop_dim()
+	if amount > 0: draw_rect(ARENA, Color(0.035,0.025,0.065,amount))
+
 func _draw_arena() -> void:
 	draw_rect(ARENA, Color("a5a182"))
 	var tile: int = roundi(_stage_size(PAVING_SIZES))
 	var shift: int = int(background_offset) % tile
-	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), visual_stage / 4.0)
-	var city_blend: float = clampf(visual_stage - 3, 0, 1)
-	var field_blend: float = clampf((visual_stage-1)/2.0,0,1)
+	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), visual_stage / float(Run.WAVE_NAMES.size()-1))
+	var scenery_stage: float = visual_stage / float(Run.WAVE_NAMES.size()-1) * 4
+	var city_blend: float = clampf(scenery_stage - 3, 0, 1)
+	var field_blend: float = clampf((scenery_stage-1)/2.0,0,1)
 	for y in range(80, 489, tile):
 		for x in range(24 - shift, 1256, tile):
 			var variant: int = posmod(int((x + background_offset) / tile) + int(y / tile), 4)
@@ -819,6 +1205,7 @@ func _draw_arena() -> void:
 			var x: float = 42 + i * 113 - fposmod(background_offset * 0.2, 113)
 			_draw_building(Rect2(x, horizon-building_height, building_height*0.7, building_height), Color(0.7, 0.7, 0.55, minf(0.8, visual_stage * 0.35)), false)
 	draw_rect(ARENA, Color(0.84, 0.85, 0.67, 0.13))
+	_draw_backdrop_shade()
 	if model.is_city(): _draw_city()
 	_draw_player()
 	if not model.is_city():
@@ -878,9 +1265,9 @@ func _draw_player() -> void:
 	var bob: float = 0 if reduced else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
 	var dx: float = snappedf(sin(clock_time * 45) * hurt * 5, 2) if not reduced else 0.0
 	_shadow(Vector2(259, 413), monster_side * 0.48, 0.27)
-	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
+	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45)*_actor_tint(true), 4)
 	_art("eldritch", Rect2(Vector2(259 - monster_side / 2 + dx, 414 - monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
-	_hp_plate(Rect2(129, 422, 260, 56), "HORROR " + ["I", "II", "III", "IV", "V"][model.stage], model.hp, model.max_hp, model.shield, TEAL)
+	_hp_plate(Rect2(129, 422, 260, 56), "HORROR %d" % (model.stage+1), model.hp, model.max_hp, model.shield, TEAL)
 
 func _draw_human(index: int) -> void:
 	if view_phase == "transition": return
@@ -907,24 +1294,80 @@ func _draw_human(index: int) -> void:
 	var dx: float = snappedf(sin(clock_time * 46) * hurt * minf(6,side*0.03), 2) if not reduced else 0.0
 	var bob: float = 0 if reduced else snappedf(sin(clock_time * 2 + index * 2) * minf(2,side/64.0), 2)
 	_shadow(Vector2(point.x, floor_y-1), side * 0.25, 0.25)
+	if human.elite:
+		var glow: Color = _elite_color(human.role)*_actor_tint(false)
+		var alpha: float = 0.42 if reduced else 0.4 + sin(clock_time * 3 + index) * 0.14
+		for offset in [Vector2(-3,0),Vector2(3,0),Vector2(0,-3),Vector2(0,3)]:
+			_art(key, Rect2(Vector2(point.x-side/2, floor_y-side+bob)+offset, Vector2.ONE*side), Color(glow, alpha))
+		Pixel.disc(self, Vector2(point.x, floor_y), maxf(12,side*0.35), Color(glow,0.35), 3, 0.25)
 	_art(key, Rect2(Vector2(point.x - side / 2 + dx, floor_y - side + bob), Vector2.ONE * side), Color.WHITE.lerp(RED, hurt * 0.6))
+	if human.attack_boost: _glyph(point - Vector2(0, side*0.6), "attack", PURPLE)
 	if human.canceled: _glyph(point - Vector2(0, side * 0.5), "close", PURPLE)
 	elif active_human == index: _glyph(point - Vector2(0, side * 0.62), human.intent.type, RED if human.intent.type == "attack" else TEAL)
-	if model.enemies.size() >= 5:
+	if model.enemies.size() >= 4:
 		_draw_small_enemy_health(index)
 		return
 	var title: String = ["VANGUARD", "ARCHER", "MAGE"][human.role] if model.enemies.size() == 5 else human.name.to_upper()
-	_hp_plate(Rect2(point.x - width / 2, floor_y + 8, width, 56), title, human.hp, human.max_hp, human.shield, RED)
+	_hp_plate(Rect2(point.x - width / 2, floor_y + 8, width, 56), title, human.hp, human.max_hp, human.shield, _elite_color(human.role) if human.elite else RED)
+
+func _elite_color(role: int) -> Color:
+	return [GOLD, Color("80d8c6"), PURPLE][role]
+
+func _reward_scale() -> float:
+	return 1.5 if fx.canvas_size.y > fx.canvas_size.x else 1.0
+
+func _diamond_center(index: int) -> Vector2:
+	return REWARD_CENTER + Vector2((index-4)*28+(index/3-1)*8, 0)*_reward_scale()
+
+func _chest_milestone_rect(tier: int) -> Rect2:
+	var side: float = 88 if _reward_scale() > 1 else 48
+	return Rect2(_diamond_center(tier*3-1)-Vector2.ONE*side/2,Vector2.ONE*side)
+
+func _chest_tier_at(point: Vector2) -> int:
+	if not _can_claim_chest(): return 0
+	for tier in range(1,4):
+		if model.chest_tier() >= tier and _chest_milestone_rect(tier).has_point(point): return tier
+	return 0
+
+func _draw_reward_progress(at: Vector2, scale_factor: float) -> void:
+	_center(at + Vector2(0,-35)*scale_factor, "PERFECT TREASURE", roundi(18*scale_factor), GOLD)
+	for i in range(9):
+		var group: int = i / 3
+		var p := _diamond_center(i)
+		var milestone: bool = i % 3 == 2
+		var filled: bool = i < model.perfect_progress
+		var radius: float = (15 if milestone else 10)*scale_factor
+		var tint: Color = [GOLD,PURPLE,Color("9dcedb")][group]
+		if milestone and filled:
+			var pulse: float = 0.7 if reduced else 0.65+sin(clock_time*3.5)*0.25
+			for j in range(3,0,-1):
+				var glow_radius: float = radius+j*4*scale_factor
+				var glow := PackedVector2Array([p+Vector2(0,-glow_radius),p+Vector2(glow_radius,0),p+Vector2(0,glow_radius),p+Vector2(-glow_radius,0)])
+				draw_colored_polygon(glow,Color(tint,pulse*0.07))
+		var points := PackedVector2Array([p+Vector2(0,-radius),p+Vector2(radius,0),p+Vector2(0,radius),p+Vector2(-radius,0)])
+		draw_colored_polygon(points,tint if filled else INK)
+		for edge in range(4): Pixel.line(self,points[edge],points[(edge+1)%4],CREAM if milestone and filled else tint if filled else EDGE,3 if milestone else 2)
+		if filled: draw_rect(Rect2(p-Vector2.ONE*(3 if milestone else 2),Vector2.ONE*(6 if milestone else 4)),CREAM)
+		if milestone and filled and _can_claim_chest():
+			_center(p+Vector2(0,34*scale_factor), "CLAIM", roundi(11*scale_factor), tint)
+
+func _draw_currencies(at: Vector2, scale_factor: float = 1.0) -> void:
+	var side: float = 32*scale_factor
+	RewardIcons.paint(self,chest.art,"ruby",Rect2(at-Vector2.ONE*side/2,Vector2.ONE*side))
+	_text(at+Vector2(23,7)*scale_factor,str(model.rubies),roundi(18*scale_factor),Color("fa6086"))
+	var shard_at: Vector2 = at+Vector2(126,0)*scale_factor
+	RewardIcons.paint(self,chest.art,"shard",Rect2(shard_at-Vector2.ONE*side/2,Vector2.ONE*side))
+	_text(shard_at+Vector2(23,7)*scale_factor,str(model.summon_shards),roundi(18*scale_factor),PURPLE)
 
 func _draw_small_enemy_health(index: int) -> void:
 	var human: Dictionary = model.enemies[index]
 	var point: Vector2 = _enemy_point(index)
 	var floor_y: float = _enemy_feet(index).y
-	var bar_width: float = 40 if model.enemies.size() == 8 else 52
-	var bar := Rect2(point.x-bar_width/2, floor_y-_enemy_side()-19 if model.enemies.size()==8 and index<4 else floor_y+7, bar_width,14)
+	var bar_width: float = 40 if model.enemies.size() > 5 else 52
+	var bar := Rect2(point.x-bar_width/2, floor_y-_enemy_side()-19 if model.enemies.size()>5 and index<5 else floor_y+7, bar_width,14)
 	draw_rect(bar.grow(2), EDGE)
 	draw_rect(bar, INK)
-	draw_rect(Rect2(bar.position+Vector2(2,2),Vector2((bar_width-4)*human.hp/float(human.max_hp),10)),RED.darkened(0.3))
+	draw_rect(Rect2(bar.position+Vector2(2,2),Vector2((bar_width-4)*human.hp/float(human.max_hp),10)),(_elite_color(human.role) if human.elite else RED).darkened(0.3))
 	_center(bar.get_center()+Vector2(0,5), str(human.hp), 12, CREAM)
 	if human.shield > 0:
 		_glyph(bar.position+Vector2(5,-10),"shield",TEAL)
@@ -948,47 +1391,85 @@ func _hp_plate(rect: Rect2, title: String, hp: int, maximum: int, shield: int, c
 		_glyph(badge.position + Vector2(15, 13), "shield", TEAL)
 		_text(badge.position + Vector2(28, 19), str(shield), 16, TEAL)
 
-func _boon_center(index: int) -> Vector2:
-	return Vector2(92 + BOON_INDICES.find(index) * 103, 655)
+func _active_statuses() -> Array:
+	return Statuses.active(model.buffs)
 
-func _boon_rect(index: int) -> Rect2:
-	return Rect2(_boon_center(index) - Vector2(36, 36), Vector2(72, 72))
+func _status_center(id: int) -> Vector2:
+	var items: Array = _active_statuses()
+	var slot: int = items.find_custom(func(item): return item.id == id)
+	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
+	var step: float = 88 if portrait else 48
+	var count: int = mini(4, items.size() - (slot / 4) * 4)
+	var anchor := _player_feet() - Vector2(0, monster_side + (44 if portrait else 24))
+	anchor.y = maxf(76, anchor.y)
+	return anchor + Vector2((slot % 4 - (count-1)/2.0)*step, -floori(slot/4.0)*step)
+
+func _status_rect(id: int) -> Rect2:
+	var side: float = 88 if fx.canvas_size.y > fx.canvas_size.x else 44
+	return Rect2(_status_center(id)-Vector2.ONE*side/2, Vector2.ONE*side)
+
+func _draw_statuses() -> void:
+	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
+	var side: float = 40 if portrait else 28
+	for item in _active_statuses():
+		var at := _status_center(item.id)
+		Pixel.disc(self, at, side*0.65, Color(INK,0.85), 2)
+		Pixel.circle(self, at, side*0.65, Color(item.color,0.6), 2)
+		_art(item.icon, Rect2(at-Vector2.ONE*side/2, Vector2.ONE*side), item.color.lightened(0.3))
+		var badge := at + Vector2(side*0.5, side*0.55)
+		draw_rect(Rect2(badge-Vector2(10,13),Vector2(20,20)), INK)
+		_center(badge+Vector2(0,4), str(item.turns), 22 if portrait else 16, item.color)
 
 func _draw_console() -> void:
-	_frame(Rect2(34, 574, 322, 142), Color("363b2e"))
-	_center(Vector2(195, 602), "BOONS", 16, GOLD)
-	var icons := ["attack", "heal", "crown", "thorns", "feast", "shield"]
-	for i in BOON_INDICES:
-		var center := _boon_center(i)
-		var amount: int = model.boon_turns(i + 1)
-		var active: bool = amount > 0
-		_frame(_boon_rect(i), Color("53613d") if active else Color("34372d"), TEAL if active else EDGE.darkened(0.3))
-		_glyph(center - Vector2(0, 3), icons[i], TEAL if active else MUTED.darkened(0.4), 2)
-		if active:
-			draw_rect(Rect2(center + Vector2(15, 14), Vector2(28, 24)), INK)
-			_center(center + Vector2(29, 32), str(amount), 16, TEAL)
+	_draw_reward_progress(REWARD_CENTER, 1.0)
 	_frame(Rect2(905, 524, 341, 231), Color("363b2e"))
 	_center(Vector2(1075, 557), "CITY FEVER" if model.is_city() else "OMEN", 20 if model.is_city() else 16, GOLD)
 	if not model.is_city() and view_phase != "charging": _center(Vector2(1075, 597), status_title, 16, status_color)
 	if model.is_city():
 		_center(Vector2(1075, 606), "%.1fx" % _roll_speed(), 44, GOLD)
 		_center(Vector2(1075, 737), "CLICK TO STOP" if view_phase == "charging" else "CLICK TO CHARGE" if view_phase == "ready" else "LOCKED", 20, GOLD)
-	elif debug_choice >= 0:
+	elif debug_choice >= 0 or debug_perfect:
 		_center(Vector2(1075, 728), "DEBUG QUEUED", 16, PURPLE)
 	else:
 		_center(Vector2(1075, 728), "CLICK TO CHARGE" if view_phase == "ready" else "", 16, GOLD)
 	if _power_meter_visible():
-		_draw_power_meter(Rect2(931, 672 if model.is_city() else 628, 288, 28))
+		_draw_power_meter(Rect2(967, 672 if model.is_city() else 628, 216, 28))
 		if not model.is_city(): _center(Vector2(1075, 699), "CLICK TO STOP" if view_phase == "charging" else "LOCKED", 16, GOLD)
 
+func _dice_spent() -> bool:
+	return view_phase in ["forming", "skill", "targeting", "resolving"]
+
+func _show_dice_links() -> bool:
+	return view_phase == "rolling" and dice.all(func(die): return die.visible) and not last_result.is_empty() and last_result.kind != Rules.Kind.NORMAL
+
+func _draw_saved_slot() -> void:
+	if view_phase in ["over", "reward"]: return
+	var at: Vector2 = _saved_slot_center()
+	var radius: float = _saved_slot_radius()
+	var accepts: bool = skill_dragging and skill_source == "current" and model.saved_skill.is_empty()
+	var hovered: bool = accepts and _in_saved_slot(skill_pointer)
+	var color: Color = GOLD if hovered else TEAL if accepts else MUTED
+	Pixel.disc(self,at,radius,Color(INK,0.75),2)
+	Pixel.circle(self,at,radius,Color(color,0.95 if accepts else 0.45),3)
+	Pixel.circle(self,at,radius-7,Color(color,0.3),2)
+	for i in range(4):
+		var p: Vector2 = at+Vector2.from_angle(PI/4+i*PI/2)*(radius+5)
+		_rune(p,i,color,1)
+	if model.saved_skill.is_empty() and casting_source != "saved":
+		Pixel.line(self,at-Vector2(12,0),at+Vector2(12,0),Color(color,0.7),3)
+		Pixel.line(self,at-Vector2(0,12),at+Vector2(0,12),Color(color,0.7),3)
+	_center(at+Vector2(0,radius+27 if fx.canvas_size.y > fx.canvas_size.x else radius+20),"SAVE" if model.saved_skill.is_empty() else "SAVED",20 if fx.canvas_size.y > fx.canvas_size.x else 12,color)
+
 func _draw_dice_circle() -> void:
+	_draw_saved_slot()
 	var layout_scale: float = DICE_RADIUS / 144.0
 	var available: bool = view_phase in ["ready", "charging"] and not guide and not debug_open
-	var fever: bool = model.is_city() and view_phase in ["ready", "charging", "rolling", "resolving"] and not guide and not debug_open
-	var color: Color = GOLD if available or fever else status_color
+	var spent: bool = _dice_spent()
+	var fever: bool = model.is_city() and view_phase in ["ready", "charging", "rolling"] and not guide and not debug_open
+	var color: Color = Color("696a70") if spent else GOLD if available or fever else status_color
 	Pixel.disc(self, DICE_CENTER + Vector2(0, 6), DICE_RADIUS + 6, Color(INK, 0.7))
-	Pixel.disc(self, DICE_CENTER, DICE_RADIUS, Color("303529"))
-	Pixel.disc(self, DICE_CENTER, DICE_RADIUS - 10, Color("252d25"))
+	Pixel.disc(self, DICE_CENTER, DICE_RADIUS, Color("29292d") if spent else Color("303529"))
+	Pixel.disc(self, DICE_CENTER, DICE_RADIUS - 10, Color("202024") if spent else Color("252d25"))
 	for i in range(4, 0, -1):
 		Pixel.circle(self, DICE_CENTER, DICE_RADIUS + i * 3, Color(color, ring_hover * (0.13 - i * 0.02)), 3)
 	Pixel.circle(self, DICE_CENTER, DICE_RADIUS, Color(color, 0.6 + ring_hover * 0.4), 3)
@@ -1005,7 +1486,7 @@ func _draw_dice_circle() -> void:
 			Pixel.line(self,at+direction*8+wing,at,Color(GOLD,0.5+pulse*0.5),3)
 	Pixel.circle(self, DICE_CENTER, 108 * layout_scale, Color(color, 0.3 + ring_hover * 0.2), 2)
 	# Two interlaced triangles and twelve hand-drawn pixel runes form a seal.
-	for offset in [0.0, PI]:
+	for offset in ([] if spent else [0.0, PI]):
 		for i in range(3):
 			var a: Vector2 = DICE_CENTER + Vector2.from_angle(-PI / 2 + offset + i * TAU / 3) * 106 * layout_scale
 			var b: Vector2 = DICE_CENTER + Vector2.from_angle(-PI / 2 + offset + (i + 1) * TAU / 3) * 106 * layout_scale
@@ -1013,13 +1494,13 @@ func _draw_dice_circle() -> void:
 	for i in range(12):
 		var p: Vector2 = DICE_CENTER + Vector2.from_angle(-PI / 2 + i * TAU / 12) * 124 * layout_scale
 		_rune(p.snapped(Vector2.ONE * 2), i % 6, Color(color, 0.65 + ring_hover * 0.35), 2)
-	if not last_result.is_empty() and last_result.kind != Rules.Kind.NORMAL:
+	if _show_dice_links():
 		var match_color: Color = [CREAM, TEAL, PURPLE, GOLD][last_result.kind]
 		for i in range(3):
 			for j in range(i + 1, 3):
 				if last_result.dice[i] == last_result.dice[j]:
 					Pixel.line(self, DICE_POSITIONS[i], DICE_POSITIONS[j], Color(match_color, 0.75), 3)
-	var label: String = "STOP!" if view_phase == "charging" else "CHARGE" if available else "..."
+	var label: String = "STOP!" if view_phase == "charging" else "CHARGE" if available else "" if spent else "..."
 	_center(DICE_CENTER + Vector2(0, 104 * layout_scale), label, roundi((22 if fever else 16) * layout_scale), color if available or fever else MUTED)
 	if available and ring_hover > 0.1:
 		var at := get_global_mouse_position().snapped(Vector2.ONE * 2)
@@ -1058,18 +1539,12 @@ func _draw_tooltips() -> void:
 	if not value.is_empty():
 		_frame(Rect2(988, 66, 256, 36), PANEL, GOLD)
 		_center(Vector2(1116, 91), value, 16, CREAM)
-	for i in BOON_INDICES:
-		if _boon_rect(i).has_point(mouse):
+	for item in _active_statuses():
+		if _status_rect(item.id).has_point(mouse):
 			_frame(Rect2(38, 405, 566, 111), PANEL, GOLD)
-			_text(Vector2(55, 433), _boon_label(i), 16, TEAL)
-			var description: String = _boon_description(i)
+			_text(Vector2(55, 433), item.name, 16, item.color)
+			var description: String = item.text + " " + _remaining_turns(item.turns)
 			_wrapped(Vector2(55, 462), description, 526, CREAM)
-
-func _boon_label(index: int) -> String:
-	return "333  " + Rules.SPECIAL_NAMES[2] if index == 2 and model.buffs[33] > 0 else "%d%d  %s" % [index+1,index+1,Rules.PAIR_NAMES[index]]
-
-func _boon_description(index: int) -> String:
-	return _special_description(2) if index == 2 and model.buffs[33] > 0 else _pair_description(index)
 
 func _remaining_turns(amount: int) -> String:
 	return "%d %s remaining." % [amount, "turn" if amount == 1 else "turns"]
@@ -1109,7 +1584,7 @@ func _draw_guide() -> void:
 	_text(Vector2(116, 126), "DICE GRIMOIRE", 32, GOLD)
 	_button(GUIDE_CLOSE, "X")
 	if home_enabled: _button(_home_rect(), "HOME")
-	_text(Vector2(116, 165), "Click to charge; click again to throw. Aim for the center. City attacks continue while charging." if model.is_city() else "Click to charge; click again to throw. Aim for the center. Attacks choose foes; pairs auto-apply.", 16, CREAM)
+	_text(Vector2(116, 165), "Drag skills to the field. Targeted skills can tap to aim. Store one skill in the SAVE seal." if model.is_city() else "Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.", 16, CREAM)
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage,3)]
 	_text(Vector2(116, 194), "CITY: 666 deals 800 damage and clears troops. Buff durations count rolls." if model.is_city() else "Damage x1.5 + growth. Normal cap %s HP. Skills ignore caps; 666 clears the wave." % caps, 16, MUTED)
 	_text(Vector2(116, 238), "PAIRS / SKILLS", 16, TEAL)
@@ -1149,6 +1624,8 @@ func _draw_debug() -> void:
 	_button(_debug_option_rect(-1), "NATURAL RANDOM")
 	_button(_debug_option_rect(0), "RANDOM SINGLES")
 	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"))
+	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"))
+	if debug_perfect: draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 2)
 	_text(Vector2(136, 259), "DOUBLES / SKILLS", 16, TEAL)
 	_text(Vector2(136, 426), "TRIPLES / SPELL", 16, PURPLE)
 	for choice in range(1, 13):

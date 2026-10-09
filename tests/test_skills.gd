@@ -61,15 +61,21 @@ func _initialize() -> void:
 	game = fresh()
 	game.enemies[0].shield = 20
 	game.set_test_roll([5,5,5])
-	check(game.apply_player_step(0)[0].amount == 0 and game.enemies[0].shield == 5, "Shield absorbs first hit")
-	check(game.apply_player_step(0)[0].amount == 10 and game.enemies[0].shield == 0, "Second hit sees depleted shield")
+	check(game.preview(game.pending,0)[0].hp_loss == 0, "Preview honors shield break protection")
+	var before_hp: int = game.enemies[0].hp
+	game.apply_player_step(0)
+	check(game.enemies[0].hp == before_hp and game.enemies[0].shield == 5, "Shield absorbs first hit")
+	game.apply_player_step(0)
+	check(game.enemies[0].hp == before_hp and game.enemies[0].shield == 0, "Breaking hit cannot spill into HP")
+	game.apply_player_step(0)
+	check(game.enemies[0].hp == before_hp-15, "Next consecutive hit damages health after shield break")
 	game = fresh()
 	game.buffs[6] = 1
 	game.set_test_roll([6,6,4])
 	game.apply_player()
 	check(game.buffs[6] == 4, "Invincibility refreshes duration rather than stacking")
 	var city = Run.new(42)
-	city.stage = 4
+	city.stage = 9
 	city.power = 6.75
 	city.max_hp = 220
 	city.hp = 100

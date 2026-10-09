@@ -354,15 +354,15 @@ func _draw_play() -> void:
 	var at := Vector2(402, 1010) if portrait else Vector2(936, 244)
 	_center(at, ancients[ancient_index].name, 42 if portrait else 36, CREAM)
 	_center(at + Vector2(0, 50 if portrait else 42), ancients[ancient_index].style, 24 if portrait else 20, GREEN)
-	var y: float = 1160 if portrait else 360
+	var y: float = 1128 if portrait else 348
 	var start: float = 130 if portrait else 726
 	var step: float = 136 if portrait else 104
-	for i in range(5):
-		var p := Vector2(start + i * step, y)
-		if i < 4: Pixel.line(self, p, p + Vector2(step, 0), EDGE.darkened(0.4), 3)
-		Pixel.disc(self, p, 28 if portrait else 23, INK, 4)
-		_art("crown" if i == 4 else ["vanguard", "vanguard", "archer", "mage"][i], Rect2(p - Vector2.ONE * 24, Vector2.ONE * 48), GOLD if i == 4 else MUTED)
-		_center(p + Vector2(0, 58), ["1", "3", "5", "8", "CITY"][i], 22 if portrait else 18, MUTED)
+	for i in range(10):
+		var p := Vector2(start + (i % 5) * step, y + floori(i/5.0) * (84 if portrait else 74))
+		if i % 5 < 4: Pixel.line(self, p, p + Vector2(step, 0), EDGE.darkened(0.4), 3)
+		Pixel.disc(self, p, 23 if portrait else 20, INK, 4)
+		_art("crown" if i == 9 else ["vanguard", "archer", "mage"][i % 3], Rect2(p - Vector2.ONE * 20, Vector2.ONE * 40), GOLD if i in [2,7,9] else MUTED)
+		_center(p + Vector2(0, 43), ["1", "3", "1E", "5", "2+1E", "3+2E", "5+2E", "4E", "5+5E", "CITY"][i], 20 if portrait else 16, GOLD if i in [2,7,9] else MUTED)
 	_center(Vector2(at.x, 1290 if portrait else 482), dices[dice_index].name, 24 if portrait else 20, MUTED)
 	var button := play_rect()
 	_button(button, "", true, GREEN)
@@ -460,7 +460,7 @@ func _draw_skills() -> void:
 		for i in range(3): _mini_die(at + Vector2((i - 1) * 112, 0), i + 1, 80 if portrait else 60)
 		_center(at + Vector2(0, 144 if portrait else 86), Rules.NORMAL_NAME, 36 if portrait else 28, CREAM)
 		var point := Vector2(80, 934) if portrait else Vector2(248, 438)
-		var info: String = "Three different faces combine into one sum. Strike a random foe for the total, multiplied by attack power and growth."
+		var info: String = "Three different faces combine into one sum. Choose a foe and cast the skill for the total, multiplied by attack power and growth."
 		if city_skills: info = "Three different faces combine into one sum. Strike the city with the total, attack power, growth and the siege multiplier."
 		var y := _wrapped(point, info, 640 if portrait else 784, 28 if portrait else 22, CREAM)
 		_wrapped(Vector2(point.x, y + 70), "Aim near the center of the power bar for more doubles and triples.", 640 if portrait else 784, 24 if portrait else 20, MUTED)

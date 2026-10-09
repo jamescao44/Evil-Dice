@@ -6,8 +6,8 @@ const CITY_TRANSFORM := Transform2D(Vector2(0.9, 0), Vector2(0, 0.9), Vector2(-3
 const GUIDE_PAIRS := Rect2(40, 432, 350, 88)
 const GUIDE_TRIPLES := Rect2(414, 432, 350, 88)
 var guide_page: int = 0
-var selected_boon: int = -1
-var boon_until: float = 0
+var selected_status: int = -1
+var status_until: float = 0
 
 func _configure_layout() -> void:
 	var window := get_window()
@@ -24,9 +24,9 @@ func _configure_layout() -> void:
 	window.title = "Evil Dice | Portrait"
 	# All controls sit below the island and above the home-indicator safe zones.
 	ARENA = Rect2(24, 228, 756, 794)
-	DICE_CENTER = Vector2(402, 1432)
+	DICE_CENTER = Vector2(402, 1448)
 	DICE_RADIUS = 232
-	DICE_POSITIONS = [Vector2(402, 1322), Vector2(296, 1492), Vector2(508, 1492)]
+	DICE_POSITIONS = [Vector2(402, 1338), Vector2(296, 1508), Vector2(508, 1508)]
 	DEBUG_RECT = Rect2(280, 124, 88, 88)
 	SPEED_RECT = Rect2(378, 124, 88, 88)
 	AUDIO_RECT = Rect2(476, 124, 88, 88)
@@ -34,8 +34,10 @@ func _configure_layout() -> void:
 	GUIDE_RECT = Rect2(672, 124, 88, 88)
 	GUIDE_CLOSE = Rect2(660, 132, 104, 88)
 	DEBUG_CLOSE = GUIDE_CLOSE
-	DEBUG_REPEAT = Rect2(40, 1470, 724, 88)
-	REPLAY_RECT = Rect2(162, 972, 480, 104)
+	DEBUG_REPEAT = Rect2(40, 1470, 350, 88)
+	DEBUG_PERFECT = Rect2(414, 1470, 350, 88)
+	REPLAY_RECT = Rect2(162, 1360, 480, 104)
+	REWARD_CENTER = Vector2(402,1090)
 	CITY_POINT = CITY_TRANSFORM * Vector2(925, 282)
 
 func _configure_effects() -> void:
@@ -50,22 +52,25 @@ func _configure_effects() -> void:
 		die.scale = Vector2.ONE * die.base_scale
 
 func _handle_click(point: Vector2) -> void:
+	if view_phase in ["reward", "skill", "targeting"]:
+		super._handle_click(point)
+		return
 	if guide:
 		if GUIDE_PAIRS.has_point(point): guide_page = 0
 		elif GUIDE_TRIPLES.has_point(point): guide_page = 1
 		super._handle_click(point)
 		return
 	if not debug_open and view_phase != "over":
-		for i in BOON_INDICES:
-			if _boon_rect(i).has_point(point):
-				selected_boon = i if selected_boon != i else -1
-				boon_until = clock_time + 5
+		for item in _active_statuses():
+			if _status_rect(item.id).has_point(point):
+				selected_status = item.id if selected_status != item.id else -1
+				status_until = clock_time + 5
 				return
-	selected_boon = -1
+	selected_status = -1
 	super._handle_click(point)
 
 func _restart() -> void:
-	selected_boon = -1
+	selected_status = -1
 	super._restart()
 
 func _player_feet() -> Vector2:
@@ -75,11 +80,17 @@ func _player_point() -> Vector2:
 	return _player_feet() - Vector2(0, monster_side * 0.48)
 
 func _enemy_feet(index: int) -> Vector2:
-	match model.enemies.size():
-		3: return [Vector2(192, 558), Vector2(410, 535), Vector2(638, 580)][index]
-		5: return [Vector2(258, 526), Vector2(364, 550), Vector2(470, 521), Vector2(576, 555), Vector2(682, 532)][index]
-		8: return [Vector2(402, 512), Vector2(472, 499), Vector2(542, 517), Vector2(612, 504), Vector2(430, 594), Vector2(500, 605), Vector2(570, 589), Vector2(640, 602)][index]
-	return Vector2(568, 662)
+	var count: int = model.enemies.size()
+	if count == 1: return Vector2(568, 662 if model.stage == 0 else 610)
+	var columns: int = mini(5, count)
+	var spacing: float = clampf(_enemy_side()*1.8, 104, 172)
+	spacing = minf(spacing, 432.0/maxi(1,columns-1))
+	var row: int = floori(index / float(columns))
+	var row_count: int = mini(columns, count-row*columns)
+	var column: int = index % columns
+	# Keep the entire troop band above the Horror's four status touch targets.
+	var bottom: float = minf(570, _player_feet().y-monster_side-154)
+	return Vector2(510+(column-(row_count-1)/2.0)*spacing, bottom-(92 if count>5 and row==0 else 0)+[0,-12,10,-6,7][column])
 
 func _city_gate_point() -> Vector2:
 	return CITY_TRANSFORM * City.gate_point()
@@ -95,9 +106,12 @@ func _draw() -> void:
 	_stone(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color("303129"))
 	_draw_header()
 	_draw_arena()
+	_draw_statuses()
 	_draw_console()
 	_draw_dice_circle()
-	if view_phase == "over": _draw_ending()
+	if view_phase == "over":
+		_draw_ending()
+		_draw_reward_progress(REWARD_CENTER,1.5)
 	if guide: _draw_guide()
 	elif debug_open: _draw_debug()
 	else: _draw_tooltips()
@@ -108,7 +122,8 @@ func _button(rect: Rect2, value: String, enabled: bool = true) -> void:
 	_center(rect.get_center() + Vector2(0, 10), value, 28, GOLD if enabled else MUTED)
 
 func _draw_header() -> void:
-	_text(Vector2(48, 182), "%d / 5" % (model.stage + 1), 40, GOLD)
+	_text(Vector2(48, 163), "%d / %d" % [model.stage + 1, Run.WAVE_NAMES.size()], 32, GOLD)
+	_draw_currencies(Vector2(58, 199),1.1)
 	_button(DEBUG_RECT, "DBG")
 	_button(SPEED_RECT, "%.1fx" % _roll_speed() if model.is_city() else "2x" if speed == 2 else "1x")
 	_button(AUDIO_RECT, "")
@@ -122,8 +137,9 @@ func _draw_arena() -> void:
 	draw_rect(ARENA, Color("a5a182"))
 	var tile: int = roundi(_stage_size(PAVING_SIZES))
 	var shift: int = int(background_offset) % tile
-	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), visual_stage / 4.0)
-	var field: float = clampf((visual_stage - 1) / 2.0, 0, 1)
+	var progress: float = visual_stage / float(Run.WAVE_NAMES.size()-1)
+	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), progress)
+	var field: float = clampf((progress * 4 - 1) / 2.0, 0, 1)
 	for y in range(int(ARENA.position.y), int(ARENA.end.y), tile):
 		for x in range(24 - shift, 780, tile):
 			var variant: int = posmod(int((x + background_offset) / tile) + int(y / tile), 4)
@@ -141,6 +157,7 @@ func _draw_arena() -> void:
 			var x: float = 42 + i * 113 - fposmod(background_offset * 0.2, 113)
 			_draw_building(Rect2(x, ARENA.position.y + 104 - height, height * 0.7, height), Color("a1a184"), false)
 	draw_rect(ARENA, Color(0.84, 0.85, 0.67, 0.13))
+	_draw_backdrop_shade()
 	if model.is_city(): _draw_city()
 	_draw_player()
 	if not model.is_city():
@@ -174,9 +191,10 @@ func _draw_player() -> void:
 	var dx: float = 0 if reduced else snappedf(sin(clock_time * 45) * hurt * 5, 2)
 	var feet := _player_feet()
 	_shadow(feet, monster_side * 0.48, 0.27)
-	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
+	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45)*_actor_tint(true), 4)
 	_art("eldritch", Rect2(feet + Vector2(-monster_side / 2 + dx, -monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
-	_text(Vector2(492, 910), "%.2fx" % model.power, 32, TEAL)
+	if skill_bubble.roll.is_empty() or skill_bubble.age >= skill_bubble.formation:
+		_text(Vector2(492, 910), "%.2fx" % model.power, 32, TEAL)
 	_meter(Rect2(48, 962, 708, 34), model.hp / float(model.max_hp), TEAL)
 	_center(Vector2(402, 987), "%d / %d" % [model.hp, model.max_hp], 28)
 	if model.shield > 0:
@@ -186,9 +204,9 @@ func _draw_player() -> void:
 func _draw_small_enemy_health(index: int) -> void:
 	var human: Dictionary = model.enemies[index]
 	var feet := _enemy_feet(index)
-	var y: float = feet.y - _enemy_side() - 30 if model.enemies.size() == 8 and index < 4 else feet.y + 8
+	var y: float = feet.y - _enemy_side() - 30 if model.enemies.size() > 5 and index < 5 else feet.y + 8
 	var bar := Rect2(feet.x - 30, y, 60, 24)
-	_meter(bar, human.hp / float(human.max_hp), RED)
+	_meter(bar, human.hp / float(human.max_hp), _elite_color(human.role) if human.elite else RED)
 	_center(bar.get_center() + Vector2(0, 8), str(human.hp), 22)
 	if human.shield > 0:
 		_glyph(bar.position + Vector2(3, -15), "shield", TEAL)
@@ -213,36 +231,21 @@ func _meter(rect: Rect2, ratio: float, color: Color) -> void:
 		draw_rect(Rect2(rect.position + Vector2(x + 3, 3), Vector2(width, rect.size.y - 6)), color.darkened(0.3))
 		draw_rect(Rect2(rect.position + Vector2(x + 3, 3), Vector2(width, 5)), color)
 
-func _boon_center(index: int) -> Vector2:
-	return Vector2(252 + BOON_INDICES.find(index) * 150, 1078)
-
-func _boon_rect(index: int) -> Rect2:
-	return Rect2(_boon_center(index) - Vector2(50, 44), Vector2(100, 88))
-
 func _draw_console() -> void:
-	var icons := ["attack", "heal", "crown", "thorns", "feast", "shield"]
-	for i in BOON_INDICES:
-		var center := _boon_center(i)
-		var amount: int = model.boon_turns(i + 1)
-		_frame(_boon_rect(i), Color("53613d") if amount > 0 else PANEL, TEAL if amount > 0 else EDGE)
-		_glyph(center - Vector2(0, 7), icons[i], TEAL if amount > 0 else MUTED.darkened(0.25), 2)
-		if amount > 0: _center(center + Vector2(27, 36), str(amount), 24, TEAL)
+	_draw_reward_progress(REWARD_CENTER, 1.5)
 	if _power_meter_visible():
-		_draw_power_meter(Rect2(114, 1164, 576, 24), 28)
-	elif model.is_city():
-		_center(Vector2(402, 1158), "FEVER  %.1fx" % _roll_speed(), 44, GOLD)
-	else:
-		_center(Vector2(402, 1164), status_title, 26, status_color)
+		_draw_power_meter(Rect2(186, 1164, 432, 24), 28)
 
 func _draw_tooltips() -> void:
-	var index: int = selected_boon if clock_time < boon_until else -1
+	var index: int = selected_status if clock_time < status_until else -1
 	if index == -1 and active_touch == -1:
-		for i in BOON_INDICES:
-			if _boon_rect(i).has_point(get_global_mouse_position()): index = i
-	if index < 0: return
+		for item in _active_statuses():
+			if _status_rect(item.id).has_point(get_global_mouse_position()): index = item.id
+	if index < 0 or model.buffs.get(index, 0) <= 0: return
+	var item: Dictionary = Statuses.ENTRIES[index]
 	_frame(Rect2(38, 762, 728, 172), PANEL, GOLD)
-	_text(Vector2(58, 800), _boon_label(index), 28, TEAL)
-	_wrapped(Vector2(58, 840), _boon_description(index), 688, CREAM, 24)
+	_text(Vector2(58, 800), item.name, 28, item.color)
+	_wrapped(Vector2(58, 840), item.text + " " + _remaining_turns(model.buffs[index]), 688, CREAM, 24)
 
 func _draw_ending() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.92))
@@ -251,22 +254,22 @@ func _draw_ending() -> void:
 	_rune(Vector2(402, 662), 5, color, 8)
 	_center(Vector2(402, 790), "VICTORY" if won else "DEFEAT", 72, color)
 	_center(Vector2(402, 858), "THE CITY REQUESTS A REFUND" if won else "BACK TO THE ABYSS", 26, CREAM)
-	_center(Vector2(402, 916), "STAGE %d / 5   -   %d HP" % [model.stage + 1, model.hp], 26, MUTED)
+	_center(Vector2(402, 916), "STAGE %d / %d   -   %d HP" % [model.stage + 1, Run.WAVE_NAMES.size(), model.hp], 26, MUTED)
 	_button(REPLAY_RECT, "RESTART")
 	if home_enabled: _button(_home_rect(), "HOME")
 
 func _home_rect() -> Rect2:
-	return Rect2(478, 132, 160, 88) if guide else Rect2(162, 1112, 480, 104)
+	return Rect2(478, 132, 160, 88) if guide else Rect2(162, 1490, 480, 104)
 
 func _draw_guide() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.98))
 	_text(Vector2(40, 188), "GRIMOIRE", 42, GOLD)
 	_button(GUIDE_CLOSE, "X")
 	if home_enabled: _button(_home_rect(), "HOME")
-	var intro: String = "Tap to charge. Tap again to throw. Aim for the center!"
+	var intro: String = "Tap twice to throw. Drag skills to the field, or tap targeted skills to choose a foe. SAVE banks a bonus cast."
 	var rule: String = "Perfect: pair or triple. Normal: sum. 666 clears the squad."
 	if model.is_city():
-		intro = "Tap to charge, then tap to throw. Troops attack while you aim!"
+		intro = "Drag skills to the field. Aim single attacks at the city. SAVE banks a bonus cast. Troops keep attacking!"
 		rule = "Perfect: triple. 666: 800 city damage; clear troops; +12 HP."
 	_wrapped(Vector2(40, 274), intro, 718, CREAM, 28)
 	_wrapped(Vector2(40, 370), rule, 718, MUTED, 24)
@@ -296,7 +299,7 @@ func _draw_debug() -> void:
 	_button(DEBUG_CLOSE, "X")
 	_button(_debug_option_rect(-1), "NATURAL RANDOM")
 	_button(_debug_option_rect(0), "RANDOM SINGLES")
-	_text(Vector2(40, 516), "DOUBLES / AUTO BOON", 28, TEAL)
+	_text(Vector2(40, 516), "DOUBLES / SKILLS", 28, TEAL)
 	_text(Vector2(40, 964), "TRIPLES / SPELL", 28, PURPLE)
 	for choice in range(1, 13):
 		var rect := _debug_option_rect(choice)
@@ -306,4 +309,6 @@ func _draw_debug() -> void:
 		for i in range(3): _mini_die(rect.position + Vector2(54 + i * 60, 48), 0 if choice <= 6 and i == 2 else face)
 		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 3), 30, color)
 	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"))
+	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"))
+	if debug_perfect: draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
 	_wrapped(Vector2(40, 1620), "Choose, then tap the seal. City is paused here.", 724, MUTED, 24)

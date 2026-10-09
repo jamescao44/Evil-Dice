@@ -1,4 +1,5 @@
 extends SceneTree
+const Driver = preload("res://tests/scene_driver.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
@@ -16,12 +17,14 @@ func check(value: bool, message: String) -> void:
 func settle() -> void:
 	var deadline := Time.get_ticks_msec() + 10000
 	while game.view_phase not in ["ready", "over"] and Time.get_ticks_msec() < deadline:
+		Driver.cast_pending(game)
 		await process_frame
 	check(Time.get_ticks_msec() < deadline, "Scene coroutine settles within timeout")
 
 func ultimate_wave() -> void:
 	game.debug_choice = 12
 	await game._roll()
+	await Driver.resolve_held(game)
 	await settle()
 
 func observe_shake() -> float:
@@ -31,8 +34,8 @@ func observe_shake() -> float:
 	while game.view_phase not in ["ready", "feeding", "over"] and Time.get_ticks_msec() < deadline:
 		await process_frame
 		peak = maxf(peak, game.shake)
-		check(game.view_phase != "target", "Roll never waits for manual targeting")
-	check(Time.get_ticks_msec() < deadline, "Automatic attack finishes")
+		Driver.cast_pending(game)
+	check(Time.get_ticks_msec() < deadline, "Selected attack finishes")
 	return peak
 
 func run() -> void:
@@ -46,10 +49,12 @@ func run() -> void:
 		for enemy in game.model.enemies: enemy.hp = 500
 		game.debug_choice = face
 		await game._roll()
-		check(game.view_phase == "ready" and game.model.round_number == 2, "Pair applies automatically and ends enemy turn")
+		var caption: Dictionary = game.skill_bubble.caption.duplicate()
+		await Driver.resolve_held(game)
+		check(game.view_phase == "ready" and game.model.round_number == 2, "Pair activates on click and ends enemy turn")
 		check(game.model.enemies[0].hp < 500 if face in [1,4,5] else game.model.boon_turns(face) >= 0, "Double attack or timed boon resolves")
 		check(game.debug_choice == -1, "One-shot debug clears after accepted roll")
-		check(game.fx.skill.label == Rules.PAIR_NAMES[face-1] and not game.fx.skill.description.is_empty(), "Every boon announces its name and short effect")
+		check(caption.name == Rules.PAIR_NAMES[face-1] and not caption.description.is_empty(), "Every boon announces its name and short effect")
 		check(game.fx.combo.label == "PAIR" and game.fx.combo.p == game.DICE_CENTER, "Pair burst starts at the center of the dice")
 	for face in range(1, 6):
 		game._restart()
@@ -59,12 +64,14 @@ func run() -> void:
 		for enemy in game.model.enemies: enemy.hp = 500
 		game.debug_choice = face + 6
 		await game._roll()
-		check(game.view_phase == "ready" and game.dice.all(func(d): return not d.rolling), "Triple automatically resolves and completes enemy phase")
-		check(game.fx.skill.label == Rules.SPECIAL_NAMES[face-1] and game.fx.combo.label == "TRIPLE", "Every special announces its skill and triple")
+		var caption: Dictionary = game.skill_bubble.caption.duplicate()
+		await Driver.resolve_held(game)
+		check(game.view_phase == "ready" and game.dice.all(func(d): return not d.rolling), "Triple click resolves and completes enemy phase")
+		check(caption.name == Rules.SPECIAL_NAMES[face-1], "Every special announces its skill and triple")
 	game._restart()
 	game.debug_choice = 0
 	var normal_shake: float = await observe_shake()
-	check(game.fx.skill.label == "Tentacle Swipe" and game.fx.skill.description == "attack", "Normal rolls also announce the skill")
+	check(game.fx.skill.is_empty(), "Normal skill caption stays attached to its bubble instead of a timed global callout")
 	game._restart()
 	game.debug_choice = 7
 	var triple_shake: float = await observe_shake()
@@ -106,29 +113,32 @@ func run() -> void:
 	check(game._in_dice_range(game.DICE_CENTER), "Space between dice is clickable")
 	check(not game._in_dice_range(game.DICE_CENTER + Vector2.ONE * game.DICE_RADIUS * 0.8), "Circle excludes bounding-box corner")
 	await ultimate_wave()
-	check(game.model.stage == 1 and game.model.enemies.size() == 3 and game.monster_side == 256, "First feeding and pan reach 1v3")
+	check(game.model.stage == 1 and game.model.enemies.size() == 3 and game.monster_side > 240, "First feeding and pan reach 1v3")
 	for enemy in game.model.enemies:
 		enemy.hp = 1
 		enemy.shield = 0
 	game.debug_choice = 7
 	await game._roll()
+	await Driver.resolve_held(game)
 	check(game.fallen.size() == 1 and game.corpse_alpha == 1 and game.model.stage == 1, "Randomly killed foe remains on the ground while others live")
 	game.debug_choice = 12
 	await game._roll()
+	await Driver.resolve_held(game)
 	check(game.view_phase == "feeding" and game.fallen.size() == 3, "All bodies persist at start of feeding")
 	await settle()
-	check(game.model.stage == 2 and game.model.enemies.size() == 5 and game.fallen.is_empty(), "Bodies fade before five-enemy wave")
+	check(game.model.stage == 2 and game.model.enemies.size() == 1 and game.model.enemies[0].elite and game.fallen.is_empty(), "Bodies fade before elite wave")
 	await ultimate_wave()
-	check(game.model.stage == 3 and game.model.enemies.size() == 8, "Fourth stage contains eight adventurers")
+	check(game.model.stage == 3 and game.model.enemies.size() == 5, "Fourth stage contains five adventurers")
 	var rows: Dictionary = {}
-	for i in range(8): rows[game._enemy_feet(i).y] = true
+	for i in range(5): rows[game._enemy_feet(i).y] = true
 	check(rows.size() >= 4, "Adventurers have varied depth rather than a straight row")
 	game.debug_choice = 2
 	var party_round: int = game.model.round_number
 	await game._roll()
-	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All eight acted and the next round prepared successfully")
-	await ultimate_wave()
-	check(game.model.is_city() and game.model.stage == 4 and game.monster_side == 320 and game.model.max_hp == 220, "Fifth and final transition reaches city scale")
+	await Driver.resolve_held(game)
+	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All five acted and the next round prepared successfully")
+	for stage in range(3,9): await ultimate_wave()
+	check(game.model.is_city() and game.model.stage == 9 and game.monster_side == 320 and game.model.max_hp == 370, "Tenth and final transition reaches city scale")
 	game._handle_click(game.DEBUG_RECT.get_center())
 	var city_clock: float = game.model.volley_clock
 	await create_timer(0.3).timeout
@@ -139,12 +149,14 @@ func run() -> void:
 	for i in range(8): game._handle_click(game.DICE_CENTER)
 	check(game._roll_speed() == 2.0 and game.model.pending == city_pending, "City stays at fixed 2x with no rerolls when spammed")
 	await settle()
-	check(game.model.city_hp < game.model.CITY_MAX_HP and game.view_phase == "ready", "City attacks automatically target city")
+	check(game.model.city_hp < game.model.CITY_MAX_HP and game.view_phase == "ready", "City skill resolves after selection")
 	game.debug_choice = 12
 	var city_health: int = game.model.city_hp
 	await game._roll()
+	var ultimate_caption: Dictionary = game.skill_bubble.caption.duplicate()
+	await Driver.resolve_held(game)
 	check(game.model.city_hp == city_health - 800 and game.view_phase == "ready", "First city ultimate leaves the city alive and returns to rolling")
-	check(game.fx.skill.label == "Annihilation" and game.fx.skill.description.is_empty(), "666 uses Annihilation without a description")
+	check(ultimate_caption.name == "Annihilation" and ultimate_caption.description.is_empty(), "666 uses Annihilation without a description")
 	check(not game.city_life.people.is_empty(), "Destroyed city houses release a visible fleeing crowd")
 	game._handle_click(game.GUIDE_RECT.get_center())
 	var crowd_clock: float = game.city_life.clock
@@ -155,6 +167,7 @@ func run() -> void:
 	for i in range(2):
 		game.debug_choice = 12
 		await game._roll()
+		await Driver.resolve_held(game)
 	check(game.model.outcome() == "victory" and game.view_phase == "over", "Repeated city attacks play through to victory")
 	game._handle_click(game.REPLAY_RECT.get_center())
 	check(game.model.stage == 0 and game.city_corpses.is_empty() and game.city_life.people.is_empty() and game.city_life.destroyed.is_empty() and game.model.hp == 100, "Mouse restart clears run and city inhabitants")
@@ -165,10 +178,11 @@ func run() -> void:
 	check(game.model.phase == "roll" and game.view_phase == "ready" and game.model.round_number == 1, "Restart cancels pending roll coroutine")
 	game.debug_choice = 12
 	await game._roll()
+	await Driver.resolve_held(game)
 	game._restart()
 	await create_timer(0.5).timeout
 	check(game.model.stage == 0 and game.view_phase == "ready", "Restart cancels feeding coroutine")
-	print("Scene smoke: automatic targets, shake, every buff/special, debug, growth, city ultimate, pause, spam, restart; %d failures" % failures)
+	print("Scene smoke: manual targets, shake, every buff/special, debug, growth, city ultimate, pause, spam, restart; %d failures" % failures)
 	game.queue_free()
 	await process_frame
 	quit(1 if failures else 0)

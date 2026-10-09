@@ -44,9 +44,9 @@ func _test_classification() -> void:
 func _test_caps() -> void:
 	var game = fresh()
 	game.set_test_roll([4, 5, 6])
-	check(game.preview(game.pending, 0)[0].damage == 10, "Normal still has one-third cap")
+	check(game.preview(game.pending, 0)[0].damage == 22, "Normal uses dice power below the one-third cap")
 	game.apply_player(0)
-	check(game.enemies[0].hp == 20, "Normal cap applies before shield")
+	check(game.enemies[0].hp == 53, "Normal hit reduces health")
 	for values in [[1,1,6], [4,4,6], [5,5,6], [4,4,4], [5,5,5]]:
 		game = fresh()
 		game.set_test_roll(values)
@@ -57,7 +57,7 @@ func _test_caps() -> void:
 	game.enemies[0].shield = 20
 	game.set_test_roll([1,1,1])
 	game.apply_player(0)
-	check(game.enemies[0].hp == 0 and game.enemies[1].hp == 36, "111 executes only one foe through shields")
+	check(game.enemies[0].hp == 0 and game.enemies[1].hp == 50, "111 executes only one foe through shields")
 	game = fresh()
 	for enemy in game.enemies:
 		enemy.hp = 999
@@ -74,7 +74,7 @@ func _test_buffs() -> void:
 			var game = fresh()
 			game.set_test_roll([face, spare, face])
 			game.apply_player()
-			check(game.buffs[face] == spare and game.enemies[0].hp == 30, "Spare die sets boon duration, with no attack")
+			check(game.buffs[face] == spare and game.enemies[0].hp == 75, "Spare die sets boon duration, with no attack")
 	var game = fresh()
 	game.hp = 40
 	game.set_test_roll([2,2,3])
@@ -162,15 +162,16 @@ func _test_independent_rolls() -> void:
 	var longest_triple_drought: int = 0
 	for seed_value in range(80):
 		var game = Rules.new(seed_value)
-		var reference := RandomNumberGenerator.new()
-		reference.seed = seed_value
 		var match_drought: int = 0
 		var triple_drought: int = 0
 		for turn in range(100):
 			game.phase = "roll"
-			var expected: Array = [reference.randi_range(1, 6), reference.randi_range(1, 6), reference.randi_range(1, 6)]
+			var fresh_history = Rules.new(seed_value)
+			fresh_history.rng.state = game.rng.state
+			fresh_history.phase = "roll"
+			var expected: Array = fresh_history.roll().dice
 			var result: Dictionary = game.roll()
-			check(result.dice == expected, "Natural dice remain independent after any history")
+			check(result.dice == expected, "Weighted odds do not depend on previous roll history")
 			match_drought = match_drought + 1 if result.kind == Rules.Kind.NORMAL else 0
 			triple_drought = triple_drought + 1 if result.kind < Rules.Kind.SPECIAL else 0
 			longest_match_drought = maxi(longest_match_drought, match_drought)

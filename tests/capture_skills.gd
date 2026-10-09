@@ -29,11 +29,11 @@ func run() -> void:
 		await shot("active-boon-guide")
 		game.guide = false
 		if portrait:
-			for index in game.BOON_INDICES:
-				game.selected_boon = index
-				game.boon_until = game.clock_time + 5
-				await shot("boon-description-" + str(index + 1))
-			game.selected_boon = -1
+			for item in game._active_statuses():
+				game.selected_status = item.id
+				game.status_until = game.clock_time + 5
+				await shot("boon-description-" + str(item.id))
+			game.selected_status = -1
 		game._restart()
 		for sample in [{"values": [2,4,6], "face": 0, "name": "normal"}, {"values": [5,2,5], "face": 5, "name": "double"}, {"values": [4,4,4], "face": 4, "name": "triple"}]:
 			for i in range(3): game.dice[i].face = sample.values[i]
@@ -61,7 +61,7 @@ func run() -> void:
 		await shot("pairs")
 		if portrait: game.guide_page = 1
 		await shot("triples")
-		game.model.stage = 4
+		game.model.stage = 9
 		game.model._load_wave()
 		await shot("city-guide")
 		game.queue_free()

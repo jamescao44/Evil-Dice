@@ -1,13 +1,14 @@
 extends RefCounted
 ## Deterministic battle model. Rendering and cosmetic randomness never alter it.
+const Weighted = preload("res://scripts/weighted_choice.gd")
 
 enum Kind { NORMAL, PAIR, SPECIAL, ULTIMATE }
 const NORMAL_NAME = "Tentacle Swipe"
 const PAIR_NAMES = ["Rending Blow", "Unnatural Regrowth", "Eldritch Might", "Sweeping Ruin", "Tentacle Flurry", "Beyond Harm"]
-const PAIR_TEXT = ["1.5x regular attack + spare die.", "Heal 5 at the next spare-die turn starts.", "1.5x attack power for the next spare-die turns.", "Hit all: 2/3 regular attack + spare die each.", "3 quick hits; regular attack + spare die each.", "Invincible for spare-die enemy phases / roll intervals."]
+const PAIR_TEXT = ["1.5x regular attack + spare die.", "Heal 5 at the next spare-die turn starts.", "1.5x attack power for the next spare-die turns.", "Hit all: 2/3 regular attack + spare die each.", "3 automatic random hits, each regular attack + spare die.", "Invincible for spare-die enemy phases / roll intervals."]
 const SPECIAL_NAMES = ["Death Sentence", "Abyssal Renewal", "Eldritch Ascension", "Worldbreaker", "Sixfold Ruin", "Annihilation"]
-const SPECIAL_TEXT = ["Instantly kill one random foe, ignoring shield.", "Restore all missing health. No attack.", "3x attack power for the next 3 turns.", "Hit every foe for 2x regular attack power.", "6 quick hits at regular attack power.", "Destroy the squad. Heal 12 HP."]
-const CITY_SPECIAL_TEXT = ["Hit the city for 5x regular attack power.", "Restore all missing health. No attack.", "3x attack power for the next 3 rolls.", "2x city attack; clear all troops.", "6 quick city hits; clear troops.", "800 city damage; clear troops; heal 12."]
+const SPECIAL_TEXT = ["Instantly kill your chosen foe, ignoring shield.", "Restore all missing health. No attack.", "3x attack power for the next 3 turns.", "Hit every foe for 2x regular attack power.", "6 automatic random hits, each regular attack power.", "Destroy the squad. Heal 12 HP."]
+const CITY_SPECIAL_TEXT = ["Hit the city for 5x regular attack power.", "Restore all missing health. No attack.", "3x attack power for the next 3 rolls.", "2x city attack; clear all troops.", "6 automatic city hits; each clears one troop.", "800 city damage; clear troops; heal 12."]
 const REGULAR_ATTACK_POWER = 10.0
 const MAX_HP = 100
 const SHIELD_CAP = 20
@@ -19,12 +20,21 @@ var rng = RandomNumberGenerator.new()
 var hp: int = MAX_HP
 var max_hp: int = MAX_HP
 var power: float = 1.0
+var reward_base_damage: float = 0.0
+var reward_damage_multiplier: float = 0.0
 var shield: int = 0
 var buffs: Dictionary = {2: 0, 3: 0, 6: 0, 33: 0}
 var enemies: Array = []
 var round_number: int = 0
 var pending: Dictionary = {}
+var saved_skill: Dictionary = {}
+var bonus_resume: Dictionary = {}
+var bonus_immunity_guard: bool = false
 var phase: String = "new"
+var category_weights: Array = [1.0, 1.0, 1.0] # normal, pair, triple; relic hooks
+var pair_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+var triple_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 0.7]
+var face_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 func _init(seed_value: int = -1) -> void:
 	if seed_value < 0:
@@ -37,6 +47,8 @@ func reset() -> void:
 	hp = MAX_HP
 	max_hp = MAX_HP
 	power = 1.0
+	reward_base_damage = 0
+	reward_damage_multiplier = 0
 	shield = 0
 	buffs = {2: 0, 3: 0, 6: 0, 33: 0}
 	enemies = [make_enemy(0), make_enemy(1), make_enemy(2)]
@@ -46,12 +58,19 @@ func reset() -> void:
 		e["acted"] = false
 	round_number = 0
 	pending = {}
+	saved_skill = {}
+	bonus_resume = {}
+	bonus_immunity_guard = false
 	phase = "new"
+	category_weights = [1.0, 1.0, 1.0]
+	pair_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+	triple_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 0.7]
+	face_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
-static func make_enemy(role: int, health_scale: float = 1.0) -> Dictionary:
+static func make_enemy(role: int, health_scale: float = 1.0, elite: bool = false) -> Dictionary:
 	# Keep exact half-HP thresholds stable despite decimal scale rounding.
-	var health: int = roundi([30, 36, 30][role] * health_scale + 0.0001)
-	return {"name": ["Vanguard", "Elf Archer", "Mage"][role], "role": role, "hp": health, "max_hp": health, "shield": 0, "damage": [3, 4, 2][role], "weight": [65, 70, 60][role], "heals": 0, "intent": {}, "canceled": false, "acted": false}
+	var health: int = roundi(([150, 100, 75] if elite else [75, 50, 35])[role] * health_scale + 0.0001)
+	return {"name": ("Elite " if elite else "") + ["Vanguard", "Elf Archer", "Mage"][role], "role": role, "elite": elite, "hp": health, "max_hp": health, "shield": 10 if elite else 0, "damage": ([10.0, 10.0, 15.0] if elite else [5.0, 7.5, 10.0])[role], "attack_boost": false, "weight": [70, 70, 65][role], "heals": 0, "intent": {}, "canceled": false, "acted": false}
 
 static func classify(dice: Array) -> Dictionary:
 	if dice.size() != 3:
@@ -91,32 +110,53 @@ static func throw_rates(throw_power: float, perfect: bool = false, fever: bool =
 	pair = minf(pair, NON_PERFECT_PAIR_CAP)
 	return {"normal": maxf(0, 1.0 - pair - triple), "pair": pair, "triple": triple}
 
+func roll_rates(throw_power: float, perfect: bool = false, fever: bool = false) -> Dictionary:
+	var base: Dictionary = throw_rates(throw_power, perfect, fever)
+	var values: Array = [base.normal, base.pair, base.triple]
+	var total: float = 0
+	for i in range(3):
+		values[i] *= maxf(0, category_weights[i])
+		total += values[i]
+	if total <= 0: return base
+	var triple: float = values[2] / total
+	if perfect:
+		triple = minf(triple, 1.0 if fever else 0.5)
+		return {"normal":0.0, "pair":1.0-triple, "triple":triple}
+	triple = minf(triple, NON_PERFECT_TRIPLE_CAP * (1.5 if fever else 1.0))
+	var pair: float = minf(values[1] / total, NON_PERFECT_PAIR_CAP)
+	return {"normal":maxf(0, 1.0-pair-triple), "pair":pair, "triple":triple}
+
+func _weighted_face(weights: Array) -> int:
+	var index: int = Weighted.pick(rng, weights)
+	return index + 1 if index >= 0 else rng.randi_range(1, 6)
+
 func _match_values(triple: bool) -> Array:
-	var face: int = rng.randi_range(1, 6)
+	var face: int = _weighted_face(triple_weights if triple else pair_weights)
 	var values: Array = [face, face, face]
 	if not triple:
-		var other: int = rng.randi_range(1, 5)
-		if other >= face: other += 1
-		values[rng.randi_range(0, 2)] = other
+		var spare_weights: Array = face_weights.duplicate()
+		spare_weights[face-1] = 0.0
+		var other: int = Weighted.pick(rng, spare_weights)
+		if other < 0: other = (face % 6)
+		values[rng.randi_range(0, 2)] = other + 1
 	return values
 
 func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) -> Dictionary:
-	if phase != "roll":
-		return {}
+	if phase != "roll": return {}
+	var rates: Dictionary = roll_rates(throw_power, perfect, fever)
+	var category: int = Weighted.pick(rng, [rates.normal, rates.pair, rates.triple])
 	var values: Array = []
-	if not perfect and not fever and throw_power <= 0:
-		# Zero power is natural 3D6, with no history-dependent guarantees.
-		values = [rng.randi_range(1, 6), rng.randi_range(1, 6), rng.randi_range(1, 6)]
+	if category > 0:
+		values = _match_values(category == 2)
 	else:
-		var rates: Dictionary = throw_rates(throw_power, perfect, fever)
-		var chance: float = rng.randf()
-		if chance < rates.triple:
-			values = _match_values(true)
-		elif chance < rates.triple + rates.pair:
-			values = _match_values(false)
-		else:
-			var faces: Array = [1, 2, 3, 4, 5, 6]
-			for i in range(3): values.append(faces.pop_at(rng.randi_range(0, faces.size() - 1)))
+		var weights: Array = face_weights.duplicate()
+		for i in range(3):
+			var index: int = Weighted.pick(rng, weights)
+			if index < 0:
+				for j in range(6): weights[j] = 0.0 if j+1 in values else 1.0
+				index = Weighted.pick(rng, weights)
+			values.append(index+1)
+			weights[index] = 0.0
 	pending = classify(values)
 	phase = "player"
 	return pending.duplicate(true)
@@ -165,23 +205,20 @@ func begin_round() -> Array:
 func choose_intent(index: int) -> Dictionary:
 	var e: Dictionary = enemies[index]
 	var role: int = e.role
-	var target: int = -1
+	var support: Array = []
 	if role == 0 and e.shield < SHIELD_CAP:
-		target = index
-	elif role == 1:
-		for i in living():
-			if enemies[i].shield < SHIELD_CAP and (target == -1 or enemies[i].hp < enemies[target].hp):
-				target = i
-	elif role == 2 and e.heals < 2:
-		for i in living():
-			var missing: int = enemies[i].max_hp - enemies[i].hp
-			if missing > 0 and (target == -1 or missing > enemies[target].max_hp - enemies[target].hp):
-				target = i
-	if target == -1 or rng.randi_range(1, 100) <= e.weight:
-		return {"type": "attack", "target": -1, "amount": e.damage, "name": ["Sword Slash", "Arrow Shot", "Arcane Bolt"][role]}
-	if role == 2:
-		return {"type": "heal", "target": target, "amount": 6, "name": "Mend"}
-	return {"type": "shield", "target": target, "amount": 6 if role == 0 else 4, "name": "Raise Shield" if role == 0 else "Covering Fire"}
+		support.append({"type": "shield", "target": index, "amount": 6, "name": "Raise Shield"})
+	if role == 2 and e.hp < e.max_hp:
+		support.append({"type": "heal", "target": index, "amount": roundi(e.max_hp * 0.3), "name": "Self Mend"})
+	if role == 1 and e.elite and living().any(func(i): return enemies[i].hp < enemies[i].max_hp):
+		support.append({"type": "team_heal", "target": index, "amount": 0, "name": "Renewing Volley"})
+	if role == 2 and e.elite:
+		var allies: Array = living().filter(func(i): return i != index and not enemies[i].attack_boost)
+		if not allies.is_empty():
+			support.append({"type": "empower", "target": allies[rng.randi_range(0, allies.size() - 1)], "amount": 0, "name": "Arcane Empowerment"})
+	if not support.is_empty() and rng.randi_range(1, 100) > e.weight:
+		return support[rng.randi_range(0, support.size() - 1)]
+	return {"type": "attack", "target": -1, "amount": e.damage, "name": ["Sword Slash", "Arrow Shot", "Arcane Bolt"][role]}
 
 func damage_cap(kind: int, target: int) -> int:
 	var max_hp: int = enemies[target].max_hp
@@ -209,8 +246,8 @@ func boon_turns(face: int) -> int:
 	return (buffs[33] if buffs[33] > 0 else buffs[3]) if face == 3 else int(buffs.get(face, 0))
 
 func attack_base(result: Dictionary) -> float:
-	if result.kind == Kind.NORMAL: return result.sum
-	var amount: float = REGULAR_ATTACK_POWER
+	if result.kind == Kind.NORMAL: return result.sum + reward_base_damage
+	var amount: float = regular_attack_power()
 	if result.kind == Kind.PAIR:
 		if result.face == 1: amount *= 1.5
 		elif result.face == 4: amount *= 2.0 / 3.0
@@ -218,6 +255,12 @@ func attack_base(result: Dictionary) -> float:
 	elif result.kind == Kind.SPECIAL and result.face == 4:
 		amount *= 2.0
 	return amount
+
+func regular_attack_power() -> float:
+	return REGULAR_ATTACK_POWER + reward_base_damage
+
+func damage_multiplier() -> float:
+	return DAMAGE_MULTIPLIER + reward_damage_multiplier
 
 func player_target() -> int:
 	if phase not in ["player", "executing"] or not is_attack(pending) or not outcome().is_empty(): return -1
@@ -234,9 +277,9 @@ func preview(result: Dictionary, primary: int) -> Array:
 	var targets: Array = living() if hits_all(result) else [primary]
 	for i in targets:
 		var execute: bool = result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
-		var damage: int = enemies[i].hp if execute else floori(attack_base(result) * DAMAGE_MULTIPLIER * power * attack_multiplier())
+		var damage: int = enemies[i].hp if execute else floori(attack_base(result) * damage_multiplier() * power * attack_multiplier())
 		if result.kind == Kind.NORMAL: damage = mini(damage, damage_cap(result.kind, i))
-		var hp_loss: int = mini(enemies[i].hp, maxi(0, damage - (0 if execute else enemies[i].shield)))
+		var hp_loss: int = 0 if enemies[i].shield > 0 and not execute else mini(enemies[i].hp, damage)
 		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss})
 	return hits
 
@@ -250,14 +293,43 @@ func _apply_support(result: Dictionary) -> Array:
 	return [event(-1, 0, "buff", SPECIAL_NAMES[2])]
 
 func _finish_player_action(result: Dictionary) -> void:
+	if not bonus_resume.is_empty():
+		# A banked skill is a bonus: preserve the current roll and its turn clocks.
+		if result.kind == Kind.PAIR and result.face == 6: bonus_immunity_guard = true
+		var resume: Dictionary = bonus_resume
+		bonus_resume = {}
+		if outcome() == "wave_clear" and not resume.pending.is_empty():
+			# Carry the unspent summoned skill into the next wave without casting it.
+			saved_skill = resume.pending.duplicate(true)
+			saved_skill.erase("target")
+		pending = resume.pending if outcome().is_empty() else {}
+		phase = resume.phase if outcome().is_empty() else "finished"
+		return
 	# Attack boosts count complete subsequent actions, not individual impacts.
 	# Immunity protects the granting enemy phase / city interval, then expires
 	# after the specified number of subsequent completed actions.
 	for face in [3, 6, 33]:
 		var refreshed: bool = (result.kind == Kind.PAIR and result.face == face) or (result.kind == Kind.SPECIAL and result.face == 3 and face == 33)
-		if not refreshed: buffs[face] = maxi(0, buffs[face] - 1)
+		if not refreshed and not (face == 6 and bonus_immunity_guard): buffs[face] = maxi(0, buffs[face] - 1)
+	bonus_immunity_guard = false
 	pending = {}
 	phase = "enemy" if outcome().is_empty() else "finished"
+
+func save_pending_skill() -> bool:
+	if phase != "player" or pending.is_empty() or not saved_skill.is_empty() or not bonus_resume.is_empty() or not outcome().is_empty(): return false
+	saved_skill = pending.duplicate(true)
+	saved_skill.erase("target")
+	# Banking passes the turn; it does not apply or refresh the stored boon.
+	_finish_player_action({"kind": Kind.NORMAL, "face": 0})
+	return true
+
+func begin_saved_cast() -> bool:
+	if saved_skill.is_empty() or not bonus_resume.is_empty() or phase not in ["roll", "player", "round_end"] or not outcome().is_empty(): return false
+	bonus_resume = {"phase": phase, "pending": pending.duplicate(true)}
+	pending = saved_skill.duplicate(true)
+	saved_skill = {}
+	phase = "player"
+	return true
 
 func apply_player_step(primary: int = -1) -> Array:
 	if phase not in ["player", "executing"] or pending.is_empty() or not outcome().is_empty(): return []
@@ -272,8 +344,12 @@ func apply_player_step(primary: int = -1) -> Array:
 	phase = "executing"
 	var events: Array = []
 	for hit in preview(result, primary):
+		var previous_shield: int = enemies[hit.target].shield
 		var loss: int = hit_enemy(hit.target, hit.damage, hit.ignore)
-		events.append(event(hit.target, loss, "damage", "-%d" % loss))
+		if previous_shield > 0 and not hit.ignore:
+			events.append(event(hit.target, previous_shield-enemies[hit.target].shield, "shield_hit", "SHIELD BREAK" if enemies[hit.target].shield == 0 else "BLOCKED"))
+		else:
+			events.append(event(hit.target, loss, "damage", "-%d" % loss))
 	pending.hits_left -= 1
 	pending.erase("target")
 	if pending.hits_left <= 0 or not outcome().is_empty():
@@ -283,19 +359,21 @@ func apply_player_step(primary: int = -1) -> Array:
 
 func apply_player(primary: int = -1) -> Array:
 	var events: Array = []
+	var bonus: bool = not bonus_resume.is_empty()
 	while phase in ["player", "executing"] and not pending.is_empty() and outcome().is_empty():
 		var step: Array = apply_player_step(primary)
 		if step.is_empty(): break
 		events.append_array(step)
+		if bonus and bonus_resume.is_empty(): break
 		primary = -1
 	return events
 
 func hit_enemy(index: int, damage: int, ignore: bool = false) -> int:
 	var e: Dictionary = enemies[index]
-	if not ignore:
-		var blocked: int = mini(e.shield, damage)
-		e.shield -= blocked
-		damage -= blocked
+	if not ignore and e.shield > 0:
+		e.shield = maxi(0, e.shield-maxi(0, damage))
+		return 0 # A single hit can break a shield, but never spill into HP.
+	if ignore: e.shield = 0
 	var actual: int = mini(e.hp, damage)
 	e.hp -= actual
 	return actual
@@ -319,15 +397,30 @@ func enemy_act(index: int) -> Array:
 		return []
 	var events: Array = []
 	if intent.type == "attack":
+		# Keep 7.5 archer damage exact until impact, then round once for integer HP.
+		var amount: int = roundi(intent.amount * (1.5 if e.attack_boost else 1.0))
+		e.attack_boost = false
 		if buffs[6] > 0:
 			events.append(event(-1, 0, "immune", "INVINCIBLE"))
 		else:
-			var blocked: int = mini(shield, intent.amount)
+			var blocked: int = mini(shield, amount)
 			shield -= blocked
-			var loss: int = mini(hp, intent.amount - blocked)
+			var loss: int = mini(hp, amount - blocked)
 			hp -= loss
 			events.append(event(-1, loss, "damage", "-%d HP" % loss if loss else "BLOCKED"))
-	elif enemies[intent.target].hp > 0:
+	elif intent.type == "team_heal":
+		for target_index in living():
+			var target: Dictionary = enemies[target_index]
+			var actual: int = mini(roundi(target.max_hp * 0.2), target.max_hp - target.hp)
+			target.hp += actual
+			events.append(event(target_index, actual, "heal", "TEAM MEND"))
+	elif intent.type == "empower":
+		var allies: Array = living().filter(func(i): return i != index and not enemies[i].attack_boost)
+		if not allies.is_empty():
+			var target: int = intent.target if intent.target in allies else allies[rng.randi_range(0, allies.size() - 1)]
+			enemies[target].attack_boost = true
+			events.append(event(target, 0, "buff", "ATTACK x1.5"))
+	elif intent.target >= 0 and intent.target < enemies.size() and enemies[intent.target].hp > 0:
 		var target: Dictionary = enemies[intent.target]
 		if intent.type == "heal":
 			var actual: int = mini(intent.amount, target.max_hp - target.hp)

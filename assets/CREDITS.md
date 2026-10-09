@@ -6,6 +6,8 @@ Source: [Dungeon Crawl 32×32 Tiles Supplemental on OpenGameArt](https://opengam
 
 Selected PNGs are copied unchanged to `art/fantasy/`. The complete source-to-project mapping is in [sources.json](art/fantasy/sources.json).
 
+The treasure chest and seven reward icons are copied unchanged from the same collection into `art/rewards/`; exact paths are in [reward sources.json](art/rewards/sources.json). Elite glows tint additional copies of the human sprites at runtime. Treasure audio reuses Kenney ticks, landings, plucks, confirmation, book, rumble, and bell clips, with pitch variation and layered prize reveals.
+
 | Game role | Original file in the public archive |
 | --- | --- |
 | The Horror | `monster/abyss/worldbinder.png` |
@@ -66,3 +68,5 @@ These files remain on disk for reference; the battle scene does not load them.
 ## Project visuals
 
 Bone dice and pips, magic-circle runes, textured framing, health bars, animated combo/skill labels, castle-city layout, roofs, circular walls, moat, bridges, a few icons, particles, slashes, feeding, and spells are implemented in project code. The city combines public stone, grass, tree, and rubble textures with pixel geometry. The user's castle-city reference guides the composition; its image is not redistributed as a game asset. No paid assets are used.
+
+Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_red.png` (ruby region displayed without its chain) and `item/scroll/blank_paper.png` (summon contract with a code-drawn magic seal). Original coins and shard artwork remain unused. See `art/rewards/sources.json`.

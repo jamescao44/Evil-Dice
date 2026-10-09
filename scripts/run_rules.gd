@@ -1,8 +1,10 @@
 extends "res://scripts/battle_rules.gd"
 ## Run progression and real-time siege. No presentation state or wall-clock calls.
-const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "CITY GATES", "LAST COMPANY", "THE CITY"]
-const WAVE_ROLES := [[0], [0, 1, 2], [0, 1, 0, 2, 1], [0, 1, 2, 1, 0, 2, 0, 1]]
-const WAVE_BOOSTS := [1.0, 1.0, 1.5, 2.25, 2.25]
+const Rewards = preload("res://scripts/reward_catalog.gd")
+const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "THE CHAMPION", "CROSSROADS", "WATCH POST", "WAR CAMP", "CITY ROAD", "ELITE GUARD", "LAST STAND", "THE CITY"]
+# Normal / elite counts. Roles are independently randomized and then shuffled.
+const WAVE_COUNTS := [[1,0], [3,0], [0,1], [5,0], [2,1], [3,2], [5,2], [0,4], [5,5]]
+const WAVE_BOOSTS := [1.0, 1.0, 1.5, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25]
 const CITY_MAX_HP := 2400
 const CITY_ULTIMATE_DAMAGE := CITY_MAX_HP / 3
 var stage: int = 0
@@ -12,9 +14,22 @@ var spawn_clock: float = 2.5
 var volley_clock: float = 4.0
 var troop_clock: float = 1.5
 var volley_warned: bool = false
+var perfect_progress: int = 0
+var perfect_total: int = 0
+const CHEST_THRESHOLDS := [0, 3, 6, 9]
+const CHEST_COUNTS := [0, 1, 3, 5]
+var claimed_slots: Array = []
+var reward_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+var open_rewards: Array = []
+var reward_history: Array = []
+var rubies: int = 0
+var summon_shards: int = 0
+var reward_rng := RandomNumberGenerator.new()
 
 func _init(seed_value: int = -1) -> void:
 	super(seed_value)
+	if seed_value < 0: reward_rng.randomize()
+	else: reward_rng.seed = seed_value + 7919
 	reset_run()
 
 func reset_run() -> void:
@@ -26,10 +41,61 @@ func reset_run() -> void:
 	volley_clock = 4.0
 	troop_clock = 1.5
 	volley_warned = false
+	perfect_progress = 0
+	perfect_total = 0
+	claimed_slots.clear()
+	reward_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+	open_rewards.clear()
+	reward_history.clear()
+	rubies = 0
+	summon_shards = 0
 	_load_wave()
 
+func record_perfect(perfect: bool) -> void:
+	# Accepted throws only. Misses/waves preserve progress; a full bank holds nine.
+	if not perfect: return
+	perfect_total += 1
+	perfect_progress = mini(9, perfect_progress + 1)
+
+func chest_tier() -> int:
+	return clampi(perfect_progress / 3, 0, 3)
+
+func open_chest(requested_tier: int = 0) -> Array:
+	if not open_rewards.is_empty(): return open_rewards.duplicate()
+	var tier: int = chest_tier() if requested_tier == 0 else requested_tier
+	if tier < 1 or tier > 3 or tier > chest_tier(): return []
+	# Any claimed milestone empties the bank, including extra unspent diamonds.
+	perfect_progress = 0
+	claimed_slots.clear()
+	for i in range(CHEST_COUNTS[tier]):
+		var index: int = Weighted.pick(reward_rng, reward_weights)
+		open_rewards.append(index if index >= 0 else reward_rng.randi_range(0, Rewards.ITEMS.size()-1))
+	return open_rewards.duplicate()
+
+func claim_reward(slot: int) -> Dictionary:
+	if slot < 0 or slot >= open_rewards.size() or slot in claimed_slots: return {}
+	var index: int = open_rewards[slot]
+	var item: Dictionary = Rewards.ITEMS[index]
+	claimed_slots.append(slot)
+	match item.id:
+		"ruby": rubies += 100
+		"shard": summon_shards += 1
+		"damage": reward_base_damage += 5
+		"multiplier": reward_damage_multiplier += 0.5
+	reward_history.append(index)
+	return item.duplicate()
+
+func rewards_collected() -> bool:
+	return not open_rewards.is_empty() and claimed_slots.size() == open_rewards.size()
+
+func close_chest() -> bool:
+	if not rewards_collected(): return false
+	open_rewards.clear()
+	claimed_slots.clear()
+	return true
+
 func is_city() -> bool:
-	return stage == WAVE_ROLES.size()
+	return stage == WAVE_COUNTS.size()
 
 func roll(throw_power: float = 0.0, perfect: bool = false, _fever: bool = false) -> Dictionary:
 	return super.roll(throw_power, perfect, is_city())
@@ -41,11 +107,14 @@ func damage_cap(kind: int, target: int) -> int:
 func _load_wave() -> void:
 	enemies.clear()
 	if not is_city():
-		for role in WAVE_ROLES[stage]:
-			var enemy: Dictionary = make_enemy(role, 1.0 + stage * 0.35)
-			# At this scale individual adventurers are weaker, but all eight act.
-			if stage == 3: enemy.damage = [1,2,1][role]
-			enemies.append(enemy)
+		for tier in range(2):
+			for i in range(WAVE_COUNTS[stage][tier]):
+				enemies.append(make_enemy(rng.randi_range(0, 2), 1.0, tier == 1))
+		for i in range(enemies.size() - 1, 0, -1):
+			var other: int = rng.randi_range(0, i)
+			var temp: Dictionary = enemies[i]
+			enemies[i] = enemies[other]
+			enemies[other] = temp
 	pending = {}
 	phase = "new"
 
@@ -83,15 +152,20 @@ func siege_damage(result: Dictionary) -> int:
 	if not is_attack(result): return 0
 	if result.kind == Kind.ULTIMATE: return mini(city_hp, CITY_ULTIMATE_DAMAGE)
 	# A city is not a humanoid: triple 1 deals five regular attacks instead.
-	var base: float = REGULAR_ATTACK_POWER * 5 if result.kind == Kind.SPECIAL and result.face == 1 else attack_base(result)
-	return mini(city_hp, floori(base * DAMAGE_MULTIPLIER * power * attack_multiplier() * 2.0))
+	var base: float = regular_attack_power() * 5 if result.kind == Kind.SPECIAL and result.face == 1 else attack_base(result)
+	return mini(city_hp, floori(base * damage_multiplier() * power * attack_multiplier() * 2.0))
 
 func player_target() -> int:
 	if not is_city(): return super.player_target()
 	return -2 if phase in ["player", "executing"] and is_attack(pending) and outcome().is_empty() else -1
 
 func _finish_player_action(result: Dictionary) -> void:
+	var bonus: bool = not bonus_resume.is_empty()
 	super._finish_player_action(result)
+	if bonus:
+		# City immunity already protects the live interval before the next roll completes.
+		if is_city(): bonus_immunity_guard = false
+		return
 	if is_city(): phase = "round_end" if outcome().is_empty() else "finished"
 
 func apply_player_step(primary: int = -1) -> Array:

@@ -1,4 +1,5 @@
 extends SceneTree
+const Driver = preload("res://tests/scene_driver.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Meter = preload("res://scripts/throw_meter.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -18,7 +19,9 @@ func check(value: bool, message: String) -> void:
 
 func settle() -> void:
 	var deadline: int = Time.get_ticks_msec() + 8000
-	while game.view_phase not in ["ready", "over"] and Time.get_ticks_msec() < deadline: await process_frame
+	while game.view_phase not in ["ready", "over"] and Time.get_ticks_msec() < deadline:
+		Driver.cast_pending(game)
+		await process_frame
 	check(Time.get_ticks_msec() < deadline, "Throw settles")
 
 func timing_checks() -> void:
@@ -34,14 +37,22 @@ func timing_checks() -> void:
 		check(Meter.sample_at(0.5 + sign_value * 1.5 / Meter.WIDTH).perfect, "New window accepts stops that missed the old window")
 	check(Meter.sample_at(0.5).power == 1 and Meter.sample_at(0.0).power == 0, "Power spans zero to one")
 	check(is_equal_approx(Meter.sample_at(0.1).power, Meter.sample_at(0.9).power), "Power is symmetric")
-	meter.elapsed = 0.6
+	meter.elapsed = Meter.PERIOD / 4
 	var center_x: float = meter.position_ratio()
 	meter.advance(0.001)
 	var center_step: float = meter.position_ratio() - center_x
 	meter.reset()
 	meter.advance(0.001)
-	check(center_step > meter.position_ratio() * 100, "Marker moves much faster at center than at endpoints")
-	for fps in [30, 60, 120]:
+	check(center_step > meter.position_ratio() * 1.5, "Marker still accelerates toward the center")
+	var previous_peak_step: float = PI / Meter.PERIOD * 0.001
+	check(center_step < previous_peak_step * 0.8 and center_step > previous_peak_step * 0.7, "Center peak is modestly slower without changing the cycle")
+	# Check real time inside the unchanged pixel window, not just curve constants.
+	var available_ms: int = 0
+	for ms in range(-20,21):
+		meter.elapsed = Meter.PERIOD/4 + ms/1000.0
+		if meter.sample().perfect: available_ms += 1
+	check(available_ms >= 13 and available_ms <= 17, "Perfect has a longer timing opportunity while retaining the +/-2 pixel window")
+	for fps in [15, 20, 30, 60, 120]:
 		meter.reset()
 		for frame in range(fps): meter.advance(1.0 / fps)
 		var direct := Meter.new()
@@ -49,10 +60,22 @@ func timing_checks() -> void:
 		check(is_equal_approx(meter.position_ratio(), direct.position_ratio()), "Meter is frame-rate independent at %d FPS" % fps)
 
 func rate_checks() -> void:
+	var modified := Rules.new(845)
+	modified.category_weights = [1.0, 20.0, 80.0]
+	for fever in [false,true]:
+		for power in [0.0,0.4,1.0]:
+			var adjusted: Dictionary = modified.roll_rates(power,false,fever)
+			check(adjusted.triple <= (0.375 if fever else 0.25) and adjusted.pair <= 0.7 and is_equal_approx(adjusted.values().reduce(func(a,b): return a+b,0.0),1.0), "Weight modifiers preserve non-Perfect caps and normalization")
+	modified.triple_weights = [0.0,0.0,0.0,0.0,0.0,4.0]
+	for i in range(20):
+		modified.phase = "roll"
+		check(modified.roll(1,true,true).face == 6, "Triple-face weights are independently configurable")
+	modified.reset()
+	check(modified.triple_weights[5] == 0.7 and modified.category_weights == [1.0,1.0,1.0], "New runs reset weight modifiers")
 	for fever in [false, true]:
 		for strength in [0.0, 0.25, 0.5, 0.75, 0.9999, 1.0]:
 			var rules := preload("res://scripts/run_rules.gd").new(97531)
-			rules.stage = 4 if fever else 0
+			rules.stage = 9 if fever else 0
 			var counts := [0, 0, 0]
 			for i in range(12000):
 				rules.phase = "roll"
@@ -61,7 +84,7 @@ func rate_checks() -> void:
 			for i in range(3): check(absf(counts[i] / 12000.0 - rates[["normal", "pair", "triple"][i]]) < 0.018, "Observed odds match power %.4f fever %s category %d" % [strength, fever, i])
 			print("Power %.4f fever %s: normal / pair / triple %s" % [strength, fever, counts])
 		var perfect_rules := preload("res://scripts/run_rules.gd").new(7913)
-		perfect_rules.stage = 4 if fever else 0
+		perfect_rules.stage = 9 if fever else 0
 		var perfect_counts := [0, 0, 0]
 		var faces := [0, 0, 0, 0, 0, 0]
 		for i in range(12000):
@@ -74,7 +97,7 @@ func rate_checks() -> void:
 			check(perfect_counts[2] == 12000, "City Perfect guarantees triple on every roll")
 		else:
 			check(absf(perfect_counts[2] / 12000.0 - 0.5) < 0.018, "Squad Perfect keeps 50 percent triples")
-		for count in faces: check(absf(count / float(perfect_counts[2]) - 1.0 / 6.0) < 0.025, "Triple faces remain uniform, including 666")
+		for i in range(6): check(absf(faces[i] / float(perfect_counts[2]) - (0.7 if i == 5 else 1.0) / 5.7) < 0.025, "Triple weights reduce 666 without changing category probability")
 		for step in range(1001):
 			var rates: Dictionary = Rules.throw_rates(step / 1000.0, false, fever)
 			check(rates.triple <= (0.375 if fever else 0.25) + 0.000001, "Non-Perfect triple cap includes power 1 without a Perfect flag")
@@ -131,7 +154,7 @@ func scene_checks(portrait: bool) -> void:
 	game._start_charge()
 	game._restart()
 	check(game.view_phase == "ready" and game.throw_meter.elapsed == 0 and game.fx.perfect.is_empty(), "Restart clears charging and Perfect feedback")
-	game.model.stage = 4
+	game.model.stage = 9
 	game.model._load_wave()
 	game._start_round()
 	game._start_charge()
