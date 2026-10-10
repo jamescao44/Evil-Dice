@@ -61,7 +61,7 @@ func model_checks() -> void:
 	for city in [false,true]:
 		for values in examples:
 			var m = fresh(city)
-			m.buffs[3] = 3
+			m.statuses[3].count = 3
 			m.set_skill_use_multiplier("echo_buff",2)
 			m.set_test_roll(values)
 			var budget: int = m.skill_use_count(m.pending)
@@ -78,7 +78,7 @@ func model_checks() -> void:
 				events.append_array(step)
 				actions += 1
 				if m.phase == "executing":
-					check(m.pending.uses_left() == budget-actions and m.buffs[3] >= 3,"Remaining uses decrease without ending the turn or expiring buffs")
+					check(m.pending.uses_left() == budget-actions and m.statuses[3].count >= 3,"Remaining uses decrease without ending the turn or expiring buffs")
 				if actions > budget: break
 			var expected: int = 1 if not city and values == [6,6,6] else budget
 			check(actions == expected and m.pending.is_empty(),"All modified uses resolve, with immediate stop on a squad wipe")
@@ -87,7 +87,7 @@ func model_checks() -> void:
 				check(events.filter(func(e): return e.type == "damage").size() == 12,"Doubled Sixfold Ruin deals exactly twelve hits")
 			if values == [4,4,4] and not city:
 				check(m.enemies.all(func(e): return e.hp == 2910),"Doubled AoE strikes every living foe twice")
-			if values == [2,2,4]: check(m.buffs[2] == 4,"Repeating a regeneration cast preserves its refresh rules instead of stacking durations")
+			if values == [2,2,4]: check(m.statuses[2].count == 4,"Repeating a regeneration cast preserves its refresh rules instead of stacking durations")
 			if values == [2,2,2]: check(m.hp == m.max_hp,"Repeated full heals never overheal")
 			if values == [6,6,6] and city: check(m.hp == 74,"Each completed ultimate use applies its healing as well as damage")
 	var m = fresh()

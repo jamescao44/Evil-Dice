@@ -70,3 +70,7 @@ These files remain on disk for reference; the battle scene does not load them.
 Bone dice and pips, magic-circle runes, textured framing, health bars, animated combo/skill labels, castle-city layout, roofs, circular walls, moat, bridges, a few icons, particles, slashes, feeding, and spells are implemented in project code. The city combines public stone, grass, tree, and rubble textures with pixel geometry. The user's castle-city reference guides the composition; its image is not redistributed as a game asset. No paid assets are used.
 
 Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_red.png` (ruby region displayed without its chain) and `item/scroll/blank_paper.png` (summon contract with a code-drawn magic seal). Original coins and shard artwork remain unused. See `art/rewards/sources.json`.
+
+## User-provided charge-loop audio
+
+`audio/magic_leak_loop.wav` derives from the user-provided `magic_leak.wav`. It is not part of the Kenney CC0 packs. The source excerpt, crossfade and normalization details are recorded in [magic_leak_loop.txt](audio/magic_leak_loop.txt). `scripts/charge_audio.gd` controls its runtime volume.

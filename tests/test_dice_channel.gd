@@ -49,7 +49,7 @@ func test_layout(game) -> void:
 		var hp: int = game.model.enemies[0].hp
 		await game._roll()
 		check(game.view_phase == "skill" and game.model.phase == "player", "A revealed roll waits in its skill bubble")
-		check(game.model.enemies[0].hp == hp and game.model.buffs[2] == 0, "Revealing never applies attack or boon")
+		check(game.model.enemies[0].hp == hp and game.model.statuses[2].count == 0, "Revealing never applies attack or boon")
 		check(game.skill_bubble.roll.dice == game.result.dice and game.fx.dice_power.is_empty(), "Dice form a skill instead of channeling to the Horror")
 		check(game._skill_center().distance_to(game._skill_rest_point()) <= 7 and game._skill_center().y < game.DICE_CENTER.y,"Skill settles above the dice at its own clickable position")
 		check(not game.skill_bubble.caption.name.is_empty() and game.fx.skill.is_empty(),"Skill name belongs to persistent bubble caption, not a timed screen callout")
@@ -105,7 +105,7 @@ func test_layout(game) -> void:
 	for face_count in [2,3]:
 		prepare(game,[5,5,2] if face_count == 2 else [5,5,5])
 		for enemy in game.model.enemies: enemy.hp = 500
-		game.model.buffs[3] = 2
+		game.model.statuses[3].count = 2
 		game.model.perfect_progress = 9
 		var count: int = 3 if face_count == 2 else 6
 		var damage: int = 40 if face_count == 2 else 33
@@ -131,12 +131,12 @@ func test_layout(game) -> void:
 			most_used = maxi(most_used, game.skill_bubble.used)
 			if game.model.phase == "executing":
 				intermediate = true
-				turn_waited = turn_waited and game.model.round_number == round_number and game.model.buffs[3] == 2 and not game._can_claim_chest()
+				turn_waited = turn_waited and game.model.round_number == round_number and game.model.statuses[3].count == 2 and not game._can_claim_chest()
 			await process_frame
 		check(Time.get_ticks_msec()<deadline and most_used == count and intermediate,"All orbs pop in sequence without more input")
 		check(turn_waited,"Boon clocks, enemy turns and chests wait for the complete combo")
 		for i in range(3): check(game.model.enemies[i].hp == expected[i],"Each automatic hit chooses a fresh random living target")
-		check(game.model.round_number == round_number+1 and game.model.buffs[3] == 1 and game.skill_bubble.roll.is_empty(),"Whole combo spends exactly one action")
+		check(game.model.round_number == round_number+1 and game.model.statuses[3].count == 1 and game.skill_bubble.roll.is_empty(),"Whole combo spends exactly one action")
 		check(game._can_claim_chest() and not game._dice_spent(),"Dice and chests unlock when the turn finishes")
 	prepare(game,[5,5,5])
 	for enemy in game.model.enemies: enemy.hp = 1
@@ -145,11 +145,11 @@ func test_layout(game) -> void:
 	check(game.view_phase == "feeding" and game.model.living().is_empty() and game.skill_bubble.roll.is_empty(),"Wave clear stops unused hits")
 	prepare(game,[2,2,4])
 	tap(game,game._skill_center())
-	check(game.view_phase == "skill" and game.model.buffs[2] == 0,"Support tap does not activate the skill")
+	check(game.view_phase == "skill" and game.model.statuses[2].count == 0,"Support tap does not activate the skill")
 	Driver.cast_pending(game)
 	check(game.view_phase == "resolving" and game._world_time_scale() == 0,"Support field drop starts casting")
 	await wait_resolved(game)
-	check(game.model.buffs[2] == 4,"New regeneration keeps its count until its first healing turn ends")
+	check(game.model.statuses[2].count == 4,"New regeneration keeps its count until its first healing turn ends")
 	prepare(game,[4,4,1])
 	Driver.cast_pending(game)
 	await wait_resolved(game)
@@ -160,7 +160,7 @@ func test_layout(game) -> void:
 		game.model._load_wave()
 		game.visual_stage = stage
 		game.monster_side = game.HORROR_SIZES[stage]
-		game.model.buffs = {2:3,3:3,33:3,6:3}
+		game.model.set_status_counts({2:3,3:3,33:3,6:3})
 		for i in range(game.model.enemies.size()):
 			var rect: Rect2 = game._target_rect(i)
 			check(game.ARENA.encloses(rect),"Enemy target stays inside battlefield")
@@ -170,7 +170,7 @@ func test_layout(game) -> void:
 				check(not health.intersects(game._enemy_health_rect(j).grow(3)),"Health bar borders never overlap in any squad formation")
 			for item in game._active_statuses():
 				check(not rect.intersects(game._status_rect(item.id)),"Enemy target never overlaps Horror status input")
-	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[9] == 320,"Mid-game visual growth is slower; city scale preserved")
+	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[9] == 288,"City Horror is slightly smaller while squad growth stays intact")
 	game._restart()
 	game.model.perfect_progress = 9
 	tap(game,game._diamond_center(2))
@@ -247,7 +247,7 @@ func test_layout(game) -> void:
 		check(game.view_phase == "resolving" and game.casting_source == "current","City rolls start casting automatically after their reveal")
 		await wait_resolved(game)
 		check(game.view_phase == "ready" and game.model.pending.is_empty(),"City auto-cast finishes without a click or drag and permits the next throw")
-		check(game.model.buffs[2] > 0 if choice == 2 else game.model.city_hp < game.Run.CITY_MAX_HP,"City auto-cast applies both support and attack results")
+		check(game.model.statuses[2].count > 0 if choice == 2 else game.model.city_hp < game.Run.CITY_MAX_HP,"City auto-cast applies both support and attack results")
 	game._restart()
 	# Isolate real-time cast beats, including city simulation and menu suspension.
 	game.model.stage = 9

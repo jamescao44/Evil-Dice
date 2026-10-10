@@ -1,0 +1,7 @@
+Source: user-provided magic_leak.wav (48 kHz, stereo, 16-bit PCM, 6 seconds).
+Excerpt: 2.5 to 4.5 seconds.
+Loop: 400 ms equal-power overlap of the excerpt's tail and head.
+The loop starts after the overlapped head, plays the middle, then the
+tail/head crossfade. The end flows into the start without an added fade to silence.
+Result: 1.6 seconds, 48 kHz stereo PCM, peak normalized to -6 dBFS.
+The source file is unchanged. Runtime volume is controlled by charge_audio.gd.

@@ -40,10 +40,10 @@ func run() -> void:
 	game.monster_side = 320
 	game._start_round()
 	await capture("wave-nine")
-	for id in [2,3,33,6]: game.model.buffs[id] = 3
+	for id in [2,3,33,6]: game.model.statuses[id].count = 3
 	await capture("statuses")
-	game.model.buffs[3] = 0
-	game.model.buffs[6] = 0
+	game.model.statuses[3].count = 0
+	game.model.statuses[6].count = 0
 	await capture("statuses-expired")
 	game.debug_open = true
 	game.debug_perfect = true

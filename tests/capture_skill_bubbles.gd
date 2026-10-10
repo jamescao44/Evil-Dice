@@ -26,7 +26,7 @@ func run() -> void:
 	game.visual_stage = 6
 	game.monster_side = game.HORROR_SIZES[6]
 	game._start_round()
-	game.model.buffs = {2:4,3:3,33:2,6:1}
+	game.model.set_status_counts({2:4,3:3,33:2,6:1})
 	game.model.perfect_progress = 9
 	game.result = game.model.set_test_roll([5,5,3])
 	game.status_color = game.TEAL

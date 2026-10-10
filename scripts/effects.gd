@@ -80,8 +80,8 @@ func feed(from: Vector2, to: Vector2, duration: float = 1.2) -> void:
 	for i in range(18):
 		feeds.append({"from": from + Vector2(cos(i * 2.4) * 30, sin(i) * 10), "to": to, "life": duration + i * 0.025, "duration": duration + i * 0.025, "bend": sin(i * 2.1) * 65})
 
-func enemy_cast(role: int, from: Vector2, target: Vector2, duration: float) -> void:
-	enemy_spells.append({"face": -1, "role": role, "from": from, "targets": [target], "life": duration, "duration": duration})
+func enemy_cast(role: int, from: Vector2, target: Vector2, duration: float, attribute: int = 0) -> void:
+	enemy_spells.append({"face": -1, "role": role, "attribute":attribute, "from": from, "targets": [target], "life": duration, "duration": duration})
 
 func clear() -> void:
 	particles.clear()
@@ -276,17 +276,19 @@ func _draw_spell(cast_info: Dictionary) -> void:
 	var strength: float = sin(progress * PI)
 	var color := Color("b395f0")
 	if cast_info.face == -1:
+		var attribute: int = cast_info.get("attribute",0)
+		var tint: Color = [Color("eee0b9"), Color("82dfff"), Color("ff9955"), Color("ffe388")][attribute]
 		var target: Vector2 = cast_info.targets[0]
 		var head: Vector2 = cast_info.from.lerp(target, minf(1, progress * 1.6))
 		if cast_info.role == 0:
-			Pixel.line(self, target + Vector2(-32, 46) * strength, target + Vector2(32, -46) * strength, Color("eee0b9"), 6)
+			Pixel.line(self, target + Vector2(-32, 46) * strength, target + Vector2(32, -46) * strength, tint, 6)
 		elif cast_info.role == 1:
-			Pixel.line(self, head, head + Vector2(42, -2), Color("bfa577"), 3)
-			Pixel.line(self, head + Vector2(9, -9), head, Color("eee0b9"), 3)
-			Pixel.line(self, head + Vector2(9, 9), head, Color("eee0b9"), 3)
+			Pixel.line(self, head, head + Vector2(42, -2), tint, 3)
+			Pixel.line(self, head + Vector2(9, -9), head, tint.lightened(0.3), 3)
+			Pixel.line(self, head + Vector2(9, 9), head, tint.lightened(0.3), 3)
 		else:
-			Pixel.disc(self, head, 12, Color("c5a4de"), 4)
-			Pixel.circle(self, head, 20, Color("eee0b9"), 3)
+			Pixel.disc(self, head, 12, tint if attribute else Color("c5a4de"), 4)
+			Pixel.circle(self, head, 20, tint.lightened(0.3), 3)
 		return
 	if cast_info.face == 6:
 		color = Color("efd394")

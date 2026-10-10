@@ -39,16 +39,16 @@ func _initialize() -> void:
 		check(hits.size() == (3 if face == 4 else 6), "Triple produces correct hit count")
 		for hit in hits: check(hit.amount == (30 if face == 4 else 15), "Triple attack uses fixed regular power, not dice sum")
 	var game = fresh()
-	game.buffs[3] = 2
-	game.buffs[33] = 1
+	game.statuses[3].count = 2
+	game.statuses[33].count = 1
 	game.set_test_roll([5,5,5])
 	for remaining in range(5,-1,-1):
 		var hits: Array = game.apply_player_step()
 		check(hits[0].amount == 45, "All six hits keep the same 3x boost")
-		check(game.buffs[33] == 1, "Boost remains through every hit and the upcoming enemy phase")
+		check(game.statuses[33].count == 1, "Boost remains through every hit and the upcoming enemy phase")
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
-	check(game.attack_multiplier() == 1.5 and game.buffs[3] == 1, "Weaker boon resumes with remaining turn")
+	check(game.attack_multiplier() == 1.5 and game.statuses[3].count == 1, "Weaker boon resumes with remaining turn")
 	check(game.apply_player_step().is_empty(), "Seventh hit is rejected")
 	game = fresh()
 	for enemy in game.enemies: enemy.hp = 1
@@ -74,10 +74,10 @@ func _initialize() -> void:
 	game.apply_player_step(0)
 	check(game.enemies[0].hp == before_hp-15, "Next consecutive hit damages health after shield break")
 	game = fresh()
-	game.buffs[6] = 1
+	game.statuses[6].count = 1
 	game.set_test_roll([6,6,4])
 	game.apply_player()
-	check(game.buffs[6] == 4, "Invincibility refreshes duration rather than stacking")
+	check(game.statuses[6].count == 4, "Invincibility refreshes duration rather than stacking")
 	var city = Run.new(42)
 	city.stage = 9
 	city.power = 6.75
@@ -109,7 +109,7 @@ func _initialize() -> void:
 	city.apply_player_step()
 	city.reset_run()
 	check(city.pending.is_empty() and city.apply_player_step().is_empty(), "Restart discards an unfinished combo")
-	check(city.buffs.values().all(func(v): return v == 0), "Restart clears every new boon")
+	check(city.status_counts().values().all(func(v): return v == 0), "Restart clears every new boon")
 	print("Skill rework: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)
 
@@ -131,15 +131,15 @@ func _test_damage_captions() -> void:
 			game.power = stats[0]
 			game.reward_base_damage = stats[1]
 			game.reward_damage_multiplier = stats[2]
-			if stats[3] > 0: game.buffs[stats[3]] = 2
+			if stats[3] > 0: game.statuses[stats[3]].count = 2
 			game.set_test_roll(values)
 			var rng: int = game.rng.state
 			var pending: MultiHitSkill = game.pending.duplicate(true)
-			var buffs: Dictionary = game.buffs.duplicate()
+			var buffs: Dictionary = game.status_counts([2,3,33,6])
 			var caption: String = game.damage_caption(game.pending,0)
 			var terms: PackedStringArray = caption.split(" ")
 			var predicted: int = int(terms[0])+int(terms[2].trim_prefix("(").trim_suffix(")"))
-			check(game.rng.state == rng and game.pending.same_as(pending) and game.buffs == buffs, "Preview leaves RNG, pending skill and buffs untouched")
+			check(game.rng.state == rng and game.pending.same_as(pending) and game.status_counts([2,3,33,6]) == buffs, "Preview leaves RNG, pending skill and buffs untouched")
 			var events: Array = game.apply_player_step(0)
 			check(events[0].amount == mini(500,predicted), "Displayed per-hit sum matches actual damage after rewards, growth, buffs and caps")
 	var city := Run.new(42)
@@ -150,7 +150,7 @@ func _test_damage_captions() -> void:
 	check(city.damage_caption(Rules.classify([6,6,6])) == "800 + 0 (x1)", "City Annihilation remains fixed even with growth")
 	city.reward_base_damage = 5
 	city.reward_damage_multiplier = 0.5
-	city.buffs[33] = 3
+	city.statuses[33].count = 3
 	check(city.damage_caption(Rules.classify([5,5,5])) == "15 + 2212 (x6)", "City preview includes all current bonuses and six hits")
 	city.city_hp = 100
 	check(city.damage_caption(Rules.classify([6,6,6])) == "800 + (-700) (x1)", "City remaining health clamps the actual strike")
@@ -158,44 +158,44 @@ func _test_damage_captions() -> void:
 func _test_turn_end_buffs() -> void:
 	var game = fresh()
 	game.hp = 50
-	game.buffs = {2:1,3:2,33:1,6:1}
+	game.set_status_counts({2:1,3:2,33:1,6:1})
 	game.phase = "round_end"
 	game.begin_round()
-	check(game.hp == 55 and game.buffs[2] == 1, "Regeneration heals at start without decrementing its badge")
+	check(game.hp == 55 and game.statuses[2].count == 1, "Regeneration heals at start without decrementing its badge")
 	game.set_test_roll([1,2,3])
 	game.apply_player(0)
-	check(game.buffs == {2:1,3:2,33:1,6:1}, "All counters stay unchanged after the player skill")
+	check(game.status_counts([2,3,33,6]) == {2:1,3:2,33:1,6:1}, "All counters stay unchanged after the player skill")
 	for i in game.living():
 		game.enemies[i].intent = {"type":"attack","target":-1,"amount":5}
 		game.enemy_act(i)
-		check(game.hp == 55 and game.buffs[6] == 1, "Last immunity turn protects every enemy impact")
+		check(game.hp == 55 and game.statuses[6].count == 1, "Last immunity turn protects every enemy impact")
 		if i < 2:
 			game.end_round()
-			check(game.buffs == {2:1,3:2,33:1,6:1}, "An incomplete enemy phase cannot tick buffs")
+			check(game.status_counts([2,3,33,6]) == {2:1,3:2,33:1,6:1}, "An incomplete enemy phase cannot tick buffs")
 	game.end_round()
-	check(game.buffs == {2:0,3:1,33:0,6:0}, "All used durations decrease together after the final enemy")
+	check(game.status_counts([2,3,33,6]) == {2:0,3:1,33:0,6:0}, "All used durations decrease together after the final enemy")
 	game.end_round()
-	check(game.buffs[3] == 1, "Duplicate turn completion cannot decrement twice")
+	check(game.statuses[3].count == 1, "Duplicate turn completion cannot decrement twice")
 	game.begin_round()
 	check(game.hp == 55 and game.attack_multiplier() == 1.5, "Expired regeneration stops and weaker attack boon resumes")
 	game.set_test_roll([2,2,1])
 	game.apply_player()
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
-	check(game.buffs[2] == 1, "Fresh regeneration retains its advertised future healing tick")
+	check(game.statuses[2].count == 1, "Fresh regeneration retains its advertised future healing tick")
 	game.begin_round()
 	var healed_hp: int = game.hp
 	game.set_test_roll([2,2,3])
 	game.apply_player()
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
-	check(game.buffs[2] == 3, "Refreshing regeneration does not charge the old tick against the new duration")
+	check(game.statuses[2].count == 3, "Refreshing regeneration does not charge the old tick against the new duration")
 	check(game.hp <= healed_hp, "Refresh itself does not heal twice")
 	var run := Run.new(5)
 	run.begin_round()
-	run.buffs[3] = 2
+	run.statuses[3].count = 2
 	run.set_test_roll([1,1,1])
 	run.apply_player(0)
-	check(run.buffs[3] == 1, "A normal wave-ending action closes the turn when there are no enemies left")
+	check(run.statuses[3].count == 1, "A normal wave-ending action closes the turn when there are no enemies left")
 	run.advance_wave()
-	check(run.buffs[3] == 1 and run.buff_ticks.is_empty(), "Wave transition cannot repeat a completed countdown")
+	check(run.statuses[3].count == 1 and run.buff_ticks.is_empty(), "Wave transition cannot repeat a completed countdown")

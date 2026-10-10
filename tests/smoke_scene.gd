@@ -138,7 +138,7 @@ func run() -> void:
 	await Driver.resolve_held(game)
 	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All five acted and the next round prepared successfully")
 	for stage in range(3,9): await ultimate_wave()
-	check(game.model.is_city() and game.model.stage == 9 and game.monster_side == 320 and game.model.max_hp == 370, "Tenth and final transition reaches city scale")
+	check(game.model.is_city() and game.model.stage == 9 and game.monster_side == 288 and game.model.max_hp == 370, "Final transition reaches the smaller city sprite without reducing player health")
 	game._handle_click(game.DEBUG_RECT.get_center())
 	var city_clock: float = game.model.volley_clock
 	await create_timer(0.3).timeout

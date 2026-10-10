@@ -43,9 +43,9 @@ func run() -> void:
 	var controls: Array = [game.DEBUG_RECT, game.SPEED_RECT, game.AUDIO_RECT, game.FX_RECT, game.GUIDE_RECT, game.GUIDE_CLOSE, game.DEBUG_CLOSE, game.DEBUG_REPEAT, game.REPLAY_RECT, game.GUIDE_PAIRS, game.GUIDE_TRIPLES, game._chest_milestone_rect(1), game._chest_milestone_rect(2), game._chest_milestone_rect(3)]
 	for i in range(-1, 13): controls.append(game._debug_option_rect(i))
 	controls.append(game.DEBUG_PERFECT)
-	for id in [2,3,33,6]: game.model.buffs[id] = 2
+	for id in [2,3,33,6]: game.model.statuses[id].count = 2
 	for item in game._active_statuses(): controls.append(game._status_rect(item.id))
-	for id in game.model.buffs: game.model.buffs[id] = 0
+	for id in game.model.statuses: game.model.statuses[id].count = 0
 	for rect in controls:
 		check(safe.encloses(rect), "Portrait control stays inside safe area: %s" % rect)
 		check(rect.size.x >= 88 and rect.size.y >= 88, "Touch target is at least 44 points: %s" % rect)
@@ -66,10 +66,10 @@ func run() -> void:
 	tap(game.DEBUG_REPEAT.get_center())
 	tap(game._debug_option_rect(2).get_center())
 	check(game.debug_repeat and game.debug_choice == 2 and not game.debug_open, "Debug touch queues repeating pair")
-	game.model.buffs[2] = 2
+	game.model.statuses[2].count = 2
 	tap(game._status_rect(2).get_center())
 	check(game.selected_status == 2, "Active status descriptions available without hover")
-	game.model.buffs[2] = 0
+	game.model.statuses[2].count = 0
 	touch(game.DICE_CENTER, true)
 	var pending: MultiHitSkill = game.model.pending.duplicate(true)
 	touch(game.AUDIO_RECT.get_center(), true, 1)
@@ -85,7 +85,7 @@ func run() -> void:
 	tap(game.DICE_CENTER)
 	var regeneration_turns: int = game.result.spare
 	await settle()
-	check(game.model.round_number == 2 and game.model.buffs[2] == regeneration_turns, "Touch applies regeneration and preserves its count until a healing turn ends")
+	check(game.model.round_number == 2 and game.model.statuses[2].count == regeneration_turns, "Touch applies regeneration and preserves its count until a healing turn ends")
 	for stage in range(9):
 		game.debug_choice = 12
 		await game._roll()

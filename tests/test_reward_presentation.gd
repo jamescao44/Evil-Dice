@@ -19,15 +19,15 @@ func test_layout(game) -> void:
 	game.muted = true
 	game.speed = 30
 	check(game._active_statuses().is_empty(), "Unactivated statuses have no indicator")
-	game.model.buffs = {2:4,3:2,33:3,6:1}
+	game.model.set_status_counts({2:4,3:2,33:3,6:1})
 	var items: Array = game._active_statuses()
 	check(items.size() == 4, "Both attack boons own separate indicators and durations")
 	for item in items:
 		var at: Vector2 = game._status_center(item.id)
 		check(at.y < game._player_feet().y-game.monster_side, "Status follows above Horror")
 		check(game._status_rect(item.id).has_point(at), "Each status owns a hit area")
-	game.model.buffs[6] = 0
-	game.model.buffs[3] = 0
+	game.model.statuses[6].count = 0
+	game.model.statuses[3].count = 0
 	items = game._active_statuses()
 	check(items.map(func(item): return item.id) == [2,33] and items[0].turns == 4 and items[1].turns == 3, "Expired indicators disappear without removing other statuses")
 	game._restart()
@@ -42,7 +42,7 @@ func test_layout(game) -> void:
 	await game._roll()
 	var expected_turns: int = game.result.spare
 	await Driver.resolve_held(game)
-	check(game.debug_perfect and game.model.perfect_total == 1 and game.model.buffs[2] == expected_turns, "Repeat retains Perfect and the chosen combination")
+	check(game.debug_perfect and game.model.perfect_total == 1 and game.model.statuses[2].count == expected_turns, "Repeat retains Perfect and the chosen combination")
 	game._restart()
 	check(game.debug_perfect, "Perfect toggle stays enabled across restart until switched off")
 	for i in range(2):

@@ -139,14 +139,16 @@ func radius_scale() -> float:
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
+	# Once taken out, the saved skill still plays its cast and dissolve effects.
+	var locked_saved: bool = stored and not is_casting() and not battle._can_use_saved()
 	if not battle.guide and not battle.debug_open:
 		age += delta
-		rotation_clock += delta * battle._world_time_scale()
+		if not locked_saved: rotation_clock += delta * battle._world_time_scale()
 		cast_age += delta
 		if dissolving: dissolve_age += delta
 		for pop in pops: pop.age += delta
 		pops = pops.filter(func(pop): return pop.age < 0.4)
-	self_modulate = Color(0.38,0.38,0.44,0.7) if is_suspended() else Color(1,1,1,CAST_OPACITY if is_casting() else 1.0)
+	self_modulate = Color(0.38,0.38,0.44,0.7) if is_suspended() or locked_saved else Color(1,1,1,CAST_OPACITY if is_casting() else 1.0)
 	queue_redraw()
 
 func _draw() -> void:
@@ -231,7 +233,7 @@ func _draw_uses(at: Vector2, radius: float, color: Color) -> void:
 				Pixel.line(self,p+direction*(8+q*20),p+direction*(14+q*30),Color(color,1-q),2)
 
 func description_text() -> String:
-	return caption.get("description", "")
+	return battle._skill_caption(roll).description if not roll.is_empty() else ""
 
 func value_text() -> String:
 	if roll.is_empty() or age < formation or is_suspended(): return ""

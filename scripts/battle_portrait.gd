@@ -84,13 +84,15 @@ func _enemy_feet(index: int) -> Vector2:
 	if count == 1: return Vector2(568, 662 if model.stage == 0 else 610)
 	var columns: int = mini(5, count)
 	var spacing: float = clampf(_enemy_side()*1.8, 104, 172)
-	spacing = minf(spacing, 432.0/maxi(1,columns-1))
+	spacing = minf(spacing, 384.0/maxi(1,columns-1))
 	var row: int = floori(index / float(columns))
 	var row_count: int = mini(columns, count-row*columns)
 	var column: int = index % columns
-	# Keep the entire troop band above the Horror's four status touch targets.
+	# Leave room for move badges between rows and for two rows of player statuses.
 	var bottom: float = minf(570, _player_feet().y-monster_side-154)
-	return Vector2(510+(column-(row_count-1)/2.0)*spacing, bottom-(92 if count>5 and row==0 else 0)+[0,-12,10,-6,7][column])
+	if count > 5: bottom = maxf(bottom,462+_enemy_side())
+	var center_x: float = 524 if columns == 3 else 540
+	return Vector2(center_x+(column-(row_count-1)/2.0)*spacing, bottom-(161 if count>5 and row==0 else 0)+[0,-12,10,-6,7][column])
 
 func _city_gate_point() -> Vector2:
 	return CITY_TRANSFORM * City.gate_point()
@@ -171,7 +173,8 @@ func _draw_city() -> void:
 	City.paint(self, art, model.city_hp / float(Run.CITY_MAX_HP), city_life.clock, city_life.people, city_life.houses, reduced, CITY_TRANSFORM)
 	for corpse in city_corpses:
 		draw_set_transform(corpse.p, PI / 2, Vector2(0.35, 1))
-		_art(["vanguard", "archer", "mage"][corpse.role], Rect2(-8, -8, 16, 16), Color("796c64"))
+		var side: float = _enemy_side()
+		_art(["vanguard", "archer", "mage"][corpse.role], Rect2(-side/2, -side/2, side, side), Color("796c64"))
 		draw_set_transform(Vector2.ZERO)
 	for i in range(model.troops):
 		var point := _troop_point(i)
@@ -179,7 +182,8 @@ func _draw_city() -> void:
 		var hop: float = 0 if reduced else snappedf(absf(sin(stride)) * 2, 1)
 		_shadow(point, 5, 0.22)
 		draw_set_transform(point - Vector2(0, hop), 0 if reduced else sin(stride) * 0.16)
-		_art(["vanguard", "archer", "mage"][i % 3], Rect2(-8, -16, 16, 16))
+		var side: float = _enemy_side()
+		_art(["vanguard", "archer", "mage"][i % 3], Rect2(-side/2, -side, side, side))
 		draw_set_transform(Vector2.ZERO)
 	_meter(Rect2(48, ARENA.position.y + 42, 708, 34), model.city_hp / float(Run.CITY_MAX_HP), GOLD)
 	_center(Vector2(402, ARENA.position.y + 67), "%d / %d" % [model.city_hp, Run.CITY_MAX_HP], 28)
@@ -187,12 +191,13 @@ func _draw_city() -> void:
 
 func _draw_player() -> void:
 	var hurt: float = hit_times[0]
-	var bob: float = 0 if reduced else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
-	var dx: float = 0 if reduced else snappedf(sin(clock_time * 45) * hurt * 5, 2)
+	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
+	var dx: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * 45) * hurt * 5, 2)
 	var feet := _player_feet()
 	_shadow(feet, monster_side * 0.48, 0.27)
-	if model.shield > 0 or model.buffs[6] > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
+	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
 	_art("eldritch", Rect2(feet + Vector2(-monster_side / 2 + dx, -monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
+	_draw_player_afflictions()
 	if skill_bubble.roll.is_empty() or skill_bubble.age >= skill_bubble.formation:
 		_text(Vector2(492, 910), "%.2fx" % model.power, 32, TEAL)
 	_meter(Rect2(48, 962, 708, 34), model.hp / float(model.max_hp), TEAL)
@@ -229,11 +234,11 @@ func _draw_tooltips() -> void:
 	if index == -1 and active_touch == -1:
 		for item in _active_statuses():
 			if _status_rect(item.id).has_point(get_global_mouse_position()): index = item.id
-	if index < 0 or model.buffs.get(index, 0) <= 0: return
+	if index < 0 or model.status_count(index) <= 0: return
 	var item: Dictionary = Statuses.ENTRIES[index]
 	_frame(Rect2(38, 762, 728, 172), PANEL, GOLD)
 	_text(Vector2(58, 800), item.name, 28, item.color)
-	_wrapped(Vector2(58, 840), item.text + " " + _remaining_turns(model.buffs[index]), 688, CREAM, 24)
+	_wrapped(Vector2(58, 840), _status_description(index,model.status_count(index)), 688, CREAM, 24)
 
 func _draw_ending() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.92))

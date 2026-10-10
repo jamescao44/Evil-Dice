@@ -7,6 +7,8 @@ const WAVE_COUNTS := [[1,0], [3,0], [0,1], [5,0], [2,1], [3,2], [5,2], [0,4], [5
 const WAVE_BOOSTS := [1.0, 1.0, 1.5, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25]
 const CITY_MAX_HP := 2400
 const CITY_ULTIMATE_DAMAGE := CITY_MAX_HP / 3
+const CITY_IMMUNITY_SECONDS_PER_STACK := 2.0
+var city_immunity_clock: float = 0.0
 var stage: int = 0
 var city_hp: int = CITY_MAX_HP
 var troops: int = 0
@@ -41,6 +43,7 @@ func reset_run() -> void:
 	volley_clock = 4.0
 	troop_clock = 1.5
 	volley_warned = false
+	city_immunity_clock = 0.0
 	perfect_progress = 0
 	perfect_total = 0
 	claimed_slots.clear()
@@ -114,6 +117,7 @@ func damage_cap(kind: int, target: int) -> int:
 	return floori(enemies[target].max_hp * numerator * WAVE_BOOSTS[stage] / 3.0)
 
 func _load_wave() -> void:
+	city_immunity_clock = 0.0
 	enemies.clear()
 	if not is_city():
 		for tier in range(2):
@@ -152,10 +156,10 @@ func begin_round() -> Array:
 		return []
 	round_number += 1
 	var events: Array = []
-	if buffs[2] > 0:
+	if statuses[2].count > 0:
 		buff_ticks[2] = true
 		events.append(event(-1, heal(5), "heal", "REGROWTH"))
-	phase = "roll"
+	_prepare_player_turn()
 	return events
 
 func is_instant_kill(result: MultiHitSkill) -> bool:
@@ -193,9 +197,34 @@ func _finish_player_action(result: MultiHitSkill) -> void:
 	if bonus: return
 	if is_city():
 		# Siege has no discrete enemy phase: preserve its complete roll intervals.
-		if result.kind == Kind.PAIR and result.face == 6: buff_ticks.erase(6)
-		_end_buff_turn()
-		phase = "round_end" if outcome().is_empty() else "finished"
+		if outcome().is_empty(): _begin_turn_end()
+		else:
+			_end_buff_turn()
+			phase = "finished"
+
+func _apply_support(result: MultiHitSkill) -> Array:
+	var events: Array = super._apply_support(result)
+	if is_city() and result.kind == Kind.PAIR and result.face == 6:
+		city_immunity_clock = 0.0
+	return events
+
+func _end_buff_turn() -> void:
+	# City immunity expires on elapsed time, including between throws.
+	if is_city(): buff_ticks.erase(Status.IMMUNITY)
+	super._end_buff_turn()
+
+func city_immunity_seconds() -> float:
+	return maxf(0.0, status_count(Status.IMMUNITY)*CITY_IMMUNITY_SECONDS_PER_STACK-city_immunity_clock)
+
+func _tick_city_immunity(delta: float) -> void:
+	if status_count(Status.IMMUNITY) == 0:
+		city_immunity_clock = 0.0
+		return
+	city_immunity_clock += maxf(0,delta)
+	while city_immunity_clock >= CITY_IMMUNITY_SECONDS_PER_STACK-0.000001 and status_count(Status.IMMUNITY) > 0:
+		city_immunity_clock = maxf(0,city_immunity_clock-CITY_IMMUNITY_SECONDS_PER_STACK)
+		statuses[Status.IMMUNITY].consume()
+	if status_count(Status.IMMUNITY) == 0: city_immunity_clock = 0.0
 
 func apply_player_step(primary: int = -1) -> Array:
 	if not is_city(): return super.apply_player_step(primary)
@@ -217,16 +246,22 @@ func apply_player_step(primary: int = -1) -> Array:
 	_complete_skill_use(result, events)
 	return events
 
-func tick_city(delta: float) -> Array:
+func tick_city(delta: float, immunity_delta: float = -1.0) -> Array:
 	var events: Array = []
-	if not is_city() or not outcome().is_empty() or delta <= 0:
+	if not is_city() or not outcome().is_empty():
+		return events
+	var elapsed: float = maxf(0,delta if immunity_delta < 0 else immunity_delta)
+	if delta <= 0:
+		_tick_city_immunity(elapsed)
 		return events
 	# Bounded fixed steps keep damage independent of frame rate and prevent a
 	# window stall from delivering an unbounded batch of invisible attacks.
 	var remaining: float = minf(delta, 0.25)
+	var immunity_rate: float = elapsed/remaining
 	while remaining > 0 and outcome().is_empty():
 		var step: float = minf(remaining, 0.05)
 		remaining -= step
+		_tick_city_immunity(step*immunity_rate)
 		spawn_clock -= step
 		volley_clock -= step
 		troop_clock -= step
@@ -249,7 +284,7 @@ func tick_city(delta: float) -> Array:
 	return events
 
 func _city_hit(amount: int) -> Array:
-	if buffs[6] > 0: return [event(-1, 0, "immune", "INVINCIBLE")]
+	if statuses[6].count > 0: return [event(-1, 0, "immune", "INVINCIBLE")]
 	var blocked: int = mini(shield, amount)
 	shield -= blocked
 	var loss: int = mini(hp, amount - blocked)

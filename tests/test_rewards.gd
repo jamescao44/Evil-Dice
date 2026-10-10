@@ -52,7 +52,7 @@ func test_model() -> void:
 	model.hp = 20
 	model.open_rewards = [1,2,5]
 	for slot in range(model.open_rewards.size()): model.claim_reward(slot)
-	check(model.hp == 20 and model.rubies == 100 and model.reward_base_damage == 10 and model.buffs.values().all(func(v): return v == 0), "Relic, curse and potion remain placeholders")
+	check(model.hp == 20 and model.rubies == 100 and model.reward_base_damage == 10 and model.status_counts().values().all(func(v): return v == 0), "Relic, curse and potion remain placeholders")
 	model.close_chest()
 	model.stage = 9
 	check(model.siege_damage(Rules.classify([6,6,6])) == 800, "Rewards cannot amplify city Annihilation")
@@ -159,7 +159,7 @@ func test_scene(game) -> void:
 	game._handle_click(game.DICE_CENTER)
 	game._handle_click(game.GUIDE_RECT.get_center())
 	if game is Portrait:
-		game.model.buffs[2] = 3
+		game.model.statuses[2].count = 3
 		game._handle_click(game._status_rect(2).get_center())
 		check(game.selected_status == -1, "Treasure overlay blocks status taps")
 	await create_timer(0.1).timeout

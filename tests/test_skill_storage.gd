@@ -24,25 +24,25 @@ func next_round(m) -> void:
 func model_checks() -> void:
 	var m := Run.new(810)
 	m.begin_round()
-	m.buffs[3] = 2
+	m.statuses[3].count = 2
 	var bank: MultiHitSkill = m.set_test_roll([3,3,5]).duplicate(true)
 	var rng: int = m.rng.state
 	check(m.save_pending_skill(),"First skill fits in the empty slot")
 	check(m.saved_skill.same_as(bank) and m.pending.is_empty() and m.phase == "enemy", "Saving stores the exact dice and passes the turn")
-	check(m.buffs[3] == 2 and m.rng.state == rng,"Saving defers the existing boon countdown until enemies finish without granting the stored boon or drawing RNG")
+	check(m.statuses[3].count == 2 and m.rng.state == rng,"Saving defers the existing boon countdown until enemies finish without granting the stored boon or drawing RNG")
 	next_round(m)
-	check(m.buffs[3] == 1,"Saving consumes one boon turn after the enemy phase")
+	check(m.statuses[3].count == 1,"Saving consumes one boon turn after the enemy phase")
 	var current: MultiHitSkill = m.set_test_roll([1,2,3]).duplicate(true)
 	check(not m.save_pending_skill() and m.pending.same_as(current) and m.saved_skill.same_as(bank),"Full slot cannot overwrite either skill")
 	var turn: int = m.round_number
 	check(m.begin_saved_cast(),"Stored boon can be used while a fresh roll is held")
 	m.apply_player()
 	check(m.pending.same_as(current) and m.phase == "player" and m.round_number == turn,"Bonus restores the waiting roll without spending a turn")
-	check(m.buffs[3] == 5 and m.saved_skill.is_empty() and m.bonus_resume.is_empty(),"Saved boon applies once and empties the slot")
+	check(m.statuses[3].count == 5 and m.saved_skill.is_empty() and m.bonus_resume.is_empty(),"Saved boon applies once and empties the slot")
 	m.apply_player(0)
-	check(m.buffs[3] == 5,"Normal action keeps the bonus boon active until enemies finish")
+	check(m.statuses[3].count == 5,"Normal action keeps the bonus boon active until enemies finish")
 	next_round(m)
-	check(m.buffs[3] == 4,"The full turn consumes one attack-boon turn")
+	check(m.statuses[3].count == 4,"The full turn consumes one attack-boon turn")
 	m.reset_run()
 	m.begin_round()
 	m.enemies[0].hp = 500
@@ -56,7 +56,7 @@ func model_checks() -> void:
 	m.begin_saved_cast()
 	m.apply_player()
 	m.apply_player(0)
-	check(m.buffs[6] == 1,"A one-turn saved immunity protects the upcoming enemy phase")
+	check(m.statuses[6].count == 1,"A one-turn saved immunity protects the upcoming enemy phase")
 	var hp: int = m.hp
 	m.enemies[0].intent = {"type":"attack","amount":5,"target":-1}
 	m.enemy_act(0)
@@ -65,7 +65,7 @@ func model_checks() -> void:
 	m.begin_round()
 	m.set_test_roll([1,2,3])
 	m.apply_player(0)
-	check(m.buffs[6] == 0,"Saved immunity expires after its protected phase")
+	check(m.statuses[6].count == 0,"Saved immunity expires after its protected phase")
 	m.saved_skill = Rules.classify([1,1,1])
 	for enemy in m.enemies: enemy.hp = 0
 	check(m.advance_wave() and m.saved_skill.face == 1,"Storage carries between waves")
@@ -80,13 +80,15 @@ func model_checks() -> void:
 	m.begin_saved_cast()
 	m.apply_player()
 	check(m.city_hp == Run.CITY_MAX_HP-150 and m.pending.same_as(current) and m.phase == "player","Stored 111 uses city damage and restores the current city roll")
-	check(m.round_number == turn and m.buffs[2] == 0,"City bonus does not execute the waiting support skill")
+	check(m.round_number == turn and m.statuses[2].count == 0,"City bonus does not execute the waiting support skill")
 	m.saved_skill = Rules.classify([6,6,1])
 	m.begin_saved_cast()
 	m.apply_player()
-	check(m.buffs[6] == 1,"City saved immunity covers the live interval")
+	check(m.statuses[6].count == 1,"City saved immunity covers the live interval")
 	m.apply_player()
-	check(m.phase == "round_end" and m.buffs[6] == 0,"Normal city roll completes once after bonus use")
+	check(m.phase == "round_end" and m.statuses[6].count == 1,"Normal city roll does not consume timed immunity from a saved skill")
+	for tick in range(40): m.tick_city(0.05)
+	check(m.statuses[6].count == 0,"Saved city immunity expires after two seconds without another throw")
 	m.saved_skill = Rules.classify([3,3,2])
 	check(m.begin_saved_cast(),"A stored skill is available between city rolls")
 	m.apply_player()
@@ -97,7 +99,7 @@ func model_checks() -> void:
 	m.set_test_roll([3,3,4])
 	m.begin_saved_cast()
 	m.apply_player(0)
-	check(m.outcome() == "wave_clear" and m.pending.is_empty() and m.bonus_resume.is_empty() and m.buffs[3] == 0,"Bonus wave clear preserves the unused roll without executing it")
+	check(m.outcome() == "wave_clear" and m.pending.is_empty() and m.bonus_resume.is_empty() and m.statuses[3].count == 0,"Bonus wave clear preserves the unused roll without executing it")
 	check(m.saved_skill.dice == [3,3,4],"Bonus wave clear automatically banks the exact waiting dice")
 	check(m.advance_wave(),"Bonus wave clear still advances normally")
 	check(m.saved_skill.dice == [3,3,4],"Automatically banked skill survives the wave transition")
@@ -131,9 +133,9 @@ func layout_checks(g) -> void:
 	force_roll(g,[5,5,3])
 	check(g.skill_bubble.value_text() == "13 + 6 (x3)","Held combo shows actual per-hit damage and three hits")
 	check(g.skill_bubble.description_text() == "random attack +3" and g.skill_bubble.value_color().r > g.skill_bubble.value_color().g,"Attack descriptions remain separate from the red value line")
-	g.model.buffs[3] = 2
+	g.model.statuses[3].count = 2
 	check(g.skill_bubble.value_text() == "13 + 16 (x3)","Held preview updates immediately when attack buffs change")
-	g.model.buffs[3] = 0
+	g.model.statuses[3].count = 0
 	g.model.phase = "roll"
 	force_roll(g,[1,1,6])
 	tap(g,g._skill_center())
@@ -181,7 +183,7 @@ func layout_checks(g) -> void:
 	drag(g,g._skill_center(),Vector2(20,20))
 	check(g.view_phase == "skill" and g.model.pending.same_as(pending) and g.model.rng.state == rng,"Invalid field drop preserves the roll and RNG")
 	tap(g,g._saved_slot_center())
-	check(g.view_phase == "skill" and not g.model.saved_skill.is_empty() and g.model.buffs[3] == 0,"Tapping a stored support skill does not cast it")
+	check(g.view_phase == "skill" and not g.model.saved_skill.is_empty() and g.model.statuses[3].count == 0,"Tapping a stored support skill does not cast it")
 	turn = g.model.round_number
 	g._handle_click(g._saved_slot_center())
 	check(g.skill_bubble.is_suspended() and g.saved_bubble.display_radius() == g._skill_radius(),"Selecting storage dims the waiting skill and restores the saved seal to full size")
@@ -204,7 +206,7 @@ func layout_checks(g) -> void:
 	check(g.saved_bubble.self_modulate.a < 0.35,"Dissolve retains cast transparency")
 	await settle(g)
 	check(g.view_phase == "skill" and g.result.same_as(pending) and g.model.pending.same_as(pending) and g.model.round_number == turn,"Bonus restores the displayed and model versions of the waiting skill")
-	check(g.model.buffs[3] == 2 and g.saved_bubble.roll.is_empty(),"Bonus boon retains its duration and the slot empties")
+	check(g.model.statuses[3].count == 2 and g.saved_bubble.roll.is_empty(),"Bonus boon retains its duration and the slot empties")
 	check(g.skill_bubble.value_text() == "7 + 10 (x1)","Waiting skill preview reflects the just-cast saved power boon")
 	g.skill_bubble._process(0)
 	check(not g.skill_bubble.is_suspended() and g.skill_bubble.self_modulate == Color.WHITE,"Bonus completion restores waiting skill interaction and opacity")
@@ -212,7 +214,7 @@ func layout_checks(g) -> void:
 	g.skill_bubble._process(0)
 	check(g.skill_bubble.self_modulate.a < 0.35,"Ordinary cast also becomes transparent")
 	await settle(g)
-	check(g.view_phase == "ready" and g.model.round_number == turn+1 and g.model.buffs[3] == 1,"Waiting skill then uses the bonus and advances exactly one turn")
+	check(g.view_phase == "ready" and g.model.round_number == turn+1 and g.model.statuses[3].count == 1,"Waiting skill then uses the bonus and advances exactly one turn")
 	force_roll(g,[5,5,3])
 	var press := InputEventScreenTouch.new()
 	press.index = 0
@@ -267,7 +269,7 @@ func layout_checks(g) -> void:
 	var wave_deadline: int = Time.get_ticks_msec()+7000
 	while (g.model.stage == 0 or g.view_phase != "ready") and Time.get_ticks_msec()<wave_deadline: await process_frame
 	check(g.model.stage == 1 and g.view_phase == "ready" and g.model.saved_skill.dice == [6,6,4],"Bonus wave victory automatically carries the unused summoned skill to the next wave")
-	check(g.saved_bubble.roll.dice == [6,6,4] and g.skill_bubble.roll.is_empty() and g.model.buffs[6] == 0,"Auto-save updates the slot visual without activating the unused boon")
+	check(g.saved_bubble.roll.dice == [6,6,4] and g.skill_bubble.roll.is_empty() and g.model.statuses[6].count == 0,"Auto-save updates the slot visual without activating the unused boon")
 	g._restart()
 	g.model.stage = 9
 	g.model._load_wave()

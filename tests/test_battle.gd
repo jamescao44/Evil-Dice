@@ -80,7 +80,7 @@ func _test_buffs() -> void:
 			var game = fresh()
 			game.set_test_roll([face, spare, face])
 			game.apply_player()
-			check(game.buffs[face] == spare and game.enemies[0].hp == 75, "Spare die sets boon duration, with no attack")
+			check(game.statuses[face].count == spare and game.enemies[0].hp == 75, "Spare die sets boon duration, with no attack")
 	var game = fresh()
 	game.hp = 40
 	game.set_test_roll([2,2,3])
@@ -100,20 +100,20 @@ func _test_buffs() -> void:
 	game = fresh()
 	game.set_test_roll([3,3,2])
 	game.apply_player()
-	check(game.buffs[3] == 2 and game.attack_multiplier() == 1.5, "Pair attack boon starts with all turns available")
+	check(game.statuses[3].count == 2 and game.attack_multiplier() == 1.5, "Pair attack boon starts with all turns available")
 	finish_round(game)
 	game.begin_round()
 	game.set_test_roll([3,3,3])
 	game.apply_player()
-	check(game.buffs[33] == 3 and game.attack_multiplier() == 3.0, "Triple boost overrides weaker boon without multiplying it")
+	check(game.statuses[33].count == 3 and game.attack_multiplier() == 3.0, "Triple boost overrides weaker boon without multiplying it")
 	finish_round(game)
 	for remaining in [2,1,0]:
 		game.begin_round()
 		game.set_test_roll([2,2,2])
 		game.apply_player()
-		check(game.buffs[33] == remaining+1, "Boost countdown waits for enemy skills")
+		check(game.statuses[33].count == remaining+1, "Boost countdown waits for enemy skills")
 		finish_round(game)
-		check(game.buffs[33] == remaining, "Boost durations count turns, including support turns")
+		check(game.statuses[33].count == remaining, "Boost durations count turns, including support turns")
 	check(game.attack_multiplier() == 1.0, "Power returns to normal after expiration")
 
 func _test_human_phase() -> void:

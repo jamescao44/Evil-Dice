@@ -20,10 +20,10 @@ func run() -> void:
 		game.muted = true
 		prefix = "skills-portrait-" if portrait else "skills-landscape-"
 		await shot("layout")
-		game.model.buffs[2] = 4
-		game.model.buffs[3] = 5
-		game.model.buffs[6] = 2
-		game.model.buffs[33] = 1
+		game.model.statuses[2].count = 4
+		game.model.statuses[3].count = 5
+		game.model.statuses[6].count = 2
+		game.model.statuses[33].count = 1
 		await shot("active-boons")
 		game.guide = true
 		await shot("active-boon-guide")

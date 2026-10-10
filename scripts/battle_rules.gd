@@ -3,6 +3,8 @@ extends RefCounted
 const Weighted = preload("res://scripts/weighted_choice.gd")
 
 const Skill = preload("res://scripts/multi_hit_skill.gd")
+const Status = preload("res://scripts/status_effect.gd")
+const ELITE_CONTROL_CHANCE := 0.5
 const Kind = Skill.Kind
 const NORMAL_NAME = "Tentacle Swipe"
 const PAIR_NAMES = ["Rending Blow", "Unnatural Regrowth", "Eldritch Might", "Sweeping Ruin", "Tentacle Flurry", "Beyond Harm"]
@@ -24,7 +26,9 @@ var power: float = 1.0
 var reward_base_damage: float = 0.0
 var reward_damage_multiplier: float = 0.0
 var shield: int = 0
-var buffs: Dictionary = {2: 0, 3: 0, 6: 0, 33: 0}
+var statuses: Dictionary = {}
+var burn_ticks_remaining: int = 0
+var ice_hits_remaining: int = 0
 var enemies: Array = []
 var round_number: int = 0
 var pending: MultiHitSkill = Skill.new()
@@ -53,7 +57,9 @@ func reset() -> void:
 	reward_base_damage = 0
 	reward_damage_multiplier = 0
 	shield = 0
-	buffs = {2: 0, 3: 0, 6: 0, 33: 0}
+	set_status_counts({2: 0, 3: 0, 6: 0, 33: 0})
+	burn_ticks_remaining = 0
+	ice_hits_remaining = 0
 	enemies = [make_enemy(0), make_enemy(1), make_enemy(2)]
 	for e in enemies:
 		e["intent"] = {}
@@ -74,7 +80,35 @@ func reset() -> void:
 static func make_enemy(role: int, health_scale: float = 1.0, elite: bool = false) -> Dictionary:
 	# Keep exact half-HP thresholds stable despite decimal scale rounding.
 	var health: int = roundi(([150, 100, 75] if elite else [75, 50, 35])[role] * health_scale + 0.0001)
-	return {"name": ("Elite " if elite else "") + ["Vanguard", "Elf Archer", "Mage"][role], "role": role, "elite": elite, "hp": health, "max_hp": health, "shield": 10 if elite else 0, "damage": ([10.0, 10.0, 15.0] if elite else [5.0, 7.5, 10.0])[role], "attack_boost": false, "weight": [70, 70, 65][role], "heals": 0, "intent": {}, "canceled": false, "acted": false}
+	return {"name": ("Elite " if elite else "") + ["Vanguard", "Elf Archer", "Mage"][role], "role": role, "elite": elite, "attribute": [Status.Attribute.SHOCK, Status.Attribute.ICE, Status.Attribute.FIRE][role] if elite else Status.Attribute.NONE, "hp": health, "max_hp": health, "shield": 10 if elite else 0, "damage": ([10.0, 10.0, 15.0] if elite else [5.0, 7.5, 10.0])[role], "attack_boost": false, "weight": [70, 70, 65][role], "heals": 0, "intent": {}, "canceled": false, "acted": false}
+
+func set_status_counts(counts: Dictionary) -> void:
+	statuses.clear()
+	for id in Status.IDS:
+		statuses[id] = Status.new(id)
+		statuses[id].count = int(counts.get(id, 0))
+
+func status_count(id: int) -> int:
+	return statuses[id].count if statuses.has(id) else 0
+
+func status_counts(ids: Array = Status.IDS) -> Dictionary:
+	var counts: Dictionary = {}
+	for id in ids: counts[id] = status_count(id)
+	return counts
+
+func is_frozen() -> bool:
+	return status_count(Status.FROZEN) > 0
+
+func is_stunned() -> bool:
+	return status_count(Status.STUNNED) > 0
+
+func apply_affliction(id: int, amount: int) -> Array:
+	if hp <= 0 or status_count(Status.IMMUNITY) > 0: return []
+	if id not in [Status.FROZEN, Status.BURNING, Status.STUNNED]: return []
+	statuses[id].apply(amount)
+	var applied := event(-1, amount, "status", {Status.FROZEN:"FROZEN", Status.BURNING:"BURN +%d" % amount, Status.STUNNED:"STUNNED"}[id])
+	applied.status = id
+	return [applied]
 
 static func classify(dice: Array) -> MultiHitSkill:
 	if dice.size() != 3: return Skill.new()
@@ -158,6 +192,7 @@ func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) 
 			values.append(index+1)
 			weights[index] = 0.0
 	pending = classify(values)
+	statuses[Status.STUNNED].consume()
 	phase = "player"
 	return pending.duplicate(true)
 
@@ -169,6 +204,7 @@ func set_test_roll(dice: Array) -> MultiHitSkill:
 	if result.is_empty():
 		return Skill.new()
 	pending = result
+	statuses[Status.STUNNED].consume()
 	phase = "player"
 	return pending.duplicate(true)
 
@@ -191,7 +227,7 @@ func begin_round() -> Array:
 		return []
 	round_number += 1
 	var events: Array = []
-	if buffs[2] > 0:
+	if statuses[2].count > 0:
 		var healed := heal(5)
 		buff_ticks[2] = true
 		events.append(event(-1, healed, "heal", "Regrowth +%d" % healed))
@@ -199,8 +235,24 @@ func begin_round() -> Array:
 		enemies[i].canceled = false
 		enemies[i].acted = false
 		enemies[i].intent = choose_intent(i)
-	phase = "roll"
+	_prepare_player_turn()
 	return events
+
+func _prepare_player_turn() -> void:
+	phase = "frozen" if is_frozen() else "roll"
+	ice_hits_remaining = 3 if is_frozen() else 0
+
+func break_ice() -> Array:
+	if phase != "frozen" or not is_frozen() or not outcome().is_empty() or ice_hits_remaining <= 0: return []
+	ice_hits_remaining -= 1
+	if ice_hits_remaining == 0: return skip_frozen_turn()
+	return [event(-1, ice_hits_remaining, "ice_crack", "CRACK")]
+
+func skip_frozen_turn() -> Array:
+	if phase != "frozen" or not is_frozen() or not outcome().is_empty() or ice_hits_remaining > 0: return []
+	statuses[Status.FROZEN].consume()
+	_finish_player_action(Skill.new(Kind.NORMAL))
+	return [event(-1, 0, "skip", "TURN SKIPPED")]
 
 func choose_intent(index: int) -> Dictionary:
 	var e: Dictionary = enemies[index]
@@ -218,7 +270,12 @@ func choose_intent(index: int) -> Dictionary:
 			support.append({"type": "empower", "target": allies[rng.randi_range(0, allies.size() - 1)], "amount": 0, "name": "Arcane Empowerment"})
 	if not support.is_empty() and rng.randi_range(1, 100) > e.weight:
 		return support[rng.randi_range(0, support.size() - 1)]
-	return {"type": "attack", "target": -1, "amount": e.damage, "name": ["Sword Slash", "Arrow Shot", "Arcane Bolt"][role]}
+	var intent := {"type": "attack", "target": -1, "amount": e.damage, "name": ["Sword Slash", "Arrow Shot", "Arcane Bolt"][role], "attribute": Status.Attribute.NONE}
+	# Decide once when the turn starts, so the displayed move is the actual move.
+	if e.elite and (role == 2 or rng.randf() < ELITE_CONTROL_CHANCE):
+		intent.attribute = e.attribute
+		intent.name = ["Stunning Blow", "Ice Arrow", "Burning Bolt"][role]
+	return intent
 
 func damage_cap(kind: int, target: int) -> int:
 	var max_hp: int = enemies[target].max_hp
@@ -247,10 +304,10 @@ static func hits_all(result: MultiHitSkill) -> bool:
 	return result.kind == Kind.ULTIMATE or (result.kind in [Kind.PAIR, Kind.SPECIAL] and result.face == 4)
 
 func attack_multiplier() -> float:
-	return 3.0 if buffs[33] > 0 else 1.5 if buffs[3] > 0 else 1.0
+	return 3.0 if statuses[33].count > 0 else 1.5 if statuses[3].count > 0 else 1.0
 
 func boon_turns(face: int) -> int:
-	return (buffs[33] if buffs[33] > 0 else buffs[3]) if face == 3 else int(buffs.get(face, 0))
+	return (statuses[33].count if statuses[33].count > 0 else statuses[3].count) if face == 3 else int(status_count(face))
 
 func attack_base(result: MultiHitSkill) -> float:
 	if result.kind == Kind.NORMAL: return result.sum + reward_base_damage
@@ -311,12 +368,12 @@ func preview(result: MultiHitSkill, primary: int) -> Array:
 
 func _apply_support(result: MultiHitSkill) -> Array:
 	if result.kind == Kind.PAIR:
-		buffs[result.face] = result.spare
+		statuses[result.face].apply(result.spare)
 		buff_ticks.erase(result.face)
 		return [event(-1, 0, "buff", PAIR_NAMES[result.face - 1])]
 	if result.face == 2:
 		return [event(-1, heal(max_hp), "heal", "FULL HEAL")]
-	buffs[33] = 3
+	statuses[33].apply(3)
 	return [event(-1, 0, "buff", SPECIAL_NAMES[2])]
 
 func _finish_player_action(result: MultiHitSkill) -> void:
@@ -341,7 +398,7 @@ func _finish_player_action(result: MultiHitSkill) -> void:
 	if phase == "finished": _end_buff_turn()
 
 func _end_buff_turn() -> void:
-	for face in buff_ticks: buffs[face] = maxi(0, buffs[face] - 1)
+	for face in buff_ticks: statuses[face].consume()
 	buff_ticks.clear()
 
 func save_pending_skill() -> bool:
@@ -430,7 +487,7 @@ func enemy_act(index: int) -> Array:
 		# Keep 7.5 archer damage exact until impact, then round once for integer HP.
 		var amount: int = roundi(intent.amount * (1.5 if e.attack_boost else 1.0))
 		e.attack_boost = false
-		if buffs[6] > 0:
+		if statuses[6].count > 0:
 			events.append(event(-1, 0, "immune", "INVINCIBLE"))
 		else:
 			var blocked: int = mini(shield, amount)
@@ -438,6 +495,11 @@ func enemy_act(index: int) -> Array:
 			var loss: int = mini(hp, amount - blocked)
 			hp -= loss
 			events.append(event(-1, loss, "damage", "-%d HP" % loss if loss else "BLOCKED"))
+			if loss > 0:
+				match intent.get("attribute", Status.Attribute.NONE):
+					Status.Attribute.ICE: events.append_array(apply_affliction(Status.FROZEN, 1))
+					Status.Attribute.FIRE: events.append_array(apply_affliction(Status.BURNING, 2))
+					Status.Attribute.SHOCK: events.append_array(apply_affliction(Status.STUNNED, 1))
 	elif intent.type == "team_heal":
 		for target_index in living():
 			var target: Dictionary = enemies[target_index]
@@ -466,14 +528,39 @@ func enemy_act(index: int) -> Array:
 		phase = "finished"
 	return events
 
-func end_round() -> void:
-	if phase != "enemy":
-		return
-	for i in living():
-		if not enemies[i].acted:
-			return
+func _begin_turn_end() -> void:
+	burn_ticks_remaining = status_count(Status.BURNING)
+	phase = "turn_end"
+	if burn_ticks_remaining == 0: _finish_turn_end()
+
+func _finish_turn_end() -> void:
+	statuses[Status.BURNING].consume()
 	_end_buff_turn()
-	phase = "round_end"
+	phase = "round_end" if outcome().is_empty() else "finished"
+
+func end_round_step() -> Array:
+	# Presentation calls once per burn tick; headless simulation uses end_round().
+	if phase == "enemy":
+		if living().any(func(i): return not enemies[i].acted): return []
+		_begin_turn_end()
+	if phase != "turn_end": return []
+	var events: Array = []
+	if burn_ticks_remaining > 0:
+		burn_ticks_remaining -= 1
+		if status_count(Status.IMMUNITY) == 0 and hp > 0:
+			hp -= 1
+			events.append(event(-1, 1, "burn", "-1"))
+	if burn_ticks_remaining == 0 or hp <= 0:
+		burn_ticks_remaining = 0
+		_finish_turn_end()
+	return events
+
+func end_round() -> Array:
+	var events: Array = []
+	while phase in ["enemy", "turn_end"]:
+		if phase == "enemy" and living().any(func(i): return not enemies[i].acted): break
+		events.append_array(end_round_step())
+	return events
 
 static func event(target: int, amount: int, type: String, text: String) -> Dictionary:
 	return {"target": target, "amount": amount, "type": type, "text": text}

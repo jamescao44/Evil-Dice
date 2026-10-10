@@ -36,8 +36,8 @@ func _initialize() -> void:
 	for wave in range(9):
 		check(game.enemies.size() == [1, 3, 1, 5, 3, 5, 7, 4, 10][wave], "Wave size progression")
 		game.begin_round()
-		game.buffs[2] = 1
-		game.buffs[33] = 3
+		game.statuses[2].count = 1
+		game.statuses[33].count = 3
 		for kind in [Rules.Kind.NORMAL]:
 			var result: MultiHitSkill = Rules.classify([4, 5, 6] if kind == Rules.Kind.NORMAL else [1, 1, 1])
 			for index in game.living():
@@ -45,11 +45,11 @@ func _initialize() -> void:
 		game.hp = 40
 		game.shield = 7
 		for e in game.enemies: e.hp = 0
-		game.buffs[3] = 2
+		game.statuses[3].count = 2
 		check(game.advance_wave(), "Growth once per clear")
 		check(game.hp == 95 and game.max_hp == 130 + wave * 30, "Feeding increases capacity and heals 55")
 		check(game.power == [1.5,3.0,5.625,6.75,7.875,9.0,10.125,11.25,12.375][wave], "Later growth includes cumulative 1.5x boosts")
-		check(game.buffs[3] == 2 and game.shield == 7, "Buffs and shield carry between areas")
+		check(game.statuses[3].count == 2 and game.shield == 7, "Buffs and shield carry between areas")
 		check(not game.advance_wave(), "Repeated advance cannot grow again")
 	check(game.is_city() and game.enemies.is_empty(), "Final battle uses city rather than squad")
 	var boosted = Run.new(13)
@@ -67,20 +67,20 @@ func _initialize() -> void:
 	game.hp = 100
 	force(game, [2,2,4])
 	game.begin_round()
-	check(game.hp == 105 and game.buffs[2] == 4, "City regen heals on next roll start and retains its count until the roll ends")
+	check(game.hp == 105 and game.statuses[2].count == 4, "City regen heals on next roll start and retains its count until the roll ends")
 	game.begin_round()
 	check(game.hp == 105, "Duplicate start cannot repeat regen")
 	game.set_test_roll([6,6,2])
 	game.apply_player()
-	tick(game, 8)
-	check(game.hp == 105 and game.troops == 6, "City invincibility blocks damage while troops keep spawning")
+	tick(game, 2)
+	check(game.hp == 105 and game.statuses[6].count == 1 and is_equal_approx(game.city_immunity_seconds(),2), "City immunity loses one stack after two seconds")
 	force(game, [3,3,1])
-	tick(game, 4)
-	check(game.hp == 110 and game.buffs[6] == 1, "One protected interval remains after next roll")
-	force(game, [3,3,1])
+	check(game.hp == 110 and game.statuses[6].count == 1, "Extra throws do not shorten timed immunity")
+	tick(game, 1.95)
+	check(game.hp == 110 and game.statuses[6].count == 1,"Immunity protects until its final fraction of a second")
 	var before_hp: int = game.hp
-	tick(game, 4)
-	check(game.hp < before_hp and game.buffs[6] == 0, "City immunity expires after specified roll intervals")
+	tick(game, 0.1)
+	check(game.hp < before_hp and game.statuses[6].count == 0, "City immunity expires at four seconds even without another roll")
 	game = city()
 	game.hp = 1
 	game.troops = 6
@@ -92,8 +92,8 @@ func _initialize() -> void:
 	tick(other, 8.0, 0.1)
 	check(game.hp == other.hp and game.troops == other.troops, "City attack cadence is frame-rate independent")
 	check(game.hp < game.max_hp and game.troops == 6, "City troops and ranged volleys keep attacking without player input")
-	game.buffs[2] = 1
-	game.buffs[33] = 3
+	game.statuses[2].count = 1
+	game.statuses[33].count = 3
 	force(game, [6, 6, 6])
 	check(game.city_hp == 1600 and game.outcome().is_empty() and game.troops == 0, "Ultimate clears troops and deals exactly one third of city MAX health, even with buffs")
 	force(game, [6, 6, 6])
@@ -141,11 +141,15 @@ func _initialize() -> void:
 		game = Run.new(seed_value)
 		for turn in range(200):
 			game.begin_round()
-			game.roll()
-			game.apply_player()
+			if game.phase == "frozen":
+				for hit in range(3): game.break_ice()
+			else:
+				game.roll()
+				game.apply_player()
 			if game.outcome() == "wave_clear":
 				game.advance_wave()
 			elif game.is_city():
+				game.end_round()
 				tick(game, 1.5)
 			else:
 				for i in range(game.enemies.size()): game.enemy_act(i)
