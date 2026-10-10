@@ -4,7 +4,7 @@ const Pixel = preload("res://scripts/pixel_paint.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 var battle
 var stored: bool = false
-var roll: Dictionary = {}
+var roll: MultiHitSkill = MultiHitSkill.new()
 var age: float = 0
 var formation: float = 0.45
 var rotation_clock: float = 0
@@ -15,7 +15,8 @@ const HOLD := 0.26
 const SETTLE := 0.28
 const ENTRANCE_SCALE := 1.75
 var caption: Dictionary = {}
-var used: int = 0
+var used: int:
+	get: return roll.uses_spent
 var pops: Array = []
 var cast_age: float = 10
 const DISSOLVE_TIME := 0.48
@@ -28,14 +29,13 @@ var fragments: Array = []
 func _ready() -> void:
 	z_index = 40
 
-func begin(value: Dictionary) -> void:
+func begin(value: MultiHitSkill) -> void:
 	roll = value.duplicate(true)
 	age = 0
 	entrance_speed = battle._roll_speed()
 	converge = 0.32 if roll.kind < Rules.Kind.SPECIAL else 0.38 if roll.kind == Rules.Kind.SPECIAL else 0.48
 	formation = (converge + RISE + HOLD + SETTLE) / entrance_speed
 	caption = battle._skill_caption(roll)
-	used = 0
 	pops.clear()
 	cast_age = 10
 	cast_position = Vector2.INF
@@ -44,10 +44,9 @@ func begin(value: Dictionary) -> void:
 	fragments.clear()
 
 func clear() -> void:
-	roll.clear()
+	roll = MultiHitSkill.new()
 	caption.clear()
 	pops.clear()
-	used = 0
 	age = 0
 	cast_position = Vector2.INF
 	dissolving = false
@@ -102,13 +101,17 @@ func _draw_dissolve(at: Vector2, radius: float, color: Color) -> void:
 		draw_rect(Rect2(p.snapped(Vector2.ONE*2),Vector2.ONE*size),Color(color.lightened(0.35),alpha))
 
 func consume_use() -> void:
+	roll.begin_cast(battle.model.skill_use_modifiers)
+	if roll.uses_left() == 0: return
 	cast_age = 0
-	if Rules.hit_count(roll) > 1:
-		pops.append({"index": used, "age": 0.0})
-	used += 1
+	if orb_count() > 1: pops.append({"index": used, "age": 0.0})
+	roll.consume_use()
 
 func uses_left() -> int:
-	return maxi(0, Rules.hit_count(roll)-used) if not roll.is_empty() else 0
+	return roll.uses_left(battle.model.skill_use_modifiers)
+
+func orb_count() -> int:
+	return battle.model.skill_use_count(roll) if roll.has_use_orbs(battle.model.skill_use_modifiers) else 0
 
 func center_at() -> Vector2:
 	if cast_position != Vector2.INF: return cast_position
@@ -198,17 +201,19 @@ func _draw() -> void:
 		if i % 2 == 0: Pixel.line(self, p-direction.orthogonal()*4, p+direction.orthogonal()*4, Color(color, appear), 2)
 	_draw_icon(at, radius*0.66, Color(1,1,1,appear))
 	if progress >= 1:
-		if Rules.hit_count(roll) > 1: _draw_uses(at, radius, color)
+		if orb_count() > 1: _draw_uses(at, radius, color)
 		if not stored or aiming or casting: _draw_caption(at,radius,portrait,aiming,color)
 
 func _draw_uses(at: Vector2, radius: float, color: Color) -> void:
-	var total: int = Rules.hit_count(roll)
+	var total: int = orb_count()
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	var side: float = 12 if portrait else 9
 	var orbit: float = radius+(18 if portrait else 16)
 	if stored and not is_active_saved():
 		side = 7 if portrait else 5
 		orbit = radius+11
+	# Shrink markers with angular spacing so twelve uses fit even in the saved slot.
+	side = minf(side, maxf(2, orbit*sin(PI/total)*0.55))
 	for i in range(total):
 		var p := at+Vector2.from_angle(-PI/2+i*TAU/total)*orbit
 		if i >= used:

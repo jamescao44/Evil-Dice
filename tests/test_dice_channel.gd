@@ -66,11 +66,11 @@ func test_layout(game) -> void:
 	game.skill_bubble.age = (game.skill_bubble.converge+game.skill_bubble.RISE+0.1)/game.skill_bubble.entrance_speed
 	check(game.skill_bubble.radius_scale() >= 1.7,"Skill entrance is substantially larger than the resting seal")
 	game.skill_bubble.age = game.skill_bubble.formation
-	var original: Dictionary = game.result.duplicate(true)
+	var original: MultiHitSkill = game.result.duplicate(true)
 	tap(game,game._skill_center())
 	check(game.view_phase == "targeting" and not game.skill_dragging, "Tap selects single-target skill without casting")
 	tap(game,Vector2(30,40))
-	check(game.view_phase == "skill" and game.model.pending == original, "Empty-space tap cancels aim without consuming skill")
+	check(game.view_phase == "skill" and game.model.pending.same_as(original), "Empty-space tap cancels aim without consuming skill")
 	game._handle_click(game._skill_center())
 	game._handle_motion(Vector2(40,50))
 	game._handle_release(Vector2(40,50))

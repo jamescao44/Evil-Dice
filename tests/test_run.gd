@@ -39,7 +39,7 @@ func _initialize() -> void:
 		game.buffs[2] = 1
 		game.buffs[33] = 3
 		for kind in [Rules.Kind.NORMAL]:
-			var result: Dictionary = Rules.classify([4, 5, 6] if kind == Rules.Kind.NORMAL else [1, 1, 1])
+			var result: MultiHitSkill = Rules.classify([4, 5, 6] if kind == Rules.Kind.NORMAL else [1, 1, 1])
 			for index in game.living():
 				check(game.preview(result, index)[0].damage <= game.damage_cap(kind, index), "Growth and buffs respect individual caps")
 		game.hp = 40
@@ -54,9 +54,9 @@ func _initialize() -> void:
 	check(game.is_city() and game.enemies.is_empty(), "Final battle uses city rather than squad")
 	var boosted = Run.new(13)
 	for wave in range(9):
-		var normal: Dictionary = Rules.classify([4,5,6])
+		var normal: MultiHitSkill = Rules.classify([4,5,6])
 		check(boosted.preview(normal,0)[0].damage == mini(floori(22.5 * boosted.power), boosted.damage_cap(Rules.Kind.NORMAL,0)), "Existing normal stage caps remain")
-		var special: Dictionary = Rules.classify([4,4,4])
+		var special: MultiHitSkill = Rules.classify([4,4,4])
 		check(boosted.preview(special,0)[0].damage == floori(30.0 * boosted.power), "Skills now ignore former stage caps")
 		clear_wave(boosted)
 	check(boosted.siege_damage(Rules.classify([1,2,3])) == floori(6 * 1.5 * boosted.power * 2), "Normal city damage follows extended growth")

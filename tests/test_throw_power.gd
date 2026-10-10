@@ -89,7 +89,7 @@ func rate_checks() -> void:
 		var faces := [0, 0, 0, 0, 0, 0]
 		for i in range(12000):
 			perfect_rules.phase = "roll"
-			var result: Dictionary = perfect_rules.roll(1.0, true)
+			var result: MultiHitSkill = perfect_rules.roll(1.0, true)
 			perfect_counts[mini(result.kind, 2)] += 1
 			if result.kind >= Rules.Kind.SPECIAL: faces[result.face - 1] += 1
 		check(perfect_counts[0] == 0, "Perfect always produces a combination")
@@ -131,9 +131,9 @@ func scene_checks(portrait: bool) -> void:
 	check(game.throw_perfect and game.throw_power == 1 and not game.fx.perfect.is_empty(), "Perfect locks power, throws, and displays feedback")
 	check(game.throw_meter.sample().position == 0.5 and game._power_flash_strength() == 1, "Perfect centers the wider indicator and flashes the meter")
 	check(game.result.kind != Rules.Kind.NORMAL, "Perfect throws a combination")
-	var pending: Dictionary = game.model.pending.duplicate(true)
+	var pending: MultiHitSkill = game.model.pending.duplicate(true)
 	game._handle_click(game.DICE_CENTER)
-	check(game.model.pending == pending, "Third click cannot reroll committed dice")
+	check(game.model.pending.same_as(pending), "Third click cannot reroll committed dice")
 	var locked: float = game.throw_meter.elapsed
 	await process_frame
 	check(game.throw_meter.elapsed == locked, "Indicator freezes on release")

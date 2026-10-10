@@ -22,6 +22,10 @@ The **SAVE slot** above and to the right of the dice stores one skill. Dragging 
 
 ## Combat and growth
 
+Every rolled or saved skill is a `MultiHitSkill` object. Normal attacks, aimed attacks, area attacks, support and ultimates start with **one use**, hiding the use orbs; 55 starts with three and 555 with six. Future use multipliers apply to the entire skill: **×2 makes a regular skill two uses/two orbs, and Sixfold Ruin twelve hits/twelve orbs**. Damage previews, orb pops and combat all use the same count. Aimed skills keep their chosen living target and retarget after a kill; random combos choose independently each hit. Area and support skills repeat their whole effect, retaining the existing buff-refresh and healing limits. The full chain remains one action and stops on victory or defeat.
+
+For future modifiers, call `model.set_skill_use_multiplier("echo_buff", 2)` for all skills, or `skill.set_use_multiplier("relic_echo", 2)` for one skill object. Passing `1` removes that named source; refreshing the same source replaces it, while different sources multiply together. Saved skills preserve their own modifiers and use current model modifiers when cast. The use budget freezes at cast start so an expiring modifier cannot change the remaining hits or orb count midway. New runs clear model modifiers. These hooks are implemented; no new multiplier buff or relic is enabled by default.
+
 Normal rolls use the sum of three different dice plus earned base-damage bonuses, with the existing normal per-hit caps. Skills use **regular attack power P = 10 + earned base-damage bonuses** and ignore caps. Let `s` be the spare die; formulas below are before the global multiplier (1.5 + earned multiplier bonuses), growth, and the active attack boon. Round down after all multipliers, then apply shields and remaining HP.
 
 | Face | Double | Triple |
@@ -102,6 +106,7 @@ The [Chinese design document](https://docs.google.com/document/d/1i-PEouZmzwagpz
 | --- | --- |
 | `scripts/home.gd` | Portrait/landscape home tabs, touch and mouse carousel, collection/skill views, battle launch and return |
 | `scripts/home_catalog.gd` | Current Ancient and dice entries, lore, play style, and collection identifiers |
+| `scripts/multi_hit_skill.gd` | Shared skill objects, base uses, named multipliers, frozen cast budgets and remaining uses |
 | `scripts/battle_rules.gd` | Seeded power/fever odds, classification, capped squad combat, buffs, enemy actions |
 | `scripts/run_rules.gd` | Wave composition, growth, carryover, city damage and real-time attack cadence |
 | `scripts/reward_chest.gd` | Chest eruption, extended one/three/five reels and manual pickups, category celebrations and presentation signals |
@@ -130,12 +135,15 @@ godot --headless --path . --script res://tests/test_portrait.gd
 godot --headless --path . --script res://tests/test_skills.gd
 godot --headless --path . --script res://tests/test_dice_channel.gd
 godot --headless --path . --script res://tests/test_skill_storage.gd
+godot --headless --path . --script res://tests/test_multi_hit.gd
 godot --headless --path . --script res://tests/test_home.gd
 godot --headless --path . --script res://tests/test_rewards.gd
 godot --headless --path . --script res://tests/test_reward_presentation.gd
 ```
 
 `tests/capture_visuals.gd` renders snapshots to `test-output/` when run with a display. Debug no longer requires a `--demo` launch argument.
+
+`test_multi_hit.gd` checks all 216 roll outcomes, modifier stacking and refresh, saved-object isolation, frozen cast budgets, doubled damage/support/AoE/instant-kill skills in squads and city, and complete animated chains in both layouts. `capture_multi_hit.gd` captures hidden single-use orbs, twelve-orb current and saved skills, and doubled aimed/support skills; add `-- --portrait` for the phone layout.
 
 `test_dice_channel.gd` checks floating positions and captions, gray spent dice without leftover links, tap and touch-drag targets, cancellation, corpse exclusion, automatic random multi-hit chains, input-spam protection, delayed boon/enemy turns, chest locking, buffs/AoE, automatic city casting, cinematic time, highest-tier claims and nonoverlapping health bars across all formations. `test_skill_storage.gd` covers saving, bonus turns, boon lifetimes, automatic carryover after a bonus victory, full-slot rejection, dimmed waiting skills, cast transparency, cast anchors, particle dissolves and restart in both layouts. `capture_skill_bubbles.gd` renders these states plus central reveals, short meters, charge pops and milestone claims.
 

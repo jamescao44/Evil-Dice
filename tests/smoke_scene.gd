@@ -92,9 +92,9 @@ func run() -> void:
 	game._handle_click(game.DICE_CENTER)
 	check(game.view_phase == "charging" and game.model.pending.is_empty(), "First click charges without committing dice")
 	game._handle_click(game.DICE_CENTER)
-	var pending: Dictionary = game.model.pending.duplicate(true)
+	var pending: MultiHitSkill = game.model.pending.duplicate(true)
 	game._handle_click(game.DICE_CENTER)
-	check(game.model.pending == pending, "Extra click cannot create another roll")
+	check(game.model.pending.same_as(pending), "Extra click cannot create another roll")
 	await settle()
 	check(game.debug_choice == 2, "Repeat persists after roll")
 	game.debug_choice = 0
@@ -145,9 +145,9 @@ func run() -> void:
 	check(game.model.volley_clock == city_clock, "Debug picker pauses city clock")
 	game._handle_click(game._debug_option_rect(0).get_center())
 	game._roll()
-	var city_pending: Dictionary = game.model.pending.duplicate(true)
+	var city_pending: MultiHitSkill = game.model.pending.duplicate(true)
 	for i in range(8): game._handle_click(game.DICE_CENTER)
-	check(game._roll_speed() == 2.0 and game.model.pending == city_pending, "City stays at fixed 2x with no rerolls when spammed")
+	check(game._roll_speed() == 2.0 and game.model.pending.same_as(city_pending), "City stays at fixed 2x with no rerolls when spammed")
 	await settle()
 	check(game.model.city_hp < game.model.CITY_MAX_HP and game.view_phase == "ready", "City skill resolves after selection")
 	game.debug_choice = 12

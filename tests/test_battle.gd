@@ -36,10 +36,10 @@ func _test_classification() -> void:
 	for a in range(1, 7):
 		for b in range(1, 7):
 			for c in range(1, 7):
-				var result: Dictionary = Rules.classify([a, b, c])
+				var result: MultiHitSkill = Rules.classify([a, b, c])
 				counts[result.kind] += 1
 				check(result.sum == a + b + c, "Sum is exact")
-				var permutation: Dictionary = Rules.classify([c, a, b])
+				var permutation: MultiHitSkill = Rules.classify([c, a, b])
 				check(result.kind == permutation.kind and result.face == permutation.face, "Order independent")
 	check(counts == [120, 90, 5, 1], "All 216 outcomes partition correctly")
 	check(Rules.classify([6, 6, 6]).kind == Rules.Kind.ULTIMATE, "666 is ultimate")
@@ -145,7 +145,7 @@ func _test_human_phase() -> void:
 func _test_rounds_and_rng() -> void:
 	var a = fresh()
 	var b = fresh()
-	check(a.roll() == b.roll(), "Seeded dice are deterministic")
+	check(a.roll().same_as(b.roll()), "Seeded dice are deterministic")
 	var victories: int = 0
 	var total_rounds: int = 0
 	for seed_value in range(200):
@@ -183,7 +183,7 @@ func _test_independent_rolls() -> void:
 			fresh_history.rng.state = game.rng.state
 			fresh_history.phase = "roll"
 			var expected: Array = fresh_history.roll().dice
-			var result: Dictionary = game.roll()
+			var result: MultiHitSkill = game.roll()
 			check(result.dice == expected, "Weighted odds do not depend on previous roll history")
 			match_drought = match_drought + 1 if result.kind == Rules.Kind.NORMAL else 0
 			triple_drought = triple_drought + 1 if result.kind < Rules.Kind.SPECIAL else 0

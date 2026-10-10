@@ -71,7 +71,7 @@ func run() -> void:
 	check(game.selected_status == 2, "Active status descriptions available without hover")
 	game.model.buffs[2] = 0
 	touch(game.DICE_CENTER, true)
-	var pending: Dictionary = game.model.pending.duplicate(true)
+	var pending: MultiHitSkill = game.model.pending.duplicate(true)
 	touch(game.AUDIO_RECT.get_center(), true, 1)
 	check(game.muted and game.active_touch == 0, "Second finger cannot steal the active touch")
 	var mouse := InputEventMouseButton.new()
@@ -80,7 +80,7 @@ func run() -> void:
 	mouse.pressed = true
 	mouse.position = game.AUDIO_RECT.get_center()
 	game._input(mouse)
-	check(game.muted and game.model.pending == pending, "Synthetic mouse does not double-fire touch")
+	check(game.muted and game.model.pending.same_as(pending), "Synthetic mouse does not double-fire touch")
 	touch(game.DICE_CENTER, false)
 	tap(game.DICE_CENTER)
 	var regeneration_turns: int = game.result.spare

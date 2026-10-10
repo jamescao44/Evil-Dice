@@ -54,8 +54,8 @@ var pixel_font: FontFile = preload("res://assets/fonts/Silkscreen-Regular.ttf").
 var dice: Array = []
 var fx: Node2D
 var view_phase: String = "ready"
-var result: Dictionary = {}
-var last_result: Dictionary = {}
+var result: MultiHitSkill = MultiHitSkill.new()
+var last_result: MultiHitSkill = MultiHitSkill.new()
 var ring_hover: float = 0
 var art: Dictionary = {}
 var clock_time: float = 0
@@ -378,9 +378,9 @@ func _skill_center() -> Vector2:
 func _in_skill_bubble(point: Vector2) -> bool:
 	return point.distance_to(_skill_center()) <= _skill_radius() + 12
 
-func _skill_needs_target(roll: Dictionary = {}) -> bool:
-	if roll.is_empty(): roll = _source_roll(skill_source)
-	return not roll.is_empty() and Rules.is_attack(roll) and not Rules.hits_all(roll) and Rules.hit_count(roll) == 1
+func _skill_needs_target(roll: MultiHitSkill = null) -> bool:
+	if roll == null: roll = _source_roll(skill_source)
+	return not roll.is_empty() and Rules.is_attack(roll) and not Rules.hits_all(roll) and not roll.random_target_per_use()
 
 func _saved_slot_center() -> Vector2:
 	return Vector2(676, 1272) if fx.canvas_size.y > fx.canvas_size.x else Vector2(834, 548)
@@ -394,7 +394,7 @@ func _in_saved_slot(point: Vector2) -> bool:
 func _can_use_saved() -> bool:
 	return not model.saved_skill.is_empty() and view_phase in ["ready", "skill", "targeting"] and not guide and not debug_open and model.outcome().is_empty()
 
-func _source_roll(source: String) -> Dictionary:
+func _source_roll(source: String) -> MultiHitSkill:
 	return model.saved_skill if source == "saved" else result
 
 func _source_bubble(source: String) -> Node2D:
@@ -403,7 +403,7 @@ func _source_bubble(source: String) -> Node2D:
 func _sync_saved_bubble() -> void:
 	if not is_instance_valid(saved_bubble): return
 	if model.saved_skill.is_empty(): saved_bubble.clear()
-	elif saved_bubble.roll != model.saved_skill:
+	elif not saved_bubble.roll.same_as(model.saved_skill):
 		saved_bubble.begin(model.saved_skill)
 		saved_bubble.age = saved_bubble.formation
 
@@ -497,8 +497,8 @@ func _save_skill() -> void:
 		return
 	_cancel_targeting()
 	_clear_skill()
-	result = {}
-	last_result = {}
+	result = MultiHitSkill.new()
+	last_result = MultiHitSkill.new()
 	fx.activate_circle(_saved_slot_center(), GOLD, _saved_slot_radius()+8, 0.6)
 	_sound("book", 1.1, -14)
 	view_phase = "resolving"
@@ -511,7 +511,7 @@ func _save_skill() -> void:
 func _activate_skill(target: int, cast_point: Vector2 = Vector2.INF) -> void:
 	if view_phase not in ["skill", "targeting"] or guide or debug_open or not model.outcome().is_empty(): return
 	var source: String = skill_source
-	var roll: Dictionary = _source_roll(source)
+	var roll: MultiHitSkill = _source_roll(source)
 	if roll.is_empty(): return
 	if source == "current" and model.phase != "player": return
 	if _skill_needs_target() and target not in _skill_targets(): return
@@ -577,7 +577,7 @@ func _start_charge() -> void:
 	view_phase = "charging"
 	status_title = "POWER"
 	status_color = GOLD
-	last_result = {}
+	last_result = MultiHitSkill.new()
 	rattle_clock = 0
 	for die in dice: die.charge(0)
 
@@ -669,7 +669,7 @@ func _roll_speed() -> float:
 func _start_round() -> void:
 	_clear_skill()
 	_show_events(model.begin_round())
-	result = {}
+	result = MultiHitSkill.new()
 	view_phase = "ready"
 	status_title = "FEVER" if model.is_city() else "READY"
 	status_color = GOLD if model.is_city() else TEAL
@@ -710,7 +710,7 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 	model.record_perfect(throw_perfect)
 	if not debug_repeat:
 		debug_choice = -1
-	last_result = {}
+	last_result = MultiHitSkill.new()
 	status_title = "ROLLING"
 	status_color = CREAM
 	fx.activate_circle(DICE_CENTER, GOLD, DICE_RADIUS, 0.8 / _roll_speed())
@@ -747,7 +747,7 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 			if not await _combo_chime(kind == Rules.Kind.ULTIMATE, token): return
 			_begin_cinematic(kind == Rules.Kind.ULTIMATE)
 	view_phase = "forming"
-	last_result.clear()
+	last_result = MultiHitSkill.new()
 	fx.skill.clear()
 	skill_bubble.begin(result)
 	_sound("bell", 1.2, -20)
@@ -770,7 +770,7 @@ func _combo_chime(ultimate: bool, token: int) -> bool:
 		if not await _wait(0.09, token): return false
 	return true
 
-func _skill_caption(roll: Dictionary) -> Dictionary:
+func _skill_caption(roll: MultiHitSkill) -> Dictionary:
 	var label: String = Rules.NORMAL_NAME
 	var description: String = "attack"
 	if roll.kind == Rules.Kind.PAIR:
@@ -790,25 +790,26 @@ func _die_landed(index: int) -> void:
 func _resolve_player(target: int, source: String = "current") -> void:
 	if model.phase != "player" or model.pending.is_empty() or view_phase == "resolving" or not model.outcome().is_empty(): return
 	var token: int = run_id
-	var roll: Dictionary = model.pending.duplicate(true)
+	if not model.begin_player_cast(): return
+	var roll: MultiHitSkill = model.pending.duplicate()
 	var bubble: Node2D = _source_bubble(source)
+	bubble.roll = roll.duplicate()
 	view_phase = "resolving"
 	var kind: int = roll.kind
 	var attacking: bool = Rules.is_attack(roll)
 	_begin_cast_cinematic(kind)
 	status_title = "CASTING" if kind >= Rules.Kind.SPECIAL else "ATTACKING" if attacking else "BLESSED"
-	if not attacking:
+	var count: int = model.skill_use_count(roll)
+	for impact in range(count):
 		bubble.consume_use()
-		fx.activate_circle(_player_point(), TEAL, monster_side * 0.45, 0.85)
-		fx.burst(_player_point(), TEAL, 30)
-		_sound("bell", 1.6, -16)
-		if not await _wait(0.3, token): return
-		_show_events(model.apply_player_step())
-	else:
-		var count: int = Rules.hit_count(roll)
-		for impact in range(count):
-			if count > 1 or (not model.is_city() and target not in model.living()): target = model.player_target()
-			bubble.consume_use()
+		if not attacking:
+			fx.activate_circle(_player_point(), TEAL, monster_side * 0.45, 0.85)
+			fx.burst(_player_point(), TEAL, 30)
+			_sound("bell", 1.6, -16)
+			if not await _wait(0.3, token): return
+			_show_events(model.apply_player_step())
+		else:
+			if roll.random_target_per_use() or (not model.is_city() and target not in model.living()): target = model.player_target()
 			attack_target = target
 			var targets: Array = [CITY_POINT] if model.is_city() else []
 			if not model.is_city():
@@ -827,8 +828,8 @@ func _resolve_player(target: int, source: String = "current") -> void:
 			_sound("crash" if kind == Rules.Kind.ULTIMATE else "hit", 0.65 + impact * 0.08 if kind >= Rules.Kind.SPECIAL else 1.0, -9)
 			_show_events(model.apply_player_step(target))
 			_sync_corpses()
-			if model.phase != "executing": break
-			if not await _wait(0.12, token): return
+		if model.phase != "executing": break
+		if not await _wait(0.12, token): return
 	bubble.dissolve()
 	# The particle finish uses presentation time so it stays readable at fever speed.
 	while bubble.dissolving and bubble.dissolve_age < bubble.DISSOLVE_TIME:
@@ -845,7 +846,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 		status_color = [CREAM, TEAL, PURPLE, GOLD][result.kind] if not result.is_empty() else GOLD if model.is_city() else TEAL
 		return
 	if model.is_city():
-		result = {}
+		result = MultiHitSkill.new()
 		view_phase = "ready"
 		status_title = "FEVER"
 	else:
@@ -998,8 +999,8 @@ func _restart() -> void:
 	if transition_tween and transition_tween.is_running(): transition_tween.kill()
 	model.reset_run()
 	fx.clear()
-	last_result = {}
-	result = {}
+	last_result = MultiHitSkill.new()
+	result = MultiHitSkill.new()
 	fallen.clear()
 	city_corpses.clear()
 	city_life.clear()
@@ -1136,7 +1137,7 @@ func _wrapped(at: Vector2, value: String, width: float, color: Color = MUTED, si
 
 func _buff_drag_active() -> bool:
 	if view_phase != "targeting" or not skill_dragging or guide or debug_open: return false
-	var roll: Dictionary = _source_roll(skill_source)
+	var roll: MultiHitSkill = _source_roll(skill_source)
 	return not roll.is_empty() and not Rules.is_attack(roll)
 
 func _art(key: String, rect: Rect2, tint: Color = Color.WHITE) -> void:

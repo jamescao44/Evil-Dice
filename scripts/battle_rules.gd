@@ -2,7 +2,8 @@ extends RefCounted
 ## Deterministic battle model. Rendering and cosmetic randomness never alter it.
 const Weighted = preload("res://scripts/weighted_choice.gd")
 
-enum Kind { NORMAL, PAIR, SPECIAL, ULTIMATE }
+const Skill = preload("res://scripts/multi_hit_skill.gd")
+const Kind = Skill.Kind
 const NORMAL_NAME = "Tentacle Swipe"
 const PAIR_NAMES = ["Rending Blow", "Unnatural Regrowth", "Eldritch Might", "Sweeping Ruin", "Tentacle Flurry", "Beyond Harm"]
 const PAIR_TEXT = ["1.5x regular attack + spare die.", "Heal 5 at the next spare-die turn starts.", "1.5x attack power for the next spare-die turns.", "Hit all: 2/3 regular attack + spare die each.", "3 automatic random hits, each regular attack + spare die.", "Invincible for spare-die enemy phases / roll intervals."]
@@ -26,10 +27,12 @@ var shield: int = 0
 var buffs: Dictionary = {2: 0, 3: 0, 6: 0, 33: 0}
 var enemies: Array = []
 var round_number: int = 0
-var pending: Dictionary = {}
-var saved_skill: Dictionary = {}
+var pending: MultiHitSkill = Skill.new()
+var saved_skill: MultiHitSkill = Skill.new()
 var bonus_resume: Dictionary = {}
 var buff_ticks: Dictionary = {}
+# Future buffs/relics can add or remove named use multipliers without changing skills.
+var skill_use_modifiers: Dictionary = {}
 var phase: String = "new"
 var category_weights: Array = [1.0, 1.0, 1.0] # normal, pair, triple; relic hooks
 var pair_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
@@ -57,10 +60,11 @@ func reset() -> void:
 		e["canceled"] = false
 		e["acted"] = false
 	round_number = 0
-	pending = {}
-	saved_skill = {}
+	pending = Skill.new()
+	saved_skill = Skill.new()
 	bonus_resume = {}
 	buff_ticks.clear()
+	skill_use_modifiers.clear()
 	phase = "new"
 	category_weights = [1.0, 1.0, 1.0]
 	pair_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
@@ -72,23 +76,19 @@ static func make_enemy(role: int, health_scale: float = 1.0, elite: bool = false
 	var health: int = roundi(([150, 100, 75] if elite else [75, 50, 35])[role] * health_scale + 0.0001)
 	return {"name": ("Elite " if elite else "") + ["Vanguard", "Elf Archer", "Mage"][role], "role": role, "elite": elite, "hp": health, "max_hp": health, "shield": 10 if elite else 0, "damage": ([10.0, 10.0, 15.0] if elite else [5.0, 7.5, 10.0])[role], "attack_boost": false, "weight": [70, 70, 65][role], "heals": 0, "intent": {}, "canceled": false, "acted": false}
 
-static func classify(dice: Array) -> Dictionary:
-	if dice.size() != 3:
-		return {}
+static func classify(dice: Array) -> MultiHitSkill:
+	if dice.size() != 3: return Skill.new()
 	var counts: Dictionary = {}
-	var total: int = 0
 	for value in dice:
-		if not value is int or value < 1 or value > 6:
-			return {}
+		if not value is int or value < 1 or value > 6: return Skill.new()
 		counts[value] = counts.get(value, 0) + 1
-		total += value
 	for face in counts:
 		if counts[face] == 3:
-			return {"kind": Kind.ULTIMATE if face == 6 else Kind.SPECIAL, "face": face, "sum": total, "dice": dice.duplicate()}
+			return Skill.new(Kind.ULTIMATE if face == 6 else Kind.SPECIAL, face, dice, 6 if face == 5 else 1)
 	for face in counts:
 		if counts[face] == 2:
-			return {"kind": Kind.PAIR, "face": face, "spare": total - face * 2, "sum": total, "dice": dice.duplicate()}
-	return {"kind": Kind.NORMAL, "face": 0, "sum": total, "dice": dice.duplicate()}
+			return Skill.new(Kind.PAIR, face, dice, 3 if face == 5 else 1)
+	return Skill.new(Kind.NORMAL, 0, dice)
 
 static func throw_rates(throw_power: float, perfect: bool = false, fever: bool = false) -> Dictionary:
 	if perfect:
@@ -141,8 +141,8 @@ func _match_values(triple: bool) -> Array:
 		values[rng.randi_range(0, 2)] = other + 1
 	return values
 
-func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) -> Dictionary:
-	if phase != "roll": return {}
+func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) -> MultiHitSkill:
+	if phase != "roll": return Skill.new()
 	var rates: Dictionary = roll_rates(throw_power, perfect, fever)
 	var category: int = Weighted.pick(rng, [rates.normal, rates.pair, rates.triple])
 	var values: Array = []
@@ -161,13 +161,13 @@ func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) 
 	phase = "player"
 	return pending.duplicate(true)
 
-func set_test_roll(dice: Array) -> Dictionary:
+func set_test_roll(dice: Array) -> MultiHitSkill:
 	# Only called by tests or the visual debug picker; overrides power odds.
 	if phase != "roll":
-		return {}
+		return Skill.new()
 	var result := classify(dice)
 	if result.is_empty():
-		return {}
+		return Skill.new()
 	pending = result
 	phase = "player"
 	return pending.duplicate(true)
@@ -224,19 +224,26 @@ func damage_cap(kind: int, target: int) -> int:
 	var max_hp: int = enemies[target].max_hp
 	return floori(float(max_hp) * (2.0 / 3.0 if kind == Kind.SPECIAL else 1.0 / 3.0))
 
-static func is_attack(result: Dictionary) -> bool:
+static func is_attack(result: MultiHitSkill) -> bool:
 	if result.is_empty(): return false
 	if result.kind == Kind.PAIR: return result.face in [1, 4, 5]
 	if result.kind == Kind.SPECIAL: return result.face in [1, 4, 5]
 	return true
 
-static func hit_count(result: Dictionary) -> int:
-	if not is_attack(result): return 0
-	if result.face == 5 and result.kind in [Kind.PAIR, Kind.SPECIAL]:
-		return 3 if result.kind == Kind.PAIR else 6
-	return 1
+func set_skill_use_multiplier(source: String, multiplier: int) -> void:
+	if multiplier <= 1: skill_use_modifiers.erase(source)
+	else: skill_use_modifiers[source] = multiplier
 
-static func hits_all(result: Dictionary) -> bool:
+func skill_use_count(skill: MultiHitSkill) -> int:
+	return skill.use_count(skill_use_modifiers)
+
+func begin_player_cast() -> bool:
+	if phase != "player" or pending.is_empty() or not outcome().is_empty(): return false
+	pending.begin_cast(skill_use_modifiers)
+	phase = "executing"
+	return true
+
+static func hits_all(result: MultiHitSkill) -> bool:
 	return result.kind == Kind.ULTIMATE or (result.kind in [Kind.PAIR, Kind.SPECIAL] and result.face == 4)
 
 func attack_multiplier() -> float:
@@ -245,7 +252,7 @@ func attack_multiplier() -> float:
 func boon_turns(face: int) -> int:
 	return (buffs[33] if buffs[33] > 0 else buffs[3]) if face == 3 else int(buffs.get(face, 0))
 
-func attack_base(result: Dictionary) -> float:
+func attack_base(result: MultiHitSkill) -> float:
 	if result.kind == Kind.NORMAL: return result.sum + reward_base_damage
 	var amount: float = regular_attack_power()
 	if result.kind == Kind.PAIR:
@@ -262,15 +269,15 @@ func regular_attack_power() -> float:
 func damage_multiplier() -> float:
 	return DAMAGE_MULTIPLIER + reward_damage_multiplier
 
-func is_instant_kill(result: Dictionary) -> bool:
+func is_instant_kill(result: MultiHitSkill) -> bool:
 	return result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
 
-func attack_damage(result: Dictionary, target: int = -1) -> int:
+func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
 	var damage: int = floori(attack_base(result) * damage_multiplier() * power * attack_multiplier())
 	if result.kind == Kind.NORMAL and target in living(): damage = mini(damage, damage_cap(result.kind, target))
 	return damage
 
-func damage_caption(result: Dictionary, primary: int = -1) -> String:
+func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 	if not is_attack(result) or is_instant_kill(result): return ""
 	var base: int = floori(attack_base(result))
 	var targets: Array = [primary] if primary in living() else living()
@@ -280,17 +287,17 @@ func damage_caption(result: Dictionary, primary: int = -1) -> String:
 	var high: int = modifiers.max()
 	var modifier: String = str(low) if low == high else "%d to %d" % [low, high]
 	if low < 0 or low != high: modifier = "("+modifier+")"
-	return "%d + %s (x%d)" % [base, modifier, hit_count(result)]
+	return "%d + %s (x%d)" % [base, modifier, skill_use_count(result)]
 
 func player_target() -> int:
 	if phase not in ["player", "executing"] or not is_attack(pending) or not outcome().is_empty(): return -1
-	if not pending.has("target") or pending.target not in living():
+	if pending.target not in living():
 		var candidates: Array = living()
 		if candidates.is_empty(): return -1
-		pending["target"] = candidates[rng.randi_range(0, candidates.size() - 1)]
+		pending.target = candidates[rng.randi_range(0, candidates.size() - 1)]
 	return pending.target
 
-func preview(result: Dictionary, primary: int) -> Array:
+func preview(result: MultiHitSkill, primary: int) -> Array:
 	# Preview one impact, without drawing RNG or consuming resources.
 	var hits: Array = []
 	if not is_attack(result) or primary not in living(): return hits
@@ -302,7 +309,7 @@ func preview(result: Dictionary, primary: int) -> Array:
 		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss})
 	return hits
 
-func _apply_support(result: Dictionary) -> Array:
+func _apply_support(result: MultiHitSkill) -> Array:
 	if result.kind == Kind.PAIR:
 		buffs[result.face] = result.spare
 		buff_ticks.erase(result.face)
@@ -312,7 +319,7 @@ func _apply_support(result: Dictionary) -> Array:
 	buffs[33] = 3
 	return [event(-1, 0, "buff", SPECIAL_NAMES[2])]
 
-func _finish_player_action(result: Dictionary) -> void:
+func _finish_player_action(result: MultiHitSkill) -> void:
 	if not bonus_resume.is_empty():
 		# A banked skill is a bonus: preserve the current roll and its turn clocks.
 		var resume: Dictionary = bonus_resume
@@ -320,8 +327,8 @@ func _finish_player_action(result: Dictionary) -> void:
 		if outcome() == "wave_clear" and not resume.pending.is_empty():
 			# Carry the unspent summoned skill into the next wave without casting it.
 			saved_skill = resume.pending.duplicate(true)
-			saved_skill.erase("target")
-		pending = resume.pending if outcome().is_empty() else {}
+			saved_skill.target = -1
+		pending = resume.pending if outcome().is_empty() else Skill.new()
 		phase = resume.phase if outcome().is_empty() else "finished"
 		return
 	# Keep counters and effects active until every enemy has finished acting.
@@ -329,7 +336,7 @@ func _finish_player_action(result: Dictionary) -> void:
 		var refreshed: bool = (result.kind == Kind.PAIR and result.face == face) or (result.kind == Kind.SPECIAL and result.face == 3 and face == 33)
 		if not refreshed: buff_ticks[face] = true
 	buff_ticks[6] = true
-	pending = {}
+	pending = Skill.new()
 	phase = "enemy" if outcome().is_empty() else "finished"
 	if phase == "finished": _end_buff_turn()
 
@@ -340,44 +347,45 @@ func _end_buff_turn() -> void:
 func save_pending_skill() -> bool:
 	if phase != "player" or pending.is_empty() or not saved_skill.is_empty() or not bonus_resume.is_empty() or not outcome().is_empty(): return false
 	saved_skill = pending.duplicate(true)
-	saved_skill.erase("target")
+	saved_skill.target = -1
 	# Banking passes the turn; it does not apply or refresh the stored boon.
-	_finish_player_action({"kind": Kind.NORMAL, "face": 0})
+	_finish_player_action(Skill.new(Kind.NORMAL))
 	return true
 
 func begin_saved_cast() -> bool:
 	if saved_skill.is_empty() or not bonus_resume.is_empty() or phase not in ["roll", "player", "round_end"] or not outcome().is_empty(): return false
 	bonus_resume = {"phase": phase, "pending": pending.duplicate(true)}
 	pending = saved_skill.duplicate(true)
-	saved_skill = {}
+	saved_skill = Skill.new()
 	phase = "player"
 	return true
 
 func apply_player_step(primary: int = -1) -> Array:
 	if phase not in ["player", "executing"] or pending.is_empty() or not outcome().is_empty(): return []
-	var result: Dictionary = pending.duplicate(true)
-	if not is_attack(result):
-		var support: Array = _apply_support(result)
-		_finish_player_action(result)
-		return support
-	if primary < 0: primary = player_target()
-	if primary not in living(): return []
-	if phase == "player": pending["hits_left"] = hit_count(result)
-	phase = "executing"
+	if is_attack(pending):
+		if primary < 0: primary = player_target()
+		if primary not in living(): return []
+		pending.target = primary
+	if phase == "player": begin_player_cast()
+	var result: MultiHitSkill = pending.duplicate()
 	var events: Array = []
-	for hit in preview(result, primary):
-		var previous_shield: int = enemies[hit.target].shield
-		var loss: int = hit_enemy(hit.target, hit.damage, hit.ignore)
-		if previous_shield > 0 and not hit.ignore:
-			events.append(event(hit.target, previous_shield-enemies[hit.target].shield, "shield_hit", "SHIELD BREAK" if enemies[hit.target].shield == 0 else "BLOCKED"))
-		else:
-			events.append(event(hit.target, loss, "damage", "-%d" % loss))
-	pending.hits_left -= 1
-	pending.erase("target")
-	if pending.hits_left <= 0 or not outcome().is_empty():
-		if result.kind == Kind.ULTIMATE: events.append(event(-1, heal(12), "heal", "+12 HP"))
-		_finish_player_action(result)
+	if not is_attack(result): events = _apply_support(result)
+	else:
+		for hit in preview(result, primary):
+			var previous_shield: int = enemies[hit.target].shield
+			var loss: int = hit_enemy(hit.target, hit.damage, hit.ignore)
+			if previous_shield > 0 and not hit.ignore:
+				events.append(event(hit.target, previous_shield-enemies[hit.target].shield, "shield_hit", "SHIELD BREAK" if enemies[hit.target].shield == 0 else "BLOCKED"))
+			else:
+				events.append(event(hit.target, loss, "damage", "-%d" % loss))
+	_complete_skill_use(result, events)
 	return events
+
+func _complete_skill_use(result: MultiHitSkill, events: Array) -> void:
+	if result.kind == Kind.ULTIMATE: events.append(event(-1, heal(12), "heal", "+12 HP"))
+	pending.consume_use()
+	if pending.random_target_per_use(): pending.target = -1
+	if pending.uses_left() == 0 or not outcome().is_empty(): _finish_player_action(result)
 
 func apply_player(primary: int = -1) -> Array:
 	var events: Array = []

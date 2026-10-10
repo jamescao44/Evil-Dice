@@ -106,7 +106,7 @@ func auto_claim_victory_chest() -> int:
 func is_city() -> bool:
 	return stage == WAVE_COUNTS.size()
 
-func roll(throw_power: float = 0.0, perfect: bool = false, _fever: bool = false) -> Dictionary:
+func roll(throw_power: float = 0.0, perfect: bool = false, _fever: bool = false) -> MultiHitSkill:
 	return super.roll(throw_power, perfect, is_city())
 
 func damage_cap(kind: int, target: int) -> int:
@@ -124,7 +124,7 @@ func _load_wave() -> void:
 			var temp: Dictionary = enemies[i]
 			enemies[i] = enemies[other]
 			enemies[other] = temp
-	pending = {}
+	pending = Skill.new()
 	phase = "new"
 
 func outcome() -> String:
@@ -158,36 +158,36 @@ func begin_round() -> Array:
 	phase = "roll"
 	return events
 
-func is_instant_kill(result: Dictionary) -> bool:
+func is_instant_kill(result: MultiHitSkill) -> bool:
 	return not is_city() and super.is_instant_kill(result)
 
-func attack_base(result: Dictionary) -> float:
+func attack_base(result: MultiHitSkill) -> float:
 	if not is_city(): return super.attack_base(result)
 	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE
 	# A city is not a humanoid: triple 1 deals five regular attacks instead.
 	return regular_attack_power() * 5 if result.kind == Kind.SPECIAL and result.face == 1 else super.attack_base(result)
 
-func attack_damage(result: Dictionary, target: int = -1) -> int:
+func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
 	if not is_city(): return super.attack_damage(result, target)
 	if not is_attack(result): return 0
 	if result.kind == Kind.ULTIMATE: return mini(city_hp, CITY_ULTIMATE_DAMAGE)
 	return mini(city_hp, floori(attack_base(result) * damage_multiplier() * power * attack_multiplier() * 2.0))
 
-func siege_damage(result: Dictionary) -> int:
+func siege_damage(result: MultiHitSkill) -> int:
 	return attack_damage(result, -2)
 
-func damage_caption(result: Dictionary, primary: int = -1) -> String:
+func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 	if not is_city(): return super.damage_caption(result, primary)
 	if not is_attack(result): return ""
 	var base: int = floori(attack_base(result))
 	var modifier: int = siege_damage(result)-base
-	return "%d + %s (x%d)" % [base, "(%d)" % modifier if modifier < 0 else str(modifier), hit_count(result)]
+	return "%d + %s (x%d)" % [base, "(%d)" % modifier if modifier < 0 else str(modifier), skill_use_count(result)]
 
 func player_target() -> int:
 	if not is_city(): return super.player_target()
 	return -2 if phase in ["player", "executing"] and is_attack(pending) and outcome().is_empty() else -1
 
-func _finish_player_action(result: Dictionary) -> void:
+func _finish_player_action(result: MultiHitSkill) -> void:
 	var bonus: bool = not bonus_resume.is_empty()
 	super._finish_player_action(result)
 	if bonus: return
@@ -200,28 +200,21 @@ func _finish_player_action(result: Dictionary) -> void:
 func apply_player_step(primary: int = -1) -> Array:
 	if not is_city(): return super.apply_player_step(primary)
 	if phase not in ["player", "executing"] or pending.is_empty() or not outcome().is_empty(): return []
-	var result: Dictionary = pending.duplicate(true)
-	if not is_attack(result):
-		var support: Array = _apply_support(result)
-		_finish_player_action(result)
-		return support
-	if phase == "player": pending["hits_left"] = hit_count(result)
-	phase = "executing"
-	var damage: int = siege_damage(result)
-	city_hp -= damage
-	var events: Array = [event(-2, damage, "damage", "SIEGE")]
-	var crushed: int = 0
-	if hits_all(result): crushed = troops
-	elif result.kind in [Kind.PAIR, Kind.SPECIAL] and result.face == 5: crushed = mini(troops, 1)
-	if crushed > 0:
-		troops -= crushed
-		var sweep: Dictionary = event(-2, crushed, "sweep", "TROOPS CRUSHED")
-		sweep["first"] = troops
-		events.append(sweep)
-	pending.hits_left -= 1
-	if pending.hits_left <= 0 or not outcome().is_empty():
-		if result.kind == Kind.ULTIMATE: events.append(event(-1, heal(12), "heal", "+12 HP"))
-		_finish_player_action(result)
+	if phase == "player": begin_player_cast()
+	var result: MultiHitSkill = pending.duplicate()
+	var events: Array = []
+	if not is_attack(result): events = _apply_support(result)
+	else:
+		var damage: int = siege_damage(result)
+		city_hp -= damage
+		events.append(event(-2, damage, "damage", "SIEGE"))
+		var crushed: int = troops if hits_all(result) else mini(troops, 1) if result.random_target_per_use() else 0
+		if crushed > 0:
+			troops -= crushed
+			var sweep: Dictionary = event(-2, crushed, "sweep", "TROOPS CRUSHED")
+			sweep["first"] = troops
+			events.append(sweep)
+	_complete_skill_use(result, events)
 	return events
 
 func tick_city(delta: float) -> Array:

@@ -119,7 +119,7 @@ func run() -> void:
 		game.view_phase = "ready"
 		await shot("enemy-bars-%d" % stage)
 	game._clear_skill()
-	game.model.pending = {}
+	game.model.pending = MultiHitSkill.new()
 	game.view_phase = "ready"
 	await shot("milestones")
 	game.model._load_wave()

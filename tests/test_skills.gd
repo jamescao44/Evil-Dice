@@ -120,7 +120,7 @@ func _test_damage_captions() -> void:
 		[[5,5,1], "11 + 5 (x3)"], [[5,5,5], "10 + 5 (x6)"],
 		[[4,4,4], "20 + 10 (x1)"], [[1,2,3], "6 + 3 (x1)"]]:
 		check(game.damage_caption(Rules.classify(example[0]),0) == example[1], "Caption gives integer base plus modifier and actual hit count")
-	var normal: Dictionary = Rules.classify([4,5,6])
+	var normal: MultiHitSkill = Rules.classify([4,5,6])
 	check(game.damage_caption(normal,2) == "15 + (-4) (x1)", "Normal target cap can reduce the displayed damage below its base")
 	check(game.damage_caption(normal) == "15 + (-4 to 7) (x1)", "Unchosen targets show the truthful cap range")
 	for values in [[1,1,1],[6,6,6],[2,2,3],[3,3,4],[6,6,4],[2,2,2],[3,3,3]]:
@@ -134,12 +134,12 @@ func _test_damage_captions() -> void:
 			if stats[3] > 0: game.buffs[stats[3]] = 2
 			game.set_test_roll(values)
 			var rng: int = game.rng.state
-			var pending: Dictionary = game.pending.duplicate(true)
+			var pending: MultiHitSkill = game.pending.duplicate(true)
 			var buffs: Dictionary = game.buffs.duplicate()
 			var caption: String = game.damage_caption(game.pending,0)
 			var terms: PackedStringArray = caption.split(" ")
 			var predicted: int = int(terms[0])+int(terms[2].trim_prefix("(").trim_suffix(")"))
-			check(game.rng.state == rng and game.pending == pending and game.buffs == buffs, "Preview leaves RNG, pending skill and buffs untouched")
+			check(game.rng.state == rng and game.pending.same_as(pending) and game.buffs == buffs, "Preview leaves RNG, pending skill and buffs untouched")
 			var events: Array = game.apply_player_step(0)
 			check(events[0].amount == mini(500,predicted), "Displayed per-hit sum matches actual damage after rewards, growth, buffs and caps")
 	var city := Run.new(42)
