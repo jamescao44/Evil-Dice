@@ -27,15 +27,20 @@ func _configure_layout() -> void:
 	DICE_CENTER = Vector2(402, 1448)
 	DICE_RADIUS = 232
 	DICE_POSITIONS = [Vector2(402, 1338), Vector2(296, 1508), Vector2(508, 1508)]
-	DEBUG_RECT = Rect2(280, 124, 88, 88)
-	SPEED_RECT = Rect2(378, 124, 88, 88)
-	AUDIO_RECT = Rect2(476, 124, 88, 88)
-	FX_RECT = Rect2(574, 124, 88, 88)
-	GUIDE_RECT = Rect2(672, 124, 88, 88)
+	MENU_RECT = Rect2(672, 124, 88, 88)
+	MENU_CLOSE = Rect2(660, 132, 104, 88)
+	MENU_RESUME = Rect2(88, 1164, 628, 112)
+	DEBUG_RECT = Rect2(88, 420, 628, 112)
+	SPEED_RECT = Rect2(476, 124, 88, 88)
+	AUDIO_RECT = Rect2(574, 124, 88, 88)
+	FX_RECT = Rect2(88, 580, 628, 112)
+	GUIDE_RECT = Rect2(88, 740, 628, 112)
 	GUIDE_CLOSE = Rect2(660, 132, 104, 88)
 	DEBUG_CLOSE = GUIDE_CLOSE
 	DEBUG_REPEAT = Rect2(40, 1470, 350, 88)
 	DEBUG_PERFECT = Rect2(414, 1470, 350, 88)
+	DEBUG_WAVE_INPUT = Rect2(220, 1578, 150, 88)
+	DEBUG_WAVE_LOAD = Rect2(414, 1578, 350, 88)
 	REPLAY_RECT = Rect2(162, 1360, 480, 104)
 	REWARD_CENTER = Vector2(402,1090)
 	CITY_POINT = CITY_TRANSFORM * Vector2(925, 282)
@@ -52,15 +57,15 @@ func _configure_effects() -> void:
 		die.scale = Vector2.ONE * die.base_scale
 
 func _handle_click(point: Vector2) -> void:
-	if view_phase in ["reward", "skill", "targeting"]:
-		super._handle_click(point)
-		return
 	if guide:
 		if GUIDE_PAIRS.has_point(point): guide_page = 0
 		elif GUIDE_TRIPLES.has_point(point): guide_page = 1
 		super._handle_click(point)
 		return
-	if not debug_open and view_phase != "over":
+	if view_phase in ["reward", "skill", "targeting"]:
+		super._handle_click(point)
+		return
+	if not _menus_open() and view_phase != "over":
 		for item in _active_statuses():
 			if _status_rect(item.id).has_point(point):
 				selected_status = item.id if selected_status != item.id else -1
@@ -69,9 +74,9 @@ func _handle_click(point: Vector2) -> void:
 	selected_status = -1
 	super._handle_click(point)
 
-func _restart() -> void:
+func _restart(wave_number: int = 1) -> void:
 	selected_status = -1
-	super._restart()
+	super._restart(wave_number)
 
 func _player_feet() -> Vector2:
 	return Vector2(222, 930)
@@ -81,18 +86,22 @@ func _player_point() -> Vector2:
 
 func _enemy_feet(index: int) -> Vector2:
 	var count: int = model.enemies.size()
-	if count == 1: return Vector2(568, 662 if model.stage == 0 else 610)
-	var columns: int = mini(5, count)
-	var spacing: float = clampf(_enemy_side()*1.8, 104, 172)
-	spacing = minf(spacing, 384.0/maxi(1,columns-1))
-	var row: int = floori(index / float(columns))
-	var row_count: int = mini(columns, count-row*columns)
-	var column: int = index % columns
-	# Leave room for move badges between rows and for two rows of player statuses.
-	var bottom: float = minf(570, _player_feet().y-monster_side-154)
-	if count > 5: bottom = maxf(bottom,462+_enemy_side())
-	var center_x: float = 524 if columns == 3 else 540
-	return Vector2(center_x+(column-(row_count-1)/2.0)*spacing, bottom-(161 if count>5 and row==0 else 0)+[0,-12,10,-6,7][column])
+	if count == 1: return Vector2(530, 662 if model.stage == 0 else 610)
+	if count <= 3:
+		var bottom: float = minf(550, _player_feet().y-monster_side-132)
+		return Vector2(486+(index-(count-1)/2.0)*144,bottom+[-12,0,-8][index])
+	# Stagger compact groups through the upper center and open right flank.
+	# The lower left stays clear for the Horror and its two rows of statuses.
+	var rows: Array = [2,2] if count == 4 else [3,2] if count == 5 else [4,count-4] if count <= 7 else [4,3,count-7]
+	var row: int = 0
+	var column: int = index
+	while column >= rows[row]:
+		column -= rows[row]
+		row += 1
+	var center: float = (436 if count == 4 else 444) if count <= 5 and row == 0 else 556 if row > 0 else 402
+	var bottom: float = (470+row*166) if count <= 5 else (438+row*182) if count <= 7 else (408+row*158)
+	var spacing: float = 112 if count <= 5 else 108
+	return Vector2(center+(column-(rows[row]-1)/2.0)*spacing,bottom+[0,-8,-4,0][column])
 
 func _city_gate_point() -> Vector2:
 	return CITY_TRANSFORM * City.gate_point()
@@ -116,6 +125,7 @@ func _draw() -> void:
 		_draw_reward_progress(REWARD_CENTER,1.5)
 	if guide: _draw_guide()
 	elif debug_open: _draw_debug()
+	elif menu_open: _draw_menu()
 	else: _draw_tooltips()
 
 func _button(rect: Rect2, value: String, enabled: bool = true) -> void:
@@ -126,14 +136,11 @@ func _button(rect: Rect2, value: String, enabled: bool = true) -> void:
 func _draw_header() -> void:
 	_text(Vector2(48, 163), "%d / %d" % [model.stage + 1, Run.WAVE_NAMES.size()], 32, GOLD)
 	_draw_currencies(Vector2(58, 199),1.1)
-	_button(DEBUG_RECT, "DBG")
 	_button(SPEED_RECT, "%.1fx" % _roll_speed() if model.is_city() else "2x" if speed == 2 else "1x")
 	_button(AUDIO_RECT, "")
-	_button(FX_RECT, "")
-	_button(GUIDE_RECT, "")
+	_button(MENU_RECT, "")
 	_glyph(AUDIO_RECT.get_center(), "mute" if muted else "sound", MUTED if muted else GOLD, 2)
-	_glyph(FX_RECT.get_center(), "fx", MUTED if reduced else GOLD, 2)
-	_art("book", Rect2(GUIDE_RECT.get_center() - Vector2(26, 26), Vector2(52, 52)))
+	_draw_menu_icon()
 
 func _draw_arena() -> void:
 	draw_rect(ARENA, Color("a5a182"))
@@ -263,7 +270,7 @@ func _draw_guide() -> void:
 	var rule: String = "Perfect: pair or triple. Normal: sum. 666 clears the squad."
 	if model.is_city():
 		intro = "Tap twice to throw. City skills cast automatically after the reveal. Drag saved skills out for a bonus cast."
-		rule = "Perfect: triple. 666: 800 city damage; clear troops; +12 HP."
+		rule = "Perfect: triple. 666: 800 x combo bonus; clear troops; +12 HP."
 	_wrapped(Vector2(40, 274), intro, 718, CREAM, 28)
 	_wrapped(Vector2(40, 370), rule, 718, MUTED, 24)
 	_button(GUIDE_PAIRS, "PAIRS")
@@ -278,6 +285,7 @@ func _draw_guide() -> void:
 		draw_rect(Rect2(40, y + 108, 724, 2), EDGE.darkened(0.35))
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage, 3)]
 	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else "Damage x1.5 + growth. Normal cap %s HP; skills ignore caps." % caps, 718, MUTED, 24)
+	_wrapped(Vector2(40, 1554), "Perfect combo: +10% damage per consecutive Perfect. A miss resets it.", 718, MUTED, 24)
 	_wrapped(Vector2(40, 1620), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22)
 
 func _debug_option_rect(choice: int) -> Rect2:
@@ -288,7 +296,7 @@ func _debug_option_rect(choice: int) -> Rect2:
 
 func _draw_debug() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.98))
-	_text(Vector2(40, 188), "DEBUG DICE", 42, GOLD)
+	_text(Vector2(40, 188), "DEBUG", 42, GOLD)
 	_button(DEBUG_CLOSE, "X")
 	_button(_debug_option_rect(-1), "NATURAL RANDOM")
 	_button(_debug_option_rect(0), "RANDOM SINGLES")
@@ -304,4 +312,6 @@ func _draw_debug() -> void:
 	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"))
 	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"))
 	if debug_perfect: draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
-	_wrapped(Vector2(40, 1620), "Choose, then tap the seal. City is paused here.", 724, MUTED, 24)
+	_text(Vector2(40,1634),"WAVE",28,GOLD)
+	_button(DEBUG_WAVE_LOAD,"LOAD")
+	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "Start fresh at wave 1-10. 10 = city.",24,RED if not debug_wave_error.is_empty() else MUTED)

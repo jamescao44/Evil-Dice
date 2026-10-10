@@ -80,9 +80,13 @@ func test_model() -> void:
 		model.reward_weights = [1,0,0,0,0,0,0]
 		var tier: int = progress / 3
 		check(model.auto_claim_victory_chest() == tier,"Victory claims the highest complete tier")
-		check(model.rubies == Run.CHEST_COUNTS[tier]*100 and model.reward_history.size() == Run.CHEST_COUNTS[tier],"Victory applies every reward exactly once")
-		check(model.open_rewards.is_empty() and model.claimed_slots.is_empty() and model.perfect_progress == (0 if tier > 0 else progress),"Auto-claim closes rewards and consumes the whole eligible bank")
-		check(model.auto_claim_victory_chest() == 0 and model.rubies == Run.CHEST_COUNTS[tier]*100,"Repeated victory checks cannot duplicate rewards")
+		check(model.rubies == 0 and model.reward_history.is_empty() and model.open_rewards.size() == Run.CHEST_COUNTS[tier],"Victory locks gifts without collecting them")
+		check(model.claimed_slots.is_empty() and model.perfect_progress == (0 if tier > 0 else progress),"Auto-claim consumes the eligible bank and awaits pickup")
+		check(model.auto_claim_victory_chest() == 0,"Repeated victory checks cannot reopen the chest")
+		for slot in range(model.open_rewards.size()): model.claim_reward(slot)
+		check(model.rubies == Run.CHEST_COUNTS[tier]*100,"Victory gifts apply only when collected")
+		model.close_chest()
+		check(model.auto_claim_victory_chest() == 0,"Collected victory chest cannot reopen")
 	model.reset_run()
 
 	var roles: Dictionary = {}
@@ -157,6 +161,7 @@ func test_scene(game) -> void:
 	game._handle_click(game._diamond_center(8 if game.model.chest_tier() == 3 else 5 if game.model.chest_tier() == 2 else 2))
 	var city_clock: float = game.model.volley_clock
 	game._handle_click(game.DICE_CENTER)
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.GUIDE_RECT.get_center())
 	if game is Portrait:
 		game.model.statuses[2].count = 3
@@ -218,15 +223,27 @@ func test_scene(game) -> void:
 		await Driver.resolve_held(game)
 		check(game.view_phase == "over" and game.model.outcome() == "victory","Final cast reaches the success screen")
 		check(game.auto_claim_tier == tier and game.auto_claim_remaining > 2,"Winning Perfect counts toward the correct auto-claimed tier")
-		check(game.model.summon_shards == Run.CHEST_COUNTS[tier] and game.model.perfect_progress == 0,"Victory delivers the complete chest immediately")
-		check(not game.chest.visible and game.model.open_rewards.is_empty(),"Auto-claim keeps the success screen without reels or manual pickups")
+		check(game.model.summon_shards == 0 and game.model.perfect_progress == 0,"Victory claims the chest but waits for individual gift pickups")
+		check(not game.chest.visible and game.model.open_rewards.size() == Run.CHEST_COUNTS[tier],"Success screen precedes the locked reward reels")
 		game._check_over()
-		check(game.model.reward_history.size() == Run.CHEST_COUNTS[tier],"Success-screen checks cannot repeat the claim")
+		check(game.model.reward_history.is_empty(),"Success-screen checks cannot prematurely collect gifts")
 		game._process(0.5)
 		check(game.auto_claim_remaining > 1.8 and game.auto_claim_notice.visible,"City speed does not shorten the visible message")
 		check(game.auto_claim_notice.z_index > game.fx.z_index and game.auto_claim_notice.z_index > game.chest.z_index,"Claim message is above victory and reward effects")
 		game._process(2.4)
-		check(game.auto_claim_remaining == 0 and not game.auto_claim_notice.visible and game.view_phase == "over","Message expires quickly while victory stays visible")
+		deadline = Time.get_ticks_msec()+5000
+		while (not game.chest.visible or game.chest.active) and Time.get_ticks_msec() < deadline: await process_frame
+		check(game.auto_claim_remaining == 0 and not game.auto_claim_notice.visible and game.view_phase == "reward","After the victory notice the reward animation opens automatically")
+		check(Time.get_ticks_msec() < deadline and not game.chest.active and game.model.reward_history.is_empty(),"Reels finish and wait for the player")
+		game._check_over()
+		check(game.view_phase == "reward" and game.model.open_rewards.size() == Run.CHEST_COUNTS[tier],"Victory polling cannot interrupt reward collection")
+		for slot in range(game.chest.rewards.size()):
+			game._handle_click(game.chest.reel_rect(slot).get_center())
+			game._handle_click(game.chest.reel_rect(slot).get_center())
+		check(game.model.summon_shards == Run.CHEST_COUNTS[tier],"Every victory gift can be collected exactly once")
+		deadline = Time.get_ticks_msec()+3000
+		while game.view_phase != "over" and Time.get_ticks_msec() < deadline: await process_frame
+		check(game.view_phase == "over" and not game.chest.visible and game.model.open_rewards.is_empty(),"Collecting every gift returns to the success screen")
 		game._handle_click(game.REPLAY_RECT.get_center())
 		check(game.auto_claim_tier == 0 and game.auto_claim_remaining == 0 and game.model.reward_history.is_empty(),"Restart clears the message and run rewards")
 	game.model.stage = 9

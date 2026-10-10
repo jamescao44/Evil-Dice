@@ -5,8 +5,8 @@ const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "THE CHAMPION", "CROSSROADS", "WAT
 # Normal / elite counts. Roles are independently randomized and then shuffled.
 const WAVE_COUNTS := [[1,0], [3,0], [0,1], [5,0], [2,1], [3,2], [5,2], [0,4], [5,5]]
 const WAVE_BOOSTS := [1.0, 1.0, 1.5, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25]
-const CITY_MAX_HP := 2400
-const CITY_ULTIMATE_DAMAGE := CITY_MAX_HP / 3
+const CITY_MAX_HP := 10000
+const CITY_ULTIMATE_DAMAGE := 800
 const CITY_IMMUNITY_SECONDS_PER_STACK := 2.0
 var city_immunity_clock: float = 0.0
 var stage: int = 0
@@ -55,10 +55,21 @@ func reset_run() -> void:
 	_load_wave()
 
 func record_perfect(perfect: bool) -> void:
+	super.record_perfect(perfect)
 	# Accepted throws only. Misses/waves preserve progress; a full bank holds nine.
 	if not perfect: return
 	perfect_total += 1
 	perfect_progress = mini(9, perfect_progress + 1)
+
+func load_debug_wave(wave_number: int) -> bool:
+	if wave_number < 1 or wave_number > WAVE_NAMES.size(): return false
+	reset_run()
+	stage = wave_number - 1
+	max_hp = MAX_HP + stage * 30
+	hp = max_hp
+	power = (1.0 + stage * 0.5) * WAVE_BOOSTS[stage]
+	if stage > 0: _load_wave()
+	return true
 
 func chest_tier() -> int:
 	return clampi(perfect_progress / 3, 0, 3)
@@ -101,9 +112,9 @@ func auto_claim_victory_chest() -> int:
 	if outcome() != "victory" or not open_rewards.is_empty(): return 0
 	var tier: int = chest_tier()
 	if tier == 0: return 0
-	var outcomes: Array = open_chest(tier)
-	for slot in range(outcomes.size()): claim_reward(slot)
-	close_chest()
+	# Claim the chest automatically, but leave its locked gifts for the reels
+	# and individual player pickups, just like a manually opened chest.
+	open_chest(tier)
 	return tier
 
 func is_city() -> bool:
@@ -174,8 +185,8 @@ func attack_base(result: MultiHitSkill) -> float:
 func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
 	if not is_city(): return super.attack_damage(result, target)
 	if not is_attack(result): return 0
-	if result.kind == Kind.ULTIMATE: return mini(city_hp, CITY_ULTIMATE_DAMAGE)
-	return mini(city_hp, floori(attack_base(result) * damage_multiplier() * power * attack_multiplier() * 2.0))
+	if result.kind == Kind.ULTIMATE: return mini(city_hp, floori(CITY_ULTIMATE_DAMAGE * combo_multiplier()))
+	return mini(city_hp, floori(attack_base(result) * damage_multiplier() * power * attack_multiplier() * 2.0 * combo_multiplier()))
 
 func siege_damage(result: MultiHitSkill) -> int:
 	return attack_damage(result, -2)

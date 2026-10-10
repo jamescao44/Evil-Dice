@@ -30,11 +30,11 @@ func timing_checks() -> void:
 		check(is_equal_approx(meter.position_ratio(), expected), "Meter traverses both ends and center")
 		meter.advance(Meter.PERIOD / 4)
 	for sign_value in [-1, 1]:
-		var edge: Dictionary = Meter.sample_at(0.5 + sign_value * 2.0 / Meter.WIDTH)
-		check(edge.perfect and edge.position == 0.5, "Both +/-2 pixel edges qualify and snap to center")
-		var outside: Dictionary = Meter.sample_at(0.5 + sign_value * 2.001 / Meter.WIDTH)
+		var edge: Dictionary = Meter.sample_at(0.5 + sign_value * 4.0 / Meter.WIDTH)
+		check(edge.perfect and edge.position == 0.5, "Both +/-4 pixel edges qualify and snap to center")
+		var outside: Dictionary = Meter.sample_at(0.5 + sign_value * 4.001 / Meter.WIDTH)
 		check(not outside.perfect and outside.position != 0.5, "Unrounded position outside window neither qualifies nor snaps")
-		check(Meter.sample_at(0.5 + sign_value * 1.5 / Meter.WIDTH).perfect, "New window accepts stops that missed the old window")
+		check(Meter.sample_at(0.5 + sign_value * 3.0 / Meter.WIDTH).perfect, "New window accepts stops that missed the old window")
 	check(Meter.sample_at(0.5).power == 1 and Meter.sample_at(0.0).power == 0, "Power spans zero to one")
 	check(is_equal_approx(Meter.sample_at(0.1).power, Meter.sample_at(0.9).power), "Power is symmetric")
 	meter.elapsed = Meter.PERIOD / 4
@@ -46,12 +46,12 @@ func timing_checks() -> void:
 	check(center_step > meter.position_ratio() * 1.5, "Marker still accelerates toward the center")
 	var previous_peak_step: float = PI / Meter.PERIOD * 0.001
 	check(center_step < previous_peak_step * 0.8 and center_step > previous_peak_step * 0.7, "Center peak is modestly slower without changing the cycle")
-	# Check real time inside the unchanged pixel window, not just curve constants.
+	# Check real time inside the widened pixel window, not just curve constants.
 	var available_ms: int = 0
 	for ms in range(-20,21):
 		meter.elapsed = Meter.PERIOD/4 + ms/1000.0
 		if meter.sample().perfect: available_ms += 1
-	check(available_ms >= 13 and available_ms <= 17, "Perfect has a longer timing opportunity while retaining the +/-2 pixel window")
+	check(available_ms >= 29 and available_ms <= 33, "Perfect timing opportunity doubles with the +/-4 pixel window")
 	for fps in [15, 20, 30, 60, 120]:
 		meter.reset()
 		for frame in range(fps): meter.advance(1.0 / fps)
@@ -120,11 +120,13 @@ func scene_checks(portrait: bool) -> void:
 	game._handle_click(game.DICE_CENTER)
 	check(game.view_phase == "charging" and game.model.phase == "roll" and game.model.rng.state == state, "Charge does not draw gameplay RNG or start combat")
 	check(game.dice.all(func(d): return d.charging and not d.rolling), "Dice build energy while charging")
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.GUIDE_RECT.get_center())
 	var elapsed: float = game.throw_meter.elapsed
 	await create_timer(0.08).timeout
 	check(game.throw_meter.elapsed == elapsed, "Grimoire pauses power meter")
 	game._handle_click(game.GUIDE_CLOSE.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
 	game.throw_meter.elapsed = Meter.PERIOD / 4
 	game.charge_stamp = Time.get_ticks_usec()
 	game._handle_click(game.DICE_CENTER)
@@ -162,12 +164,14 @@ func scene_checks(portrait: bool) -> void:
 	var city_clock: float = game.model.volley_clock
 	await create_timer(0.12).timeout
 	check(game.model.volley_clock < city_clock and game.view_phase == "charging", "City siege continues while aiming")
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.DEBUG_RECT.get_center())
 	city_clock = game.model.volley_clock
 	elapsed = game.throw_meter.elapsed
 	await create_timer(0.08).timeout
 	check(game.model.volley_clock == city_clock and game.throw_meter.elapsed == elapsed, "Debug pauses both siege and charge")
 	game._handle_click(game.DEBUG_CLOSE.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
 	game.model.hp = 1
 	game.model.volley_clock = 0.001
 	await create_timer(0.08).timeout

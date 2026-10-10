@@ -50,9 +50,11 @@ func test_layout(game) -> void:
 		await game._roll()
 		check(game.throw_perfect and game.debug_perfect and game.debug_choice == -1,"Perfect stays on across throws without Repeat while the forced dice choice clears")
 		await Driver.resolve_held(game)
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.DEBUG_RECT.get_center())
 	game._handle_click(game.DEBUG_PERFECT.get_center())
 	game._handle_click(game.DEBUG_CLOSE.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
 	check(not game.debug_perfect,"Debug button switches the persistent Perfect toggle off")
 	game.debug_choice = 2
 	await game._roll()

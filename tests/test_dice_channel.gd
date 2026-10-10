@@ -54,6 +54,7 @@ func test_layout(game) -> void:
 		check(game._skill_center().distance_to(game._skill_rest_point()) <= 7 and game._skill_center().y < game.DICE_CENTER.y,"Skill settles above the dice at its own clickable position")
 		check(not game.skill_bubble.caption.name.is_empty() and game.fx.skill.is_empty(),"Skill name belongs to persistent bubble caption, not a timed screen callout")
 		check(game._dice_spent() and not game._show_dice_links(),"Held skills grey the dice and hide all combination links")
+		check(game.dice.all(func(d): return d.visible and d.self_modulate.r > 0 and d.self_modulate.r < 0.5),"Revealed dice stay visible and dim while the skill is held")
 		game.skill_bubble.age += 5
 		check(not game.skill_bubble.caption.name.is_empty(),"Caption remains below the skill for as long as it is held")
 		var rng: int = game.model.rng.state
@@ -62,6 +63,8 @@ func test_layout(game) -> void:
 		game._restart()
 		await process_frame
 		check(game.skill_bubble.roll.is_empty() and game.cinematic_remaining == 0, "Restart clears bubble and cinematic")
+		await process_frame # The signal precedes the scene's presentation update.
+		check(game.dice.all(func(d): return d.visible and d.self_modulate == Color.WHITE),"Ready dice become fully bright again")
 	prepare(game,[1,2,3])
 	game.skill_bubble.age = (game.skill_bubble.converge+game.skill_bubble.RISE+0.1)/game.skill_bubble.entrance_speed
 	check(game.skill_bubble.radius_scale() >= 1.7,"Skill entrance is substantially larger than the resting seal")
@@ -127,7 +130,9 @@ func test_layout(game) -> void:
 		var most_used: int = 1
 		var intermediate: bool = false
 		var turn_waited: bool = true
+		var dice_stayed_dim: bool = true
 		while game.view_phase == "resolving" and Time.get_ticks_msec()<deadline:
+			dice_stayed_dim = dice_stayed_dim and game.dice.all(func(d): return d.visible and d.self_modulate.r > 0 and d.self_modulate.r < 0.5)
 			most_used = maxi(most_used, game.skill_bubble.used)
 			if game.model.phase == "executing":
 				intermediate = true
@@ -135,6 +140,7 @@ func test_layout(game) -> void:
 			await process_frame
 		check(Time.get_ticks_msec()<deadline and most_used == count and intermediate,"All orbs pop in sequence without more input")
 		check(turn_waited,"Boon clocks, enemy turns and chests wait for the complete combo")
+		check(dice_stayed_dim,"Dice remain visible and dim through the entire multi-hit cast and enemy phase")
 		for i in range(3): check(game.model.enemies[i].hp == expected[i],"Each automatic hit chooses a fresh random living target")
 		check(game.model.round_number == round_number+1 and game.model.statuses[3].count == 1 and game.skill_bubble.roll.is_empty(),"Whole combo spends exactly one action")
 		check(game._can_claim_chest() and not game._dice_spent(),"Dice and chests unlock when the turn finishes")

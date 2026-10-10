@@ -77,15 +77,20 @@ func run() -> void:
 	var triple_shake: float = await observe_shake()
 	check(normal_shake > 0 and triple_shake > normal_shake * 2, "Normal has a small impact shake; triples have a much larger shake")
 	game._restart()
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.FX_RECT.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
 	game.debug_choice = 7
 	check(await observe_shake() == 0 and root.canvas_transform == Transform2D.IDENTITY, "Reduced effects disables screen shake")
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.FX_RECT.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
 	game._restart()
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.DEBUG_RECT.get_center())
 	await process_frame
 	await process_frame
-	check(game.debug_open and game.dice.all(func(d): return not d.visible), "Debug modal hides dice")
+	check(game.debug_open and game.dice.all(func(d): return d.visible and d.self_modulate.r < 0.4), "Debug dims dice without hiding them")
 	game._handle_click(game.DEBUG_REPEAT.get_center())
 	game._handle_click(game._debug_option_rect(2).get_center())
 	check(not game.debug_open and game.debug_choice == 2 and game.debug_repeat, "Visual card queues repeatable pair")
@@ -101,10 +106,12 @@ func run() -> void:
 	for i in range(30):
 		check(Rules.classify(game._debug_values()).kind == Rules.Kind.NORMAL, "Random singles are always all different")
 	game._restart()
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.GUIDE_RECT.get_center())
 	game._handle_click(game.DICE_CENTER)
 	check(game.guide and game.view_phase == "ready", "Guide blocks roll")
 	game._handle_click(game.GUIDE_CLOSE.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
 	var key := InputEventKey.new()
 	key.keycode = KEY_SPACE
 	key.pressed = true
@@ -139,6 +146,7 @@ func run() -> void:
 	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All five acted and the next round prepared successfully")
 	for stage in range(3,9): await ultimate_wave()
 	check(game.model.is_city() and game.model.stage == 9 and game.monster_side == 288 and game.model.max_hp == 370, "Final transition reaches the smaller city sprite without reducing player health")
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.DEBUG_RECT.get_center())
 	var city_clock: float = game.model.volley_clock
 	await create_timer(0.3).timeout
@@ -158,12 +166,15 @@ func run() -> void:
 	check(game.model.city_hp == city_health - 800 and game.view_phase == "ready", "First city ultimate leaves the city alive and returns to rolling")
 	check(ultimate_caption.name == "Annihilation" and ultimate_caption.description.is_empty(), "666 uses Annihilation without a description")
 	check(not game.city_life.people.is_empty(), "Destroyed city houses release a visible fleeing crowd")
+	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.GUIDE_RECT.get_center())
 	var crowd_clock: float = game.city_life.clock
 	var troop_position: Vector2 = game._troop_point(0)
 	await create_timer(0.15).timeout
 	check(game.city_life.clock == crowd_clock and game._troop_point(0) == troop_position, "Grimoire pauses civilian motion and troop running with city combat")
 	game._handle_click(game.GUIDE_CLOSE.get_center())
+	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
+	game.model.city_hp = 1600
 	for i in range(2):
 		game.debug_choice = 12
 		await game._roll()

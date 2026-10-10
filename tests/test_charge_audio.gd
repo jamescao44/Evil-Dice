@@ -23,6 +23,8 @@ func run() -> void:
 	layer.update(0.04, true, 0.0, false)
 	var edge: float = layer.player.volume_linear
 	layer.update(0.04, true, 1.0, false)
+	check(is_equal_approx(layer.player.volume_linear, db_to_linear(layer.CENTER_DB)*0.25), "Charging loop is now one quarter of its original volume at full power")
+	check(is_equal_approx(edge, db_to_linear(layer.EDGE_DB)*0.25), "The additional volume reduction also applies at the edge")
 	check(layer.player.volume_linear > edge * 10, "Center is louder than the edge")
 	check(layer.player.pitch_scale == 1.0, "Texture stays at its original pitch")
 	game._cancel_charge()
@@ -42,6 +44,8 @@ func run() -> void:
 	game._process(0.1)
 	check(not layer.player.playing, "Modal pauses silence the texture")
 	check(game.sounds.has("click_001"), "Existing dice click sound remains available")
+	for clip in ["soft_sweep", "perfect"]:
+		check(game.sounds[clip] is AudioStreamWAV and game.sounds[clip].resource_path.ends_with(clip+".wav"), "Finished WAV is imported for "+clip)
 	game.queue_free()
 	await process_frame
 	# Let the audio mixer release stopped playback voices before exiting.

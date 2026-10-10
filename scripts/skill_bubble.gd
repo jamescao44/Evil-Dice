@@ -141,7 +141,7 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
 	# Once taken out, the saved skill still plays its cast and dissolve effects.
 	var locked_saved: bool = stored and not is_casting() and not battle._can_use_saved()
-	if not battle.guide and not battle.debug_open:
+	if not battle._menus_open():
 		age += delta
 		if not locked_saved: rotation_clock += delta * battle._world_time_scale()
 		cast_age += delta
@@ -152,7 +152,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	if not is_instance_valid(battle) or battle.guide or battle.debug_open: return
+	if not is_instance_valid(battle) or battle._menus_open(): return
 	var source: String = "saved" if stored else "current"
 	var selected: bool = battle.skill_source == source
 	var casting: bool = is_casting()

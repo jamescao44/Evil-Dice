@@ -74,3 +74,7 @@ Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_re
 ## User-provided charge-loop audio
 
 `audio/magic_leak_loop.wav` derives from the user-provided `magic_leak.wav`. It is not part of the Kenney CC0 packs. The source excerpt, crossfade and normalization details are recorded in [magic_leak_loop.txt](audio/magic_leak_loop.txt). `scripts/charge_audio.gd` controls its runtime volume.
+
+## User-provided finished sound effects
+
+`audio/soft_sweep.wav` and `audio/perfect.wav` are copied unchanged from the user’s finished-SFX folder, `/Users/James/Desktop/Music Files/Station A/Evil Dice/outs-FXs`. The soft sweep replaces the scraping dice-throw sweep; the Perfect clip layers onto accepted Perfect throws. These are user-provided project audio, not part of the Kenney CC0 packs. The existing magic-leak charging loop now plays at 25% of its original runtime amplitude across its entire power curve. The soft sweep plays 6 dB louder than its initial mix; source WAV files remain unchanged.

@@ -95,11 +95,11 @@ func _initialize() -> void:
 	game.statuses[2].count = 1
 	game.statuses[33].count = 3
 	force(game, [6, 6, 6])
-	check(game.city_hp == 1600 and game.outcome().is_empty() and game.troops == 0, "Ultimate clears troops and deals exactly one third of city MAX health, even with buffs")
+	check(game.city_hp == 9200 and game.outcome().is_empty() and game.troops == 0, "Ultimate clears troops and keeps its 800 base damage against the 10000 HP city")
 	force(game, [6, 6, 6])
-	check(game.city_hp == 800 and game.outcome().is_empty(), "Second ultimate uses max health, not remaining health")
-	force(game, [6, 6, 6])
-	check(game.city_hp == 0 and game.outcome() == "victory", "Three ultimates destroy a full city")
+	check(game.city_hp == 8400 and game.outcome().is_empty(), "Second ultimate still deals 800")
+	for i in range(11): force(game, [6, 6, 6])
+	check(game.city_hp == 0 and game.outcome() == "victory", "Thirteen unboosted ultimates destroy the larger city")
 	var final_hp: int = game.hp
 	tick(game, 5.0)
 	check(game.hp == final_hp, "City damage stops after victory")

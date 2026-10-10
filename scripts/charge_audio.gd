@@ -3,6 +3,7 @@ extends Node
 const LOOP = preload("res://assets/audio/magic_leak_loop.wav")
 const EDGE_DB := -38.0
 const CENTER_DB := -14.0
+const VOLUME_SCALE := 0.25
 const FADE_IN := 0.04
 const FADE_OUT := 0.08
 var player: AudioStreamPlayer
@@ -30,7 +31,7 @@ func update(delta: float, active: bool, power: float, muted: bool) -> void:
 		# controls the swell, including any changes to its timing or speed.
 		level = db_to_linear(lerpf(EDGE_DB, CENTER_DB, smoothstep(0.0, 1.0, power)))
 	envelope = move_toward(envelope, 1.0 if active else 0.0, delta / (FADE_IN if active else FADE_OUT))
-	player.volume_linear = level * envelope
+	player.volume_linear = level * envelope * VOLUME_SCALE
 	if not active and envelope <= 0.0: player.stop()
 
 func silence() -> void:

@@ -56,12 +56,14 @@ func run() -> void:
 	var landscape := Battle.new()
 	check(landscape.DICE_CENTER == Vector2(639, 640) and landscape.DICE_RADIUS == 144 and landscape.ARENA == Rect2(24, 80, 1232, 409), "Portrait geometry does not mutate restored landscape layout")
 	landscape.free()
+	if not game.menu_open: tap(game.MENU_RECT.get_center())
 	tap(game.GUIDE_RECT.get_center())
 	tap(game.GUIDE_TRIPLES.get_center())
 	check(game.guide and game.guide_page == 1, "Grimoire tabs work by touch")
 	tap(game.DICE_CENTER)
 	check(game.view_phase == "ready" and game.guide, "Modal consumes underlying dice touch")
 	tap(game.GUIDE_CLOSE.get_center())
+	if not game.menu_open: tap(game.MENU_RECT.get_center())
 	tap(game.DEBUG_RECT.get_center())
 	tap(game.DEBUG_REPEAT.get_center())
 	tap(game._debug_option_rect(2).get_center())
@@ -92,6 +94,7 @@ func run() -> void:
 		await Driver.resolve_held(game)
 		await settle()
 		check(game.model.stage == stage + 1, "Portrait advances to stage %d" % (stage + 2))
+	if not game.menu_open: tap(game.MENU_RECT.get_center())
 	tap(game.DEBUG_RECT.get_center())
 	var siege_clock: float = game.model.volley_clock
 	await create_timer(0.15).timeout
@@ -115,11 +118,13 @@ func run() -> void:
 	game._notification(Node.NOTIFICATION_APPLICATION_PAUSED)
 	check(game.active_touch == -1, "App suspension cancels held input")
 	await settle()
+	check(game.model.city_hp > 9000, "Portrait city uses the larger 10000 HP pool")
+	game.model.city_hp = 2400
 	for i in range(3):
 		game.debug_choice = 12
 		await game._roll()
 		await Driver.resolve_held(game)
-	check(game.model.outcome() == "victory", "Portrait city retains three-ultimate health balance")
+	check(game.model.outcome() == "victory", "Portrait city can finish its remaining health through repeated casts")
 	tap(game.REPLAY_RECT.get_center())
 	check(game.model.stage == 0 and game.model.hp == 100 and game.view_phase == "ready", "Touch restart resets the whole run")
 	print("Portrait: %d checks, %d failures" % [checks, failures])

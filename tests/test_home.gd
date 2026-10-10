@@ -95,6 +95,7 @@ func run() -> void:
 		check(home.battle.model.stage == 0 and home.battle.view_phase == "ready", "A new battle starts on wave one")
 		home.battle._handle_click(home.battle.DICE_CENTER)
 		check(home.battle.view_phase == "charging", "Existing charge mechanic still works")
+		home.battle._handle_click(home.battle.MENU_RECT.get_center())
 		home.battle._handle_click(home.battle.GUIDE_RECT.get_center())
 		home.battle._handle_click(home.battle._home_rect().get_center())
 		await process_frame

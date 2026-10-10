@@ -72,6 +72,33 @@ func model_checks() -> void:
 	m.end_round()
 	check(m.hp == 100 and m.status_count(Status.BURNING) == 3 and m.status_count(6) == 0,"Last-turn immunity protects every burn tick before expiring")
 	m = fresh()
+	m.apply_affliction(Status.BURNING,9)
+	var capped: Array = m.apply_affliction(Status.BURNING,2)
+	check(m.status_count(Status.BURNING) == 10 and capped[0].amount == 1 and capped[0].text == "BURN +1","Burning caps at ten and reports only the added stack")
+	check(m.apply_affliction(Status.BURNING,2).is_empty() and m.status_count(Status.BURNING) == 10,"Repeated fire at the cap does not add stacks or false popups")
+	m.statuses[Status.BURNING].count = 100
+	check(m.status_count(Status.BURNING) == 10,"Direct status assignment also respects the burn cap")
+	enemy_turn(m)
+	check(m.end_round().size() == 10 and m.hp == 90 and m.status_count(Status.BURNING) == 9,"Maximum burning produces ten one-HP ticks then decays")
+	m.set_status_counts({Status.BURNING:50})
+	check(m.status_count(Status.BURNING) == 10,"Restoring statuses cannot bypass the burn cap")
+	m = fresh(1)
+	m.enemies.append(Rules.make_enemy(1,1,true))
+	m.enemies.append(Rules.make_enemy(1,1,true))
+	m.apply_affliction(Status.FROZEN,1)
+	m.phase = "round_end"
+	m.begin_round()
+	check(m.phase == "frozen" and m.enemies.all(func(e):return e.intent.type == "attack" and e.intent.attribute == Status.Attribute.NONE),"Every archer schedules an ordinary arrow while the player is frozen")
+	for i in range(3): m.break_ice()
+	for i in m.living(): m.enemy_act(i)
+	m.end_round()
+	m.begin_round()
+	check(m.phase == "roll" and not m.is_frozen(),"Breaking free guarantees a playable next turn even against multiple elite archers")
+	var can_freeze_again: bool = false
+	for i in range(100):
+		if m.choose_intent(0).get("attribute",Status.Attribute.NONE) == Status.Attribute.ICE: can_freeze_again = true
+	check(can_freeze_again,"Archers can assign ice arrows again once the player has a playable turn")
+	m = fresh()
 	m.shield = 30
 	enemy_turn(m,Status.Attribute.FIRE,15)
 	check(m.hp == 100 and m.status_count(Status.BURNING) == 0,"Fully shielded hits do not apply afflictions")
@@ -172,7 +199,9 @@ func layout_checks(g) -> void:
 			check(g.ARENA.encloses(badge) and g.ARENA.encloses(health),"Move badges and health bars stay inside every wave's battlefield"+location+str(badge)+str(health))
 			for j in range(g.model.enemies.size()):
 				check(not badge.intersects(g._enemy_health_rect(j).grow(3)),"Move badges never overlap health bars"+location+" bar "+str(j))
-				if j != i: check(not badge.intersects(g._enemy_intent_rect(j).grow(2)),"Enemy move badges never overlap each other")
+				if j != i:
+					check(not badge.intersects(g._enemy_intent_rect(j).grow(2)),"Enemy move badges never overlap each other")
+					check(not health.intersects(g._enemy_health_rect(j).grow(3)),"Enemy health bars never overlap each other")
 			for item in g._active_statuses():
 				var icon: Rect2 = g._status_rect(item.id)
 				check(not badge.intersects(icon) and not health.intersects(icon) and not g._target_rect(i).intersects(icon),"All seven statuses fit clear of enemy targets, moves and health"+location+" status "+str(item.id))

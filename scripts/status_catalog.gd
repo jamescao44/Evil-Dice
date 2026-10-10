@@ -8,7 +8,7 @@ const ENTRIES := {
 	33: {"name": Rules.SPECIAL_NAMES[2], "icon": "crown", "text": "3x attack power.", "color": Color("c5a4de")},
 	6: {"name": Rules.PAIR_NAMES[5], "icon": "shield", "text": "Invincible.", "color": Color("80d8c6")},
 	Status.FROZEN: {"name": "Frozen", "icon": "ice", "text": "Tap the ice 3 times to break free and end your turn.", "color": Color("82dfff")},
-	Status.BURNING: {"name": "Burning", "icon": "fire", "text": "1 damage per stack after enemies act; lose 1 stack each turn.", "color": Color("ff9955")},
+	Status.BURNING: {"name": "Burning", "icon": "fire", "text": "1 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.", "color": Color("ff9955")},
 	Status.STUNNED: {"name": "Stunned", "icon": "stars", "text": "The next throw's power marker moves unpredictably.", "color": Color("ffe388")},
 }
 

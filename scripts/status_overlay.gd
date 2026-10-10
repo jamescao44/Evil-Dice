@@ -9,7 +9,7 @@ func _process(_delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	if not is_instance_valid(battle) or not battle.model.is_frozen() or battle.guide or battle.debug_open or battle.view_phase in ["over","reward"]: return
+	if not is_instance_valid(battle) or not battle.model.is_frozen() or battle._menus_open() or battle.view_phase in ["over","reward"]: return
 	var radius: float = battle.DICE_RADIUS+8
 	var at: Vector2 = battle.DICE_CENTER
 	var cracks: int = 3-battle.model.ice_hits_remaining if battle.model.phase == "frozen" else 0

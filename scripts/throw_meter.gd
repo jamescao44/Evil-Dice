@@ -1,7 +1,7 @@
 extends RefCounted
 ## Layout-independent meter coordinates. One reference pixel is 1/288 of the track.
 const WIDTH := 288.0
-const PERFECT_TOLERANCE := 2.0
+const PERFECT_TOLERANCE := 4.0
 const PERIOD := 2.4 / 0.9 # Ten percent slower across the whole timing curve.
 const CENTER_EASING := 0.35
 var elapsed: float = 0.0

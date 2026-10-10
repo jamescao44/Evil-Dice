@@ -11,7 +11,7 @@ const PAIR_NAMES = ["Rending Blow", "Unnatural Regrowth", "Eldritch Might", "Swe
 const PAIR_TEXT = ["1.5x regular attack + spare die.", "Heal 5 at the next spare-die turn starts.", "1.5x attack power for the next spare-die turns.", "Hit all: 2/3 regular attack + spare die each.", "3 automatic random hits, each regular attack + spare die.", "Invincible for spare-die enemy phases / roll intervals."]
 const SPECIAL_NAMES = ["Death Sentence", "Abyssal Renewal", "Eldritch Ascension", "Worldbreaker", "Sixfold Ruin", "Annihilation"]
 const SPECIAL_TEXT = ["Instantly kill your chosen foe, ignoring shield.", "Restore all missing health. No attack.", "3x attack power for the next 3 turns.", "Hit every foe for 2x regular attack power.", "6 automatic random hits, each regular attack power.", "Destroy the squad. Heal 12 HP."]
-const CITY_SPECIAL_TEXT = ["Hit the city for 5x regular attack power.", "Restore all missing health. No attack.", "3x attack power for the next 3 rolls.", "2x city attack; clear all troops.", "6 automatic city hits; each clears one troop.", "800 city damage; clear troops; heal 12."]
+const CITY_SPECIAL_TEXT = ["Hit the city for 5x regular attack power.", "Restore all missing health. No attack.", "3x attack power for the next 3 rolls.", "2x city attack; clear all troops.", "6 automatic city hits; each clears one troop.", "800 damage x Perfect combo bonus; clear troops; heal 12."]
 const REGULAR_ATTACK_POWER = 10.0
 const MAX_HP = 100
 const SHIELD_CAP = 20
@@ -25,6 +25,7 @@ var max_hp: int = MAX_HP
 var power: float = 1.0
 var reward_base_damage: float = 0.0
 var reward_damage_multiplier: float = 0.0
+var perfect_combo: int = 0
 var shield: int = 0
 var statuses: Dictionary = {}
 var burn_ticks_remaining: int = 0
@@ -56,6 +57,7 @@ func reset() -> void:
 	power = 1.0
 	reward_base_damage = 0
 	reward_damage_multiplier = 0
+	perfect_combo = 0
 	shield = 0
 	set_status_counts({2: 0, 3: 0, 6: 0, 33: 0})
 	burn_ticks_remaining = 0
@@ -105,7 +107,11 @@ func is_stunned() -> bool:
 func apply_affliction(id: int, amount: int) -> Array:
 	if hp <= 0 or status_count(Status.IMMUNITY) > 0: return []
 	if id not in [Status.FROZEN, Status.BURNING, Status.STUNNED]: return []
+	var before: int = status_count(id)
 	statuses[id].apply(amount)
+	if id == Status.BURNING:
+		amount = status_count(id) - before
+		if amount <= 0: return []
 	var applied := event(-1, amount, "status", {Status.FROZEN:"FROZEN", Status.BURNING:"BURN +%d" % amount, Status.STUNNED:"STUNNED"}[id])
 	applied.status = id
 	return [applied]
@@ -192,11 +198,12 @@ func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) 
 			values.append(index+1)
 			weights[index] = 0.0
 	pending = classify(values)
+	record_perfect(perfect)
 	statuses[Status.STUNNED].consume()
 	phase = "player"
 	return pending.duplicate(true)
 
-func set_test_roll(dice: Array) -> MultiHitSkill:
+func set_test_roll(dice: Array, perfect: bool = false) -> MultiHitSkill:
 	# Only called by tests or the visual debug picker; overrides power odds.
 	if phase != "roll":
 		return Skill.new()
@@ -204,9 +211,17 @@ func set_test_roll(dice: Array) -> MultiHitSkill:
 	if result.is_empty():
 		return Skill.new()
 	pending = result
+	record_perfect(perfect)
 	statuses[Status.STUNNED].consume()
 	phase = "player"
 	return pending.duplicate(true)
+
+func record_perfect(perfect: bool) -> void:
+	# Only accepted throws change the streak; skips and bonus casts preserve it.
+	perfect_combo = perfect_combo + 1 if perfect else 0
+
+func combo_multiplier() -> float:
+	return 1.0 + perfect_combo * 0.1
 
 func living() -> Array:
 	var result: Array = []
@@ -272,7 +287,9 @@ func choose_intent(index: int) -> Dictionary:
 		return support[rng.randi_range(0, support.size() - 1)]
 	var intent := {"type": "attack", "target": -1, "amount": e.damage, "name": ["Sword Slash", "Arrow Shot", "Arcane Bolt"][role], "attribute": Status.Attribute.NONE}
 	# Decide once when the turn starts, so the displayed move is the actual move.
-	if e.elite and (role == 2 or rng.randf() < ELITE_CONTROL_CHANCE):
+	# These intents execute after the current player turn. If it is frozen,
+	# archers must leave the following player turn available after the ice breaks.
+	if e.elite and not (role == 1 and is_frozen()) and (role == 2 or rng.randf() < ELITE_CONTROL_CHANCE):
 		intent.attribute = e.attribute
 		intent.name = ["Stunning Blow", "Ice Arrow", "Burning Bolt"][role]
 	return intent
@@ -330,7 +347,7 @@ func is_instant_kill(result: MultiHitSkill) -> bool:
 	return result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
 
 func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
-	var damage: int = floori(attack_base(result) * damage_multiplier() * power * attack_multiplier())
+	var damage: int = floori(attack_base(result) * damage_multiplier() * power * attack_multiplier() * combo_multiplier())
 	if result.kind == Kind.NORMAL and target in living(): damage = mini(damage, damage_cap(result.kind, target))
 	return damage
 

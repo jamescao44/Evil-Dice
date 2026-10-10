@@ -7,12 +7,13 @@ const ASCENSION := 33
 const IMMUNITY := 6
 const FROZEN := 100
 const BURNING := 101
+const MAX_BURNING_STACKS := 10
 const STUNNED := 102
 const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED]
 enum Attribute { NONE, ICE, FIRE, SHOCK }
 var id: int
 var count: int = 0:
-	set(value): count = maxi(0, value)
+	set(value): count = clampi(value, 0, MAX_BURNING_STACKS) if id == BURNING else maxi(0, value)
 
 func _init(effect_id: int) -> void:
 	id = effect_id
