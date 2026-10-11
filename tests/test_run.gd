@@ -48,7 +48,7 @@ func _initialize() -> void:
 		game.statuses[3].count = 2
 		check(game.advance_wave(), "Growth once per clear")
 		check(game.hp == 95 and game.max_hp == 130 + wave * 30, "Feeding increases capacity and heals 55")
-		check(game.power == [1.5,3.0,5.625,6.75,7.875,9.0,10.125,11.25,12.375][wave], "Later growth includes cumulative 1.5x boosts")
+		check(game.power == 1.0, "Later waves do not grant free damage multipliers")
 		check(game.statuses[3].count == 2 and game.shield == 7, "Buffs and shield carry between areas")
 		check(not game.advance_wave(), "Repeated advance cannot grow again")
 	check(game.is_city() and game.enemies.is_empty(), "Final battle uses city rather than squad")
@@ -59,10 +59,10 @@ func _initialize() -> void:
 		var special: MultiHitSkill = Rules.classify([4,4,4])
 		check(boosted.preview(special,0)[0].damage == floori(30.0 * boosted.power), "Skills now ignore former stage caps")
 		clear_wave(boosted)
-	check(boosted.siege_damage(Rules.classify([1,2,3])) == floori(6 * 1.5 * boosted.power * 2), "Normal city damage follows extended growth")
+	check(boosted.siege_damage(Rules.classify([1,2,3])) == 9, "Normal city damage uses base multiplier one")
 	for values in [[1,1,1],[4,4,4],[5,5,5]]:
 		var base: float = 50 if values[0] == 1 else 20 if values[0] == 4 else 10
-		check(boosted.siege_damage(Rules.classify(values)) == floori(base * 1.5 * boosted.power * 2), "City skill damage uses fixed regular power")
+		check(boosted.siege_damage(Rules.classify(values)) == floori(base * 1.5), "City skill damage uses fixed regular power")
 	game = city()
 	game.hp = 100
 	force(game, [2,2,4])
@@ -94,12 +94,9 @@ func _initialize() -> void:
 	check(game.hp < game.max_hp and game.troops == 6, "City troops and ranged volleys keep attacking without player input")
 	game.statuses[2].count = 1
 	game.statuses[33].count = 3
+	game.city_hp = 5000
 	force(game, [6, 6, 6])
-	check(game.city_hp == 9200 and game.outcome().is_empty() and game.troops == 0, "Ultimate clears troops and keeps its 800 base damage against the 10000 HP city")
-	force(game, [6, 6, 6])
-	check(game.city_hp == 8400 and game.outcome().is_empty(), "Second ultimate still deals 800")
-	for i in range(11): force(game, [6, 6, 6])
-	check(game.city_hp == 0 and game.outcome() == "victory", "Thirteen unboosted ultimates destroy the larger city")
+	check(game.city_hp == 0 and game.outcome() == "victory" and game.troops == 0, "Ultimate uses the full city DMG multiplier, clears troops and clamps to remaining health")
 	var final_hp: int = game.hp
 	tick(game, 5.0)
 	check(game.hp == final_hp, "City damage stops after victory")

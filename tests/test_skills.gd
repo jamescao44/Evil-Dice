@@ -19,6 +19,7 @@ func fresh():
 	return game
 
 func _initialize() -> void:
+	_test_normalized_base_damage()
 	_test_damage_captions()
 	_test_turn_end_buffs()
 	for face in [1,4,5]:
@@ -44,7 +45,7 @@ func _initialize() -> void:
 	game.set_test_roll([5,5,5])
 	for remaining in range(5,-1,-1):
 		var hits: Array = game.apply_player_step()
-		check(hits[0].amount == 45, "All six hits keep the same 3x boost")
+		check(hits[0].amount == 52, "All six hits add both active attack bonuses")
 		check(game.statuses[33].count == 1, "Boost remains through every hit and the upcoming enemy phase")
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
@@ -88,7 +89,7 @@ func _initialize() -> void:
 	city.troops = 6
 	city.set_test_roll([1,1,1])
 	city.apply_player()
-	check(city.city_hp == 1388, "City 111 deals floor(10 x 5 x 1.5 x 6.75 x 2)")
+	check(city.city_hp == Run.CITY_MAX_HP-506, "City 111 deals floor(15 x 5 x 6.75)")
 	check(city.troops == 6, "City 111 is a city strike, not an all-troop sweep")
 	city.begin_round()
 	city.set_test_roll([4,4,1])
@@ -99,7 +100,7 @@ func _initialize() -> void:
 	city.set_test_roll([5,5,1])
 	var before: int = city.city_hp
 	city.apply_player()
-	check(city.city_hp == before - 666 and city.troops == 3, "City double five delivers three distinct 222-damage hits")
+	check(city.city_hp == before - 333 and city.troops == 3, "City double five delivers three distinct 111-damage hits")
 	city.begin_round()
 	city.set_test_roll([2,2,2])
 	city.apply_player()
@@ -113,16 +114,29 @@ func _initialize() -> void:
 	print("Skill rework: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)
 
+func _test_normalized_base_damage() -> void:
+	var game = fresh()
+	check(game.damage_multiplier() == 1.0, "A fresh battle starts at DMG x 1.0")
+	for a in range(1,7):
+		for b in range(a+1,7):
+			for c in range(b+1,7):
+				var normal = Rules.classify([a,b,c])
+				check(game.attack_damage(normal,0) == floori((a+b+c)*1.5), "Normal x1 preserves the previous unbuffed hit across all distinct rolls")
+	game.reward_damage_multiplier = 1.0
+	for spare in range(2,7):
+		var heavy = Rules.classify([1,1,spare])
+		check(game.attack_damage(heavy,0) == 45+3*spare, "Heavy x2 multiplies the fractional base before rounding, yielding 51 through 63")
+
 func _test_damage_captions() -> void:
 	var game = Rules.new(42)
 	for example in [
-		[[1,1,6], "21 + 10 (x1)"], [[4,4,1], "7 + 4 (x1)"],
-		[[5,5,1], "11 + 5 (x3)"], [[5,5,5], "10 + 5 (x6)"],
-		[[4,4,4], "20 + 10 (x1)"], [[1,2,3], "6 + 3 (x1)"]]:
+		[[1,1,6], "31 + 0 (x1)"], [[4,4,1], "11 + 0 (x1)"],
+		[[5,5,1], "16 + 0 (x3)"], [[5,5,5], "15 + 0 (x6)"],
+		[[4,4,4], "30 + 0 (x1)"], [[1,2,3], "9 + 0 (x1)"]]:
 		check(game.damage_caption(Rules.classify(example[0]),0) == example[1], "Caption gives integer base plus modifier and actual hit count")
 	var normal: MultiHitSkill = Rules.classify([4,5,6])
-	check(game.damage_caption(normal,2) == "15 + (-4) (x1)", "Normal target cap can reduce the displayed damage below its base")
-	check(game.damage_caption(normal) == "15 + (-4 to 7) (x1)", "Unchosen targets show the truthful cap range")
+	check(game.damage_caption(normal,2) == "22 + (-11) (x1)", "Normal target cap can reduce the displayed damage below its base")
+	check(game.damage_caption(normal) == "22 + (-11 to 0) (x1)", "Unchosen targets show the truthful cap range")
 	for values in [[1,1,1],[6,6,6],[2,2,3],[3,3,4],[6,6,4],[2,2,2],[3,3,3]]:
 		check(game.damage_caption(Rules.classify(values)).is_empty(), "Instant kills and support never show a damage number")
 	for stats in [[1.0,0,0,0],[5.625,5,0.5,3],[12.375,10,1.0,33]]:
@@ -146,14 +160,14 @@ func _test_damage_captions() -> void:
 	city.stage = 9
 	city.power = 12.375
 	city._load_wave()
-	check(city.damage_caption(Rules.classify([1,1,1])) == "50 + 1806 (x1)", "City 111 has scaled numeric damage instead of instant-kill omission")
-	check(city.damage_caption(Rules.classify([6,6,6])) == "800 + 0 (x1)", "City Annihilation remains fixed even with growth")
+	check(city.damage_caption(Rules.classify([1,1,1])) == "75 + 853 (x1)", "City 111 has scaled numeric damage instead of instant-kill omission")
+	check(city.damage_caption(Rules.classify([6,6,6])) == "2000 + 22750 (x1)", "City Annihilation displays the full multiplied hit")
 	city.reward_base_damage = 5
 	city.reward_damage_multiplier = 0.5
 	city.statuses[33].count = 3
-	check(city.damage_caption(Rules.classify([5,5,5])) == "15 + 2212 (x6)", "City preview includes all current bonuses and six hits")
+	check(city.damage_caption(Rules.classify([5,5,5])) == "22 + 312 (x6)", "City preview includes all current bonuses and six hits")
 	city.city_hp = 100
-	check(city.damage_caption(Rules.classify([6,6,6])) == "800 + (-700) (x1)", "City remaining health clamps the actual strike")
+	check(city.damage_caption(Rules.classify([6,6,6])) == "2000 + 27750 (x1)", "Low city health never shrinks the damage preview")
 
 func _test_turn_end_buffs() -> void:
 	var game = fresh()

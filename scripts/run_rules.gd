@@ -6,7 +6,7 @@ const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "THE CHAMPION", "CROSSROADS", "WAT
 const WAVE_COUNTS := [[1,0], [3,0], [0,1], [5,0], [2,1], [3,2], [5,2], [0,4], [5,5]]
 const WAVE_BOOSTS := [1.0, 1.0, 1.5, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25]
 const CITY_MAX_HP := 10000
-const CITY_ULTIMATE_DAMAGE := 800
+const CITY_ULTIMATE_DAMAGE := 2000
 const CITY_IMMUNITY_SECONDS_PER_STACK := 2.0
 var city_immunity_clock: float = 0.0
 var stage: int = 0
@@ -21,12 +21,16 @@ var perfect_total: int = 0
 const CHEST_THRESHOLDS := [0, 3, 6, 9]
 const CHEST_COUNTS := [0, 1, 3, 5]
 var claimed_slots: Array = []
-var reward_weights: Array = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+var reward_weights: Array = Rewards.DEFAULT_WEIGHTS.duplicate()
 var open_rewards: Array = []
+var chest_relics: Dictionary = {}
 var reward_history: Array = []
 var rubies: int = 0
 var summon_shards: int = 0
 var reward_rng := RandomNumberGenerator.new()
+var relic_choices: Array = []
+var relic_offer_resolved: bool = true
+var relic_reward_stage: int = -1
 
 func _init(seed_value: int = -1) -> void:
 	super(seed_value)
@@ -47,17 +51,21 @@ func reset_run() -> void:
 	perfect_progress = 0
 	perfect_total = 0
 	claimed_slots.clear()
-	reward_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+	reward_weights = Rewards.DEFAULT_WEIGHTS.duplicate()
 	open_rewards.clear()
+	chest_relics.clear()
 	reward_history.clear()
 	rubies = 0
 	summon_shards = 0
+	relic_choices.clear()
+	relic_offer_resolved = true
+	relic_reward_stage = -1
 	_load_wave()
 
 func record_perfect(perfect: bool) -> void:
 	super.record_perfect(perfect)
 	# Accepted throws only. Misses/waves preserve progress; a full bank holds nine.
-	if not perfect: return
+	if not perfect or RelicEffects.has_flag(relics.items,"no_treasure"): return
 	perfect_total += 1
 	perfect_progress = mini(9, perfect_progress + 1)
 
@@ -67,7 +75,7 @@ func load_debug_wave(wave_number: int) -> bool:
 	stage = wave_number - 1
 	max_hp = MAX_HP + stage * 30
 	hp = max_hp
-	power = (1.0 + stage * 0.5) * WAVE_BOOSTS[stage]
+	power = 1.0
 	if stage > 0: _load_wave()
 	return true
 
@@ -81,23 +89,55 @@ func open_chest(requested_tier: int = 0) -> Array:
 	# Any claimed milestone empties the bank, including extra unspent diamonds.
 	perfect_progress = 0
 	claimed_slots.clear()
+	# Resolve every category, rarity and concrete relic before presentation starts.
 	for i in range(CHEST_COUNTS[tier]):
-		var index: int = Weighted.pick(reward_rng, reward_weights)
-		open_rewards.append(index if index >= 0 else reward_rng.randi_range(0, Rewards.ITEMS.size()-1))
+		var index: int = Rewards.draw_category(reward_rng,reward_weights)
+		if index == Rewards.Category.RELIC:
+			var id: String = relics.draw_one(reward_rng,chest_relics.values())
+			if id.is_empty(): index = Rewards.Category.RUBY
+			else:
+				chest_relics[i] = id
+				if Relics.Catalog.ITEMS[id].rarity == Relics.Catalog.Rarity.CURSED: index = Rewards.Category.CURSE
+		open_rewards.append(index)
 	return open_rewards.duplicate()
 
-func claim_reward(slot: int) -> Dictionary:
+func reward_item(slot: int) -> Dictionary:
+	if slot < 0 or slot >= open_rewards.size(): return {}
+	var item: Dictionary = Rewards.ITEMS[open_rewards[slot]].duplicate()
+	if chest_relics.has(slot):
+		var id: String = chest_relics[slot]
+		item.name = Relics.Catalog.ITEMS[id].name
+		item.text = Relics.Catalog.ITEMS[id].text
+		item.color = Relics.Catalog.color(id)
+		item.relic_id = id
+	return item
+
+func claim_reward(slot: int, replace_index: int = -1, discard: bool = false) -> Dictionary:
 	if slot < 0 or slot >= open_rewards.size() or slot in claimed_slots: return {}
 	var index: int = open_rewards[slot]
-	var item: Dictionary = Rewards.ITEMS[index]
+	if index in Rewards.RETIRED_CATEGORIES and not discard: return {}
+	var item: Dictionary = reward_item(slot)
+	if item.has("relic_id") and not discard and not acquire_relic(item.relic_id, replace_index): return {}
 	claimed_slots.append(slot)
+	if discard:
+		item.id = "discard"
+		item.name = "LEFT BEHIND"
+		item.text = "Relic discarded."
+		return item
 	match item.id:
 		"ruby": rubies += 100
 		"shard": summon_shards += 1
-		"damage": reward_base_damage += 5
-		"multiplier": reward_damage_multiplier += 0.5
 	reward_history.append(index)
 	return item.duplicate()
+
+func discard_unclaimed_rewards() -> int:
+	# Resolve remaining slots without applying rewards, history entries or RNG.
+	var discarded: int = 0
+	for slot in range(open_rewards.size()):
+		if slot not in claimed_slots:
+			claim_reward(slot,-1,true)
+			discarded += 1
+	return discarded
 
 func rewards_collected() -> bool:
 	return not open_rewards.is_empty() and claimed_slots.size() == open_rewards.size()
@@ -105,6 +145,7 @@ func rewards_collected() -> bool:
 func close_chest() -> bool:
 	if not rewards_collected(): return false
 	open_rewards.clear()
+	chest_relics.clear()
 	claimed_slots.clear()
 	return true
 
@@ -125,7 +166,7 @@ func roll(throw_power: float = 0.0, perfect: bool = false, _fever: bool = false)
 
 func damage_cap(kind: int, target: int) -> int:
 	var numerator: float = 2.0 if kind == Kind.SPECIAL else 1.0
-	return floori(enemies[target].max_hp * numerator * WAVE_BOOSTS[stage] / 3.0)
+	return maxi(1, floori(enemies[target].max_hp * numerator * WAVE_BOOSTS[stage] / 3.0))
 
 func _load_wave() -> void:
 	city_immunity_clock = 0.0
@@ -147,17 +188,45 @@ func outcome() -> String:
 		return "defeat"
 	if is_city():
 		return "victory" if city_hp <= 0 else ""
-	return "wave_clear" if living().is_empty() else ""
+	return "wave_clear" if not has_living_enemies() else ""
 
 func advance_wave() -> bool:
-	if outcome() != "wave_clear":
+	if outcome() != "wave_clear" or not relic_offer_resolved:
 		return false
+	_record_relic_wave_clear()
 	_end_buff_turn()
 	stage += 1
-	max_hp += 30
+	base_max_hp += 30
 	heal(55) # Increased capacity plus a modest recovery from feeding.
-	power = (1.0 + stage * 0.5) * WAVE_BOOSTS[stage]
+	power = 1.0
 	_load_wave()
+	return true
+
+func _record_relic_wave_clear() -> void:
+	if relic_reward_stage == stage: return
+	relic_reward_stage = stage
+	rubies += RelicEffects.wave_cleared(self)
+
+func open_relic_offer() -> Array:
+	if not relic_offer_resolved: return relic_choices.duplicate()
+	if outcome() not in ["wave_clear", "victory"] or relic_reward_stage == stage: return []
+	_record_relic_wave_clear()
+	relic_choices = relics.offers(reward_rng)
+	relic_offer_resolved = false
+	return relic_choices.duplicate()
+
+func choose_relic(index: int, replace_index: int = -1) -> bool:
+	if relic_offer_resolved or index < 0 or index >= relic_choices.size(): return false
+	if not acquire_relic(relic_choices[index], replace_index): return false
+	relic_offer_resolved = true
+	relic_choices.clear()
+	return true
+
+func skip_relic() -> bool:
+	if relic_offer_resolved: return false
+	rubies += 10
+	relic_offer_resolved = true
+	relic_choices.clear()
 	return true
 
 func begin_round() -> Array:
@@ -166,6 +235,7 @@ func begin_round() -> Array:
 	if not outcome().is_empty() or phase not in ["new", "round_end"]:
 		return []
 	round_number += 1
+	relic_turn_closed = false
 	var events: Array = []
 	if statuses[2].count > 0:
 		buff_ticks[2] = true
@@ -178,15 +248,14 @@ func is_instant_kill(result: MultiHitSkill) -> bool:
 
 func attack_base(result: MultiHitSkill) -> float:
 	if not is_city(): return super.attack_base(result)
-	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE
+	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE + relic_base_damage()
 	# A city is not a humanoid: triple 1 deals five regular attacks instead.
 	return regular_attack_power() * 5 if result.kind == Kind.SPECIAL and result.face == 1 else super.attack_base(result)
 
 func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
 	if not is_city(): return super.attack_damage(result, target)
 	if not is_attack(result): return 0
-	if result.kind == Kind.ULTIMATE: return mini(city_hp, floori(CITY_ULTIMATE_DAMAGE * combo_multiplier()))
-	return mini(city_hp, floori(attack_base(result) * damage_multiplier() * power * attack_multiplier() * 2.0 * combo_multiplier()))
+	return mini(city_hp,unmitigated_damage(result))
 
 func siege_damage(result: MultiHitSkill) -> int:
 	return attack_damage(result, -2)
@@ -195,7 +264,7 @@ func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 	if not is_city(): return super.damage_caption(result, primary)
 	if not is_attack(result): return ""
 	var base: int = floori(attack_base(result))
-	var modifier: int = siege_damage(result)-base
+	var modifier: int = unmitigated_damage(result)-base
 	return "%d + %s (x%d)" % [base, "(%d)" % modifier if modifier < 0 else str(modifier), skill_use_count(result)]
 
 func player_target() -> int:
@@ -245,9 +314,12 @@ func apply_player_step(primary: int = -1) -> Array:
 	var events: Array = []
 	if not is_attack(result): events = _apply_support(result)
 	else:
-		var damage: int = siege_damage(result)
-		city_hp -= damage
-		events.append(event(-2, damage, "damage", "SIEGE"))
+		lifesteal_used = 0
+		var damage: int = unmitigated_damage(result)
+		var loss: int = mini(city_hp,damage)
+		city_hp -= loss
+		events.append(damage_event(-2,loss,damage))
+		events.append_array(_attack_relic_effects(-2,loss,result))
 		var crushed: int = troops if hits_all(result) else mini(troops, 1) if result.random_target_per_use() else 0
 		if crushed > 0:
 			troops -= crushed
@@ -295,10 +367,19 @@ func tick_city(delta: float, immunity_delta: float = -1.0) -> Array:
 	return events
 
 func _city_hit(amount: int) -> Array:
-	if statuses[6].count > 0: return [event(-1, 0, "immune", "INVINCIBLE")]
-	var blocked: int = mini(shield, amount)
-	shield -= blocked
-	var loss: int = mini(hp, amount - blocked)
-	hp -= loss
+	var events: Array = receive_damage(amount)
 	if not outcome().is_empty(): phase = "finished"
-	return [event(-1, loss, "damage", "CITY ATTACK")]
+	return events
+
+func resolve_perfect_relic() -> Array:
+	if not is_city(): return super.resolve_perfect_relic()
+	if not perfect_relic_ready or not outcome().is_empty(): return []
+	relic_activated.emit("prismatic_stone")
+	perfect_relic_ready = false
+	lifesteal_used = 0
+	var damage: int = floori((RelicEffects.PERFECT_STRIKE_BASE + relic_base_damage()) * damage_multiplier(pending))
+	var loss: int = mini(city_hp,damage)
+	city_hp -= loss
+	var events: Array = [damage_event(-2,loss,damage)]
+	events.append_array(_attack_relic_effects(-2,loss,Skill.new(Kind.NORMAL)))
+	return events

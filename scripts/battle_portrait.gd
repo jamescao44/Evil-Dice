@@ -23,7 +23,7 @@ func _configure_layout() -> void:
 		window.move_to_center()
 	window.title = "Evil Dice | Portrait"
 	# All controls sit below the island and above the home-indicator safe zones.
-	ARENA = Rect2(24, 228, 756, 794)
+	ARENA = Rect2(24, 228, 756, 722)
 	DICE_CENTER = Vector2(402, 1448)
 	DICE_RADIUS = 232
 	DICE_POSITIONS = [Vector2(402, 1338), Vector2(296, 1508), Vector2(508, 1508)]
@@ -35,6 +35,7 @@ func _configure_layout() -> void:
 	AUDIO_RECT = Rect2(574, 124, 88, 88)
 	FX_RECT = Rect2(88, 580, 628, 112)
 	GUIDE_RECT = Rect2(88, 740, 628, 112)
+	LANGUAGE_RECT = Rect2(88, 944, 628, 112)
 	GUIDE_CLOSE = Rect2(660, 132, 104, 88)
 	DEBUG_CLOSE = GUIDE_CLOSE
 	DEBUG_REPEAT = Rect2(40, 1470, 350, 88)
@@ -62,7 +63,7 @@ func _handle_click(point: Vector2) -> void:
 		elif GUIDE_TRIPLES.has_point(point): guide_page = 1
 		super._handle_click(point)
 		return
-	if view_phase in ["reward", "skill", "targeting"]:
+	if view_phase in ["reward", "relic_reward", "skill", "targeting"]:
 		super._handle_click(point)
 		return
 	if not _menus_open() and view_phase != "over":
@@ -79,7 +80,7 @@ func _restart(wave_number: int = 1) -> void:
 	super._restart(wave_number)
 
 func _player_feet() -> Vector2:
-	return Vector2(222, 930)
+	return Vector2(222, 890)
 
 func _player_point() -> Vector2:
 	return _player_feet() - Vector2(0, monster_side * 0.48)
@@ -205,13 +206,11 @@ func _draw_player() -> void:
 	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
 	_art("eldritch", Rect2(feet + Vector2(-monster_side / 2 + dx, -monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
 	_draw_player_afflictions()
-	if skill_bubble.roll.is_empty() or skill_bubble.age >= skill_bubble.formation:
-		_text(Vector2(492, 910), "%.2fx" % model.power, 32, TEAL)
-	_meter(Rect2(48, 962, 708, 34), model.hp / float(model.max_hp), TEAL)
-	_center(Vector2(402, 987), "%d / %d" % [model.hp, model.max_hp], 28)
+	_meter(Rect2(48, 910, 708, 34), model.hp / float(model.max_hp), TEAL)
+	_center(Vector2(402, 935), "%d / %d" % [model.hp, model.max_hp], 28)
 	if model.shield > 0:
-		_glyph(Vector2(625, 934), "shield", TEAL, 2)
-		_text(Vector2(654, 944), str(model.shield), 28, TEAL)
+		_glyph(Vector2(625, 882), "shield", TEAL, 2)
+		_text(Vector2(654, 892), str(model.shield), 28, TEAL)
 
 func _draw_enemy_health(index: int) -> void:
 	var human: Dictionary = model.enemies[index]
@@ -243,9 +242,13 @@ func _draw_tooltips() -> void:
 			if _status_rect(item.id).has_point(get_global_mouse_position()): index = item.id
 	if index < 0 or model.status_count(index) <= 0: return
 	var item: Dictionary = Statuses.ENTRIES[index]
-	_frame(Rect2(38, 762, 728, 172), PANEL, GOLD)
-	_text(Vector2(58, 800), item.name, 28, item.color)
-	_wrapped(Vector2(58, 840), _status_description(index,model.status_count(index)), 688, CREAM, 24)
+	var description: String = _status_description(index,model.status_count(index))
+	var lines := GameText.lines(description,description_font,30,688)
+	var height: float = 90+lines.size()*36
+	var top: float = 934-height
+	_frame(Rect2(38,top,728,height), PANEL, GOLD)
+	_text(Vector2(58,top+38), item.name, 28, item.color)
+	_wrapped(Vector2(58,top+78),description,688,CREAM,30)
 
 func _draw_ending() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.92))
@@ -254,7 +257,7 @@ func _draw_ending() -> void:
 	_rune(Vector2(402, 662), 5, color, 8)
 	_center(Vector2(402, 790), "VICTORY" if won else "DEFEAT", 72, color)
 	_center(Vector2(402, 858), "THE CITY REQUESTS A REFUND" if won else "BACK TO THE ABYSS", 26, CREAM)
-	_center(Vector2(402, 916), "STAGE %d / %d   -   %d HP" % [model.stage + 1, Run.WAVE_NAMES.size(), model.hp], 26, MUTED)
+	_center(Vector2(402, 916), GameText.format("STAGE %d / %d   -   %d HP", [model.stage + 1, Run.WAVE_NAMES.size(), model.hp]), 26, MUTED)
 	_button(REPLAY_RECT, "RESTART")
 	if home_enabled: _button(_home_rect(), "HOME")
 
@@ -270,9 +273,9 @@ func _draw_guide() -> void:
 	var rule: String = "Perfect: pair or triple. Normal: sum. 666 clears the squad."
 	if model.is_city():
 		intro = "Tap twice to throw. City skills cast automatically after the reveal. Drag saved skills out for a bonus cast."
-		rule = "Perfect: triple. 666: 800 x combo bonus; clear troops; +12 HP."
-	_wrapped(Vector2(40, 274), intro, 718, CREAM, 28)
-	_wrapped(Vector2(40, 370), rule, 718, MUTED, 24)
+		rule = "Perfect: triple. 666: 2000 x DMG; clear troops; +12 HP."
+	_wrapped(Vector2(40, 258), intro, 718, CREAM, 26)
+	_wrapped(Vector2(40, 390), rule, 718, MUTED, 24)
 	_button(GUIDE_PAIRS, "PAIRS")
 	_button(GUIDE_TRIPLES, "TRIPLES")
 	draw_rect((GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3), TEAL if guide_page == 0 else PURPLE, false, 3)
@@ -280,12 +283,12 @@ func _draw_guide() -> void:
 		var y: float = 584 + i * 145
 		var code: String = str(i + 1).repeat(2 if guide_page == 0 else 3)
 		var label: String = Rules.PAIR_NAMES[i] if guide_page == 0 else Rules.SPECIAL_NAMES[i]
-		_text(Vector2(40, y), code + "  " + label, 28, TEAL if guide_page == 0 else GOLD if i == 5 else PURPLE)
-		_wrapped(Vector2(40, y + 42), _pair_description(i) if guide_page == 0 else _special_description(i), 718, CREAM, 24)
+		_text(Vector2(40, y), code + "  " + GameText.text(label), 28, TEAL if guide_page == 0 else GOLD if i == 5 else PURPLE)
+		_wrapped(Vector2(40, y + 42), _pair_description(i) if guide_page == 0 else _special_description(i), 718, CREAM, 28)
 		draw_rect(Rect2(40, y + 108, 724, 2), EDGE.darkened(0.35))
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage, 3)]
-	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else "Damage x1.5 + growth. Normal cap %s HP; skills ignore caps." % caps, 718, MUTED, 24)
-	_wrapped(Vector2(40, 1554), "Perfect combo: +10% damage per consecutive Perfect. A miss resets it.", 718, MUTED, 24)
+	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.", caps), 718, MUTED, 24)
+	_wrapped(Vector2(40, 1554), "Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.", 718, MUTED, 24)
 	_wrapped(Vector2(40, 1620), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22)
 
 func _debug_option_rect(choice: int) -> Rect2:

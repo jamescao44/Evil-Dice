@@ -49,16 +49,16 @@ func model_checks() -> void:
 	var effects: Array = enemy_turn(m,Status.Attribute.FIRE,15)
 	check(m.hp == 85 and m.status_count(Status.BURNING) == 2 and effects[-1].text == "BURN +2","Fire damage applies two burning stacks")
 	var burn: Array = m.end_round_step()
-	check(m.hp == 84 and burn.size() == 1 and burn[0].amount == 1 and m.phase == "turn_end","Burning resolves one HP at a time after enemies finish")
+	check(m.hp == 80 and burn.size() == 1 and burn[0].amount == 5 and m.phase == "turn_end","Burning resolves five HP at a time after enemies finish")
 	burn = m.end_round_step()
-	check(m.hp == 83 and burn[0].type == "burn" and m.status_count(Status.BURNING) == 1 and m.phase == "round_end","Two stacks deal two ticks then lose one stack")
-	check(m.end_round().is_empty() and m.hp == 83,"Completed burning cannot tick twice")
+	check(m.hp == 75 and burn[0].type == "burn" and m.status_count(Status.BURNING) == 1 and m.phase == "round_end","Two stacks deal two ticks then lose one stack")
+	check(m.end_round().is_empty() and m.hp == 75,"Completed burning cannot tick twice")
 	m.begin_round()
 	m.set_test_roll([2,2,4])
 	m.apply_player()
 	enemy_turn(m)
 	m.end_round()
-	check(m.hp == 82 and m.status_count(Status.BURNING) == 0,"One remaining stack ticks once and expires")
+	check(m.hp == 70 and m.status_count(Status.BURNING) == 0,"One remaining stack ticks once and expires")
 	m = fresh()
 	m.apply_affliction(Status.BURNING,2)
 	m.apply_affliction(Status.BURNING,2)
@@ -79,7 +79,7 @@ func model_checks() -> void:
 	m.statuses[Status.BURNING].count = 100
 	check(m.status_count(Status.BURNING) == 10,"Direct status assignment also respects the burn cap")
 	enemy_turn(m)
-	check(m.end_round().size() == 10 and m.hp == 90 and m.status_count(Status.BURNING) == 9,"Maximum burning produces ten one-HP ticks then decays")
+	check(m.end_round().size() == 10 and m.hp == 50 and m.status_count(Status.BURNING) == 9,"Maximum burning produces ten five-HP ticks then decays")
 	m.set_status_counts({Status.BURNING:50})
 	check(m.status_count(Status.BURNING) == 10,"Restoring statuses cannot bypass the burn cap")
 	m = fresh(1)
@@ -133,7 +133,7 @@ func model_checks() -> void:
 	m.hp = 2
 	m.apply_affliction(Status.BURNING,10)
 	enemy_turn(m)
-	check(m.end_round().size() == 2 and m.hp == 0 and m.phase == "finished","Lethal burning stops immediately and never produces negative HP")
+	check(m.end_round().size() == 1 and m.hp == 0 and m.phase == "finished","Lethal burning stops immediately and never produces negative HP")
 	var city = Run.new(4)
 	city.stage = 9
 	city._load_wave()
@@ -147,7 +147,7 @@ func model_checks() -> void:
 	city.apply_player()
 	check(city.phase == "turn_end","City carries burning into its completed roll interval")
 	city.end_round()
-	check(city.hp == 97 and city.status_count(Status.BURNING) == 2,"City roll ends tick carried burning once")
+	check(city.hp == 85 and city.status_count(Status.BURNING) == 2,"City roll ends tick carried burning once")
 	city.reset_run()
 	check(city.status_counts().values().all(func(v):return v == 0),"Restart clears boons and every affliction")
 
@@ -191,7 +191,12 @@ func layout_checks(g) -> void:
 		g.model._load_wave()
 		g.visual_stage = stage
 		g.monster_side = g.HORROR_SIZES[stage]
-		g.model.set_status_counts({2:3,3:3,33:3,6:3,Status.FROZEN:1,Status.BURNING:4,Status.STUNNED:1})
+		g.model.set_status_counts({2:3,3:3,33:3,6:3,Status.FROZEN:1,Status.BURNING:4,Status.STUNNED:1,Status.DARKNESS:3,Status.CORROSION:3,Status.PLAGUE:1})
+		for item in g._active_statuses():
+			var rect: Rect2 = g._status_rect(item.id)
+			check(g.ARENA.encloses(rect),"All ten player status icons stay inside the battlefield")
+			for other in g._active_statuses():
+				if other.id != item.id: check(not rect.intersects(g._status_rect(other.id)),"Player status icons do not overlap")
 		for i in range(g.model.enemies.size()):
 			var badge: Rect2 = g._enemy_intent_rect(i).grow(2)
 			var health: Rect2 = g._enemy_health_rect(i).grow(3)
@@ -204,7 +209,7 @@ func layout_checks(g) -> void:
 					check(not health.intersects(g._enemy_health_rect(j).grow(3)),"Enemy health bars never overlap each other")
 			for item in g._active_statuses():
 				var icon: Rect2 = g._status_rect(item.id)
-				check(not badge.intersects(icon) and not health.intersects(icon) and not g._target_rect(i).intersects(icon),"All seven statuses fit clear of enemy targets, moves and health"+location+" status "+str(item.id))
+				check(not badge.intersects(icon) and not health.intersects(icon) and not g._target_rect(i).intersects(icon),"All ten statuses fit clear of enemy targets, moves and health"+location+" status "+str(item.id))
 	g._restart()
 	g.model.enemies = [Rules.make_enemy(0),Rules.make_enemy(1,1,true),Rules.make_enemy(2,1,true)]
 	for e in g.model.enemies: e.damage = 0
@@ -279,17 +284,17 @@ func layout_checks(g) -> void:
 	for e in g.model.enemies: e.acted = true
 	g.view_phase = "resolving"
 	g._resolve_turn_end(g.run_id)
-	check(g.model.hp == 99 and g.model.phase == "turn_end","Burn animation starts with a single one-HP tick")
+	check(g.model.hp == 95 and g.model.phase == "turn_end","Burn animation starts with a single five-HP tick")
 	g.guide = true
 	await create_timer(0.25).timeout
-	check(g.model.hp == 99,"Opening a menu pauses the burn tick sequence")
+	check(g.model.hp == 95,"Opening a menu pauses the burn tick sequence")
 	g.guide = false
-	var hp_steps: Array = [99]
+	var hp_steps: Array = [95]
 	deadline = Time.get_ticks_msec()+2000
 	while g.model.phase == "turn_end" and Time.get_ticks_msec()<deadline:
 		await process_frame
 		if g.model.hp != hp_steps[-1]: hp_steps.append(g.model.hp)
-	check(hp_steps == [99,98,97] and g.model.status_count(Status.BURNING) == 2,"Scene presents consecutive one-HP losses and decays one stack after the sequence")
+	check(hp_steps == [95,90,85] and g.model.status_count(Status.BURNING) == 2,"Scene presents consecutive five-HP losses and decays one stack after the sequence")
 	g._restart()
 	g.view_phase = "resolving"
 	g.model.phase = "enemy"

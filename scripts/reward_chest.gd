@@ -7,6 +7,12 @@ signal completed
 const Catalog = preload("res://scripts/reward_catalog.gd")
 const Icons = preload("res://scripts/reward_icons.gd")
 const Pixel = preload("res://scripts/pixel_paint.gd")
+const Relics = preload("res://scripts/relic_catalog.gd")
+const RelicDrops = preload("res://scripts/relic_drop_table.gd")
+var symbols: Array = Catalog.ITEMS.duplicate(true)
+var scroll_relics: Array = []
+var relic_symbols: Dictionary = {}
+var relic_atlas: Texture2D
 const OPEN_TIME := 0.65
 const SPIN_TIME := 1.55
 const REEL_STEPS := 64
@@ -17,6 +23,7 @@ var font: Font
 var size := Vector2(1280, 800)
 var elapsed: float = 0
 var active: bool = false
+var skip_requested: bool = false
 var reduced: bool = false
 var playback_speed: float = 1.0
 var announced: int = 0
@@ -32,13 +39,23 @@ func _ready() -> void:
 	z_index = 80
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	cosmetic.randomize()
+	relic_atlas = load("res://assets/art/relic_atlas.png")
+	for id in Relics.ITEMS:
+		var item: Dictionary = Relics.ITEMS[id]
+		symbols.append({"id":"curse" if item.rarity == Relics.Rarity.CURSED else "relic", "name":item.name,"text":item.text,"color":Relics.color(id),"relic_id":id})
+		relic_symbols[id] = symbols.size()-1
+		if not item.get("fusion",false): scroll_relics.append(id)
 	for key in ["chest_closed", "chest_open", "ruby", "contract", "relic", "curse", "damage", "multiplier", "potion"]:
 		art[key] = load("res://assets/art/rewards/" + key + ".png")
 	hide()
 
-func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false) -> void:
+func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false, prizes: Array = [], category_weights: Array = Catalog.DEFAULT_WEIGHTS) -> void:
 	rewards = values.duplicate()
+	for i in range(mini(prizes.size(),rewards.size())):
+		if prizes[i].has("relic_id"):
+			rewards[i] = relic_symbols[prizes[i].relic_id]
 	collected.clear()
+	skip_requested = false
 	size = canvas
 	font = pixel_font
 	reduced = reduce
@@ -52,14 +69,23 @@ func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = fals
 	sequences.clear()
 	for outcome in rewards:
 		var sequence: Array = []
-		for i in range(REEL_STEPS+4): sequence.append(cosmetic.randi_range(0, Catalog.ITEMS.size()-1))
+		for i in range(REEL_STEPS+4):
+			sequence.append(_scroll_symbol(category_weights))
 		sequence[REEL_STEPS] = outcome
 		sequences.append(sequence)
 	active = not rewards.is_empty()
 	visible = active
 
+func _scroll_symbol(category_weights: Array = Catalog.DEFAULT_WEIGHTS) -> int:
+	# Theater only: use the same category/rarity rules with a separate RNG.
+	var category: int = Catalog.draw_category(cosmetic,category_weights)
+	if category == Catalog.Category.RELIC:
+		return relic_symbols[RelicDrops.draw(cosmetic,scroll_relics)]
+	return category
+
 func cancel() -> void:
 	active = false
+	skip_requested = false
 	rewards.clear()
 	collected.clear()
 	celebrations.clear()
@@ -88,6 +114,26 @@ func pickup_at(point: Vector2) -> int:
 		if i not in collected and reel_rect(i).grow(7).has_point(point): return i
 	return -1
 
+func skip_rect() -> Rect2:
+	return Rect2(152,130,500,88) if size.y > size.x else Rect2(944,64,304,56)
+
+func can_skip() -> bool:
+	return visible and not skip_requested and collected.size() < rewards.size()
+
+func skip_remaining() -> void:
+	active = false
+	skip_requested = true
+
+func draw_skip_button(canvas: CanvasItem) -> void:
+	if not can_skip(): return
+	var rect: Rect2 = skip_rect()
+	canvas.draw_rect(rect,Color("20271f"))
+	canvas.draw_rect(rect,Color("9c9b8c"),false,2)
+	var text: String = GameText.text("SKIP REMAINING")
+	var point_size: int = 28 if size.y > size.x else 20
+	var width: float = font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size).x
+	canvas.draw_string(font,rect.get_center()+Vector2(-width/2,point_size*0.35),text,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size,Color("eee0b9"))
+
 func chest_point() -> Vector2:
 	return Vector2(size.x/2, (1440 if rewards.size() == 5 else 1350) if size.y > size.x else 680)
 
@@ -102,7 +148,7 @@ func prize_origin(index: int) -> Vector2:
 func celebrate(index: int) -> void:
 	if index < 0 or index >= rewards.size(): return
 	focused = index
-	var item: Dictionary = Catalog.ITEMS[rewards[index]]
+	var item: Dictionary = symbols[rewards[index]]
 	var specks: Array = []
 	for i in range(72): specks.append(Vector4(cosmetic.randf(),cosmetic.randf(),cosmetic.randf(),cosmetic.randf()))
 	celebrations.append({"id":item.id,"at":reel_rect(index).get_center(),"color":item.color,"born":elapsed,"specks":specks})
@@ -130,6 +176,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _text(at: Vector2, text: String, point_size: int, color: Color) -> void:
+	text = GameText.text(text)
 	var width: float = font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size).x
 	var p := (at-Vector2(width/2,0)).round()
 	draw_string(font,p+Vector2(3,3),text,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size,Color("111716"))
@@ -172,10 +219,11 @@ func _draw() -> void:
 			for j in range(5):
 				var trail: float = clampf(t-j*0.08,0,1)
 				var at := (box_at-Vector2(0,45)).lerp(rect.get_center(),1-pow(1-trail,2))-Vector2(0,sin(trail*PI)*65)
-				Icons.paint(self,art,Catalog.ITEMS[sequences[reel][j]].icon,Rect2(at-Vector2.ONE*20,Vector2.ONE*40),Rect2(),Color(1,1,1,(1-j/6.0)*t))
+				_paint_symbol(sequences[reel][j],Rect2(at-Vector2.ONE*20,Vector2.ONE*40),Rect2(),Color(1,1,1,(1-j/6.0)*t))
 			rect = Rect2(prize_origin(reel)-rect.size*(0.22+0.78*t)/2,rect.size*(0.22+0.78*t))
 		_draw_reel(reel,rect,gold)
 	_draw_celebrations(true)
+	draw_skip_button(self)
 
 func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 	draw_rect(rect.grow(7),Color("6e5738"))
@@ -189,7 +237,7 @@ func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 		var item_rect := Rect2(rect.get_center()-Vector2.ONE*side/2+Vector2(0,(row-scroll)*step),Vector2.ONE*side)
 		var clipped := item_rect.intersection(rect.grow(-8))
 		if not clipped.has_area(): continue
-		Icons.paint(self,art,Catalog.ITEMS[item_index].icon,item_rect,rect.grow(-8))
+		_paint_symbol(item_index,item_rect,rect.grow(-8))
 	for y in [rect.position.y,rect.end.y-16]: draw_rect(Rect2(rect.position.x,y,rect.size.x,16),Color(0.04,0.08,0.06,0.8))
 	draw_rect(rect,gold if reel == focused or active else gold.darkened(0.5),false,4 if reel == focused else 2)
 	var blink: float = clampf(1-(elapsed-stop_time(reel))*4,0,1) if elapsed >= stop_time(reel) else 0
@@ -197,6 +245,18 @@ func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 	for direction in [-1,1]:
 		var at := Vector2(rect.get_center().x+direction*(rect.size.x/2+9),rect.get_center().y)
 		draw_colored_polygon(PackedVector2Array([at+Vector2(direction*9,-10),at+Vector2(-direction*5,0),at+Vector2(direction*9,10)]),gold)
+
+func _paint_symbol(index: int, rect: Rect2, clip: Rect2 = Rect2(), tint: Color = Color.WHITE) -> void:
+	var item: Dictionary = symbols[index]
+	if not item.has("relic_id"):
+		Icons.paint(self,art,item.icon,rect,clip,tint)
+		return
+	var position: int = Relics.ITEMS.keys().find(item.relic_id)
+	var source := Rect2(position*64,0,64,64)
+	var visible_rect: Rect2 = rect.intersection(clip) if clip.has_area() else rect
+	if not visible_rect.has_area(): return
+	var uv := Rect2(source.position+(visible_rect.position-rect.position)/rect.size*source.size,visible_rect.size/rect.size*source.size)
+	draw_texture_rect_region(relic_atlas,visible_rect,uv,tint)
 
 func _draw_celebrations(foreground: bool) -> void:
 	for event in celebrations:

@@ -46,6 +46,7 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	pixel_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 	pixel_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	GameText.prepare_font(pixel_font)
 	pixel_font.oversampling = 1
 	for key in ["eldritch", "stone", "arch", "column", "floor0", "book", "crown", "fx", "attack", "vanguard", "archer", "mage"]:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
@@ -105,6 +106,12 @@ func close_rect() -> Rect2:
 	var area := modal_rect()
 	return Rect2(area.end.x - (112 if portrait else 78), area.position.y + 20, 88 if portrait else 58, 88 if portrait else 58)
 
+func settings_rect() -> Rect2:
+	return Rect2(590,124,174,80) if portrait else Rect2(1060,34,172,56)
+
+func language_rect(index: int) -> Rect2:
+	return Rect2(88,530+index*144,628,112) if portrait else Rect2(368,260+index*100,544,72)
+
 func skill_tab_rect(index: int) -> Rect2:
 	return Rect2(48 + index * 240, 370, 228, 84) if portrait else Rect2(168 + index * 232, 142, 220, 52)
 
@@ -132,6 +139,7 @@ func _process(delta: float) -> void:
 
 func _interactive(point: Vector2) -> bool:
 	if not modal.is_empty(): return modal_rect().has_point(point)
+	if settings_rect().has_point(point): return true
 	for i in range(5):
 		if tab_rect(i).has_point(point): return true
 	if page == 2: return play_rect().has_point(point)
@@ -207,6 +215,11 @@ func _activate(point: Vector2) -> void:
 			if city_rect().has_point(point):
 				city_skills = not city_skills
 				_click()
+		elif modal == "settings":
+			for i in range(GameText.LANGUAGES.size()):
+				if language_rect(i).has_point(point):
+					GameText.set_language(GameText.LANGUAGES[i])
+					_click()
 		elif modal == "ancients":
 			for slot in range(6 if portrait else 8):
 				var index: int = picker_offset + slot
@@ -223,6 +236,11 @@ func _activate(point: Vector2) -> void:
 			dice_index = detail_dice
 			modal = ""
 			_click()
+		_update_preview()
+		return
+	if settings_rect().has_point(point):
+		modal = "settings"
+		_click()
 		_update_preview()
 		return
 	for i in range(5):
@@ -299,6 +317,7 @@ func _update_preview() -> void:
 
 func _draw() -> void:
 	_background()
+	_button(settings_rect(),"Settings")
 	var header := Vector2(48, 168) if portrait else Vector2(48, 70)
 	_text(header, TABS[page], 48 if portrait else 36, GOLD)
 	_text(header + Vector2(0, 46 if portrait else 32), ["Relics of chance", "Choose your awakening", "Let the world tremble", "Beyond the veil", ""][page], 24 if portrait else 18, MUTED)
@@ -316,6 +335,17 @@ func _draw() -> void:
 			"ancients": _draw_picker()
 			"dice": _draw_dice_detail()
 			"skills": _draw_skills()
+			"settings": _draw_settings()
+
+func _draw_settings() -> void:
+	var area := modal_rect()
+	_text(area.position+Vector2(24,68 if portrait else 50),"SETTINGS",34 if portrait else 28,GOLD)
+	_center(Vector2(area.get_center().x,450 if portrait else 225),"Choose your language",28 if portrait else 22,CREAM)
+	for i in range(GameText.LANGUAGES.size()):
+		var rect := language_rect(i)
+		var selected: bool = GameText.language == GameText.LANGUAGES[i]
+		_button(rect,GameText.LANGUAGE_NAMES[i],true,GREEN if selected else EDGE)
+		if selected: draw_rect(rect.grow(-5),GREEN,false,3)
 
 func _background() -> void:
 	var size := canvas_size()
@@ -379,7 +409,7 @@ func _draw_ancient() -> void:
 	_text(at + Vector2(0, 50), ancients[ancient_index].style, 24 if portrait else 20, GREEN)
 	_wrapped(at + Vector2(0, 106), ancients[ancient_index].lore, 708 if portrait else 550, 24 if portrait else 22, MUTED)
 	_button(skills_rect(), "DICE SKILLS", true, GREEN)
-	_button(picker_rect(), "ANCIENTS  /  %02d" % ancients.size())
+	_button(picker_rect(), GameText.format("ANCIENTS  /  %02d", ancients.size()))
 
 func _draw_dices() -> void:
 	for i in range(dices.size()):
@@ -476,27 +506,25 @@ func _draw_skills() -> void:
 		var label: String = Rules.PAIR_NAMES[i] if skill_page == 1 else Rules.SPECIAL_NAMES[i]
 		var description: String = Rules.PAIR_TEXT[i] if skill_page == 1 else (Rules.CITY_SPECIAL_TEXT[i] if city_skills else Rules.SPECIAL_TEXT[i])
 		_text(name_at, label, 24 if portrait else 18, color)
-		_wrapped(rect.position + (Vector2(158, 76) if portrait else Vector2(10, 62)), description, 550 if portrait else 440, 22 if portrait else 18, CREAM)
+		_wrapped(rect.position + (Vector2(12, 76) if portrait else Vector2(10, 62)), description, 684 if portrait else 440, 28 if portrait else 22, CREAM)
 
 func _text(at: Vector2, value: String, size: int, color: Color = CREAM) -> void:
+	value = GameText.text(value)
 	draw_string(pixel_font, at.round() + Vector2(2, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, INK)
 	draw_string(pixel_font, at.round(), value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
 func _center(at: Vector2, value: String, size: int, color: Color = CREAM) -> void:
+	value = GameText.text(value)
 	_text(at - Vector2(pixel_font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x / 2, 0), value, size, color)
 
 func _wrapped(at: Vector2, value: String, width: float, size: int, color: Color) -> float:
-	var row := ""
+	var font: Font = GameText.description_font()
+	size = maxi(size,28 if portrait else 22)
 	var y: float = at.y
-	for word in value.split(" "):
-		var next: String = word if row.is_empty() else row + " " + word
-		if not row.is_empty() and pixel_font.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
-			_text(Vector2(at.x, y), row, size, color)
-			y += size + 10
-			row = word
-		else: row = next
-	_text(Vector2(at.x, y), row, size, color)
-	return y
+	for line in GameText.lines(value, font, size, width):
+		draw_string(font,Vector2(at.x,y).round(),line,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
+		y += size+10
+	return maxf(at.y,y-size-10)
 
 func _art(key: String, rect: Rect2, color: Color = Color.WHITE) -> void:
 	if not art.has(key): art[key] = load("res://assets/art/fantasy/" + key + ".png")

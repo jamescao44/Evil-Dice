@@ -9,7 +9,16 @@ static func star(node: CanvasItem, at: Vector2, radius: float, color: Color) -> 
 	node.draw_colored_polygon(points,color)
 
 static func icon(node: CanvasItem, at: Vector2, radius: float, type: String, color: Color) -> void:
-	if type == "stars":
+	if type == "dark":
+		Pixel.circle(node,at,radius,color,2)
+		Pixel.disc(node,at,radius*0.4,color,2)
+		Pixel.line(node,at-Vector2.ONE*radius*0.7,at+Vector2.ONE*radius*0.7,Color("33233e"),3)
+	elif type == "acid":
+		node.draw_colored_polygon(PackedVector2Array([at-Vector2(0,radius),at+Vector2(radius*0.7,radius*0.3),at+Vector2(radius*0.4,radius),at+Vector2(-radius*0.4,radius),at+Vector2(-radius*0.7,radius*0.3)]),color)
+	elif type == "plague":
+		Pixel.disc(node,at,radius*0.25,color,2)
+		for i in range(3): Pixel.circle(node,at+Vector2.from_angle(i*TAU/3-PI/2)*radius*0.5,radius*0.5,color,2)
+	elif type == "stars":
 		star(node,at,radius,color)
 	elif type == "ice":
 		for i in range(6):

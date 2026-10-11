@@ -1,6 +1,9 @@
 extends RefCounted
 ## Test player: aims single-target skills; drags other skills onto the field.
 static func cast_pending(game) -> void:
+	if game.view_phase == "relic_reward":
+		game.model.skip_relic()
+		return
 	if game.view_phase != "skill": return
 	game._handle_click(game._skill_center())
 	if game._skill_needs_target(): game._handle_release(game._skill_center())

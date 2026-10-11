@@ -15,6 +15,10 @@ run/main_scene="res://scenes/home_portrait.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+TranslationLiveReload="*res://scripts/translation_live_reload.gd"
+
 [display]
 
 window/size/viewport_width=1280
@@ -22,6 +26,11 @@ window/size/viewport_height=800
 window/size/window_width_override=1280
 window/size/window_height_override=800
 window/stretch/mode="canvas_items"
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://assets/localization/ui.en.translation", "res://assets/localization/ui.zh_CN.translation")
+locale/fallback="en"
 
 [physics]
 

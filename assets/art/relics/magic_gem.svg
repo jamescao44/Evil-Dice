@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Shared neutral gem. Element colors are applied by RelicPaint. -->
+  <path fill="#182027" d="M11 1h10v2h4v4h3v5h2v9h-2v5h-4v3h-5v2h-7v-2H8v-3H4v-5H2v-9h2V7h3V3h4z"/>
+  <path fill="#aebcc4" d="M11 3h10v2h3v4h3v5h1v6h-2v5h-4v3h-4v1h-5v-2H9v-3H6v-5H4v-6h2V9h3V5h2z"/>
+  <path fill="#f1f7fa" d="M11 3h10l-3 6-7 2-5 2V9h3V5h2z"/>
+  <path fill="#8998a4" d="m21 3 3 2v4h3v5l-6-3-3-2z"/>
+  <path fill="#d2dce3" d="m11 11 7-2 3 2 2 7-7 4-7-5z"/>
+  <path fill="#7c8c98" d="m6 13 5-2-2 6 3 7-3 0H6v-5H4v-6z"/>
+  <path fill="#5b6976" d="m21 11 6 3h1v6h-2v5l-4 0 1-7z"/>
+  <path fill="#a9b9c5" d="m9 17 7 5-3 5H9v-3z"/>
+  <path fill="#53606d" d="m16 22 7-4-1 7v3h-4v1h-5v-2z"/>
+  <path fill="#ffffff" d="M11 5h7v2h-5v2h-3V7h1z"/>
+  <path fill="#edf5fa" d="M7 12h2v4H7zM16 11h3v2h-3z"/>
+</svg>

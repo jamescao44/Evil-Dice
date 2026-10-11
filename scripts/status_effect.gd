@@ -9,8 +9,12 @@ const FROZEN := 100
 const BURNING := 101
 const MAX_BURNING_STACKS := 10
 const STUNNED := 102
-const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED]
-enum Attribute { NONE, ICE, FIRE, SHOCK }
+const DARKNESS := 103
+const CORROSION := 104
+const PLAGUE := 105
+const HARMFUL := [FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE]
+const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE]
+enum Attribute { NONE, ICE, FIRE, SHOCK, DARK, ACID, DISEASE }
 var id: int
 var count: int = 0:
 	set(value): count = clampi(value, 0, MAX_BURNING_STACKS) if id == BURNING else maxi(0, value)
@@ -19,13 +23,13 @@ func _init(effect_id: int) -> void:
 	id = effect_id
 
 func apply(amount: int) -> void:
-	count = count+maxi(0,amount) if id == BURNING else maxi(0,amount)
+	count = count+maxi(0,amount) if is_stacking() else maxi(0,amount)
 
 func consume(amount: int = 1) -> void:
 	count -= amount
 
 func is_harmful() -> bool:
-	return id in [FROZEN, BURNING, STUNNED]
+	return id in HARMFUL
 
 func is_stacking() -> bool:
-	return id == BURNING
+	return id in [BURNING, DARKNESS, CORROSION, PLAGUE]

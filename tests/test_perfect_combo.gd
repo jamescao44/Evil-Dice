@@ -55,14 +55,14 @@ func damage_checks() -> void:
 	for city in [false,true]:
 		var m = fresh(city)
 		m.set_test_roll([5,5,5],true)
-		check(m.attack_damage(m.pending,0) == (33 if city else 16),"First Perfect boosts the skill it just rolled")
+		check(m.attack_damage(m.pending,0) == 16,"First Perfect boosts the skill it just rolled")
 		m.phase = "roll"
 		m.set_test_roll([5,5,5],true)
-		check(m.damage_caption(m.pending,0) == ("10 + 26 (x6)" if city else "10 + 8 (x6)"),"Preview includes the current combo on each hit")
+		check(m.damage_caption(m.pending,0) == "15 + 3 (x6)","Preview includes the current combo on each hit")
 		m.set_skill_use_multiplier("echo",2)
 		var events: Array = m.apply_player(0)
 		var hits: Array = events.filter(func(e): return e.type == "damage")
-		check(hits.size() == 12 and hits.all(func(e): return e.amount == (36 if city else 18)),"Every one of twelve hits receives the combo bonus")
+		check(hits.size() == 12 and hits.all(func(e): return e.amount == 18),"Every one of twelve hits receives the combo bonus")
 		check(m.perfect_combo == 2,"Individual hits never add to the throw streak")
 		m = fresh(city)
 		m.reward_base_damage = 5
@@ -70,7 +70,7 @@ func damage_checks() -> void:
 		m.power = 2
 		m.statuses[3].count = 3
 		m.set_test_roll([4,4,4],true)
-		check(m.attack_damage(m.pending,0) == (396 if city else 198),"Combo multiplies rewards, growth and attack boons")
+		check(m.attack_damage(m.pending,0) == 139,"Combo adds to rewards and attack boons above the growth baseline")
 		m = fresh(city)
 		m.hp = 40
 		m.set_test_roll([2,2,2],true)
@@ -86,12 +86,34 @@ func damage_checks() -> void:
 	m.apply_player(0)
 	check(m.enemies[0].hp == 0,"Perfect instant kills still execute")
 	m = fresh(true)
+	m.city_hp = 100000 # Keep this fixture alive to measure uncapped combo damage.
 	m.set_test_roll([6,6,6],true)
-	check(m.damage_caption(m.pending) == "800 + 80 (x1)","City Annihilation includes combo in its numeric preview")
+	check(m.damage_caption(m.pending) == "2000 + 200 (x1)","City Annihilation includes combo in its numeric preview")
 	m.apply_player()
-	check(m.city_hp == Run.CITY_MAX_HP-880,"City Annihilation receives the Perfect damage bonus")
+	check(m.city_hp == 100000-2200,"City Annihilation receives the Perfect damage bonus")
 	m.city_hp = 20
 	check(m.siege_damage(Rules.classify([6,6,6])) == 20,"Combo damage clamps to remaining city health")
+
+func additive_checks() -> void:
+	var m = fresh()
+	m.reward_damage_multiplier = 0.5
+	m.statuses[3].count = 2
+	m.statuses[33].count = 1
+	m.perfect_combo = 5
+	check(m.damage_multiplier() == 4.5, "Baseline 1.0 + treasure 0.5 + both buffs 0.5/2.0 + combo 0.5 = 4.5")
+	var skill = Rules.classify([5,5,5])
+	check(m.attack_damage(skill,0) == 67, "Fifteen base damage times 4.5 rounds down to 67")
+	m.statuses[33].consume()
+	check(m.damage_multiplier() == 2.5 and m.attack_damage(skill,0) == 37, "Expiring one buff removes only its own contribution")
+	m.phase = "roll"
+	m.set_test_roll([5,5,5],false)
+	check(m.damage_multiplier() == 2.0, "Missing Perfect removes only combo; treasure and remaining buff persist")
+	m.power = 2
+	check(m.damage_multiplier() == 3.0, "Growth changes baseline without multiplying reward or buff bonuses")
+	m.stage = 9
+	check(m.damage_multiplier() == 3.0, "City preserves the same baseline and additive bonuses")
+	m.city_hp = 100000
+	check(m.siege_damage(Rules.classify([6,6,6])) == 6000, "Annihilation uses the same multiplier as every other numeric city attack")
 
 func preserved_turn_checks() -> void:
 	var m = fresh()
@@ -116,10 +138,12 @@ func scene_checks(portrait: bool) -> void:
 	var g = Portrait.new() if portrait else Battle.new()
 	root.add_child(g)
 	g.muted = true
+	check(g._damage_multiplier_label().is_empty() and not g.damage_feedback.active, "Multiplier stays hidden before an attack")
 	var at: Vector2 = g._perfect_combo_center()
 	var saved: Vector2 = g._saved_slot_center()
 	check(is_equal_approx(at.x+saved.x,2*g.DICE_CENTER.x) and at.y == saved.y,"Combo mirrors the saved slot in each layout")
 	g.model.perfect_combo = 3
+	check(g._damage_multiplier_label().is_empty() and g.model.damage_multiplier() == 1.3, "Idle combo changes do not reveal the cast-only multiplier")
 	g._start_charge()
 	g._cancel_charge()
 	check(g.model.perfect_combo == 3,"Canceled charging preserves combo")
@@ -145,12 +169,20 @@ func scene_checks(portrait: bool) -> void:
 		await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("res://test-output/perfect-combo-"+("portrait" if portrait else "landscape")+".png")
+		g._restart(10)
+		for status in Status.IDS: g.model.statuses[status].count = 3
+		g.model.perfect_combo = 5
+		g.queue_redraw()
+		await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("res://test-output/additive-city-"+("portrait" if portrait else "landscape")+".png")
 	g.queue_free()
 	await process_frame
 
 func run() -> void:
 	streak_checks()
 	damage_checks()
+	additive_checks()
 	preserved_turn_checks()
 	await scene_checks(false)
 	await scene_checks(true)

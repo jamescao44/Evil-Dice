@@ -17,3 +17,6 @@ export_credentials.cfg
 *.p12
 *.pfx
 *.keystore
+
+# macOS folder metadata.
+.DS_Store

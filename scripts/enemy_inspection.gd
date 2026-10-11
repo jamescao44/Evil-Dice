@@ -17,7 +17,12 @@ func focus_rect(index: int) -> Rect2:
 
 func card_rect(index: int) -> Rect2:
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
-	var size := Vector2(620,202) if portrait else Vector2(380,154)
+	var width: float = 680 if portrait else 440
+	var font_size: int = 30 if portrait else 22
+	var inset: float = 24 if portrait else 18
+	var data: Dictionary = battle._enemy_intent_data(index)
+	var lines := GameText.lines(data.get("description",""),battle.description_font,font_size,width-inset*2)
+	var size := Vector2(width,(96 if portrait else 77)+lines.size()*(font_size+8))
 	var focus: Rect2 = focus_rect(index)
 	var x: float = clampf(focus.get_center().x-size.x/2,20,battle.fx.canvas_size.x-size.x-20)
 	var y: float = minf(focus.end.y+20,battle.fx.canvas_size.y-size.y-20)
@@ -44,15 +49,9 @@ func _draw() -> void:
 	var inset: float = 24 if portrait else 18
 	var title_y: float = 44 if portrait else 34
 	Paint.intent_icon(self,card.position+Vector2(inset+12,title_y-10),12,data.icon,data.color)
-	draw_string(battle.pixel_font,card.position+Vector2(inset+40,title_y),data.name,HORIZONTAL_ALIGNMENT_LEFT,-1,28 if portrait else 20,data.color)
-	var font_size: int = 24 if portrait else 16
+	draw_string(battle.pixel_font,card.position+Vector2(inset+40,title_y),GameText.text(data.name),HORIZONTAL_ALIGNMENT_LEFT,-1,28 if portrait else 20,data.color)
+	var font_size: int = 30 if portrait else 22
 	var y: float = card.position.y+(86 if portrait else 67)
-	var line: String = ""
-	for word in data.description.split(" "):
-		var next: String = word if line.is_empty() else line+" "+word
-		if battle.pixel_font.get_string_size(next,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x > card.size.x-inset*2 and not line.is_empty():
-			draw_string(battle.pixel_font,Vector2(card.position.x+inset,y),line,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,battle.CREAM)
-			y += font_size+8
-			line = word
-		else: line = next
-	if not line.is_empty(): draw_string(battle.pixel_font,Vector2(card.position.x+inset,y),line,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,battle.CREAM)
+	for line in GameText.lines(data.description,battle.description_font,font_size,card.size.x-inset*2):
+		draw_string(battle.description_font,Vector2(card.position.x+inset,y),line,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,battle.CREAM)
+		y += font_size+8

@@ -6,7 +6,7 @@ Source: [Dungeon Crawl 32×32 Tiles Supplemental on OpenGameArt](https://opengam
 
 Selected PNGs are copied unchanged to `art/fantasy/`. The complete source-to-project mapping is in [sources.json](art/fantasy/sources.json).
 
-The treasure chest and seven reward icons are copied unchanged from the same collection into `art/rewards/`; exact paths are in [reward sources.json](art/rewards/sources.json). Elite glows tint additional copies of the human sprites at runtime. Treasure audio reuses Kenney ticks, landings, plucks, confirmation, book, rumble, and bell clips, with pitch variation and layered prize reveals.
+The treasure chest and seven reward category icons are copied unchanged from the same collection into `art/rewards/`; exact paths are in [reward sources.json](art/rewards/sources.json). Elite glows tint additional copies of the human sprites at runtime. Treasure audio reuses Kenney ticks, landings, plucks, confirmation, book, rumble, and bell clips, with pitch variation and layered prize reveals.
 
 | Game role | Original file in the public archive |
 | --- | --- |
@@ -25,6 +25,10 @@ The treasure chest and seven reward icons are copied unchanged from the same col
 | Boon and effect icons | `gui/skills/`: shields, fighting, transmutations, necromancy, invocations, spellcasting |
 
 The actors use 32×32 source images with nearest-neighbor sampling and stepped idle motion. Apparent scale changes with growth; death poses rotate and flatten the same sprite. City troops and inhabitants lean and hop while running; civilians and aristocrats emerge when houses become rubble. Scene and UI textures are tiled, cropped, and tinted at runtime. These are existing public pixel-art tiles; no custom image generation was used for this redesign.
+
+## Relic inventory artwork
+
+Relic sprites use unchanged CC0 tiles from the same **Dungeon Crawl Stone Soup Full** archive above: scrolls, rings, armor, shields, weapons, runestones, a skull and an hourglass. Exact source paths are recorded in [relic sources.json](art/relics/sources.json). The six elemental magic stones and Prismatic Stone instead share the project's original `magic_gem.svg`, tinted at draw time by element; Prismatic Stone uses a multicolor tint. The previous stone PNGs remain as unused source references. Transparent margins are trimmed at draw time; source PNGs are unmodified. The chest atlas is rendered from the same shared renderer by `tests/render_relic_atlas.gd`.
 
 ## Silkscreen — all active text and numbers
 
@@ -78,3 +82,5 @@ Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_re
 ## User-provided finished sound effects
 
 `audio/soft_sweep.wav` and `audio/perfect.wav` are copied unchanged from the user’s finished-SFX folder, `/Users/James/Desktop/Music Files/Station A/Evil Dice/outs-FXs`. The soft sweep replaces the scraping dice-throw sweep; the Perfect clip layers onto accepted Perfect throws. These are user-provided project audio, not part of the Kenney CC0 packs. The existing magic-leak charging loop now plays at 25% of its original runtime amplitude across its entire power curve. The soft sweep plays 6 dB louder than its initial mix; source WAV files remain unchanged.
+
+- **Noto Sans SC**: bundled Chinese font from [Google Fonts / Adobe](https://github.com/google/fonts/tree/main/ofl/notosanssc), SIL Open Font License 1.1. License: `fonts/NotoSansSC-LICENSE.txt`.

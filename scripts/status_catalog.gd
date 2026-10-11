@@ -4,12 +4,15 @@ const Rules = preload("res://scripts/battle_rules.gd")
 const Status = preload("res://scripts/status_effect.gd")
 const ENTRIES := {
 	2: {"name": Rules.PAIR_NAMES[1], "icon": "heal", "text": "Heal 5 at turn start.", "color": Color("aed085")},
-	3: {"name": Rules.PAIR_NAMES[2], "icon": "attack", "text": "1.5x attack power.", "color": Color("dfb866")},
-	33: {"name": Rules.SPECIAL_NAMES[2], "icon": "crown", "text": "3x attack power.", "color": Color("c5a4de")},
+	3: {"name": Rules.PAIR_NAMES[2], "icon": "attack", "text": "Adds +0.5 to DMG. Stacks with other bonuses.", "color": Color("dfb866")},
+	33: {"name": Rules.SPECIAL_NAMES[2], "icon": "crown", "text": "Adds +2.0 to DMG. Stacks with other bonuses.", "color": Color("c5a4de")},
 	6: {"name": Rules.PAIR_NAMES[5], "icon": "shield", "text": "Invincible.", "color": Color("80d8c6")},
 	Status.FROZEN: {"name": "Frozen", "icon": "ice", "text": "Tap the ice 3 times to break free and end your turn.", "color": Color("82dfff")},
-	Status.BURNING: {"name": "Burning", "icon": "fire", "text": "1 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.", "color": Color("ff9955")},
+	Status.BURNING: {"name": "Burning", "icon": "fire", "text": "5 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.", "color": Color("ff9955")},
 	Status.STUNNED: {"name": "Stunned", "icon": "stars", "text": "The next throw's power marker moves unpredictably.", "color": Color("ffe388")},
+	Status.DARKNESS: {"name":"Darkness", "icon":"dark", "text":"Attack damage x0.5. Cannot heal. Lose 1 stack each turn.", "color":Color("c18ce8")},
+	Status.CORROSION: {"name":"Corrosion", "icon":"acid", "text":"Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.", "color":Color("8ad26a")},
+	Status.PLAGUE: {"name":"Plague", "icon":"plague", "text":"Max HP -10 per stack, minimum 1. Gains 1 stack and spreads 1 stack to a random ally each turn.", "color":Color("93899e")},
 }
 
 static func active(statuses: Dictionary) -> Array:
@@ -24,5 +27,5 @@ static func active(statuses: Dictionary) -> Array:
 	return items
 
 static func remaining(id: int, amount: int) -> String:
-	var unit: String = "stack" if id == Status.BURNING else "throw" if id == Status.STUNNED else "turn"
+	var unit: String = "stack" if id in [Status.BURNING,Status.DARKNESS,Status.CORROSION,Status.PLAGUE] else "throw" if id == Status.STUNNED else "turn"
 	return "%d %s%s remaining." % [amount, unit, "" if amount == 1 else "s"]

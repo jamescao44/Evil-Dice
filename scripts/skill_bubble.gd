@@ -1,6 +1,7 @@
 extends Node2D
 ## Presentation only. The battle owns targeting, consumption and combat time.
 const Pixel = preload("res://scripts/pixel_paint.gd")
+const Orb = preload("res://scripts/skill_orb_paint.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 var battle
 var stored: bool = false
@@ -21,6 +22,9 @@ var pops: Array = []
 var cast_age: float = 10
 const DISSOLVE_TIME := 0.48
 const CAST_OPACITY := 0.28
+const SLAM_IMPACT_TIME := 0.28
+const SLAM_DURATION := 0.46
+var slam_age: float = SLAM_DURATION
 var cast_position := Vector2.INF
 var dissolving: bool = false
 var dissolve_age: float = 0
@@ -30,6 +34,7 @@ func _ready() -> void:
 	z_index = 40
 
 func begin(value: MultiHitSkill) -> void:
+	slam_age = SLAM_DURATION
 	roll = value.duplicate(true)
 	age = 0
 	entrance_speed = battle._roll_speed()
@@ -44,6 +49,7 @@ func begin(value: MultiHitSkill) -> void:
 	fragments.clear()
 
 func clear() -> void:
+	slam_age = SLAM_DURATION
 	roll = MultiHitSkill.new()
 	caption.clear()
 	pops.clear()
@@ -58,6 +64,20 @@ func clear() -> void:
 func lock_cast_position(at: Vector2) -> void:
 	cast_position = at
 
+func begin_slam() -> void:
+	if cast_position == Vector2.INF: cast_position = display_center()
+	slam_age = 0
+
+func slam_lift() -> float:
+	if battle.reduced or slam_age >= SLAM_IMPACT_TIME: return 0.0
+	if slam_age < 0.12: return smoothstep(0, 0.12, slam_age)
+	return 1.0 - pow((slam_age - 0.12) / (SLAM_IMPACT_TIME - 0.12), 3)
+
+func slam_scale() -> float:
+	if battle.reduced or slam_age >= SLAM_DURATION: return 1.0
+	if slam_age < SLAM_IMPACT_TIME: return 1.0 + slam_lift() * 0.4
+	return 1.0 - 0.22 * (1.0 - smoothstep(SLAM_IMPACT_TIME, SLAM_DURATION, slam_age))
+
 func is_active_saved() -> bool:
 	return stored and (battle.casting_source == "saved" or (battle.view_phase == "targeting" and battle.skill_source == "saved"))
 
@@ -68,11 +88,11 @@ func is_casting() -> bool:
 	return battle.view_phase == "resolving" and battle.casting_source == ("saved" if stored else "current")
 
 func display_radius() -> float:
-	if stored: return battle._skill_radius() if is_active_saved() else battle._saved_slot_radius()*0.84
-	return battle._skill_radius()*radius_scale()*(0.7 if battle.skill_dragging and battle.skill_source == "current" else 1.0)
+	if stored: return (battle._skill_radius() if is_active_saved() else battle._saved_slot_radius()*0.84) * slam_scale()
+	return battle._skill_radius()*radius_scale()*(0.7 if battle.skill_dragging and battle.skill_source == "current" else 1.0)*slam_scale()
 
 func display_center() -> Vector2:
-	if cast_position != Vector2.INF: return cast_position
+	if cast_position != Vector2.INF: return cast_position - Vector2(0, battle._skill_radius() * slam_lift())
 	if not battle.skill_dragging or battle.skill_source != ("saved" if stored else "current"): return center_at()
 	var at: Vector2 = battle.skill_pointer-Vector2(0,78 if battle.fx.canvas_size.y > battle.fx.canvas_size.x and battle.active_touch >= 0 else 0)
 	var radius: float = display_radius()
@@ -101,17 +121,17 @@ func _draw_dissolve(at: Vector2, radius: float, color: Color) -> void:
 		draw_rect(Rect2(p.snapped(Vector2.ONE*2),Vector2.ONE*size),Color(color.lightened(0.35),alpha))
 
 func consume_use() -> void:
-	roll.begin_cast(battle.model.skill_use_modifiers)
+	roll.begin_cast(battle.model.skill_modifiers_for(roll))
 	if roll.uses_left() == 0: return
 	cast_age = 0
 	if orb_count() > 1: pops.append({"index": used, "age": 0.0})
 	roll.consume_use()
 
 func uses_left() -> int:
-	return roll.uses_left(battle.model.skill_use_modifiers)
+	return roll.uses_left(battle.model.skill_modifiers_for(roll))
 
 func orb_count() -> int:
-	return battle.model.skill_use_count(roll) if roll.has_use_orbs(battle.model.skill_use_modifiers) else 0
+	return battle.model.skill_use_count(roll) if battle.model.skill_use_count(roll) > 1 else 0
 
 func center_at() -> Vector2:
 	if cast_position != Vector2.INF: return cast_position
@@ -145,6 +165,7 @@ func _process(delta: float) -> void:
 		age += delta
 		if not locked_saved: rotation_clock += delta * battle._world_time_scale()
 		cast_age += delta
+		slam_age = minf(SLAM_DURATION, slam_age + delta)
 		if dissolving: dissolve_age += delta
 		for pop in pops: pop.age += delta
 		pops = pops.filter(func(pop): return pop.age < 0.4)
@@ -219,9 +240,7 @@ func _draw_uses(at: Vector2, radius: float, color: Color) -> void:
 	for i in range(total):
 		var p := at+Vector2.from_angle(-PI/2+i*TAU/total)*orbit
 		if i >= used:
-			for glow in range(3,0,-1): Pixel.disc(self,p,side+glow*3,Color(color,0.06),2)
-			Pixel.disc(self,p,side,Color("eee0b9"),2)
-			Pixel.disc(self,p,side*0.5,color,2)
+			Orb.paint(self,p,side,color)
 		else: Pixel.circle(self,p,side*0.6,Color(color,0.18),2)
 	for pop in pops:
 		var p := at+Vector2.from_angle(-PI/2+pop.index*TAU/total)*orbit
@@ -242,6 +261,7 @@ func value_text() -> String:
 	if not selected and not (held and not battle._skill_needs_target(roll)): return ""
 	if Rules.is_attack(roll): return battle.model.damage_caption(roll, battle.hover_target if selected else -1)
 	if roll.face == 2:
+		if battle.model.status_count(battle.Status.DARKNESS) > 0: return "+0 HP"
 		if roll.kind == Rules.Kind.PAIR: return "5 HP (x%d)" % roll.spare
 		return "+%d HP" % maxi(0, battle.model.max_hp-battle.model.hp)
 	return ""
@@ -259,21 +279,26 @@ func _draw_value(at: Vector2, radius: float, portrait: bool) -> void:
 
 func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, color: Color) -> void:
 	_draw_value(at, radius, portrait)
-	var description: String = description_text()
+	var description: String = GameText.text(description_text())
+	var title: String = GameText.text(caption.name)
 	var title_size: int = 32 if portrait else 24
+	var body_size: int = 30 if portrait else 24
 	var width: float = 700 if portrait else 500
-	while title_size > 16 and battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x > width: title_size -= 2
+	while title_size > 16 and battle.pixel_font.get_string_size(title,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x > width: title_size -= 2
 	var baseline: Vector2 = at+Vector2(0,radius+(64 if portrait else 48))
-	var caption_width: float = maxf(battle.pixel_font.get_string_size(caption.name,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x,battle.pixel_font.get_string_size(description,HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 16).x)
+	var lines := GameText.lines(description,battle.description_font,body_size,width)
+	var caption_width: float = battle.pixel_font.get_string_size(title,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x
+	for line in lines: caption_width = maxf(caption_width,battle.description_font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,body_size).x)
 	baseline.x = clampf(baseline.x,caption_width/2+16,battle.fx.canvas_size.x-caption_width/2-16)
-	_center(baseline,caption.name,title_size,color,true)
-	var next: float = 34 if portrait else 26
+	_center(baseline,title,title_size,color,true)
+	var next: float = 40 if portrait else 32
 	if not description.is_empty():
-		_center(baseline+Vector2(0,next),description,24 if portrait else 16,Color("eee0b9"),true)
-		next += 30 if portrait else 25
+		for line in lines:
+			_center(baseline+Vector2(0,next),line,body_size,Color("eee0b9"),true,battle.description_font)
+			next += body_size+6
 	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended(): return
 	var hint: String = "CHOOSE A FOE" if aiming and battle._skill_needs_target(roll) else "TAP / DRAG TO AIM" if battle._skill_needs_target(roll) else "DRAG TO FIELD"
-	_center(baseline+Vector2(0,next),hint,19 if portrait else 12,Color("b8b7b2"),true)
+	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font)
 
 func _draw_target(target: int, selected: bool, color: Color) -> void:
 	var rect: Rect2 = battle._target_rect(target)
@@ -312,7 +337,9 @@ func _mini_die(at: Vector2, face: int, half: float, alpha: float) -> void:
 		var width: float = maxf(2,half*0.25)
 		draw_rect(Rect2(at+pip*half*0.55-Vector2.ONE*width/2,Vector2.ONE*width),Color("271c35",alpha))
 
-func _center(at: Vector2, value: String, size: int, color: Color, outline: bool = false) -> void:
-	var width: float = battle.pixel_font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
-	if outline: draw_string_outline(battle.pixel_font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,4,Color("15151b"))
-	draw_string(battle.pixel_font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
+func _center(at: Vector2, value: String, size: int, color: Color, outline: bool = false, font: Font = null) -> void:
+	value = GameText.text(value)
+	if font == null: font = battle.pixel_font
+	var width: float = font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
+	if outline: draw_string_outline(font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,4 if font == battle.pixel_font else 2,Color("15151b"))
+	draw_string(font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)

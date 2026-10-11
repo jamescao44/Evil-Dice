@@ -21,7 +21,7 @@ func fresh(city: bool = false):
 	if city:
 		m.stage = 9
 		m._load_wave()
-		m.city_hp = 10000
+		m.city_hp = 100000 # Leave room for both modified Annihilation uses.
 	m.begin_round()
 	for enemy in m.enemies:
 		enemy.hp = 3000

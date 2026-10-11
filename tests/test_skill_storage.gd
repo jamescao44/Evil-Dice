@@ -79,7 +79,7 @@ func model_checks() -> void:
 	turn = m.round_number
 	m.begin_saved_cast()
 	m.apply_player()
-	check(m.city_hp == Run.CITY_MAX_HP-150 and m.pending.same_as(current) and m.phase == "player","Stored 111 uses city damage and restores the current city roll")
+	check(m.city_hp == Run.CITY_MAX_HP-75 and m.pending.same_as(current) and m.phase == "player","Stored 111 uses city damage and restores the current city roll")
 	check(m.round_number == turn and m.statuses[2].count == 0,"City bonus does not execute the waiting support skill")
 	m.saved_skill = Rules.classify([6,6,1])
 	m.begin_saved_cast()
@@ -131,16 +131,16 @@ func layout_checks(g) -> void:
 	g.model.enemies[0].hp = 500
 	g.model.enemies[0].max_hp = 500
 	force_roll(g,[5,5,3])
-	check(g.skill_bubble.value_text() == "13 + 6 (x3)","Held combo shows actual per-hit damage and three hits")
-	check(g.skill_bubble.description_text() == "random attack +3" and g.skill_bubble.value_color().r > g.skill_bubble.value_color().g,"Attack descriptions remain separate from the red value line")
+	check(g.skill_bubble.value_text() == "19 + 0 (x3)","Held combo shows actual per-hit damage and three hits")
+	check(g.skill_bubble.description_text() == "random attack +4.5" and g.skill_bubble.value_color().r > g.skill_bubble.value_color().g,"Attack descriptions remain separate from the red value line")
 	g.model.statuses[3].count = 2
-	check(g.skill_bubble.value_text() == "13 + 16 (x3)","Held preview updates immediately when attack buffs change")
+	check(g.skill_bubble.value_text() == "19 + 10 (x3)","Held preview updates immediately when attack buffs change")
 	g.model.statuses[3].count = 0
 	g.model.phase = "roll"
 	force_roll(g,[1,1,6])
 	tap(g,g._skill_center())
 	g._handle_motion(g._enemy_point(0))
-	check(g.skill_bubble.value_text() == "21 + 10 (x1)","Selected targeted skill shows a single-hit damage preview")
+	check(g.skill_bubble.value_text() == "31 + 0 (x1)","Selected targeted skill shows a single-hit damage preview")
 	check(not g._buff_drag_active(),"Attack selection does not dim enemies")
 	g._cancel_targeting()
 	g.model.phase = "roll"
@@ -207,7 +207,7 @@ func layout_checks(g) -> void:
 	await settle(g)
 	check(g.view_phase == "skill" and g.result.same_as(pending) and g.model.pending.same_as(pending) and g.model.round_number == turn,"Bonus restores the displayed and model versions of the waiting skill")
 	check(g.model.statuses[3].count == 2 and g.saved_bubble.roll.is_empty(),"Bonus boon retains its duration and the slot empties")
-	check(g.skill_bubble.value_text() == "7 + 10 (x1)","Waiting skill preview reflects the just-cast saved power boon")
+	check(g.skill_bubble.value_text() == "11 + 6 (x1)","Waiting skill preview reflects the just-cast saved power boon")
 	g.skill_bubble._process(0)
 	check(not g.skill_bubble.is_suspended() and g.skill_bubble.self_modulate == Color.WHITE,"Bonus completion restores waiting skill interaction and opacity")
 	Driver.cast_pending(g)
@@ -267,7 +267,9 @@ func layout_checks(g) -> void:
 	g._sync_saved_bubble()
 	drag(g,g._saved_slot_center(),g._enemy_point(0))
 	var wave_deadline: int = Time.get_ticks_msec()+7000
-	while (g.model.stage == 0 or g.view_phase != "ready") and Time.get_ticks_msec()<wave_deadline: await process_frame
+	while (g.model.stage == 0 or g.view_phase != "ready") and Time.get_ticks_msec()<wave_deadline:
+		if g.view_phase == "relic_reward": g.model.skip_relic()
+		await process_frame
 	check(g.model.stage == 1 and g.view_phase == "ready" and g.model.saved_skill.dice == [6,6,4],"Bonus wave victory automatically carries the unused summoned skill to the next wave")
 	check(g.saved_bubble.roll.dice == [6,6,4] and g.skill_bubble.roll.is_empty() and g.model.statuses[6].count == 0,"Auto-save updates the slot visual without activating the unused boon")
 	g._restart()
@@ -275,6 +277,7 @@ func layout_checks(g) -> void:
 	g.model._load_wave()
 	g._start_round()
 	g.model.hp = 1000
+	g.model.city_hp = 100000 # Exercise resuming the waiting skill after a nonlethal bonus cast.
 	force_roll(g,[1,2,3])
 	pending = g.model.pending.duplicate(true)
 	g.model.saved_skill = Rules.classify([6,6,6])
@@ -282,11 +285,13 @@ func layout_checks(g) -> void:
 	turn = g.model.round_number
 	drag(g,g._saved_slot_center(),g.ARENA.get_center())
 	await settle(g)
-	check(g.model.city_hp == Run.CITY_MAX_HP-800 and g.model.pending.same_as(pending) and g.view_phase == "skill" and g.model.round_number == turn,"City bonus Annihilation leaves the current skill and round intact")
+	check(g.model.city_hp == 100000-2000 and g.model.pending.same_as(pending) and g.view_phase == "skill" and g.model.round_number == turn,"City bonus Annihilation leaves the current skill and round intact")
 	g.queue_free()
 	await process_frame
 
 func run() -> void:
+	# These assertions verify the English wording; Chinese is covered by test_localization.
+	GameText.set_language("en",false)
 	model_checks()
 	await layout_checks(Battle.new())
 	await layout_checks(Portrait.new())

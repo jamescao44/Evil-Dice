@@ -105,7 +105,7 @@ func _test_buffs() -> void:
 	game.begin_round()
 	game.set_test_roll([3,3,3])
 	game.apply_player()
-	check(game.statuses[33].count == 3 and game.attack_multiplier() == 3.0, "Triple boost overrides weaker boon without multiplying it")
+	check(game.statuses[33].count == 3 and game.attack_multiplier() == 3.5, "Both attack boons add their bonuses without multiplying them")
 	finish_round(game)
 	for remaining in [2,1,0]:
 		game.begin_round()

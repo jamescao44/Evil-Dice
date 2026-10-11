@@ -24,7 +24,13 @@ func test_layout(game) -> void:
 	check(items.size() == 4, "Both attack boons own separate indicators and durations")
 	for item in items:
 		var at: Vector2 = game._status_center(item.id)
-		check(at.y < game._player_feet().y-game.monster_side, "Status follows above Horror")
+		if game is Portrait:
+			var rect: Rect2 = game._status_rect(item.id)
+			check(game.ARENA.encloses(rect), "Portrait status fits the battlefield")
+			for enemy in range(game.model.enemies.size()):
+				check(not rect.intersects(game._target_rect(enemy)) and not rect.intersects(game._enemy_health_rect(enemy)) and not rect.intersects(game._enemy_intent_rect(enemy)), "Portrait status avoids enemy controls")
+		else:
+			check(at.y < game._player_feet().y-game.monster_side, "Status follows above Horror")
 		check(game._status_rect(item.id).has_point(at), "Each status owns a hit area")
 	game.model.statuses[6].count = 0
 	game.model.statuses[3].count = 0
@@ -94,10 +100,10 @@ func test_layout(game) -> void:
 	check(not chest.active and signals.back() == "complete", "Completion follows the last landing")
 	chest._process(0.1)
 	check(signals.count("complete") == 1, "Completion cannot duplicate a claim")
-	for id in [3,4,5,6]:
+	for id in [0,6]:
 		chest.start([id],game.fx.canvas_size,game.pixel_font,true)
 		chest.celebrate(0)
-		check(chest.reduced and chest.celebrations[0].id == game.Rewards.ITEMS[id].id, "Power and placeholder FX preserve reward category in reduced mode")
+		check(chest.reduced and chest.celebrations[0].id == game.Rewards.ITEMS[id].id, "Currency FX preserve reward category in reduced mode")
 	chest.cancel()
 	check(not chest.visible and not chest.active and chest.celebrations.is_empty(), "Cancel clears all celebration particles")
 	game.queue_free()

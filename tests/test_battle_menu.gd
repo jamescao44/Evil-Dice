@@ -38,7 +38,7 @@ func model_checks() -> void:
 		m.statuses[6].count = 5
 		check(m.load_debug_wave(wave),"Each supported wave loads")
 		check(m.stage == wave-1 and m.hp == 100+(wave-1)*30 and m.hp == m.max_hp,"Wave gets matching full player health")
-		check(m.power == [1.0,1.5,3.0,5.625,6.75,7.875,9.0,10.125,11.25,12.375][wave-1],"Wave gets matching growth")
+		check(m.power == 1.0,"Every wave keeps base damage multiplier at one")
 		check(m.phase == "new" and m.round_number == 0 and m.pending.is_empty() and m.saved_skill.is_empty() and m.perfect_combo == 0 and m.perfect_progress == 0 and m.status_count(6) == 0,"Wave starts with fresh turn, treasure, skills and statuses")
 		check(m.city_hp == 10000 and m.troops == 0,"Fresh city has 10000 HP and fresh siege clocks")
 		if wave < 10:
@@ -116,6 +116,9 @@ func scene_checks(portrait: bool) -> void:
 	g.model.city_hp = 0
 	g.model.perfect_progress = 9
 	g._check_over()
+	g.model.skip_relic()
+	await process_frame
+	await process_frame
 	check(g.auto_claim_tier == 3 and not g.model.open_rewards.is_empty(),"Victory reserves the largest chest")
 	g._handle_click(g.MENU_RECT.get_center())
 	g.auto_claim_remaining = 0

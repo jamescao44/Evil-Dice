@@ -129,6 +129,8 @@ func layout_checks(g) -> void:
 	await process_frame
 
 func run() -> void:
+	# English wording checks; test_localization covers Chinese and live switching.
+	GameText.set_language("en",false)
 	timer_checks()
 	await layout_checks(Battle.new())
 	await layout_checks(Portrait.new())

@@ -158,14 +158,6 @@ func run() -> void:
 	check(game._roll_speed() == 2.0 and game.model.pending.same_as(city_pending), "City stays at fixed 2x with no rerolls when spammed")
 	await settle()
 	check(game.model.city_hp < game.model.CITY_MAX_HP and game.view_phase == "ready", "City skill resolves after selection")
-	game.debug_choice = 12
-	var city_health: int = game.model.city_hp
-	await game._roll()
-	var ultimate_caption: Dictionary = game.skill_bubble.caption.duplicate()
-	await Driver.resolve_held(game)
-	check(game.model.city_hp == city_health - 800 and game.view_phase == "ready", "First city ultimate leaves the city alive and returns to rolling")
-	check(ultimate_caption.name == "Annihilation" and ultimate_caption.description.is_empty(), "666 uses Annihilation without a description")
-	check(not game.city_life.people.is_empty(), "Destroyed city houses release a visible fleeing crowd")
 	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.GUIDE_RECT.get_center())
 	var crowd_clock: float = game.city_life.clock
@@ -174,12 +166,14 @@ func run() -> void:
 	check(game.city_life.clock == crowd_clock and game._troop_point(0) == troop_position, "Grimoire pauses civilian motion and troop running with city combat")
 	game._handle_click(game.GUIDE_CLOSE.get_center())
 	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
-	game.model.city_hp = 1600
-	for i in range(2):
-		game.debug_choice = 12
-		await game._roll()
-		await Driver.resolve_held(game)
-	check(game.model.outcome() == "victory" and game.view_phase == "over", "Repeated city attacks play through to victory")
+	game.debug_choice = 12
+	await game._roll()
+	var ultimate_caption: Dictionary = game.skill_bubble.caption.duplicate()
+	game.model.city_hp = 1500
+	await Driver.resolve_held(game)
+	check(game.model.city_hp == 0 and game.view_phase == "over", "City ultimate applies the shared DMG multiplier and reaches victory")
+	check(ultimate_caption.name == "Annihilation" and ultimate_caption.description.is_empty(), "666 uses Annihilation without a description")
+	check(not game.city_life.people.is_empty(), "Destroyed city houses release a visible fleeing crowd")
 	game._handle_click(game.REPLAY_RECT.get_center())
 	check(game.model.stage == 0 and game.city_corpses.is_empty() and game.city_life.people.is_empty() and game.city_life.destroyed.is_empty() and game.model.hp == 100, "Mouse restart clears run and city inhabitants")
 	game.debug_choice = 9

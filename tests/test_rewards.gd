@@ -16,6 +16,70 @@ func check(value: bool, label: String) -> void:
 func _initialize() -> void:
 	call_deferred("run")
 
+func wait_for_chest(game, landed: bool = true) -> void:
+	var deadline: int = Time.get_ticks_msec()+4000
+	while (not game.chest.visible or (landed and game.chest.active)) and Time.get_ticks_msec() < deadline: await process_frame
+	check(game.chest.visible and (not landed or not game.chest.active),"Treasure opens in time for interaction")
+
+func wait_for_exit(game, phase: String) -> void:
+	var deadline: int = Time.get_ticks_msec()+600
+	while game.view_phase == "reward" and Time.get_ticks_msec() < deadline: await process_frame
+	check(game.view_phase == phase and not game.chest.visible and game.model.open_rewards.is_empty(),"Skip exits treasure immediately and restores the previous screen")
+
+func capture(game, label: String) -> void:
+	if "--visual" not in OS.get_cmdline_user_args(): return
+	await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("res://test-output/treasure-%s-%s.png" % ["portrait" if game is Portrait else "landscape",label])
+
+func partial_claim_checks(game) -> void:
+	game._restart()
+	game.model.perfect_progress = 9
+	game.model.reward_weights = [1,0,0,0,0,0,0]
+	game.chest.playback_speed = 100
+	game._reward_sequence()
+	await wait_for_chest(game)
+	for slot in [0,2]: game._handle_click(game.chest.reel_rect(slot).get_center())
+	check(game.chest.can_skip() and game.model.rubies == 200,"Players can claim a subset before skipping")
+	await capture(game,"partial")
+	game._handle_click(game.chest.skip_rect().get_center())
+	await wait_for_exit(game,"ready")
+	check(game.model.rubies == 200 and game.model.reward_history.size() == 2,"Exiting preserves only collected gifts")
+	game._restart()
+	game.model.perfect_progress = 6
+	game.model.reward_weights = [0,1,0,0,0,0,0]
+	game._reward_sequence()
+	await wait_for_chest(game)
+	var picked: String = game.model.chest_relics[0]
+	game._handle_click(game.chest.reel_rect(0).get_center())
+	check(game.relic_ui.pickup.active,"A chest relic starts its flight immediately on pickup")
+	game._handle_click(game.chest.skip_rect().get_center())
+	await wait_for_exit(game,"ready")
+	check(not game.relic_ui.pickup.active and game.model.relics.items.size() == 1 and game.model.relics.has(picked),"Skipping during a relic flight keeps the claimed item and clears the animation")
+	game._restart()
+	game.model.perfect_progress = 6
+	game.chest.playback_speed = 1
+	game._reward_sequence()
+	await wait_for_chest(game,false)
+	check(game.chest.active and game.chest.can_skip(),"Skip is available during the rolling animation")
+	game._handle_click(game.chest.skip_rect().get_center())
+	await wait_for_exit(game,"ready")
+	check(game.model.reward_history.is_empty() and game.model.perfect_progress == 0,"Skipping the whole chest awards nothing and cannot reopen the consumed chest")
+	game._restart()
+	for id in ["heart","armor","coin","bracelet","magic_shield","magic_sword","twin_scythes","orange_stone","blue_stone","cursed_bow"]: game.model.acquire_relic(id)
+	var owned: Array = game.model.relics.items.duplicate(true)
+	game.model.perfect_progress = 3
+	game.model.reward_weights = [0,1,0,0,0,0,0]
+	game.chest.playback_speed = 100
+	game._reward_sequence()
+	await wait_for_chest(game)
+	game._handle_click(game.chest.reel_rect(0).get_center())
+	check(game.relic_ui.chest_slot == 0,"An unclaimed relic opens full-inventory replacement")
+	await capture(game,"replacement-skip")
+	game._handle_click(game.chest.skip_rect().get_center())
+	await wait_for_exit(game,"ready")
+	check(game.relic_ui.chest_slot == -1 and game.model.relics.items == owned,"Skip also exits replacement without changing the owned inventory")
+
 func test_model() -> void:
 	var model = Run.new(123)
 	for perfect in [true,false,true,false]: model.record_perfect(perfect)
@@ -35,7 +99,7 @@ func test_model() -> void:
 		var before: int = model.reward_history.size()
 		check(not model.close_chest(), "Uncollected gifts prevent closure")
 		for slot in range(results.size()-1,-1,-1):
-			check(not model.claim_reward(slot).is_empty(), "Every slot can be collected in any order")
+			check(not model.claim_reward(slot,0).is_empty(), "Every slot can be collected in any order, replacing a relic when full")
 			check(model.claim_reward(slot).is_empty(), "Repeated pickup cannot duplicate a reward")
 		check(model.rewards_collected() and model.reward_history.size() == before+results.size(), "All results claimed exactly once")
 		check(model.close_chest() and model.open_chest().is_empty(), "Chest closes only after pickups")
@@ -45,18 +109,34 @@ func test_model() -> void:
 	model.reset_run()
 	model.open_rewards = [0,3,4,3,4,6,6]
 	for slot in range(model.open_rewards.size()): model.claim_reward(slot)
-	check(model.rubies == 100 and model.summon_shards == 2 and model.reward_base_damage == 10 and model.reward_damage_multiplier == 1, "Currency and stat rewards have requested values")
-	check(model.regular_attack_power() == 20 and model.damage_multiplier() == 2.5, "Rewards affect base and additive multiplier")
-	check(model.attack_base(Rules.classify([1,2,3])) == 16, "Damage reward also increases normal attack")
+	check(model.rubies == 100 and model.summon_shards == 2 and model.reward_base_damage == 0 and model.reward_damage_multiplier == 0, "Retired upgrades grant no stats, while currency rewards still work")
+	check(model.regular_attack_power() == 15 and model.damage_multiplier() == 1.0, "Treasure no longer raises base damage or DMG")
+	check(model.attack_base(Rules.classify([1,2,3])) == 9, "Normal attacks retain their natural base damage")
+	check(model.discard_unclaimed_rewards() == 4,"Removed legacy rewards can be discarded safely")
 	model.close_chest()
 	model.hp = 20
 	model.open_rewards = [1,2,5]
+	model.chest_relics = {0:"armor",1:"cursed_bow"}
 	for slot in range(model.open_rewards.size()): model.claim_reward(slot)
-	check(model.hp == 20 and model.rubies == 100 and model.reward_base_damage == 10 and model.status_counts().values().all(func(v): return v == 0), "Relic, curse and potion remain placeholders")
+	check(model.relics.has("armor") and model.relics.has("cursed_bow") and model.hp == 20, "Chest relic and curse rewards grant real items; retired potion grants nothing")
+	model.discard_unclaimed_rewards()
 	model.close_chest()
+	model.relics.items.clear()
 	model.stage = 9
-	check(model.siege_damage(Rules.classify([6,6,6])) == 800, "Rewards cannot amplify city Annihilation")
-	check(model.siege_damage(Rules.classify([1,1,1])) == 500, "City execution uses rewarded base and multiplier")
+	model.city_hp = 100000 # Measure reward scaling before the remaining-health cap.
+	check(model.siege_damage(Rules.classify([6,6,6])) == 2000, "Treasure no longer inflates Annihilation damage")
+	check(model.siege_damage(Rules.classify([1,1,1])) == 75, "City execution keeps its unmodified base damage")
+	model.reset_run()
+	model.open_rewards = [0,1,2,6]
+	model.chest_relics = {1:"heart",2:"cursed_bow"}
+	model.claim_reward(0)
+	model.claim_reward(1)
+	var reward_rng: int = model.reward_rng.state
+	var combat_rng: int = model.rng.state
+	check(model.discard_unclaimed_rewards() == 2 and model.discard_unclaimed_rewards() == 0,"Skip resolves only unclaimed slots, once")
+	check(model.rubies == 100 and model.relics.has("heart") and not model.relics.has("cursed_bow") and model.summon_shards == 0 and model.reward_history == [0,1],"Partial claims persist; skipped rewards grant nothing")
+	check(model.reward_rng.state == reward_rng and model.rng.state == combat_rng,"Skipping does not reroll future rewards or combat")
+	check(model.close_chest() and model.claim_reward(2).is_empty(),"Skipped rewards cannot be claimed after closing")
 	model.reset_run()
 	check(model.rubies == 0 and model.summon_shards == 0 and model.reward_base_damage == 0 and model.reward_damage_multiplier == 0 and model.perfect_total == 0 and model.reward_history.is_empty() and model.chest_tier() == 0 and model.open_rewards.is_empty(), "New run resets all reward state")
 	model.reward_weights = [0,0,0,0,0,0,4]
@@ -179,8 +259,12 @@ func test_scene(game) -> void:
 		game._handle_click(game.chest.reel_rect(i).get_center())
 		game._handle_click(game.chest.reel_rect(i).get_center())
 		check(game.model.reward_history.size() == i+1, "Reward applies exactly once on tap")
+		var pickup_deadline: int = Time.get_ticks_msec()+2000
+		while game.relic_ui.pickup.active and Time.get_ticks_msec() < pickup_deadline: await process_frame
+		check(not game.relic_ui.pickup.active,"A claimed relic lands before picking the next chest gift")
 	await create_timer(1.8).timeout
 	check(game.view_phase == "ready" and not game.chest.visible and game.model.open_rewards.is_empty(), "Picking up every gift resumes combat")
+	await partial_claim_checks(game)
 	game._restart()
 	game.model.record_perfect(true)
 	game.model.record_perfect(true)
@@ -237,10 +321,15 @@ func test_scene(game) -> void:
 		check(Time.get_ticks_msec() < deadline and not game.chest.active and game.model.reward_history.is_empty(),"Reels finish and wait for the player")
 		game._check_over()
 		check(game.view_phase == "reward" and game.model.open_rewards.size() == Run.CHEST_COUNTS[tier],"Victory polling cannot interrupt reward collection")
-		for slot in range(game.chest.rewards.size()):
+		var pickups: int = 1 if tier == 3 else game.chest.rewards.size()
+		for slot in range(pickups):
 			game._handle_click(game.chest.reel_rect(slot).get_center())
 			game._handle_click(game.chest.reel_rect(slot).get_center())
-		check(game.model.summon_shards == Run.CHEST_COUNTS[tier],"Every victory gift can be collected exactly once")
+		check(game.model.summon_shards == pickups,"Every chosen victory gift can be collected exactly once")
+		if tier == 3:
+			game._handle_click(game.chest.skip_rect().get_center())
+			await wait_for_exit(game,"over")
+			check(game.model.summon_shards == 1,"Partial victory treasure skips back to the success screen")
 		deadline = Time.get_ticks_msec()+3000
 		while game.view_phase != "over" and Time.get_ticks_msec() < deadline: await process_frame
 		check(game.view_phase == "over" and not game.chest.visible and game.model.open_rewards.is_empty(),"Collecting every gift returns to the success screen")
@@ -257,6 +346,17 @@ func test_scene(game) -> void:
 	await process_frame
 
 func run() -> void:
+	if "--skip-only" in OS.get_cmdline_user_args():
+		for game in [Battle.new(),Portrait.new()]:
+			root.add_child(game)
+			game.muted = true
+			game.speed = 30
+			await partial_claim_checks(game)
+			game.queue_free()
+			await process_frame
+		print("Treasure skipping: %d checks, %d failures" % [checks,failures])
+		quit(1 if failures else 0)
+		return
 	test_model()
 	await test_scene(Battle.new())
 	await test_scene(Portrait.new())

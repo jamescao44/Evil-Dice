@@ -1,0 +1,40 @@
+{
+  "source": "https://opengameart.org/content/dungeon-crawl-32x32-tiles-supplemental",
+  "archive": "Dungeon Crawl Stone Soup Full.zip",
+  "license": "CC0 / public domain",
+  "render_overrides": {
+    "magic_gem.svg": {
+      "source": "Original project vector art; shared faceted gem geometry",
+      "relics": ["orange_stone", "blue_stone", "purple_stone", "yellow_stone", "green_stone", "black_stone", "prismatic_stone"],
+      "color": "Element tint from relic_catalog.gd; multicolor for Prismatic Stone"
+    }
+  },
+  "files": {
+    "codex_page": "item/scroll/scroll_old.png",
+    "heart": "misc/brands/top_right/heart_new.png",
+    "bracelet": "item/ring/artefact/urand_mage.png",
+    "armor": "item/armor/torso/orcish_platemail.png",
+    "coin": "item/gold/gold_pile_1.png",
+    "magic_shield": "item/armor/shields/shield_3.png",
+    "magic_sword": "item/weapon/long_sword_7.png",
+    "runestone": "item/misc/misc_rune.png",
+    "lucky_die": "item/amulet/artefact/urand_four_winds_new.png",
+    "bloodstone": "item/amulet/crystal_red.png",
+    "twin_scythes": "item/weapon/double_sword_new.png",
+    "contract": "item/scroll/scroll-red.png",
+    "orange_stone": "item/misc/runes/rune_demonic_3.png",
+    "blue_stone": "item/misc/runes/rune_cocytus_new.png",
+    "purple_stone": "item/misc/runes/rune_demonic_1.png",
+    "yellow_stone": "item/misc/runes/rune_spider.png",
+    "green_stone": "item/misc/runes/rune_demonic_2.png",
+    "black_stone": "item/misc/runes/rune_demonic_6.png",
+    "prismatic_stone": "item/misc/misc_orb.png",
+    "mithril_blade": "item/weapon/long_sword_5.png",
+    "ancient_codex": "item/book/book_of_the_dead_new.png",
+    "cursed_skull": "monster/undead/curse_skull.png",
+    "cursed_die": "item/misc/misc_box.png",
+    "reaper_scythe": "item/weapon/artefact/spwpn_scythe_of_curses_new.png",
+    "cursed_bow": "item/weapon/artefact/urand_storm_bow.png",
+    "cursed_watch": "dungeon/altars/cheibriados.png"
+  }
+}

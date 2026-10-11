@@ -22,6 +22,9 @@ var canvas_size := Vector2(1280, 800)
 var skill_anchor := Vector2(640, 280)
 var skill_max_width: float = 1200
 var combo_font_size: int = 64
+const FLOAT_FONT_SIZE := 24
+const PERFECT_FONT_SIZE := 80
+const PAIR_FONT_SIZE := 52
 var ultimate_center := Vector2(927, 286)
 var ultimate_scale: float = 1.0
 
@@ -37,8 +40,11 @@ func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160) ->
 func ring(at: Vector2, color: Color, radius: float = 90.0) -> void:
 	rings.append({"p": at, "color": color, "life": 0.55, "radius": radius})
 
-func floating(at: Vector2, text: String, color: Color) -> void:
-	floats.append({"p": at, "text": text, "color": color, "life": 1.3})
+static func damage_font_size(damage: int) -> int:
+	return roundi(FLOAT_FONT_SIZE*maxf(1.0,log(maxi(1,damage))/log(10.0)))
+
+func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE) -> void:
+	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size})
 
 func reveal_combo(label: String, at: Vector2, color: Color) -> void:
 	combo = {"label": label, "p": at, "color": color, "age": 0.0}
@@ -181,10 +187,15 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, canvas_size), Color(f.color, f.life / 0.22 * f.amount))
 	for f in floats:
 		var alpha: float = minf(1, f.life * 3)
-		var width := font.get_string_size(f.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
-		var point: Vector2 = (f.p - Vector2(width / 2, 0)).snapped(Vector2.ONE * 2)
-		draw_string(font, point + Vector2(2, 2), f.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.02, 0.04, 0.07, alpha))
-		draw_string(font, point, f.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(f.color, alpha))
+		var translated := GameText.text(f.text)
+		var size: int = f.get("size",FLOAT_FONT_SIZE)
+		var width := font.get_string_size(translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		if width > canvas_size.x-32:
+			size = maxi(1,floori(size*(canvas_size.x-32)/width))
+			width = font.get_string_size(translated,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
+		var point := Vector2(clampf(f.p.x-width/2,16,canvas_size.x-width-16),maxf(font.get_ascent(size)+8,f.p.y)).snapped(Vector2.ONE*2)
+		draw_string(font, point + Vector2(2, 2), translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.02, 0.04, 0.07, alpha))
+		draw_string(font, point, translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(f.color, alpha))
 	_draw_callouts()
 	_draw_dice_power()
 
@@ -239,17 +250,24 @@ func _draw_callouts() -> void:
 	if not perfect.is_empty():
 		var age: float = perfect.age
 		var pop: float = 1.0 if reduced else lerpf(0.65, 1.0, minf(1, age / 0.08))
-		_label("PERFECT", perfect.p - Vector2(0, age * 36), roundi(52 * pop), Color(Color("fff0a6"), minf(1, (0.7 - age) / 0.22)), 4)
+		_label("PERFECT", perfect.p - Vector2(0, age * 36), roundi(PERFECT_FONT_SIZE * pop), Color(Color("fff0a6"), minf(1, (0.7 - age) / 0.22)), 4)
 	if not skill.is_empty():
 		var age: float = skill.age
 		var alpha: float = minf(1, age * 14) * clampf((1.4-age)/0.35,0,1)
 		var center := skill_anchor - Vector2(0, minf(age * 8, 8))
 		var size: int = 52 if reduced else roundi(lerpf(58,52,clampf(age/0.18,0,1)))
-		while size > 24 and font.get_string_size(skill.label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > skill_max_width:
+		while size > 24 and font.get_string_size(GameText.text(skill.label), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > skill_max_width:
 			size -= 2
 		_label(skill.label,center,size,Color(skill.color,alpha),4)
 		if not skill.description.is_empty():
-			_label(skill.description,center+Vector2(0,34),24,Color(0.92,0.89,0.75,alpha),3)
+			var body: Font = GameText.description_font()
+			var body_size: int = 30 if canvas_size.y > canvas_size.x else 24
+			var lines := GameText.lines(skill.description,body,body_size,skill_max_width)
+			for i in range(lines.size()):
+				var width: float = body.get_string_size(lines[i],HORIZONTAL_ALIGNMENT_LEFT,-1,body_size).x
+				var at: Vector2 = center+Vector2(-width/2,42+i*(body_size+8))
+				draw_string_outline(body,at,lines[i],HORIZONTAL_ALIGNMENT_LEFT,-1,body_size,2,Color(0.06,0.08,0.07,alpha))
+				draw_string(body,at,lines[i],HORIZONTAL_ALIGNMENT_LEFT,-1,body_size,Color(0.92,0.89,0.75,alpha))
 	if not combo.is_empty():
 		var age: float = combo.age
 		var pop: float = lerpf(0.45,1.22,1-pow(1-clampf(age/0.12,0,1),3))
@@ -257,7 +275,7 @@ func _draw_callouts() -> void:
 		var rise: float = clampf((age-0.1)/0.95,0,1)
 		var at: Vector2 = combo.p - Vector2(0,rise*84)
 		var alpha: float = clampf((1.05-age)/0.6,0,1)
-		var size: int = roundi(combo_font_size * pop)
+		var size: int = roundi((PAIR_FONT_SIZE if combo.label == "PAIR" else combo_font_size) * pop)
 		if not reduced and age < 0.24:
 			for i in range(8):
 				var direction := Vector2.from_angle(i*TAU/8)
@@ -265,6 +283,7 @@ func _draw_callouts() -> void:
 		_label(combo.label,at+Vector2(0,size*0.34),size,Color(combo.color,alpha),4)
 
 func _label(value: String, baseline: Vector2, size: int, color: Color, outline: int) -> void:
+	value = GameText.text(value)
 	var width: float = font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 	var at: Vector2 = (baseline - Vector2(width/2,0)).snapped(Vector2.ONE*2)
 	for offset in [Vector2(-outline,0),Vector2(outline,0),Vector2(0,-outline),Vector2(0,outline),Vector2(outline,outline+2)]:

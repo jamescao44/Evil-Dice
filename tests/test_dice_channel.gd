@@ -111,7 +111,7 @@ func test_layout(game) -> void:
 		game.model.statuses[3].count = 2
 		game.model.perfect_progress = 9
 		var count: int = 3 if face_count == 2 else 6
-		var damage: int = 40 if face_count == 2 else 33
+		var damage: int = 36 if face_count == 2 else 30
 		var round_number: int = game.model.round_number
 		tap(game,game._skill_center())
 		check(game.view_phase == "skill" and game.skill_bubble.used == 0,"Tapping a rapid skill does not cast it")
@@ -148,7 +148,7 @@ func test_layout(game) -> void:
 	for enemy in game.model.enemies: enemy.hp = 1
 	Driver.cast_pending(game)
 	while game.view_phase == "resolving": await process_frame
-	check(game.view_phase == "feeding" and game.model.living().is_empty() and game.skill_bubble.roll.is_empty(),"Wave clear stops unused hits")
+	check(game.view_phase == "relic_reward" and game.model.living().is_empty() and game.skill_bubble.roll.is_empty(),"Wave clear stops unused hits before offering a relic")
 	prepare(game,[2,2,4])
 	tap(game,game._skill_center())
 	check(game.view_phase == "skill" and game.model.statuses[2].count == 0,"Support tap does not activate the skill")
@@ -235,7 +235,7 @@ func test_layout(game) -> void:
 	var city_hp: int = game.model.city_hp
 	Driver.cast_pending(game)
 	await wait_resolved(game)
-	check(game.model.city_hp == city_hp-108 and game.model.troops == 0,"One city drop automatically deals all three hits and clears three troops")
+	check(game.model.city_hp == city_hp-54 and game.model.troops == 0,"One city drop automatically deals all three hits and clears three troops")
 	check(game.view_phase == "ready" and game._can_claim_chest(),"Whole city combo releases the dice and treasure lock")
 	game._restart()
 	check(game._world_time_scale() == 1 and game.fx.time_factor == 1,"Restart restores normal time")
@@ -264,7 +264,7 @@ func test_layout(game) -> void:
 	city_clock = game.model.volley_clock
 	await create_timer(0.055).timeout
 	check(game._world_time_scale() == 0 and game.model.volley_clock == city_clock,"Cast anticipation freezes city damage clocks")
-	await create_timer(0.14).timeout
+	await create_timer(game.cinematic_pause).timeout
 	check(game._world_time_scale() > 0 and game._world_time_scale() < 0.3 and game._backdrop_dim() > 0.5,"Anticipation releases into ominous slow motion")
 	game.guide = true
 	var frozen_cinematic: float = game.cinematic_remaining
