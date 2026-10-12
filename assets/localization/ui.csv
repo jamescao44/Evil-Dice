@@ -60,19 +60,19 @@ Worldbreaker,Worldbreaker,破界一击
 Sixfold Ruin,Sixfold Ruin,六重毁灭
 Annihilation,Annihilation,湮灭
 1.5x regular attack + 1.5x spare die.,1.5x regular attack + 1.5x spare die.,普通攻击的1.5倍 + 剩余骰子点数的1.5倍。
-Heal 5 at the next spare-die turn starts.,Heal 5 at the next spare-die turn starts.,每回合开始恢复5点生命，持续回合数等于剩余骰子点数。
-+0.5 damage multiplier for the next spare-die turns.,+0.5 damage multiplier for the next spare-die turns.,伤害倍率增加0.5，持续回合数等于剩余骰子点数。
+Heal 5 at the next spare-die turn starts.,Regen 5 for spare turns. Recast pays remaining healing.,每回合恢复5生命，持续剩余点数回合；重施结清剩余治疗。
++0.5 damage multiplier for the next spare-die turns.,+0.5 DMG for spare turns. Recast: 10-base shockwave.,倍率+0.5，持续剩余点数回合；重施释放10基础伤害冲击波。
 Hit all: 2/3 regular attack + 1.5x spare die each.,Hit all: 2/3 regular attack + 1.5x spare die each.,攻击全体：每个目标受到普通攻击的2/3 + 剩余骰子点数的1.5倍伤害。
 "3 automatic random hits, each regular attack + 1.5x spare die.","3 automatic random hits, each regular attack + 1.5x spare die.",自动攻击随机目标3次，每次为普通攻击 + 剩余骰子点数的1.5倍伤害。
-Invincible for spare-die enemy phases / roll intervals.,Invincible for spare-die enemy phases / roll intervals.,获得无敌，持续回合数等于剩余骰子点数；城市战每层持续2秒。
+Invincible for spare-die enemy phases / roll intervals.,Invincible for spare turns; 2s/stack in city. Recast extends.,无敌持续剩余点数回合；城市每层2秒。重施延长时间。
 "Instantly kill your chosen foe, ignoring shield.","Instantly kill your chosen foe, ignoring shield.",无视护盾，立即消灭选中的敌人。
 Restore all missing health. No attack.,Restore all missing health. No attack.,恢复全部生命，不进行攻击。
-+2.0 damage multiplier for the next 3 turns.,+2.0 damage multiplier for the next 3 turns.,伤害倍率增加2.0，持续3回合。
++2.0 damage multiplier for the next 3 turns.,+2.0 DMG for 3 turns. Recast: 50-base shockwave.,倍率+2.0，持续3回合；重施释放50基础伤害冲击波。
 Hit every foe for 2x regular attack power.,Hit every foe for 2x regular attack power.,攻击所有敌人，造成普通攻击的2倍伤害。
 "6 automatic random hits, each regular attack power.","6 automatic random hits, each regular attack power.",自动攻击随机目标6次，每次造成普通攻击伤害。
 Destroy the squad. Heal 12 HP.,Destroy the squad. Heal 12 HP.,消灭整支敌方小队，恢复12点生命。
 Hit the city for 5x regular attack power.,Hit the city for 5x regular attack power.,对城市造成普通攻击的5倍伤害。
-+2.0 damage multiplier for the next 3 rolls.,+2.0 damage multiplier for the next 3 rolls.,伤害倍率增加2.0，持续3次投掷。
++2.0 damage multiplier for the next 3 rolls.,+2.0 DMG for 3 rolls. Recast: 50-base shockwave.,倍率+2.0，持续3次投掷；重施释放50基础伤害冲击波。
 2x city attack; clear all troops.,2x city attack; clear all troops.,对城市造成2倍攻击伤害，消灭所有士兵。
 6 automatic city hits; each clears one troop.,6 automatic city hits; each clears one troop.,自动攻击城市6次，每次消灭一名士兵。
 2000 base damage x DMG multiplier; clear troops; heal 12.,2000 base damage x DMG multiplier; clear troops; heal 12.,2000基础伤害 × 伤害倍率；消灭所有士兵，恢复12点生命。
@@ -189,10 +189,10 @@ Stunned,Stunned,晕眩
 Darkness,Darkness,黑暗
 Corrosion,Corrosion,腐蚀
 Plague,Plague,瘟疫
-Heal 5 at turn start.,Heal 5 at turn start.,回合开始时恢复5点生命。
-Adds +0.5 to DMG. Stacks with other bonuses.,Adds +0.5 to DMG. Stacks with other bonuses.,伤害倍率增加0.5，与其他加成相加。
-Adds +2.0 to DMG. Stacks with other bonuses.,Adds +2.0 to DMG. Stacks with other bonuses.,伤害倍率增加2.0，与其他加成相加。
-Invincible.,Invincible.,无敌。
+Heal 5 at turn start.,"Heal 5 at turn start. Recast heals the unpaid remainder, then refreshes.",回合开始恢复5生命；重施结清尚未触发的治疗，再刷新效果。
+Adds +0.5 to DMG. Stacks with other bonuses.,"+0.5 DMG, additive. Recast: 10-base shockwave, then refresh.",倍率+0.5，与其他加成相加；重施释放10基础伤害冲击波后刷新。
+Adds +2.0 to DMG. Stacks with other bonuses.,"+2.0 DMG, additive. Recast: 50-base shockwave, then refresh.",倍率+2.0，与其他加成相加；重施释放50基础伤害冲击波后刷新。
+Invincible.,Invincible. Recast adds the new duration to the time remaining.,无敌；重施将新持续时间加到剩余时间上。
 Tap the ice 3 times to break free and end your turn.,Tap the ice 3 times to break free and end your turn.,点击冰块3次，破冰后结束本回合。
 5 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.,5 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.,敌方行动后，每层造成5点伤害；每回合减少1层，最多10层。
 The next throw's power marker moves unpredictably.,The next throw's power marker moves unpredictably.,下次投掷的力量指示条将随机移动。
@@ -473,3 +473,37 @@ Permanent,Permanent,永久
 %d stacks,%d stacks,%d层
 %d turn,%d turn,%d回合
 %d turns,%d turns,%d回合
+BUFFS & STATUS EFFECTS,BUFFS & STATUS EFFECTS,增益与异常状态
+No active buffs or status effects.,No active buffs or status effects.,当前无增益或异常状态。
+Shield,Shield,护盾
+Attack boost,Attack boost,攻击强化
+%d shield,%d shield,%d点护盾
+Recast extends duration.,Recast extends duration.,重施延长持续时间。
+Recast pays remaining healing.,Recast pays remaining healing.,重施结清剩余治疗。
+Recast: %d-base shockwave.,Recast: %d-base shockwave.,重施释放%d基础伤害冲击波。
+Next x1.5,Next x1.5,下次攻击×1.5
+IMMOBILIZED,IMMOBILIZED,无法行动
+IMMOBILIZED +%d,IMMOBILIZED +%d,无法行动 +%d
+Immobilized,Immobilized,无法行动
+Shield broken. Cannot act for one turn.,Shield broken. Cannot act for one turn.,护盾破碎，无法行动一回合。
+Recast: heal remainder.,Recast: heal remainder.,重施：结清剩余治疗。
+SKILLS,SKILLS,技能
+STATUSES,STATUSES,状态
+Player: tap the ice 3 times to end the turn. Enemies: skip one turn.,Player: tap the ice 3 times to end the turn. Enemies: skip one turn.,玩家：点击冰块3次破冰并结束回合。敌人：跳过一回合。
+5 damage per stack each turn. Lose 1 stack per turn; maximum 10 stacks.,5 damage per stack each turn. Lose 1 stack per turn; maximum 10 stacks.,每层每回合造成5点伤害；每回合减少1层，最多10层。
+Player only. The next throw's Perfect marker moves unpredictably.,Player only. The next throw's Perfect marker moves unpredictably.,仅玩家：下次投掷的完美指示条随机移动。
+Attack damage x0.5; cannot heal. Lose 1 stack per turn.,Attack damage x0.5; cannot heal. Lose 1 stack per turn.,攻击伤害减半，无法恢复生命；每回合减少1层。
+"No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.","No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",护盾、无敌与护甲失效，受到伤害×1.5；每回合减少1层。
+Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random ally each turn.,Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random ally each turn.,仅敌人：每层降低10生命上限，最低为1；每回合增加1层，并向随机一名队友传播1层。
+"Enemy shield broken: skip the next action, then recover.","Enemy shield broken: skip the next action, then recover.",敌人护盾破碎：跳过下次行动，随后恢复。
+Fortune Cookie,Fortune Cookie,幸运饼干
+"Receive a random tarot immediately, then another every 3 completed turns.","Receive a random tarot immediately, then another every 3 completed turns.",立即获得一张随机塔罗牌，此后每完成3回合再获得一张。
+Crystal Ball,Crystal Ball,水晶球
+Receive a random tarot after every completed turn.,Receive a random tarot after every completed turn.,每完成一个完整回合，获得一张随机塔罗牌。
+Turns: %d / 3.,Turns: %d / 3.,回合：%d / 3。
+TAROT +1,TAROT +1,塔罗牌 +1
+Ancient Prophecy,Ancient Prophecy,远古预言
+Each tarot activates twice. Make new choices when needed; normal stacking and overwrite rules apply.,Each tarot activates twice. Make new choices when needed; normal stacking and overwrite rules apply.,每张塔罗牌发动两次；需要时重新选择，仍遵循原有叠加和覆盖规则。
+Finish the tarot effect first.,Finish the tarot effect first.,请先完成当前塔罗牌效果。
+Ancient Prophecy: choose another enemy.,Ancient Prophecy: choose another enemy.,远古预言：再选择一名敌人。
+Skip repeat,Skip repeat,跳过再次发动

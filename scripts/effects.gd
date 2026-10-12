@@ -37,8 +37,8 @@ func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160) ->
 		var velocity := Vector2.from_angle(angle) * cosmetic.randf_range(strength * 0.25, strength)
 		particles.append({"p": at, "v": velocity, "color": color, "life": cosmetic.randf_range(0.4, 0.9), "max": 1.0, "size": cosmetic.randi_range(3, 7)})
 
-func ring(at: Vector2, color: Color, radius: float = 90.0) -> void:
-	rings.append({"p": at, "color": color, "life": 0.55, "radius": radius})
+func ring(at: Vector2, color: Color, radius: float = 90.0, clip: Rect2 = Rect2()) -> void:
+	rings.append({"p": at, "color": color, "life": 0.55, "radius": radius, "clip":clip})
 
 static func damage_font_size(damage: int) -> int:
 	return roundi(FLOAT_FONT_SIZE*maxf(1.0,log(maxi(1,damage))/log(10.0)))
@@ -180,7 +180,7 @@ func _draw() -> void:
 			Pixel.line(self, start, end, Color("fff1c5"), 4)
 	for r in rings:
 		var progress: float = 1 - r.life / 0.55
-		Pixel.circle(self, r.p, 10 + progress * r.radius, Color(r.color, (1 - progress) * 0.8), 3)
+		Pixel.circle(self, r.p, 10 + progress * r.radius, Color(r.color, (1 - progress) * 0.8), 3, r.clip)
 	for p in particles:
 		draw_rect(Rect2(p.p.snapped(Vector2(2, 2)), Vector2.ONE * p.size), Color(p.color, minf(1, p.life * 2)))
 	for f in flashes:

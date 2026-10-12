@@ -68,7 +68,12 @@ func card_size() -> Vector2:
 	return Vector2(204,316) if portrait() else Vector2(154,238)
 
 func row_point(index: int) -> Vector2:
-	return Vector2(canvas_size.x/2+(index-1)*(242 if portrait() else 266),670 if portrait() else 298)
+	var bob: float = 0.0
+	if not reduced and index >= 0 and index < draws.size():
+		var settle: float = smoothstep(0.45,0.85,draws[index].age)
+		if state == "collect": settle *= 1.0-smoothstep(0,0.12,age)
+		bob = sin(sky_age*2.2-index*0.8)*(8 if portrait() else 5)*settle
+	return Vector2(canvas_size.x/2+(index-1)*(242 if portrait() else 266),670 if portrait() else 298)+Vector2(0,bob)
 
 func row_rect(index: int) -> Rect2:
 	return Rect2(row_point(index)-card_size()/2,card_size())

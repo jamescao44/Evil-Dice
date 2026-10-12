@@ -5,7 +5,15 @@
   "render_overrides": {
     "magic_gem.svg": {
       "source": "Original project vector art; shared faceted gem geometry",
-      "relics": ["orange_stone", "blue_stone", "purple_stone", "yellow_stone", "green_stone", "black_stone", "prismatic_stone"],
+      "relics": [
+        "orange_stone",
+        "blue_stone",
+        "purple_stone",
+        "yellow_stone",
+        "green_stone",
+        "black_stone",
+        "prismatic_stone"
+      ],
       "color": "Element tint from relic_catalog.gd; multicolor for Prismatic Stone"
     }
   },
@@ -35,6 +43,9 @@
     "cursed_die": "item/misc/misc_box.png",
     "reaper_scythe": "item/weapon/artefact/spwpn_scythe_of_curses_new.png",
     "cursed_bow": "item/weapon/artefact/urand_storm_bow.png",
-    "cursed_watch": "dungeon/altars/cheibriados.png"
+    "cursed_watch": "dungeon/altars/cheibriados.png",
+    "fortune_cookie": "item/food/bread_ration_old.png",
+    "crystal_ball": "item/misc/misc_crystal_new.png",
+    "ancient_prophecy": "item/book/gold.png"
   }
 }

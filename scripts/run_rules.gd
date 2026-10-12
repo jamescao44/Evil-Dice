@@ -40,6 +40,13 @@ var relic_choices: Array = []
 var relic_offer_resolved: bool = true
 var relic_reward_stage: int = -1
 
+func grant_random_tarots(count: int) -> Array:
+	var pool: Array = Tarot.ITEMS.keys().filter(func(id): return id not in tarot_effects.banned)
+	var granted: Array = []
+	if pool.is_empty(): return granted
+	for i in range(count): granted.append(tarots.add(pool[reward_rng.randi_range(0,pool.size()-1)]))
+	return granted
+
 func _init(seed_value: int = -1) -> void:
 	super(seed_value)
 	if seed_value < 0: reward_rng.randomize()
@@ -353,9 +360,17 @@ func _finish_player_action(result: MultiHitSkill) -> void:
 			phase = "finished"
 
 func _apply_support(result: MultiHitSkill) -> Array:
+	var protected_before: bool = status_count(Status.IMMUNITY) > 0
 	var events: Array = super._apply_support(result)
-	if is_city() and result.kind == Kind.PAIR and result.face == 6:
+	if is_city() and result.kind == Kind.PAIR and result.face == 6 and not protected_before:
 		city_immunity_clock = 0.0
+	return events
+
+func _boon_shockwave(result: MultiHitSkill, base_damage: float) -> Array:
+	var events: Array = super._boon_shockwave(result,base_damage)
+	if is_city() and troops > 0:
+		events.append(event(-2,troops,"sweep","TROOPS CRUSHED"))
+		troops = 0
 	return events
 
 func _end_buff_turn() -> void:

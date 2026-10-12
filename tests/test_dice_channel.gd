@@ -121,7 +121,7 @@ func test_layout(game) -> void:
 		for i in range(count): expected[probe.randi_range(0,2)] -= damage
 		Driver.cast_pending(game)
 		check(game.view_phase == "resolving" and game.skill_bubble.used == 1,"One field drop starts the whole combo with its first orb")
-		check(game._world_time_scale() == 0 and game._backdrop_dim() > 0.4,"Combo begins with a casting pause")
+		check(game.damage_feedback.building and game._world_time_scale() == 1,"Damage buildup leaves the battle running before the impact beat")
 		var rng: int = game.model.rng.state
 		for repeat in range(4): tap(game,game._skill_center())
 		tap(game,game._diamond_center(8))

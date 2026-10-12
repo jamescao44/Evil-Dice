@@ -32,16 +32,24 @@ func timing_checks() -> void:
 	for crossing in [Meter.PERIOD / 4.0, Meter.PERIOD * 3.0 / 4.0]:
 		for sign_value in [-1, 1]:
 			meter.elapsed = crossing + sign_value * 0.030
-			check(meter.sample().perfect and meter.sample().position == 0.5, "Both +/-30 ms boundaries qualify on both passes")
+			check(meter.sample().perfect and is_equal_approx(meter.sample().position,meter.position_ratio()), "Both +/-30 ms boundaries qualify without snapping the marker")
 			check(is_equal_approx(absf(meter.position_ratio() - 0.5) * Meter.WIDTH, Meter.perfect_tolerance_pixels()), "Visible Perfect zone matches the time boundary")
 			meter.elapsed = crossing + sign_value * 0.030001
 			check(not meter.sample().perfect, "A stop just outside +/-30 ms misses")
 			meter.elapsed = crossing + sign_value * 0.025
 			check(meter.sample().perfect, "25 ms offset qualifies within the widened window")
+	# Every sample moves through the whole window, in both directions.
+	for crossing in [Meter.PERIOD/4.0,Meter.PERIOD*3.0/4.0]:
+		var previous: float = Meter.normal_position_at(crossing-0.031)
+		for millisecond in range(-30,31):
+			meter.elapsed = crossing+millisecond/1000.0
+			var position: float = meter.sample().position
+			check(position > previous if crossing < Meter.PERIOD/2 else position < previous,"Perfect-zone animation never sticks at center")
+			previous = position
 	# Stun retains the visible zone despite its random crossing schedule.
 	for sign_value in [-1, 1]:
 		var edge: Dictionary = Meter.sample_at(0.5 + sign_value * Meter.perfect_tolerance_pixels() / Meter.WIDTH)
-		check(edge.perfect and edge.position == 0.5, "Stunned meter accepts the visible zone boundary")
+		check(edge.perfect and not is_equal_approx(edge.position,0.5), "Stunned meter accepts the visible zone boundary without snapping")
 		check(not Meter.sample_at(0.5 + sign_value * (Meter.perfect_tolerance_pixels() + 0.001) / Meter.WIDTH).perfect, "Stunned meter rejects positions beyond the visible zone")
 	check(Meter.sample_at(0.5).power == 1 and Meter.sample_at(0.0).power == 0, "Power spans zero to one")
 	check(is_equal_approx(Meter.sample_at(0.1).power, Meter.sample_at(0.9).power), "Power is symmetric")
@@ -150,7 +158,7 @@ func scene_checks(portrait: bool) -> void:
 	game.charge_stamp = Time.get_ticks_usec()
 	game._handle_click(game.DICE_CENTER)
 	check(game.throw_perfect and game.throw_power == 1 and not game.fx.perfect.is_empty(), "Perfect locks power, throws, and displays feedback")
-	check(game.throw_meter.sample().position == 0.5 and game._power_flash_strength() == 1, "Perfect centers the wider indicator and flashes the meter")
+	check(is_equal_approx(game.throw_meter.sample().position,game.throw_meter.position_ratio()) and game._power_flash_strength() == 1, "Perfect feedback preserves the underlying timing sample and flashes the meter")
 	check(game.result.kind != Rules.Kind.NORMAL, "Perfect throws a combination")
 	var pending: MultiHitSkill = game.model.pending.duplicate(true)
 	game._handle_click(game.DICE_CENTER)

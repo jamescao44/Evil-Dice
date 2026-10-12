@@ -9,7 +9,13 @@ static func star(node: CanvasItem, at: Vector2, radius: float, color: Color) -> 
 	node.draw_colored_polygon(points,color)
 
 static func icon(node: CanvasItem, at: Vector2, radius: float, type: String, color: Color) -> void:
-	if type == "dark":
+	if type == "broken_shield":
+		intent_icon(node,at,radius,"shield",color)
+		Pixel.line(node,at+Vector2(radius*0.2,-radius*0.8),at+Vector2(-radius*0.25,0),Color("332b25"),3)
+		Pixel.line(node,at+Vector2(-radius*0.25,0),at+Vector2(radius*0.35,radius*0.55),Color("332b25"),3)
+	elif type in ["shield","attack"]:
+		intent_icon(node,at,radius,"sword" if type == "attack" else "shield",color)
+	elif type == "dark":
 		Pixel.circle(node,at,radius,color,2)
 		Pixel.disc(node,at,radius*0.4,color,2)
 		Pixel.line(node,at-Vector2.ONE*radius*0.7,at+Vector2.ONE*radius*0.7,Color("33233e"),3)

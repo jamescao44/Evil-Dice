@@ -81,7 +81,7 @@ func _initialize() -> void:
 	game.statuses[6].count = 1
 	game.set_test_roll([6,6,4])
 	game.apply_player()
-	check(game.statuses[6].count == 4, "Invincibility refreshes duration rather than stacking")
+	check(game.statuses[6].count == 5, "Invincibility adds the new duration to the remaining protection")
 	var city = Run.new(42)
 	city.stage = 9
 	city.power = 6.75

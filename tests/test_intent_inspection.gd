@@ -38,8 +38,8 @@ func timer_checks() -> void:
 	m.begin_round()
 	m.set_test_roll([6,6,1])
 	m.apply_player()
-	check(m.city_immunity_seconds() == 2,"Reapplying refreshes the new duration without retaining a partial old stack")
-	m.tick_city(0,2)
+	check(m.city_immunity_seconds() == 4.5,"Reapplying extends the remaining duration, including its partial old stack")
+	m.tick_city(0,4.5)
 	check(m._city_hit(7)[0].amount == 7,"City damage resumes after expiry")
 	m.reset_run()
 	check(m.city_immunity_clock == 0 and m.status_count(6) == 0,"Restart clears the timed state")
@@ -73,6 +73,16 @@ func layout_checks(g) -> void:
 		var data: Dictionary = g._enemy_intent_data(0)
 		var expected: String = "sword" if type == "attack" else "plus" if type in ["heal","team_heal"] else "shield" if type == "shield" else "boost"
 		check(data.icon == expected and not data.description.is_empty(),"Every intent uses the appropriate symbol and a short inspection description")
+	g.model.enemies[0].shield = 5
+	g.model.enemies[0].attack_boost = true
+	g.model.hit_enemy(0,5)
+	var broken: Dictionary = g._enemy_intent_data(0)
+	check(broken.icon == "skip" and broken.name == "Immobilized","Shield break replaces the next-move icon with immobilization")
+	var inspection = g.get_children().filter(func(node): return node.get_script() == preload("res://scripts/enemy_inspection.gd"))[0]
+	var rows: Array = inspection.status_rows(0)
+	check(rows.any(func(item): return item.id is String and item.id == "enemy_empower") and rows.any(func(item): return item.id is int and item.id == StatusEffect.IMMOBILIZED),"Enemy buffs and shield-break status appear together in hold inspection")
+	g.model.enemies[0].statuses.clear()
+	g.model.enemies[0].attack_boost = false
 	var point: Vector2 = g._enemy_point(0)
 	var rng: int = g.model.rng.state
 	g._handle_click(point)

@@ -3,8 +3,8 @@ extends "res://scripts/battle.gd"
 ## 804x1748 = twice the iPhone 16 Pro's 402x874 logical display size.
 const PORTRAIT_SIZE := Vector2i(804, 1748)
 const CITY_TRANSFORM := Transform2D(Vector2(0.9, 0), Vector2(0, 0.9), Vector2(-390, 336))
-const GUIDE_PAIRS := Rect2(40, 432, 350, 88)
-const GUIDE_TRIPLES := Rect2(414, 432, 350, 88)
+const GUIDE_PAIRS := Rect2(40, 432, 226, 88)
+const GUIDE_TRIPLES := Rect2(289, 432, 226, 88)
 var guide_page: int = 0
 var selected_status: int = -1
 var status_until: float = 0
@@ -37,6 +37,7 @@ func _configure_layout() -> void:
 	GUIDE_RECT = Rect2(88, 740, 628, 112)
 	LANGUAGE_RECT = Rect2(88, 944, 628, 112)
 	GUIDE_CLOSE = Rect2(660, 132, 104, 88)
+	GUIDE_STATUSES = Rect2(538,432,226,88)
 	DEBUG_CLOSE = GUIDE_CLOSE
 	DEBUG_TAROTS = Rect2(40,1350,724,88)
 	DEBUG_REPEAT = Rect2(40, 1470, 350, 88)
@@ -60,8 +61,9 @@ func _configure_effects() -> void:
 
 func _handle_click(point: Vector2) -> void:
 	if guide:
-		if GUIDE_PAIRS.has_point(point): guide_page = 0
-		elif GUIDE_TRIPLES.has_point(point): guide_page = 1
+		if GUIDE_PAIRS.has_point(point): guide_page = 0; guide_status_page = false
+		elif GUIDE_TRIPLES.has_point(point): guide_page = 1; guide_status_page = false
+		elif GUIDE_STATUSES.has_point(point): guide_status_page = true; return
 		super._handle_click(point)
 		return
 	if view_phase in ["reward", "relic_reward", "skill", "targeting"]:
@@ -199,7 +201,7 @@ func _draw_city() -> void:
 func _draw_player() -> void:
 	var hurt: float = hit_times[0]
 	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
-	var dx: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * 45) * hurt * 5, 2)
+	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	var feet := _player_feet()
 	_shadow(feet, monster_side * 0.48, 0.27)
 	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
@@ -278,7 +280,11 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	_wrapped(Vector2(40, 390), rule, 718, MUTED, 24, canvas)
 	_button(GUIDE_PAIRS, "PAIRS", true, canvas)
 	_button(GUIDE_TRIPLES, "TRIPLES", true, canvas)
-	canvas.draw_rect((GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3), TEAL if guide_page == 0 else PURPLE, false, 3)
+	_button(GUIDE_STATUSES, "STATUSES", true, canvas)
+	canvas.draw_rect((GUIDE_STATUSES if guide_status_page else GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3), GOLD if guide_status_page else TEAL if guide_page == 0 else PURPLE, false, 3)
+	if guide_status_page:
+		_draw_status_help(canvas)
+		return
 	for i in range(6):
 		var y: float = 584 + i * 145
 		var code: String = str(i + 1).repeat(2 if guide_page == 0 else 3)

@@ -14,6 +14,7 @@ var values: Array = [1,1,1]
 var prepared: Dictionary = {}
 var notice: String = ""
 var notice_time: float = 0
+var resume_phase: String = "ready"
 
 func _ready() -> void:
 	z_index = 130
@@ -29,10 +30,12 @@ func reset() -> void:
 	prepared.clear()
 	notice = ""
 	notice_time = 0
+	resume_phase = "ready"
 
 func request(card: int, point: Vector2, from: Vector2) -> void:
 	if active() or not battle.tarot_ui.available(): return
 	instance_id = card
+	resume_phase = battle.view_phase
 	drop_point = point
 	origin = from
 	var target: int = battle._enemy_inspect_at(point)
@@ -77,9 +80,15 @@ func click(point: Vector2) -> bool:
 	if cancel_rect().has_point(point):
 		choice_type = ""
 		battle.tarot_ui.swallow_release = true
+		if instance_id < 0:
+			battle.model.tarot_effects.dismiss_repeat()
+			_finish_cast()
 		queue_redraw()
 		return true
 	match choice_type:
+		"repeat_target":
+			var target: int = battle._enemy_inspect_at(point)
+			if battle.model.is_enemy_alive(target): _cast({"target":target})
 		"magician":
 			for i in range(18):
 				if cell_rect(i,6,4).has_point(point): values[i/6] = i%6+1
@@ -113,7 +122,6 @@ func _cast(selection: Dictionary) -> void:
 	choice_type = ""
 	busy = true
 	var token: int = battle.run_id
-	var previous_phase: String = battle.view_phase
 	battle.view_phase = "resolving"
 	battle.tarot_ui.play_cast(result.id,drop_point)
 	battle.fx.z_index = 121
@@ -137,11 +145,43 @@ func _cast(selection: Dictionary) -> void:
 	if not finished:
 		if battle.run_id == token:
 			battle.model.tarot_effects.pending_steps.clear()
+			battle.model.tarot_effects.dismiss_repeat()
 			busy = false
 			battle.fx.z_index = 0
 		return
+	while battle.relic_ui.pickup.active:
+		await get_tree().process_frame
+		if not battle._valid_turn(token): return
 	battle.fx.z_index = 0
 	busy = false
+	if _continue_repeat(): return
+	_finish_cast()
+
+func _continue_repeat() -> bool:
+	var rules = battle.model.tarot_effects
+	if rules.pending_repeat.is_empty(): return false
+	if not battle.model.outcome().is_empty():
+		rules.dismiss_repeat()
+		return false
+	instance_id = rules.pending_repeat.instance_id
+	if rules.pending_repeat.id == "death":
+		choice_type = "repeat_target"
+	else:
+		prepared = rules.prepare(battle.model,instance_id)
+		if prepared.has("error"):
+			rules.dismiss_repeat() # No eligible target/relic remains for the repeat.
+			return false
+		choice_type = prepared.get("choice","")
+		if choice_type.is_empty():
+			_cast({})
+			return true
+	values = [1,1,1]
+	battle.tarot_ui.cast_visual.clear()
+	queue_redraw()
+	return true
+
+func _finish_cast() -> void:
+	var token: int = battle.run_id
 	if battle._check_over(): return
 	if battle.model.phase in ["enemy","turn_end","round_end"]:
 		battle.tarot_ui.close_inventory()
@@ -156,14 +196,15 @@ func _cast(selection: Dictionary) -> void:
 		battle.view_phase = "frozen"
 		battle.status_title = "FROZEN"
 		return
-	battle.view_phase = previous_phase
+	battle.view_phase = resume_phase
 	# Free actions preserve the rolled skill and update its preview immediately.
 	if not battle.model.pending.is_empty():
 		battle.result = battle.model.pending.duplicate()
 		battle.skill_bubble.roll = battle.result.duplicate()
-	if not battle.model.tarot_effects.bonus_chests.is_empty():
+	while not battle.model.tarot_effects.bonus_chests.is_empty() and battle.view_phase in ["ready","skill"]:
 		battle.tarot_ui.close_inventory()
 		await battle._reward_sequence(0,false,true)
+		if not battle._valid_turn(token): return
 
 func _resolve_steps(token: int) -> bool:
 	# Presentation time keeps each application legible during fever / fast-forward.
@@ -191,7 +232,9 @@ func _resolve_steps(token: int) -> bool:
 	return battle._valid_turn(token)
 
 func _process(delta: float) -> void:
-	if not battle.model.outcome().is_empty() and not choice_type.is_empty(): choice_type = ""
+	if not battle.model.outcome().is_empty() and not choice_type.is_empty():
+		choice_type = ""
+		battle.model.tarot_effects.dismiss_repeat()
 	notice_time = maxf(0,notice_time-delta)
 	queue_redraw()
 
@@ -200,12 +243,23 @@ func _label(rect: Rect2, title: String, selected: bool = false, size: int = 22) 
 	Paint.wrap(self,battle.description_font,rect.grow(-8),title,size,Paint.GOLD,true)
 
 func _draw() -> void:
+	if choice_type == "repeat_target":
+		var prompt := Rect2(62,1040,680,110) if portrait() else Rect2(340,560,600,80)
+		Paint.panel(self,prompt,Color("211f29"),Paint.GOLD)
+		Paint.wrap(self,battle.description_font,prompt.grow(-12),"Ancient Prophecy: choose another enemy.",26 if portrait() else 20,Paint.GOLD,true)
+		for target in battle.model.living():
+			var at: Vector2 = battle._enemy_impact_point(target)
+			draw_arc(at,48 if portrait() else 32,0,TAU,32,Paint.GOLD,3)
+		_label(cancel_rect(),"Skip repeat")
+		return
 	if not choice_type.is_empty():
 		draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.025,0.04,0.68))
 		var panel: Rect2 = panel_rect()
 		Paint.panel(self,panel,Color("211f29"),Color("807889"))
 		var title: String = {"magician":"Choose the next three dice","lovers":"Choose odd or even","hanged_man":"Exclude one tarot from future draws","replace":"Choose a relic to replace"}.get(choice_type,"")
-		Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(24,20),Vector2(panel.size.x-48,100)),title,30 if portrait() else 25,Paint.GOLD,true)
+		if instance_id < 0: title = GameText.text("Ancient Prophecy")+"\n"+GameText.text(title)
+		var title_size: int = (25 if portrait() else 20) if instance_id < 0 else (30 if portrait() else 25)
+		Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(24,20),Vector2(panel.size.x-48,100)),title,title_size,Paint.GOLD,true)
 		match choice_type:
 			"magician":
 				for i in range(18): _label(cell_rect(i,6,4),str(i%6+1),values[i/6] == i%6+1,34 if portrait() else 28)
@@ -221,7 +275,7 @@ func _draw() -> void:
 				Paint.text(self,battle.description_font,panel.position+Vector2(panel.size.x/2,124 if portrait() else 91),Relics.ITEMS[prepared.relic].name,24 if portrait() else 20,Relics.color(prepared.relic))
 				Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(28,150 if portrait() else 112),Vector2(panel.size.x-56,122 if portrait() else 66)),Relics.ITEMS[prepared.relic].text,24 if portrait() else 18,Color("eee0d6"),true)
 				for i in range(battle.model.relics.items.size()): _label(cell_rect(i,2,5),Relics.ITEMS[battle.model.relics.items[i].id].name,false,24 if portrait() else 18)
-		_label(cancel_rect(),"Cancel")
+		_label(cancel_rect(),"Skip repeat" if instance_id < 0 else "Cancel")
 	if notice_time > 0:
 		var rect := Rect2(62,1000,680,140) if portrait() else Rect2(340,348,600,100)
 		Paint.panel(self,rect,Color("25242d",0.96),Color("8c818e"))

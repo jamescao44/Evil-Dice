@@ -38,11 +38,12 @@ func distribution_checks() -> void:
 			var members: int = eligible.filter(func(other): return Relics.ITEMS[other].rarity == tier).size()
 			frequency(item_counts.get(id,0),SAMPLES,Relics.RARITY_WEIGHTS[tier]/100/members,"Uniform selection within rarity: " + id)
 	var inventory = Inventory.new()
-	inventory.add("mithril_blade")
+	for id in all:
+		if Relics.ITEMS[id].rarity == Relics.Rarity.LEGENDARY: inventory.add(id)
 	var exhausted := [0,0,0,0,0]
 	for n in range(SAMPLES): exhausted[Relics.ITEMS[inventory.draw_one(rng)].rarity] += 1
-	check(exhausted[3] == 0,"Owned sole legendary is excluded")
-	for tier in [0,1,2,4]: frequency(exhausted[tier],SAMPLES,Relics.RARITY_WEIGHTS[tier]/95,"Empty rarity redistributes proportionally")
+	check(exhausted[3] == 0,"All owned legendary relics are excluded")
+	for tier in [0,1,2,4]: frequency(exhausted[tier],SAMPLES,Relics.RARITY_WEIGHTS[tier]/(100-Relics.RARITY_WEIGHTS[3]),"Empty rarity redistributes proportionally")
 	check(inventory.draw_one(rng,all).is_empty(),"Fully excluded pools return no relic")
 	check(Drops.draw(rng,["ancient_codex","prismatic_stone"]).is_empty(),"Fusion-only entries cannot enter reward rolls")
 

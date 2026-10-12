@@ -302,8 +302,12 @@ func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, col
 	while title_size > 16 and battle.pixel_font.get_string_size(title,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x > width: title_size -= 2
 	var baseline: Vector2 = at+Vector2(0,radius+(64 if portrait else 48))
 	var lines := GameText.lines(description,battle.description_font,body_size,width)
+	var bonus: String = battle._skill_reapply_bonus(roll)
+	var bonus_size: int = 30 if portrait else 20
+	var bonus_lines := GameText.lines(bonus,battle.description_font,bonus_size,width if portrait else 340)
 	var caption_width: float = battle.pixel_font.get_string_size(title,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size).x
 	for line in lines: caption_width = maxf(caption_width,battle.description_font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,body_size).x)
+	for line in bonus_lines: caption_width = maxf(caption_width,battle.description_font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,bonus_size).x)
 	baseline.x = clampf(baseline.x,caption_width/2+16,battle.fx.canvas_size.x-caption_width/2-16)
 	_center(baseline,title,title_size,color,true)
 	var next: float = 40 if portrait else 32
@@ -311,6 +315,10 @@ func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, col
 		for line in lines:
 			_center(baseline+Vector2(0,next),line,body_size,Color("eee0b9"),true,battle.description_font)
 			next += body_size+6
+	if not bonus.is_empty():
+		for line in bonus_lines:
+			_center(baseline+Vector2(0,next),line,bonus_size,battle.GOLD,true,battle.description_font)
+			next += bonus_size+6
 	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended(): return
 	var hint: String = "CHOOSE A FOE" if aiming and battle._skill_needs_target(roll) else "TAP / DRAG TO AIM" if battle._skill_needs_target(roll) else "DRAG TO FIELD"
 	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font)

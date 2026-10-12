@@ -21,6 +21,8 @@ var tarot_cast: Node2D
 var dice_group: Node2D
 const DamageFeedback = preload("res://scripts/damage_feedback.gd")
 var damage_feedback: Node2D
+const CombatMotion = preload("res://scripts/combat_motion.gd")
+var combat_motion = CombatMotion.new()
 var status_layout_key: String = ""
 var status_layout_points: Array = []
 const Die = preload("res://scripts/die.gd")
@@ -63,6 +65,8 @@ var DEBUG_RECT := Rect2(400, 218, 480, 60)
 var LANGUAGE_RECT := Rect2(400, 480, 480, 50)
 var REPLAY_RECT := Rect2(531, 433, 218, 53)
 var GUIDE_CLOSE := Rect2(1132, 96, 40, 36)
+var GUIDE_STATUSES := Rect2(742,96,220,36)
+var guide_status_page: bool = false
 var DEBUG_CLOSE := Rect2(1120, 121, 42, 36)
 var DEBUG_REPEAT := Rect2(888, 176, 252, 40)
 var DEBUG_PERFECT := Rect2(888, 228, 252, 40)
@@ -265,6 +269,7 @@ func _process(delta: float) -> void:
 		cinematic_remaining = maxf(0, cinematic_remaining - delta)
 		auto_claim_remaining = maxf(0, auto_claim_remaining - delta)
 	var world_delta: float = delta * _world_time_scale()
+	if not _menus_open() and inspecting_enemy < 0: combat_motion.advance(delta)
 	clock_time += world_delta
 	_update_charge()
 	shake = maxf(0, shake - delta * 24)
@@ -314,7 +319,7 @@ func _process(delta: float) -> void:
 	ring_hover = move_toward(ring_hover, 1.0 if in_ring else 0.0, delta * 7)
 	var interactive := in_ring or MENU_RECT.has_point(mouse) or AUDIO_RECT.has_point(mouse) or SPEED_RECT.has_point(mouse)
 	if guide:
-		interactive = GUIDE_CLOSE.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
+		interactive = GUIDE_CLOSE.has_point(mouse) or GUIDE_STATUSES.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
 	elif debug_open:
 		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse) or DEBUG_WAVE_LOAD.has_point(mouse) or DEBUG_TAROTS.has_point(mouse)
 		for i in range(-1, 13):
@@ -468,6 +473,7 @@ func _handle_click(mouse: Vector2) -> void:
 		home_requested.emit()
 		return
 	if guide:
+		if GUIDE_STATUSES.has_point(mouse): guide_status_page = not guide_status_page
 		if GUIDE_CLOSE.has_point(mouse):
 			guide = false
 			menu_open = true
@@ -779,7 +785,7 @@ func _begin_cast_cinematic(kind: int) -> void:
 func _world_time_scale() -> float:
 	if is_instance_valid(tarot_ui) and tarot_ui.ceremony.active(): return 0.0
 	if inspecting_enemy >= 0: return 0.0
-	if is_instance_valid(damage_feedback) and damage_feedback.building: return 0.0
+	if is_instance_valid(damage_feedback) and damage_feedback.building: return 1.0
 	if cinematic_remaining <= 0: return 1.0
 	if cinematic_duration-cinematic_remaining < cinematic_pause: return 0.0
 	return lerpf(cinematic_speed, 1.0, 1.0-clampf(cinematic_remaining/cinematic_recovery,0,1))
@@ -863,7 +869,9 @@ func _draw_power_meter(rect: Rect2, text_size: int = 16) -> void:
 	var center: float = rect.get_center().x
 	draw_rect(Rect2(center - ThrowMeter.perfect_tolerance_pixels() * unit, rect.position.y, 2 * ThrowMeter.perfect_tolerance_pixels() * unit, rect.size.y), CREAM)
 	if flash > 0: draw_rect(rect, Color(1, 1, 1, flash))
-	var marker: float = rect.position.x + stopped.position * rect.size.x
+	# Center the successful stop feedback, while charging stays continuous.
+	var marker_ratio: float = 0.5 if view_phase == "rolling" and throw_perfect else stopped.position
+	var marker: float = rect.position.x + marker_ratio * rect.size.x
 	draw_rect(Rect2(marker - unit * 5, rect.position.y - 6, unit * 10, rect.size.y + 12), INK)
 	draw_rect(Rect2(marker - unit * 3, rect.position.y - 4, unit * 6, rect.size.y + 8), GOLD.lerp(Color.WHITE, flash))
 	_center(Vector2(center, rect.position.y - 12), GameText.format("POWER %d%%", roundi(stopped.power * 100)), text_size, GOLD)
@@ -1069,6 +1077,15 @@ func _skill_caption(roll: MultiHitSkill) -> Dictionary:
 		elif roll.face == 3: description = GameText.format("DMG +%.1f for %d turns",[(0.5 if roll.kind == Rules.Kind.PAIR else 2.0)*factor,roll.spare if roll.kind == Rules.Kind.PAIR else 3])
 	return {"name": label, "description": description}
 
+func _skill_reapply_bonus(roll: MultiHitSkill) -> String:
+	var id: int = roll.face if roll.kind == Rules.Kind.PAIR else Status.ASCENSION if roll.kind == Rules.Kind.SPECIAL and roll.face == 3 else -1
+	if model.status_count(id) <= 0: return ""
+	match id:
+		Status.REGEN: return GameText.text("Recast: heal remainder.")
+		Status.MIGHT, Status.ASCENSION: return GameText.format("Recast: %d-base shockwave.",10 if id == Status.MIGHT else 50)
+		Status.IMMUNITY: return GameText.text("Recast extends duration.")
+	return ""
+
 func _die_landed(index: int) -> void:
 	_sound("drop_001", 0.95 + index * 0.13 - throw_power * 0.25, -17 + throw_power * 7)
 	fx.burst(dice[index].position + Vector2(0, 35), GOLD, roundi(12 + throw_power * 18), 90 + throw_power * 70)
@@ -1083,7 +1100,6 @@ func _resolve_player(target: int, source: String = "current") -> void:
 	view_phase = "resolving"
 	var kind: int = roll.kind
 	var attacking: bool = Rules.is_attack(roll)
-	_begin_cast_cinematic(kind)
 	status_title = "CASTING" if kind >= Rules.Kind.SPECIAL else "ATTACKING" if attacking else "BLESSED"
 	# A cast starts consuming its visual use budget immediately; damage still
 	# waits for the modifier buildup and impact animation below.
@@ -1093,6 +1109,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 		while damage_feedback.building:
 			await get_tree().process_frame
 			if not _valid_turn(token): return
+	_begin_cast_cinematic(kind)
 	if kind == Rules.Kind.ULTIMATE:
 		bubble.begin_slam()
 		# Presentation time keeps the slam readable during fever and fast-forward.
@@ -1114,6 +1131,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 			_sound("bell", 1.6, -16)
 			if not await _wait(0.3, token): return
 			_show_events(model.apply_player_step())
+			_sync_corpses()
 		else:
 			if roll.random_target_per_use() or (not model.is_city() and target not in model.living()): target = model.player_target()
 			attack_target = target
@@ -1173,12 +1191,13 @@ func _enemy_phase() -> void:
 		var human: Dictionary = model.enemies[i]
 		status_title = "ENEMY TURN"
 		if not await _wait(0.12, token): return
-		if not human.canceled and model.status_count(Status.HIDDEN) == 0 and model.enemy_status_count(i, Status.FROZEN) == 0 and human.intent.type == "attack":
+		var immobilized: bool = model.enemy_cannot_act(i)
+		if not human.canceled and model.status_count(Status.HIDDEN) == 0 and not immobilized and human.intent.type == "attack":
 			fx.enemy_cast(human.role, _enemy_point(i), _player_point(), 0.22 / speed, human.intent.get("attribute", Status.Attribute.NONE))
 			_sound("slash" if human.role != 2 else "bell", 1.4, -17)
 			if not await _wait(0.18, token): return
 		var events: Array = model.enemy_act(i)
-		if not human.canceled and human.intent.type != "attack" and events.size() > 0:
+		if not human.canceled and not immobilized and human.intent.type != "attack" and events.size() > 0:
 			for event in events:
 				if event.target >= 0: fx.activate_circle(_enemy_point(event.target), PURPLE if human.intent.type == "empower" else TEAL, maxf(12,_enemy_side()*0.22), 0.4)
 			_sound("bell", 1.7, -20)
@@ -1344,6 +1363,7 @@ func _advance_wave() -> void:
 		await get_tree().process_frame
 	if not _valid_turn(token): return
 	if not model.advance_wave(): return
+	combat_motion.clear()
 	fallen.clear()
 	city_corpses.clear()
 	city_life.clear()
@@ -1376,6 +1396,7 @@ func _restart(wave_number: int = 1) -> void:
 	fx.z_index = 0
 	if transition_tween and transition_tween.is_running(): transition_tween.kill()
 	model.load_debug_wave(wave_number)
+	combat_motion.clear()
 	fx.clear()
 	last_result = MultiHitSkill.new()
 	result = MultiHitSkill.new()
@@ -1423,8 +1444,18 @@ static func _event_font_size(event: Dictionary) -> int:
 func _show_events(events: Array) -> void:
 	var offsets: Dictionary = {}
 	for event in events:
+		if event.type in ["damage","burn","shield_hit"] and (event.amount > 0 or event.get("corpse_hit",false)):
+			combat_motion.hit(event.target,0.4 if event.type == "burn" else 1.0)
+		elif event.type in ["skip","cancel"]: combat_motion.skip(event.target)
 		var point: Vector2 = _player_point() if event.target == -1 else CITY_POINT if event.target == -2 else _enemy_point(event.target)
 		if event.target >= 0 and event.get("corpse_hit",false): point = _enemy_impact_point(event.target)
+		if event.type == "boon_wave":
+			var tint: Color = PURPLE if event.amount >= 50 else GOLD
+			var radius: float = maxf(ARENA.size.x,ARENA.size.y)
+			fx.ring(_player_point(),tint,radius,ARENA)
+			fx.burst(_player_point(),tint,12 if reduced else 32,240)
+			_sound("rumble",1.15 if event.amount < 50 else 0.8,-16)
+			continue
 		if event.type == "spawn":
 			fx.burst(_city_gate_point(), GOLD, 10, 40)
 			continue
@@ -1722,7 +1753,7 @@ func _shadow(point: Vector2, radius: float, alpha: float) -> void:
 func _draw_player() -> void:
 	var hurt: float = hit_times[0]
 	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
-	var dx: float = snappedf(sin(clock_time * 45) * hurt * 5, 2) if not reduced and not model.is_frozen() else 0.0
+	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	_shadow(Vector2(259, 413), monster_side * 0.48, 0.27)
 	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
 	_art("eldritch", Rect2(Vector2(259 - monster_side / 2 + dx, 414 - monster_side + bob), Vector2.ONE * monster_side), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
@@ -1741,7 +1772,7 @@ func _draw_human(index: int) -> void:
 		var t: float = minf(1, fallen.get(index, 1.0) / 0.3)
 		var center: Vector2 = point.lerp(Vector2(point.x, floor_y-side*0.08), t)
 		var hurt: float = hit_times[index + 1]
-		if not reduced: center.x += sin(clock_time*46)*hurt*minf(6,side*0.03)
+		center.x += combat_motion.offset(index,side,clock_time,false,reduced)
 		_shadow(Vector2(point.x, floor_y-2), side * 0.42, 0.2 * corpse_alpha)
 		draw_set_transform(center, t * PI / 2, Vector2(lerpf(1, 0.36, t), 1))
 		_art(key, Rect2(Vector2.ONE * -side / 2, Vector2.ONE * side), Color(0.64, 0.52, 0.49, corpse_alpha).lerp(Color(RED,corpse_alpha),hurt*0.6))
@@ -1752,8 +1783,8 @@ func _draw_human(index: int) -> void:
 		Pixel.disc(self, Vector2(point.x, floor_y-2), side * 0.35, Color(color, 0.35), 6, 0.23)
 		_rune(point - Vector2(0, side * 0.55), 3, color, 3)
 	var hurt: float = hit_times[index + 1]
-	var dx: float = snappedf(sin(clock_time * 46) * hurt * minf(6,side*0.03), 2) if not reduced else 0.0
-	var bob: float = 0 if reduced or model.enemy_status_count(index, Status.FROZEN) > 0 else snappedf(sin(clock_time * 2 + index * 2) * minf(2,side/64.0), 2)
+	var dx: float = combat_motion.offset(index,side,clock_time,model.enemy_cannot_act(index) or human.canceled,reduced)
+	var bob: float = 0 if reduced or model.enemy_cannot_act(index) else snappedf(sin(clock_time * 2 + index * 2) * minf(2,side/64.0), 2)
 	_shadow(Vector2(point.x, floor_y-1), side * 0.25, 0.25)
 	if human.elite:
 		var glow: Color = _elite_color(human.role)
@@ -1771,14 +1802,13 @@ func _draw_human(index: int) -> void:
 	_art(key, Rect2(Vector2(point.x - side / 2 + dx, floor_y - side + bob), Vector2.ONE * side), Color.WHITE.lerp(RED, hurt * 0.6))
 	if human.elite: StatusPaint.ellipse(self,Vector2(point.x,floor_y),maxf(22,side*0.53),_elite_color(human.role))
 	if model.enemy_status_count(index,Status.FROZEN) > 0:
-		StatusPaint.ice(self,Rect2(point.x-side*0.45,floor_y-side,side*0.9,side),false)
+		StatusPaint.ice(self,Rect2(point.x-side*0.45+dx,floor_y-side,side*0.9,side),false)
 	_draw_enemy_intent(index)
 	_draw_enemy_health(index)
 	_draw_enemy_statuses(index)
 
 func _draw_enemy_statuses(index: int) -> void:
-	var effects: Dictionary = model.enemies[index].get("statuses",{})
-	var items: Array = Statuses.active(effects)
+	var items: Array = Statuses.enemy_active(model.enemies[index])
 	var bar: Rect2 = _enemy_health_rect(index)
 	var radius: float = 8 if fx.canvas_size.y > fx.canvas_size.x else 5
 	var step: float = minf(radius*3,bar.size.x/maxi(1,items.size()))
@@ -1786,21 +1816,26 @@ func _draw_enemy_statuses(index: int) -> void:
 		var at: Vector2 = bar.get_center()+Vector2((i-(items.size()-1)/2.0)*step,bar.size.y/2+radius+8)
 		Pixel.disc(self,at,radius+3,INK,2)
 		StatusPaint.icon(self,at,radius,items[i].icon,items[i].color)
-		_text(at+Vector2(radius*0.55,radius+5),"∞" if items[i].permanent else str(items[i].turns),12,CREAM)
+		_text(at+Vector2(radius*0.55,radius+5),items[i].get("badge","∞" if items[i].permanent else str(items[i].turns)),12,CREAM)
 
 func _elite_color(role: int) -> Color:
 	return [Color("ffe388"), Color("82dfff"), Color("ff9955")][role]
 
 func _draw_player_afflictions() -> void:
 	var feet: Vector2 = _player_feet()
+	var dx := Vector2(combat_motion.offset(-1,monster_side,clock_time,false,reduced),0)
 	if model.is_frozen():
-		StatusPaint.ice(self,_player_ice_rect(),true,3-model.ice_hits_remaining if model.phase == "frozen" else 0)
+		var ice: Rect2 = _player_ice_rect()
+		ice.position += dx
+		StatusPaint.ice(self,ice,true,3-model.ice_hits_remaining if model.phase == "frozen" else 0)
 	if model.is_stunned():
-		StatusPaint.orbiting_stars(self,feet-Vector2(0,monster_side*0.89),monster_side,clock_time,reduced)
+		StatusPaint.orbiting_stars(self,feet+dx-Vector2(0,monster_side*0.89),monster_side,clock_time,reduced)
 
 func _enemy_intent_data(index: int) -> Dictionary:
 	var enemy: Dictionary = model.enemies[index]
 	if enemy.hp <= 0 or enemy.acted or enemy.intent.is_empty(): return {}
+	if model.enemy_status_count(index,Status.IMMOBILIZED) > 0:
+		return {"label":"IMMOBILIZED","detail":"SKIP","color":Statuses.ENTRIES[Status.IMMOBILIZED].color,"icon":"skip","name":"Immobilized","description":"Shield broken. Cannot act for one turn."}
 	if model.enemy_status_count(index,Status.FROZEN) > 0:
 		return {"label":"FROZEN","detail":"SKIP","color":Statuses.ENTRIES[Status.FROZEN].color,"icon":"skip","name":"Frozen","description":"Cannot act this turn. One freeze stack is consumed."}
 	var intent: Dictionary = enemy.intent
@@ -2051,9 +2086,9 @@ func _draw_statuses() -> void:
 
 func _status_description(id: int, count: int) -> String:
 	if id == Status.IMMUNITY and model.is_city():
-		return GameText.format("Invincible for %.1f more seconds. Each stack lasts 2 seconds.",model.city_immunity_seconds())
-	if id == Status.REGEN: return GameText.format("Heal %d at turn start.",roundi(5*model.statuses[id].potency))+" "+GameText.remaining(count,"turn")
-	if id in [Status.MIGHT,Status.ASCENSION]: return GameText.format("Adds +%.1f to DMG. Stacks with other bonuses.",(0.5 if id == Status.MIGHT else 2.0)*model.statuses[id].potency)+" "+GameText.remaining(count,"turn")
+		return GameText.format("Invincible for %.1f more seconds. Each stack lasts 2 seconds.",model.city_immunity_seconds())+" "+GameText.text("Recast extends duration.")
+	if id == Status.REGEN: return GameText.format("Heal %d at turn start.",roundi(5*model.statuses[id].potency))+" "+GameText.remaining(count,"turn")+" "+GameText.text("Recast pays remaining healing.")
+	if id in [Status.MIGHT,Status.ASCENSION]: return GameText.format("Adds +%.1f to DMG. Stacks with other bonuses.",(0.5 if id == Status.MIGHT else 2.0)*model.statuses[id].potency)+" "+GameText.remaining(count,"turn")+" "+GameText.format("Recast: %d-base shockwave.",10 if id == Status.MIGHT else 50)
 	var unit: String = "stack" if id in [Status.BURNING,Status.DARKNESS,Status.CORROSION,Status.PLAGUE] else "throw" if id == Status.STUNNED else "turn"
 	return GameText.text(Statuses.ENTRIES[id].text)+" "+GameText.remaining(count,unit)
 
@@ -2249,11 +2284,15 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	canvas.draw_rect(Rect2(0, 0, 1280, 800), Color(0.06, 0.08, 0.05))
 	_frame(Rect2(86, 76, 1108, 681), Color("333b2e"), GOLD, canvas)
 	_text(Vector2(116, 126), "DICE GRIMOIRE", 32, GOLD, canvas)
+	_button(GUIDE_STATUSES,"SKILLS" if guide_status_page else "STATUS EFFECTS",true,canvas)
 	_button(GUIDE_CLOSE, "X", true, canvas)
 	if home_enabled: _button(_home_rect(), "HOME", true, canvas)
 	_text(Vector2(116, 165), "City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast." if model.is_city() else "Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.", 16, CREAM, canvas)
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage,3)]
 	_text(Vector2(116, 194), "CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP. Skills ignore caps; 666 clears the wave.", caps), 16, MUTED, canvas)
+	if guide_status_page:
+		_draw_status_help(canvas)
+		return
 	_text(Vector2(116, 238), "PAIRS / SKILLS", 16, TEAL, canvas)
 	_text(Vector2(656, 238), "TRIPLES / SPELLS", 16, PURPLE, canvas)
 	canvas.draw_rect(Rect2(632, 220, 2, 478), EDGE.darkened(0.25))
@@ -2265,6 +2304,23 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 		_wrapped(Vector2(656, y + 25), _special_description(i), 504, MUTED, 16, canvas)
 	_text(Vector2(116, 713), "Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.", 16, MUTED, canvas)
 	_text(Vector2(116, 739), "Art: Dungeon Crawl Stone Soup / CC0    Sound: Kenney", 16, MUTED, canvas)
+
+func _draw_status_help(canvas: CanvasItem) -> void:
+	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
+	var items: Array = Statuses.help_entries()
+	var per_column: int = items.size() if portrait else ceili(items.size()/2.0)
+	var body_size: int = 26 if portrait else 22
+	var width: float = 724 if portrait else 504
+	var y: float = 550 if portrait else 238
+	for i in range(items.size()):
+		if i == per_column: y = 238
+		var x: float = 40 if portrait else 116+floori(i/float(per_column))*540
+		var item: Dictionary = items[i]
+		StatusPaint.icon(canvas,Vector2(x+14,y+(18 if portrait else 10)),13 if portrait else 11,item.icon,item.color)
+		_text(Vector2(x+40,y+(28 if portrait else 20)),item.name,28 if portrait else 20,item.color,canvas)
+		y += 62 if portrait else 46
+		y = _wrapped(Vector2(x,y),item.text,width,CREAM,body_size,canvas)+body_size+(18 if portrait else 10)
+		canvas.draw_line(Vector2(x,y-8),Vector2(x+width,y-8),Color(EDGE,0.35),1)
 
 func _debug_option_rect(choice: int) -> Rect2:
 	if choice == -1: return Rect2(136, 176, 250, 40)

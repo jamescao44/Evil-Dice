@@ -28,7 +28,7 @@ The actors use 32×32 source images with nearest-neighbor sampling and stepped i
 
 ## Relic inventory artwork
 
-Relic sprites use unchanged CC0 tiles from the same **Dungeon Crawl Stone Soup Full** archive above: scrolls, rings, armor, shields, weapons, runestones, a skull and an hourglass. Exact source paths are recorded in [relic sources.json](art/relics/sources.json). The six elemental magic stones and Prismatic Stone instead share the project's original `magic_gem.svg`, tinted at draw time by element; Prismatic Stone uses a multicolor tint. The previous stone PNGs remain as unused source references. Transparent margins are trimmed at draw time; source PNGs are unmodified. The chest atlas is rendered from the same shared renderer by `tests/render_relic_atlas.gd`.
+Relic sprites use unchanged CC0 tiles from the same **Dungeon Crawl Stone Soup Full** archive above: scrolls, rings, armor, shields, weapons, runestones, a skull, an hourglass, and the bread/crystal/book icons used for Fortune Cookie, Crystal Ball and Ancient Prophecy. Exact source paths are recorded in [relic sources.json](art/relics/sources.json). The six elemental magic stones and Prismatic Stone instead share the project's original `magic_gem.svg`, tinted at draw time by element; Prismatic Stone uses a multicolor tint. The previous stone PNGs remain as unused source references. Transparent margins are trimmed at draw time; source PNGs are unmodified. The chest atlas is rendered from the same shared renderer by `tests/render_relic_atlas.gd`.
 
 ## Silkscreen — all active text and numbers
 

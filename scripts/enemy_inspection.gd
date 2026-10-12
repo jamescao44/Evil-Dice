@@ -19,7 +19,7 @@ func focus_rect(index: int) -> Rect2:
 	return sprite.merge(battle._enemy_intent_rect(index)).merge(health).grow(6).intersection(Rect2(Vector2.ZERO,battle.fx.canvas_size))
 
 func status_rows(index: int) -> Array:
-	return Statuses.active(battle.model.enemies[index].get("statuses",{}))
+	return Statuses.enemy_active(battle.model.enemies[index])
 
 func card_rect(index: int) -> Rect2:
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
@@ -72,18 +72,17 @@ func _draw_statuses(index: int, card: Rect2, top: float, inset: float, portrait:
 	var right: float = card.end.x-inset
 	draw_line(Vector2(left,top),Vector2(right,top),Color(battle.CREAM,0.2),2)
 	var y: float = top+(34 if portrait else 26)
-	draw_string(battle.description_font,Vector2(left,y),GameText.text("STATUS EFFECTS"),HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 18,battle.MUTED)
+	draw_string(battle.description_font,Vector2(left,y),GameText.text("BUFFS & STATUS EFFECTS"),HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 18,battle.MUTED)
 	var items: Array = status_rows(index)
 	var size: int = 28 if portrait else 20
 	var step: float = 52 if portrait else 38
 	if items.is_empty():
-		draw_string(battle.description_font,Vector2(left,y+step),GameText.text("No active status effects."),HORIZONTAL_ALIGNMENT_LEFT,-1,size,battle.CREAM)
+		draw_string(battle.description_font,Vector2(left,y+step),GameText.text("No active buffs or status effects."),HORIZONTAL_ALIGNMENT_LEFT,-1,size,battle.CREAM)
 		return
 	for item in items:
 		y += step
 		Paint.icon(self,Vector2(left+14,y-10),14 if portrait else 11,item.icon,item.color)
 		draw_string(battle.description_font,Vector2(left+40,y),GameText.text(item.name),HORIZONTAL_ALIGNMENT_LEFT,-1,size,item.color)
-		var unit: String = ("%d stack" if item.turns == 1 else "%d stacks") if item.stacking else ("%d turn" if item.turns == 1 else "%d turns")
-		var counter: String = GameText.text("Permanent") if item.permanent else GameText.format(unit,item.turns)
+		var counter: String = Statuses.counter_text(item)
 		var width: float = battle.description_font.get_string_size(counter,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 		draw_string(battle.description_font,Vector2(right-width,y),counter,HORIZONTAL_ALIGNMENT_LEFT,-1,size,battle.CREAM)

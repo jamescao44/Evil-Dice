@@ -17,6 +17,7 @@ const STATS := {
 	"twin_scythes": {"combo_uses_factor":2},
 	"cursed_bow": {"combo_uses_per_wave":1,"single_target_factor":0.95},
 	"coin": {"wave_rubies":10},
+	"ancient_prophecy": {"tarot_repeat":true},
 	"cursed_watch": {"always_perfect":true,"no_ultimate":true,"no_treasure":true},
 }
 const STONES := {
@@ -33,6 +34,11 @@ const TURN_CHARGES := {
 }
 const CRITICAL_FACTOR := 3.0
 const PERFECT_STRIKE_BASE := 100.0
+const TAROT_GENERATORS := {"fortune_cookie":3,"crystal_ball":1}
+
+static func acquired(model, id: String) -> void:
+	if id == "fortune_cookie" and not model.grant_random_tarots(1).is_empty():
+		model.relic_activated.emit(id)
 
 static func has_flag(items: Array, flag: String) -> bool:
 	for item in items:
@@ -179,6 +185,14 @@ static func prevent_death(model) -> Array:
 static func turn_finished(model) -> Array:
 	var events: Array = []
 	for item in model.relics.items:
+		if TAROT_GENERATORS.has(item.id):
+			item.turns += 1
+			if item.turns >= TAROT_GENERATORS[item.id]:
+				item.turns = 0
+				var cards: Array = model.grant_random_tarots(1)
+				if not cards.is_empty():
+					model.relic_activated.emit(item.id)
+					events.append(model.event(-1,cards.size(),"relic","TAROT +1"))
 		if not TURN_CHARGES.has(item.id): continue
 		var charge: Dictionary = TURN_CHARGES[item.id]
 		item.turns += 1

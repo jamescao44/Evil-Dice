@@ -21,6 +21,18 @@ var banned: Array = []
 var locked_grants: Dictionary = {}
 var bonus_chests: Array = []
 var pending_steps: Array = []
+# A second activation belongs to the consumed card, not a new inventory item.
+# Snapshot the proc so rerolling/removing Prophecy cannot cancel or recurse it.
+var pending_repeat: Dictionary = {}
+
+func _card(model, instance_id: int) -> Dictionary:
+	if pending_repeat.get("instance_id",0) == instance_id: return pending_repeat
+	var index: int = model.tarots.find_instance(instance_id)
+	return {} if index < 0 else model.tarots.items[index]
+
+func dismiss_repeat() -> void:
+	locked_grants.erase(pending_repeat.get("instance_id",0))
+	pending_repeat.clear()
 
 func begin_round() -> void:
 	extra_rolls = next_extra_rolls
@@ -74,8 +86,8 @@ func modify_dice(model, natural: Array) -> Array:
 func usable(model) -> bool:
 	return pending_steps.is_empty() and (model.phase in ["roll","player"] or (model.is_city() and model.phase == "round_end")) and model.outcome().is_empty() and model.tarot_source.is_empty() and model.open_rewards.is_empty()
 
-func error(model, id: String, choice: Dictionary = {}) -> String:
-	if not usable(model): return "Use tarot between actions, before or after rolling."
+func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) -> String:
+	if not model.outcome().is_empty() or (not repeating and not usable(model)): return "Use tarot between actions, before or after rolling."
 	if not Catalog.ITEMS.has(id): return "Unknown tarot card."
 	if id in ["death","judgement"] and model.is_city(): return "This card cannot affect the city."
 	if id == "death" and not model.is_enemy_alive(choice.get("target",-1)): return "Drag Death onto a living enemy."
@@ -85,10 +97,12 @@ func error(model, id: String, choice: Dictionary = {}) -> String:
 	return ""
 
 func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
-	var index: int = model.tarots.find_instance(instance_id)
-	if index < 0: return {"error":"Card already used."}
-	var id: String = model.tarots.items[index].id
-	var reason: String = error(model,id,choice)
+	var card: Dictionary = _card(model,instance_id)
+	if card.is_empty(): return {"error":"Card already used."}
+	var repeating: bool = instance_id < 0
+	if (not pending_repeat.is_empty() and not repeating) or not pending_steps.is_empty(): return {"error":"Finish the tarot effect first."}
+	var id: String = card.id
+	var reason: String = error(model,id,choice,repeating)
 	if not reason.is_empty(): return {"error":reason}
 	if id in ["magician","lovers","hanged_man"]: return {"choice":id}
 	if id in ["emperor","world"]:
@@ -108,8 +122,8 @@ func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	var setup: Dictionary = prepare(model,instance_id,choice)
 	if setup.has("error"): return setup
-	var index: int = model.tarots.find_instance(instance_id)
-	var id: String = model.tarots.items[index].id
+	var id: String = _card(model,instance_id).id
+	var repeating: bool = instance_id < 0
 	match setup.get("choice",""):
 		"magician":
 			var values: Array = choice.get("dice",[])
@@ -120,6 +134,8 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			if not Catalog.ITEMS.has(choice.get("ban","")) or choice.ban in banned: return {"error":"Choose a tarot still in the deck."}
 		"replace":
 			if choice.get("replace",-1) < 0 or choice.replace >= model.relics.items.size(): return {"error":"Choose a relic to replace."}
+	var repeat_after: bool = not repeating and model.RelicEffects.has_flag(model.relics.items,"tarot_repeat")
+	if repeating or repeat_after: model.relic_activated.emit("ancient_prophecy")
 	if id in Catalog.ROLL_FACE_SETTINGS:
 		magician.clear()
 		parity = -1
@@ -129,7 +145,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		conditional_order.append(id)
 	# Siege opens its next turn lazily. A committed tarot can begin that turn,
 	# while inspecting/canceling a choice must not grant another regen tick.
-	var events: Array = model.begin_round() if model.phase == "round_end" else []
+	var events: Array = model.begin_round() if model.phase == "round_end" and not repeating else []
 	var reward: String = ""
 	match id:
 		"fool":
@@ -145,11 +161,11 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			model.relics.items = replacements
 			model.relics._fuse()
 			model.refresh_relic_health(old_max)
+			for item in replacements: model.RelicEffects.acquired(model,item.id)
 		"magician": magician = choice.dice.duplicate()
 		"high_priestess": extra_uses += 1
 		"empress":
-			var pool: Array = Catalog.ITEMS.keys().filter(func(key): return key not in banned)
-			for i in range(2): model.tarots.add(pool[model.reward_rng.randi_range(0,pool.size()-1)])
+			model.grant_random_tarots(2)
 		"emperor", "world":
 			reward = locked_grants[instance_id]
 			if not model.acquire_relic(reward,choice.get("replace",-1)): return {"error":"Choose a relic to replace."}
@@ -166,7 +182,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"devil": devil = 1
 		"star": star_throws = 3
 		"temperance":
-			next_extra_rolls = 1
+			next_extra_rolls += 1
 			extra_rolls = 0
 			model._finish_player_action(Skill.new(Skill.Kind.NORMAL))
 		"death": events.append_array(_execute(model,choice.target))
@@ -190,9 +206,12 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 				var statuses: Array = Status.PLAYER_HARMFUL if target == -1 else Status.ENEMY_HARMFUL
 				var status: int = statuses[model.rng.randi_range(0,statuses.size()-1)]
 				pending_steps.append({"target":target,"status":status,"count":3 if status in [Status.DARKNESS,Status.CORROSION] else 1})
-	model.tarots.remove_instance(instance_id)
+	if repeating: dismiss_repeat()
+	else:
+		model.tarots.remove_instance(instance_id)
+		if repeat_after: pending_repeat = {"id":id,"instance_id":-instance_id}
 	if pending_steps.is_empty(): _finish_effect(model,events)
-	return {"id":id,"events":events,"relic":reward}
+	return {"id":id,"events":events,"relic":reward,"repeated":repeating}
 
 func resolve_next_step(model) -> Dictionary:
 	if pending_steps.is_empty(): return {}
@@ -229,21 +248,4 @@ func _execute(model, target: int) -> Array:
 func _chariot(model) -> Array:
 	var skill = Skill.new(Skill.Kind.SPECIAL,4)
 	skill.amplifier_locked = true # Strength and stored critical belong to the next skill.
-	var damage: int = floori((50+model.relic_base_damage())*model.damage_multiplier(skill))
-	var events: Array = []
-	model.lifesteal_used = 0
-	if model.is_city():
-		var loss: int = mini(model.city_hp,damage)
-		model.city_hp -= loss
-		events.append(model.damage_event(-2,loss,damage))
-		if loss > 0: events.append_array(model._attack_relic_effects(-2,loss,skill))
-	else:
-		for target in model.living():
-			var amount: int = roundi(damage*(1.5 if model.enemy_status_count(target,Status.CORROSION) > 0 else 1.0))
-			var shielded: bool = model.enemies[target].shield > 0 and model.enemy_status_count(target,Status.CORROSION) == 0
-			var loss: int = model.hit_enemy(target,amount)
-			var hit: Dictionary = model.damage_event(target,loss,amount,"shield_hit" if shielded else "damage")
-			if shielded: hit.text = "BLOCKED"
-			events.append(hit)
-			if loss > 0: events.append_array(model._attack_relic_effects(target,loss,skill))
-	return events
+	return preload("res://scripts/area_attack.gd").apply(model,50.0,skill)

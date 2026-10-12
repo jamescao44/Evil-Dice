@@ -7,6 +7,7 @@ const Skill = preload("res://scripts/multi_hit_skill.gd")
 const Status = preload("res://scripts/status_effect.gd")
 const Relics = preload("res://scripts/relic_inventory.gd")
 const RelicEffects = preload("res://scripts/relic_effects.gd")
+const AreaAttack = preload("res://scripts/area_attack.gd")
 const TarotEffects = preload("res://scripts/tarot_effects.gd")
 var tarot_effects = TarotEffects.new()
 const DiceOdds = preload("res://scripts/dice_odds.gd")
@@ -117,6 +118,9 @@ func set_status_counts(counts: Dictionary) -> void:
 
 func status_count(id: int) -> int:
 	return statuses[id].count if statuses.has(id) else 0
+
+func is_city() -> bool:
+	return false
 
 func status_counts(ids: Array = Status.IDS) -> Dictionary:
 	var counts: Dictionary = {}
@@ -523,17 +527,36 @@ func preview(result: MultiHitSkill, primary: int) -> Array:
 	return hits
 
 func _apply_support(result: MultiHitSkill) -> Array:
+	var events: Array = []
+	var id: int = result.face if result.kind == Kind.PAIR else Status.ASCENSION
+	if result.kind == Kind.SPECIAL and result.face == 2:
+		return [event(-1, heal(max_hp), "heal", "FULL HEAL")]
+	if id == Status.REGEN and status_count(id) > 0:
+		# Counts tick after enemies act; this turn's start heal was already paid.
+		var remaining: int = maxi(0,status_count(id)-(1 if buff_ticks.has(id) else 0))
+		var restored: int = heal(remaining*roundi(5*statuses[id].potency))
+		if restored > 0: events.append(event(-1,restored,"heal","REGROWTH"))
+	elif id in [Status.MIGHT,Status.ASCENSION] and status_count(id) > 0:
+		events.append_array(_boon_shockwave(result,10.0 if id == Status.MIGHT else 50.0))
 	if result.kind == Kind.PAIR:
-		statuses[result.face].apply(result.spare,tarot_effects.skill_factor(result))
+		var duration: int = result.spare + (status_count(id) if id == Status.IMMUNITY else 0)
+		statuses[id].apply(duration,tarot_effects.skill_factor(result))
 		buff_ticks.erase(result.face)
 		# Stored skills are free actions; the waiting attack can use a boon turn.
 		if bonus_resume.is_empty(): turn_boon_refreshes[result.face] = true
-		return [event(-1, 0, "buff", PAIR_NAMES[result.face - 1])]
-	if result.face == 2:
-		return [event(-1, heal(max_hp), "heal", "FULL HEAL")]
-	statuses[33].apply(3,tarot_effects.skill_factor(result))
-	if bonus_resume.is_empty(): turn_boon_refreshes[33] = true
-	return [event(-1, 0, "buff", SPECIAL_NAMES[2])]
+		events.append(event(-1, 0, "buff", PAIR_NAMES[result.face - 1]))
+	else:
+		statuses[Status.ASCENSION].apply(3,tarot_effects.skill_factor(result))
+		if bonus_resume.is_empty(): turn_boon_refreshes[Status.ASCENSION] = true
+		events.append(event(-1, 0, "buff", SPECIAL_NAMES[2]))
+	return events
+
+func _boon_shockwave(result: MultiHitSkill, base_damage: float) -> Array:
+	var wave := Skill.new(Kind.SPECIAL,4,result.dice)
+	wave.amplifier_locked = true
+	var events: Array = [event(-1,int(base_damage),"boon_wave","")]
+	events.append_array(AreaAttack.apply(self,base_damage,wave))
+	return events
 
 func _finish_player_action(result: MultiHitSkill) -> void:
 	if not bonus_resume.is_empty():
@@ -635,6 +658,7 @@ func hit_enemy(index: int, damage: int, ignore: bool = false) -> int:
 	var e: Dictionary = enemies[index]
 	if not ignore and e.shield > 0 and enemy_status_count(index, Status.CORROSION) == 0:
 		e.shield = maxi(0, e.shield-maxi(0, damage))
+		if e.shield == 0: apply_enemy_status(index,Status.IMMOBILIZED,1)
 		return 0 # A single hit can break a shield, but never spill into HP.
 	if ignore: e.shield = 0
 	var actual: int = mini(e.hp, damage)
@@ -655,9 +679,12 @@ func enemy_act(index: int) -> Array:
 	if e.hp <= 0 or e.acted:
 		return []
 	e.acted = true
-	if enemy_status_count(index, Status.FROZEN) > 0:
-		e.statuses[Status.FROZEN].consume()
-		return [event(index, 0, "skip", "FROZEN")]
+	if enemy_cannot_act(index):
+		var reason: String = "IMMOBILIZED" if enemy_status_count(index,Status.IMMOBILIZED) > 0 else "FROZEN"
+		# Overlapping immobilization effects use the same missed action.
+		for id in Status.ENEMY_ACTION_LOCKS:
+			if enemy_status_count(index,id) > 0: e.statuses[id].consume()
+		return [event(index, 0, "skip", reason)]
 	if e.canceled:
 		return [event(index, 0, "cancel", "Lost in thought.")]
 	var intent: Dictionary = e.intent
@@ -745,7 +772,12 @@ func acquire_relic(id: String, replace_index: int = -1) -> bool:
 	var old_max: int = max_hp
 	if not relics.add(id, replace_index): return false
 	refresh_relic_health(old_max)
+	RelicEffects.acquired(self,id)
 	return true
+
+func grant_random_tarots(_count: int) -> Array:
+	# Standalone battles have no run inventory; RunRules owns consumable rewards.
+	return []
 
 func refresh_relic_health(old_max: int) -> void:
 	for status in Status.HARMFUL:
@@ -781,7 +813,10 @@ func _complete_relic_turn() -> Array:
 	return RelicEffects.turn_finished(self)
 
 static func status_label(id: int, amount: int) -> String:
-	return "%s +%d" % [{Status.FROZEN:"FROZEN",Status.BURNING:"BURN",Status.STUNNED:"STUN",Status.DARKNESS:"DARKNESS",Status.CORROSION:"CORROSION",Status.PLAGUE:"PLAGUE"}.get(id,"STATUS"), amount]
+	return "%s +%d" % [{Status.FROZEN:"FROZEN",Status.BURNING:"BURN",Status.STUNNED:"STUN",Status.DARKNESS:"DARKNESS",Status.CORROSION:"CORROSION",Status.PLAGUE:"PLAGUE",Status.IMMOBILIZED:"IMMOBILIZED"}.get(id,"STATUS"), amount]
+
+func enemy_cannot_act(index: int) -> bool:
+	return Status.ENEMY_ACTION_LOCKS.any(func(id): return enemy_status_count(index,id) > 0)
 
 func enemy_status_count(index: int, id: int) -> int:
 	if index < 0 or index >= enemies.size(): return 0

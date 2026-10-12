@@ -21,14 +21,16 @@ static func line(canvas: CanvasItem, a: Vector2, b: Vector2, color: Color, pixel
 			error += dx
 			from.y += sy
 
-static func circle(canvas: CanvasItem, center: Vector2, radius: float, color: Color, pixel: int = 3) -> void:
+static func circle(canvas: CanvasItem, center: Vector2, radius: float, color: Color, pixel: int = 3, clip: Rect2 = Rect2()) -> void:
 	var x: int = maxi(1, roundi(radius / pixel))
 	var y: int = 0
 	var error: int = 1 - x
 	var origin := center.snapped(Vector2.ONE * pixel)
 	while x >= y:
 		for offset in [Vector2(x,y),Vector2(y,x),Vector2(-y,x),Vector2(-x,y),Vector2(-x,-y),Vector2(-y,-x),Vector2(y,-x),Vector2(x,-y)]:
-			canvas.draw_rect(Rect2(origin + offset * pixel, Vector2.ONE * pixel), color)
+			var dot := Rect2(origin + offset * pixel, Vector2.ONE * pixel)
+			if clip.has_area(): dot = dot.intersection(clip)
+			if dot.has_area(): canvas.draw_rect(dot, color)
 		y += 1
 		if error < 0:
 			error += 2 * y + 1

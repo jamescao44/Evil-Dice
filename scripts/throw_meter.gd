@@ -64,5 +64,5 @@ static func sample_at(ratio: float) -> Dictionary:
 
 static func _sample(ratio: float, perfect: bool) -> Dictionary:
 	var distance: float = absf(clampf(ratio, 0, 1) - 0.5) * WIDTH
-	# Snap only the displayed position; the continuous clock still determines the hit.
-	return {"position": 0.5 if perfect else clampf(ratio, 0, 1), "power": 1.0 if perfect else 1.0 - distance / (WIDTH * 0.5), "perfect": perfect}
+	# Draw the continuous position even inside the timing window.
+	return {"position": clampf(ratio, 0, 1), "power": 1.0 if perfect else 1.0 - distance / (WIDTH * 0.5), "perfect": perfect}

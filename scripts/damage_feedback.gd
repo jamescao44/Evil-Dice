@@ -167,7 +167,7 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
 	visible = active and not battle._menus_open() and battle.view_phase == "resolving"
 	if battle._menus_open() or not active: return
-	var elapsed: float = delta*clampf(battle.speed,1,2)
+	var elapsed: float = delta*clampf(battle._roll_speed(),1,2)
 	impact_age += elapsed
 	tremble_age += elapsed
 	if phase == "result": result_age += elapsed
