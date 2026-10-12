@@ -25,7 +25,7 @@ func snapshot(g, label: String, portrait: bool) -> void:
 	if "--capture" not in OS.get_cmdline_user_args(): return
 	g.queue_redraw()
 	await process_frame
-	await RenderingServer.frame_post_draw
+	RenderingServer.force_draw()
 	root.get_texture().get_image().save_png("res://test-output/menu-"+label+("-portrait" if portrait else "-landscape")+".png")
 
 func model_checks() -> void:
@@ -77,6 +77,18 @@ func scene_checks(portrait: bool) -> void:
 	check(g.debug_open and g.debug_wave_input.visible and g.debug_wave_input.text == "10","Debug shows a wave number field")
 	check(g.DEBUG_WAVE_INPUT.encloses(g.debug_wave_input.get_rect()),"Native number field fits the debug layout")
 	await snapshot(g,"debug",portrait)
+	g.model.tarots.add("tower")
+	g.model.tarot_effects.banned = Run.Tarot.ITEMS.keys()
+	var existing: Array = g.model.tarots.items.duplicate(true)
+	var combat_rng: int = g.model.rng.state
+	var reward_rng: int = g.model.reward_rng.state
+	g._handle_click(g.DEBUG_TAROTS.get_center())
+	check(g.model.tarots.items.size() == 23 and g.model.tarots.items[0] == existing[0],"Debug adds all 22 tarot cards while preserving existing cards")
+	check(g.model.tarots.items.slice(1).map(func(item): return item.id) == Run.Tarot.ITEMS.keys(),"Debug grants every card once even if excluded from rewards")
+	g._handle_click(g.DEBUG_TAROTS.get_center())
+	check(g.model.tarots.items.size() == 45 and g.debug_open,"Repeated debug grants add another full set without leaving debug")
+	check(g.model.rng.state == combat_rng and g.model.reward_rng.state == reward_rng,"Debug grants do not change combat or reward RNG")
+	for other in [g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD,g._debug_option_rect(12)]: check(not g.DEBUG_TAROTS.intersects(other),"New debug button does not overlap existing controls")
 	for invalid in ["", "x", "0", "11", "1.5"]:
 		g._debug_load_wave(invalid)
 		check(g.debug_open and g.model.stage == 9 and not g.debug_wave_error.is_empty(),"Invalid text shows an error without loading")
@@ -137,6 +149,9 @@ func scene_checks(portrait: bool) -> void:
 		g.model.city_hp = 0
 		g.model.perfect_progress = 9
 		g._check_over()
+		g.model.skip_relic()
+		await process_frame
+		await process_frame
 		g._process(0.3)
 		await snapshot(g,"victory-notice",portrait)
 		g._process(g.AUTO_CLAIM_DURATION)
@@ -151,7 +166,24 @@ func scene_checks(portrait: bool) -> void:
 		g.chest.active = false
 		g.chest.queue_redraw()
 		await snapshot(g,"victory-pickups",portrait)
-		for slot in range(g.chest.rewards.size()): g._handle_click(g.chest.reel_rect(slot).get_center())
+		for slot in range(g.chest.rewards.size()):
+			g._handle_click(g.chest.reel_rect(slot).get_center())
+			if g.tarot_ui.ceremony.active():
+				var draw = g.tarot_ui.ceremony
+				for delta in [1.4,0.5,0.6]: g.tarot_ui._process(delta)
+				for i in range(3):
+					var remaining: Array = draw.fan_order().filter(func(index): return index not in draw.removed)
+					remaining.sort_custom(func(a,b): return absf(draw.fan_pose(a).step) < absf(draw.fan_pose(b).step))
+					var point: Vector2 = draw.fan_pose(remaining[0]).at
+					g._handle_click(point)
+					g._handle_release(point)
+					g.tarot_ui._process(0.6)
+				g.tarot_ui._process(1.1)
+				for point in [draw.row_point(0),draw.keep_rect().get_center()]:
+					g._handle_click(point)
+					g._handle_release(point)
+				g.tarot_ui._process(1.0)
+			g.relic_ui._process(0.7)
 		deadline = Time.get_ticks_msec()+4000
 		while g.view_phase != "over" and Time.get_ticks_msec() < deadline: await process_frame
 		check(g.view_phase == "over" and g.model.reward_history.size() == 5,"Victory returns after every gift is picked up")

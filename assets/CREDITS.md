@@ -84,3 +84,11 @@ Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_re
 `audio/soft_sweep.wav` and `audio/perfect.wav` are copied unchanged from the user’s finished-SFX folder, `/Users/James/Desktop/Music Files/Station A/Evil Dice/outs-FXs`. The soft sweep replaces the scraping dice-throw sweep; the Perfect clip layers onto accepted Perfect throws. These are user-provided project audio, not part of the Kenney CC0 packs. The existing magic-leak charging loop now plays at 25% of its original runtime amplitude across its entire power curve. The soft sweep plays 6 dB louder than its initial mix; source WAV files remain unchanged.
 
 - **Noto Sans SC**: bundled Chinese font from [Google Fonts / Adobe](https://github.com/google/fonts/tree/main/ofl/notosanssc), SIL Open Font License 1.1. License: `fonts/NotoSansSC-LICENSE.txt`.
+
+## Tarot cards
+
+Art by Jose Angel Canabal. All 22 Major Arcana and the card back are from
+[Major Arcana Pixel Art](https://jcanabal.itch.io/major-arcana-pixel-art-free).
+Original monochrome PNGs, used unchanged. Free commercial and noncommercial
+digital-game use with attribution; asset resale and print use are not permitted.
+See `art/tarot/LICENSE.txt` for the source and license summary.

@@ -62,7 +62,10 @@ func _initialize() -> void:
 		check(not killed.has(target), "Consecutive hits never retarget a corpse")
 		killed[target] = true
 		game.apply_player_step(target)
-	check(game.outcome() == "victory" and game.pending.is_empty(), "Combo ends early when all foes die")
+	check(game.outcome().is_empty() and game.pending.uses_left() == 3, "Combo retains its remaining uses after all foes die")
+	var follow_through: Array = game.apply_player().filter(func(e): return e.type == "damage")
+	check(follow_through.size() == 3 and follow_through.all(func(e): return e.corpse_hit and e.amount == 0), "Remaining strikes hit corpses without extra HP loss")
+	check(game.outcome() == "victory" and game.pending.is_empty(), "Victory follows the final hit")
 	game = fresh()
 	game.enemies[0].shield = 20
 	game.set_test_roll([5,5,5])

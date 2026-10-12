@@ -1,7 +1,7 @@
 extends RefCounted
 ## Layout-independent meter coordinates. One reference pixel is 1/288 of the track.
 const WIDTH := 288.0
-const PERFECT_TOLERANCE := 4.0
+const PERFECT_HALF_WINDOW := 0.030 # Seconds on either side of a center crossing.
 const PERIOD := 2.4 / 0.9 # Ten percent slower across the whole timing curve.
 const CENTER_EASING := 0.35
 var elapsed: float = 0.0
@@ -37,17 +37,32 @@ func advance(delta: float) -> void:
 
 func position_ratio() -> float:
 	if erratic: return lerpf(segment_from, segment_to, clampf(segment_age/segment_duration,0,1))
+	return normal_position_at(elapsed)
+
+static func normal_position_at(time: float) -> float:
 	# Keep the same cycle, but soften the center acceleration: peak speed is 24% lower.
-	var phase: float = fposmod(elapsed, PERIOD) / PERIOD
+	var phase: float = fposmod(time, PERIOD) / PERIOD
 	var linear: float = 1.0 - absf(phase * 2.0 - 1.0)
 	var eased: float = (1.0 - cos(phase * TAU)) * 0.5
 	return lerpf(linear, eased, CENTER_EASING)
 
+static func perfect_tolerance_pixels() -> float:
+	# Derive the visible zone from the timing rule, so it cannot drift from judgment.
+	return (normal_position_at(PERIOD / 4.0 + PERFECT_HALF_WINDOW) - 0.5) * WIDTH
+
 func sample() -> Dictionary:
-	return sample_at(position_ratio())
+	# Stun deliberately disrupts the normal crossing schedule; keep judging its
+	# random marker against the same visible zone rather than an invisible clock.
+	if erratic: return sample_at(position_ratio())
+	var time: float = fposmod(elapsed, PERIOD)
+	var error: float = minf(absf(time - PERIOD / 4.0), absf(time - PERIOD * 3.0 / 4.0))
+	return _sample(position_ratio(), error <= PERFECT_HALF_WINDOW + 0.000000001)
 
 static func sample_at(ratio: float) -> Dictionary:
 	var distance: float = absf(clampf(ratio, 0, 1) - 0.5) * WIDTH
-	var perfect: bool = distance <= PERFECT_TOLERANCE + 0.000001
+	return _sample(ratio, distance <= perfect_tolerance_pixels() + 0.000001)
+
+static func _sample(ratio: float, perfect: bool) -> Dictionary:
+	var distance: float = absf(clampf(ratio, 0, 1) - 0.5) * WIDTH
 	# Snap only the displayed position; the continuous clock still determines the hit.
 	return {"position": 0.5 if perfect else clampf(ratio, 0, 1), "power": 1.0 if perfect else 1.0 - distance / (WIDTH * 0.5), "perfect": perfect}

@@ -1,6 +1,14 @@
 extends "res://scripts/battle_rules.gd"
 ## Run progression and real-time siege. No presentation state or wall-clock calls.
 const Rewards = preload("res://scripts/reward_catalog.gd")
+const Tarot = preload("res://scripts/tarot_catalog.gd")
+const TarotInventory = preload("res://scripts/tarot_inventory.gd")
+var tarots = TarotInventory.new()
+var wave_tarots: Array = []
+var chest_tarots: Dictionary = {}
+var tarot_choices: Array = []
+var tarot_source: String = ""
+var tarot_slot: int = -1
 const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "THE CHAMPION", "CROSSROADS", "WATCH POST", "WAR CAMP", "CITY ROAD", "ELITE GUARD", "LAST STAND", "THE CITY"]
 # Normal / elite counts. Roles are independently randomized and then shuffled.
 const WAVE_COUNTS := [[1,0], [3,0], [0,1], [5,0], [2,1], [3,2], [5,2], [0,4], [5,5]]
@@ -60,6 +68,10 @@ func reset_run() -> void:
 	relic_choices.clear()
 	relic_offer_resolved = true
 	relic_reward_stage = -1
+	tarots.clear()
+	wave_tarots.clear()
+	chest_tarots.clear()
+	_clear_tarot_draw()
 	_load_wave()
 
 func record_perfect(perfect: bool) -> void:
@@ -88,16 +100,28 @@ func open_chest(requested_tier: int = 0) -> Array:
 	if tier < 1 or tier > 3 or tier > chest_tier(): return []
 	# Any claimed milestone empties the bank, including extra unspent diamonds.
 	perfect_progress = 0
+	return _roll_chest(tier)
+
+func open_bonus_chest() -> Array:
+	if not open_rewards.is_empty() or tarot_effects.bonus_chests.is_empty(): return []
+	return _roll_chest(tarot_effects.bonus_chests.pop_front())
+
+func _roll_chest(tier: int) -> Array:
 	claimed_slots.clear()
 	# Resolve every category, rarity and concrete relic before presentation starts.
 	for i in range(CHEST_COUNTS[tier]):
 		var index: int = Rewards.draw_category(reward_rng,reward_weights)
 		if index == Rewards.Category.RELIC:
-			var id: String = relics.draw_one(reward_rng,chest_relics.values())
-			if id.is_empty(): index = Rewards.Category.RUBY
+			# Replace one relic slot per treasure. Currency rolls are unchanged.
+			if chest_tarots.is_empty():
+				index = Rewards.Category.TAROT
+				chest_tarots[i] = Tarot.draw_choices(reward_rng,tarot_effects.banned)
 			else:
-				chest_relics[i] = id
-				if Relics.Catalog.ITEMS[id].rarity == Relics.Catalog.Rarity.CURSED: index = Rewards.Category.CURSE
+				var id: String = relics.draw_one(reward_rng,chest_relics.values())
+				if id.is_empty(): index = Rewards.Category.RUBY
+				else:
+					chest_relics[i] = id
+					if Relics.Catalog.ITEMS[id].rarity == Relics.Catalog.Rarity.CURSED: index = Rewards.Category.CURSE
 		open_rewards.append(index)
 	return open_rewards.duplicate()
 
@@ -113,9 +137,11 @@ func reward_item(slot: int) -> Dictionary:
 	return item
 
 func claim_reward(slot: int, replace_index: int = -1, discard: bool = false) -> Dictionary:
+	if not tarot_source.is_empty(): return {}
 	if slot < 0 or slot >= open_rewards.size() or slot in claimed_slots: return {}
 	var index: int = open_rewards[slot]
 	if index in Rewards.RETIRED_CATEGORIES and not discard: return {}
+	if index == Rewards.Category.TAROT and not discard: return {} # Resolved by choose_tarot.
 	var item: Dictionary = reward_item(slot)
 	if item.has("relic_id") and not discard and not acquire_relic(item.relic_id, replace_index): return {}
 	claimed_slots.append(slot)
@@ -131,6 +157,7 @@ func claim_reward(slot: int, replace_index: int = -1, discard: bool = false) -> 
 	return item.duplicate()
 
 func discard_unclaimed_rewards() -> int:
+	if not tarot_source.is_empty(): return 0
 	# Resolve remaining slots without applying rewards, history entries or RNG.
 	var discarded: int = 0
 	for slot in range(open_rewards.size()):
@@ -146,6 +173,7 @@ func close_chest() -> bool:
 	if not rewards_collected(): return false
 	open_rewards.clear()
 	chest_relics.clear()
+	chest_tarots.clear()
 	claimed_slots.clear()
 	return true
 
@@ -186,6 +214,7 @@ func _load_wave() -> void:
 func outcome() -> String:
 	if hp <= 0:
 		return "defeat"
+	if has_pending_attack_hits(): return ""
 	if is_city():
 		return "victory" if city_hp <= 0 else ""
 	return "wave_clear" if not has_living_enemies() else ""
@@ -211,46 +240,87 @@ func open_relic_offer() -> Array:
 	if not relic_offer_resolved: return relic_choices.duplicate()
 	if outcome() not in ["wave_clear", "victory"] or relic_reward_stage == stage: return []
 	_record_relic_wave_clear()
-	relic_choices = relics.offers(reward_rng)
+	relic_choices = relics.offers(reward_rng,2)
+	wave_tarots = Tarot.draw_choices(reward_rng,tarot_effects.banned)
 	relic_offer_resolved = false
 	return relic_choices.duplicate()
 
 func choose_relic(index: int, replace_index: int = -1) -> bool:
+	if not tarot_source.is_empty(): return false
 	if relic_offer_resolved or index < 0 or index >= relic_choices.size(): return false
 	if not acquire_relic(relic_choices[index], replace_index): return false
 	relic_offer_resolved = true
 	relic_choices.clear()
+	wave_tarots.clear()
 	return true
 
 func skip_relic() -> bool:
+	if not tarot_source.is_empty(): return false
 	if relic_offer_resolved: return false
 	rubies += 10
 	relic_offer_resolved = true
 	relic_choices.clear()
+	wave_tarots.clear()
 	return true
+
+func begin_tarot_reward(source: String, slot: int = -1) -> Array:
+	# A transaction stays pending until a revealed card is chosen. All candidates
+	# were locked when the parent reward opened; taps never consume reward RNG.
+	if not tarot_source.is_empty(): return []
+	if source == "wave":
+		if relic_offer_resolved or wave_tarots.is_empty(): return []
+		tarot_choices = wave_tarots.duplicate()
+	elif source == "chest":
+		if slot in claimed_slots or not chest_tarots.has(slot): return []
+		tarot_choices = chest_tarots[slot].duplicate()
+	else: return []
+	tarot_source = source
+	tarot_slot = slot
+	return tarot_choices.duplicate()
+
+func choose_tarot(index: int) -> Dictionary:
+	if tarot_source.is_empty() or index < 0 or index >= tarot_choices.size(): return {}
+	var item: Dictionary = tarots.add(tarot_choices[index])
+	if item.is_empty(): return {}
+	if tarot_source == "wave":
+		relic_offer_resolved = true
+		relic_choices.clear()
+		wave_tarots.clear()
+	else:
+		claimed_slots.append(tarot_slot)
+		reward_history.append(Rewards.Category.TAROT)
+	_clear_tarot_draw()
+	return item
+
+func _clear_tarot_draw() -> void:
+	tarot_choices.clear()
+	tarot_source = ""
+	tarot_slot = -1
 
 func begin_round() -> Array:
 	if not is_city():
 		return super.begin_round()
 	if not outcome().is_empty() or phase not in ["new", "round_end"]:
 		return []
+	tarot_effects.begin_round()
+	turn_boon_refreshes.clear()
 	round_number += 1
 	relic_turn_closed = false
 	var events: Array = []
 	if statuses[2].count > 0:
 		buff_ticks[2] = true
-		events.append(event(-1, heal(5), "heal", "REGROWTH"))
+		events.append(event(-1, heal(roundi(5*statuses[2].potency)), "heal", "REGROWTH"))
 	_prepare_player_turn()
 	return events
 
 func is_instant_kill(result: MultiHitSkill) -> bool:
 	return not is_city() and super.is_instant_kill(result)
 
-func attack_base(result: MultiHitSkill) -> float:
-	if not is_city(): return super.attack_base(result)
-	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE + relic_base_damage()
+func attack_base_with_bonus(result: MultiHitSkill, bonus: float) -> float:
+	if not is_city(): return super.attack_base_with_bonus(result,bonus)
+	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE + bonus
 	# A city is not a humanoid: triple 1 deals five regular attacks instead.
-	return regular_attack_power() * 5 if result.kind == Kind.SPECIAL and result.face == 1 else super.attack_base(result)
+	return (regular_base_damage() + bonus) * 5 if result.kind == Kind.SPECIAL and result.face == 1 else super.attack_base_with_bonus(result,bonus)
 
 func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
 	if not is_city(): return super.attack_damage(result, target)
@@ -274,7 +344,7 @@ func player_target() -> int:
 func _finish_player_action(result: MultiHitSkill) -> void:
 	var bonus: bool = not bonus_resume.is_empty()
 	super._finish_player_action(result)
-	if bonus: return
+	if bonus or phase == "roll": return
 	if is_city():
 		# Siege has no discrete enemy phase: preserve its complete roll intervals.
 		if outcome().is_empty(): _begin_turn_end()
@@ -317,9 +387,12 @@ func apply_player_step(primary: int = -1) -> Array:
 		lifesteal_used = 0
 		var damage: int = unmitigated_damage(result)
 		var loss: int = mini(city_hp,damage)
+		var ruined: bool = city_hp <= 0
 		city_hp -= loss
-		events.append(damage_event(-2,loss,damage))
-		events.append_array(_attack_relic_effects(-2,loss,result))
+		var impact: Dictionary = damage_event(-2,loss,damage)
+		impact.corpse_hit = ruined
+		events.append(impact)
+		if loss > 0: events.append_array(_attack_relic_effects(-2,loss,result))
 		var crushed: int = troops if hits_all(result) else mini(troops, 1) if result.random_target_per_use() else 0
 		if crushed > 0:
 			troops -= crushed
@@ -331,7 +404,7 @@ func apply_player_step(primary: int = -1) -> Array:
 
 func tick_city(delta: float, immunity_delta: float = -1.0) -> Array:
 	var events: Array = []
-	if not is_city() or not outcome().is_empty():
+	if not is_city() or city_hp <= 0 or not outcome().is_empty():
 		return events
 	var elapsed: float = maxf(0,delta if immunity_delta < 0 else immunity_delta)
 	if delta <= 0:
@@ -358,7 +431,7 @@ func tick_city(delta: float, immunity_delta: float = -1.0) -> Array:
 		if volley_clock <= 0:
 			volley_clock += 4.0
 			volley_warned = false
-			events.append(event(-2, 0, "volley", "VOLLEY"))
+			if status_count(Status.HIDDEN) == 0: events.append(event(-2, 0, "volley", "VOLLEY"))
 			events.append_array(_city_hit(7))
 		if troop_clock <= 0 and outcome().is_empty():
 			troop_clock += 1.5

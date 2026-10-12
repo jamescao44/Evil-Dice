@@ -48,13 +48,14 @@ func distribution_checks() -> void:
 
 func chest_distribution_checks() -> void:
 	var model = Run.new(890)
-	var categories := [0,0,0,0,0,0,0]
+	var categories := [0,0,0,0,0,0,0,0]
 	var rarities := [0,0,0,0,0]
 	for n in range(SAMPLES):
 		model.perfect_progress = 3
 		model.open_chest()
 		var gift: Dictionary = model.reward_item(0)
-		if gift.has("relic_id"):
+		if gift.id == "tarot": categories[Rewards.Category.RELIC] += 1
+		elif gift.has("relic_id"):
 			categories[Rewards.Category.RELIC] += 1
 			rarities[Relics.ITEMS[gift.relic_id].rarity] += 1
 		else: categories[model.open_rewards[0]] += 1
@@ -67,15 +68,15 @@ func chest_distribution_checks() -> void:
 		var forced: Array = [0,0,0,0,0,0,0]
 		forced[retired] = 1
 		for i in range(100): check(Rewards.draw_category(model.reward_rng,forced) not in Rewards.RETIRED_CATEGORIES,"Custom weights cannot restore removed rewards")
-	for tier in range(5): frequency(rarities[tier],categories[1],Relics.RARITY_WEIGHTS[tier]/100,"Chest relics use the same rarity probabilities")
+	check(rarities == [0,0,0,0,0],"A common chest substitutes its only relic slot with a tarot draw")
 	for weights in [[0,1,0,0,0,0,0],[0,0,1,0,0,0,0]]:
 		model.reward_weights = weights
 		var counts := [0,0,0,0,0]
 		for n in range(SAMPLES):
-			model.perfect_progress = 3
+			model.perfect_progress = 6
 			model.open_chest()
-			counts[Relics.ITEMS[model.reward_item(0).relic_id].rarity] += 1
-			model.claim_reward(0,-1,true)
+			counts[Relics.ITEMS[model.reward_item(1).relic_id].rarity] += 1
+			model.discard_unclaimed_rewards()
 			model.close_chest()
 		for tier in range(5): frequency(counts[tier],SAMPLES,Relics.RARITY_WEIGHTS[tier]/100,"Legacy cursed category cannot bypass the shared rarity roll")
 
@@ -84,16 +85,22 @@ func presentation_checks() -> void:
 	root.add_child(chest)
 	chest.set_process(false)
 	chest.cosmetic.seed = 331
-	var counts := [0,0,0,0,0]
-	var relic_count: int = 0
-	for n in range(SAMPLES):
-		var symbol: Dictionary = chest.symbols[chest._scroll_symbol()]
-		check(symbol.id not in ["damage","multiplier","potion"],"Reels never show retired upgrades or potion placeholders")
-		if symbol.has("relic_id"):
-			relic_count += 1
-			counts[Relics.ITEMS[symbol.relic_id].rarity] += 1
-	frequency(relic_count,SAMPLES,2.0/4,"Reels do not overrepresent relics as the catalog grows")
-	for tier in range(5): frequency(counts[tier],relic_count,Relics.RARITY_WEIGHTS[tier]/100,"Reel rarity distribution follows the shared table")
+	chest.start([Rewards.Category.RUBY,Rewards.Category.SHARD,Rewards.Category.TAROT],Vector2(1280,800),null)
+	for sequence in chest.sequences:
+		var rolling: Array = sequence.slice(0,chest.reel_steps)
+		for category in [Rewards.Category.RUBY,Rewards.Category.SHARD,Rewards.Category.TAROT]:
+			check(category in rolling,"Every reel shows currency and tarot regardless of the winning category")
+		for id in Relics.ITEMS:
+			check((chest.relic_symbols[id] in rolling) == not Relics.ITEMS[id].get("fusion",false),"Every directly obtainable relic appears; fusion-only relics stay out")
+		for index in sequence:
+			check(chest.symbols[index].id not in ["damage","multiplier","potion"] and index not in [Rewards.Category.RELIC,Rewards.Category.CURSE],"Reels show real rewards without retired items or generic relic placeholders")
+	chest.cosmetic.seed = 207
+	chest.start([Rewards.Category.RUBY],Vector2(1280,800),null)
+	var ruby_sequence: Array = chest.sequences[0].duplicate()
+	chest.cosmetic.seed = 207
+	chest.start([Rewards.Category.TAROT],Vector2(1280,800),null)
+	for i in range(ruby_sequence.size()):
+		if i != chest.reel_steps: check(ruby_sequence[i] == chest.sequences[0][i],"Changing the reward changes only the final landing symbol, never the filler")
 	var model = Run.new(889)
 	model.perfect_progress = 9
 	model.reward_weights = [0,1,0,0,0,0,0]
@@ -112,12 +119,16 @@ func presentation_checks() -> void:
 		for i in range(12): chest._process(2)
 		check(not chest.active and model.claimed_slots.is_empty(),"Animation ends without granting any prize")
 		for slot in range(outcomes.size()):
-			var symbol: Dictionary = chest.symbols[chest.sequences[slot][chest.REEL_STEPS]]
-			check(symbol.relic_id == locked[slot].relic_id and model.reward_item(slot) == locked[slot],"Every reel ends on the concrete reward chosen before animation")
+			var symbol: Dictionary = chest.symbols[chest.sequences[slot][chest.reel_steps]]
+			check(symbol.get("relic_id","") == locked[slot].get("relic_id","") and symbol.id == locked[slot].id and model.reward_item(slot) == locked[slot],"Every reel ends on the concrete reward chosen before animation")
 		check(model.reward_rng.state == reward_state and model.rng.state == combat_state,"Animation and speed consume neither reward nor combat RNG")
 	check(model.open_chest() == outcomes and model.reward_rng.state == reward_state,"Reopening a pending chest cannot reroll")
 	for slot in range(outcomes.size()-1,-1,-1):
-		check(model.claim_reward(slot).relic_id == locked[slot].relic_id,"Reverse pickup order grants the preselected relic")
+		if locked[slot].id == "tarot":
+			model.begin_tarot_reward("chest",slot)
+			check(not model.choose_tarot(0).is_empty(),"Reverse pickup order also collects a locked tarot draw")
+		else:
+			check(model.claim_reward(slot).relic_id == locked[slot].relic_id,"Reverse pickup order grants the preselected relic")
 	check(model.reward_rng.state == reward_state and model.rng.state == combat_state,"Collecting rewards never rolls them again")
 	check(model.close_chest(),"All locked rewards are collectible")
 	chest.free()

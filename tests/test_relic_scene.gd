@@ -118,7 +118,7 @@ func run() -> void:
 	game.muted = true; game.speed = 20
 	game.model.enemies[0].hp = 0
 	game._check_over()
-	check(game.view_phase == "relic_reward" and game.model.relic_choices.size() == 3,"Cleared wave opens three choices before advancing")
+	check(game.view_phase == "relic_reward" and game.model.relic_choices.size() == 2 and game.model.wave_tarots.size() == 3,"Cleared wave opens two relics and a tarot draw before advancing")
 	var offers: Array = game.model.relic_choices.duplicate()
 	await create_timer(0.15).timeout
 	check(game.model.stage == 0 and game.model.relic_choices == offers,"Reward screen waits without rerolling")
@@ -208,7 +208,7 @@ func run() -> void:
 	await capture("inventory")
 	for enemy in game.model.enemies: enemy.hp = 0
 	game._check_over()
-	game.model.relic_choices = ["contract","bloodstone","runestone"]
+	game.model.relic_choices = ["contract","bloodstone"]
 	game._handle_click(game.relic_ui.card_rect(0).get_center())
 	check(game.relic_ui.replacement_choice == 0 and game.model.relics.items.size() == 10,"Full inventory prompts for a replacement")
 	await capture("replacement")
@@ -226,7 +226,7 @@ func run() -> void:
 	game._reward_sequence()
 	var deadline: int = Time.get_ticks_msec()+4000
 	while not game.chest.visible and Time.get_ticks_msec() < deadline: await process_frame
-	check(game.chest.visible and game.model.chest_relics.size() == 5,"Perfect chest locks five real relic prizes")
+	check(game.chest.visible and game.model.chest_relics.size() == 4 and game.model.chest_tarots.size() == 1,"Perfect chest locks four relics and one tarot draw")
 	game.chest.set_process(false)
 	game.chest.elapsed = 3.8
 	game.chest.queue_redraw()
@@ -235,7 +235,9 @@ func run() -> void:
 	game.chest.playback_speed = 100
 	while game.chest.active and Time.get_ticks_msec() < deadline: await process_frame
 	check(not game.chest.active,"Relic reels finish normally")
-	for slot in range(5):
+	game.model.claim_reward(0,-1,true)
+	game.chest.collected.append(0)
+	for slot in range(1,5):
 		var prize: String = game.model.chest_relics[slot]
 		check(game.chest.symbols[game.chest.rewards[slot]].relic_id == prize,"Reel lands on the exact locked relic")
 		game._handle_click(game.chest.reel_rect(slot).get_center())

@@ -354,3 +354,122 @@ Turns: %d / 6. Stored charges: %d.,Turns: %d / 6. Stored charges: %d.,回合：%
 Kills: %d.,Kills: %d.,击杀数：%d。
 Extra hits: %d.,Extra hits: %d.,额外攻击次数：%d。
 SKIP REMAINING,SKIP REMAINING,跳过剩余奖励
++%s BASE,+%s BASE,基础伤害 +%s
+CHOOSE ONE REWARD,CHOOSE ONE REWARD,选择一项奖励
+Draw Tarot,Draw Tarot,抽取塔罗牌
+Draw three cards. Keep one.,Draw three cards. Keep one.,抽取三张牌，保留其中一张。
+TAROT,TAROT,塔罗牌
+SHUFFLING THE STARS,SHUFFLING THE STARS,正在洗牌
+DRAW THREE CARDS,DRAW THREE CARDS,抽取三张牌
+SWIPE TO EXPLORE THE FAN,SWIPE TO EXPLORE THE FAN,左右滑动浏览牌扇
+CHOOSE ONE TO KEEP,CHOOSE ONE TO KEEP,选择一张保留
+KEEP THIS CARD,KEEP THIS CARD,保留此牌
+CARD COLLECTED,CARD COLLECTED,已收集
+TAROT COLLECTION,TAROT COLLECTION,塔罗牌收藏
+NO TAROT CARDS YET,NO TAROT CARDS YET,尚未收集塔罗牌
+Find cards in wave rewards and treasures.,Find cards in wave rewards and treasures.,在通关奖励或宝藏中获得塔罗牌。
+SWIPE TO BROWSE · TAP TO INSPECT,SWIPE TO BROWSE · TAP TO INSPECT,左右滑动浏览 · 点击查看
+Effects not implemented yet.,Effects not implemented yet.,效果尚未实现。
+Planned effect,Planned effect,预定效果
+INSPECT ONLY,INSPECT ONLY,仅供查看
+BACK,BACK,返回
+DRAWN %d / 3,DRAWN %d / 3,已抽取 %d / 3
+CARDS %d,CARDS %d,塔罗牌 %d
+Return to dice,Return to dice,返回骰子
+Collected tarot cards,Collected tarot cards,已收集的塔罗牌
+The Fool,The Fool,愚者
+Reroll an owned item into a different one.,Reroll an owned item into a different one.,将持有的一件道具随机替换为另一件不同的道具。
+The Magician,The Magician,法师
+Choose the next dice result.,Choose the next dice result.,指定下次骰子投掷点数。
+The High Priestess,The High Priestess,女祭司
+Non-special skills gain one extra use this turn.,Non-special skills gain one extra use this turn.,本回合非特殊技能的使用次数加一。
+The Empress,The Empress,女皇
+Receive two random tarot cards.,Receive two random tarot cards.,获得两张随机塔罗牌。
+The Emperor,The Emperor,皇帝
+Receive a random item.,Receive a random item.,获得一件随机道具。
+The Hierophant,The Hierophant,教皇
+Gain a revelation face. Rolls containing it become that triple.,Gain a revelation face. Rolls containing it become that triple.,获得启示点数；投掷含有该点数时变为该点数的三骰。
+The Lovers,The Lovers,恋人
+Choose all odd or all even dice for the next throw.,Choose all odd or all even dice for the next throw.,指定下次投掷全部为奇数或偶数。
+The Chariot,The Chariot,战车
+Deal 50 base damage to all enemies.,Deal 50 base damage to all enemies.,对全体敌人造成50点基础伤害。
+Strength,Strength,力量
+Double the damage or effect of the next skill.,Double the damage or effect of the next skill.,下次技能的伤害或效果翻倍。
+The Hermit,The Hermit,隐者
+Become invisible for three turns; attacking breaks invisibility.,Become invisible for three turns; attacking breaks invisibility.,隐身三回合；攻击会解除隐身。
+Wheel of Fortune,Wheel of Fortune,命运之轮
+A 1 in 4 chance of a chest; 1 in 10 of those is rare.,A 1 in 4 chance of a chest; 1 in 10 of those is rare.,四分之一概率获得宝箱，其中十分之一为稀有宝箱。
+Justice,Justice,正义
+The next throw is guaranteed to be a triple.,The next throw is guaranteed to be a triple.,下次投掷必定为三骰。
+The Hanged Man,The Hanged Man,倒吊人
+Choose a tarot card to exclude from future draws.,Choose a tarot card to exclude from future draws.,选择一张塔罗牌，使其不再出现。
+Death,Death,死神
+Execute a selected enemy.,Execute a selected enemy.,处决指定敌人。
+Temperance,Temperance,节制
+Skip this turn; gain an extra throw and skill use next turn.,Skip this turn; gain an extra throw and skill use next turn.,跳过本回合；下回合额外投掷并使用技能一次。
+The Devil,The Devil,恶魔
+The next triple becomes 666.,The next triple becomes 666.,下次三骰变为666。
+The Tower,The Tower,高塔
+"Apply ten random statuses, each to a random character, including the player.","Apply ten random statuses, each to a random character, including the player.",施加十次随机异常状态，每次随机选择一名角色，包括玩家。
+The Star,The Star,星星
+The next three throws are Perfect.,The next three throws are Perfect.,接下来三次投掷必定Perfect。
+The Moon,The Moon,月亮
+Apply permanent darkness to all enemies.,Apply permanent darkness to all enemies.,使所有敌人永久黑暗。
+The Sun,The Sun,太阳
+Fully heal and apply one burning stack to every enemy.,Fully heal and apply one burning stack to every enemy.,恢复全部生命，并对所有敌人施加一层燃烧。
+Judgement,Judgement,审判
+"If the enemy count is a multiple of six, execute a random half.","If the enemy count is a multiple of six, execute a random half.",若敌人数量为六的倍数，则随机处决其中一半。
+The World,The World,世界
+Receive a random legendary item.,Receive a random legendary item.,获得一件随机传奇道具。
+Reroll every owned relic. New relics cannot match any previously owned relic.,Reroll every owned relic. New relics cannot match any previously owned relic.,重置所有已持有的法具。新法具不会与重置前的任何法具重复。
+Choose all three dice for the next throw. Takes priority over other roll effects.,Choose all three dice for the next throw. Takes priority over other roll effects.,指定下次投掷的全部三个点数，优先于其他改变点数的效果。
+"Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.","Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.",为下次投掷随机获得一个启示点数。若投出该点数，则全部骰子变为该点数。
+Effect,Effect,效果
+Single use,Single use,一次性消耗品
+SWIPE · TAP TO INSPECT · DRAG TO CAST,SWIPE · TAP TO INSPECT · DRAG TO CAST,滑动浏览 · 点击查看 · 拖至战场使用
+Invisible,Invisible,隐身
+Untargetable for 3 turns. Using an attack skill breaks invisibility.,Untargetable for 3 turns. Using an attack skill breaks invisibility.,三回合内无法被选为目标，使用攻击技能后解除隐身。
+"Use tarot between actions, before or after rolling.","Use tarot between actions, before or after rolling.",请在行动之间使用塔罗牌，投掷前后均可。
+Unknown tarot card.,Unknown tarot card.,未知的塔罗牌。
+Card already used.,Card already used.,该卡牌已使用。
+This card cannot affect the city.,This card cannot affect the city.,此牌无法对城市使用。
+Drag Death onto a living enemy.,Drag Death onto a living enemy.,将死神拖到一名存活的敌人身上。
+Judgement needs a multiple of six living enemies.,Judgement needs a multiple of six living enemies.,审判需要存活敌人数为六的倍数。
+No relics to reroll.,No relics to reroll.,没有可以重置的法具。
+At least one tarot must remain in the deck.,At least one tarot must remain in the deck.,牌堆中至少需要保留一种塔罗牌。
+No eligible relic is available.,No eligible relic is available.,目前没有符合条件的法具。
+This relic is already owned.,This relic is already owned.,已经持有该法具。
+Choose all three dice.,Choose all three dice.,请选择全部三个点数。
+Choose odd or even.,Choose odd or even.,请选择奇数或偶数。
+Choose a tarot still in the deck.,Choose a tarot still in the deck.,请选择尚未排除的塔罗牌。
+Choose a relic to replace.,Choose a relic to replace.,请选择要替换的法具。
+Choose a relic to replace,Choose a relic to replace,选择要替换的法具
+NO TREASURE,NO TREASURE,未获得宝箱
+UNTARGETABLE,UNTARGETABLE,无法被选为目标
+STRENGTH,STRENGTH,力量
+EXTRA THROW,EXTRA THROW,额外投掷
+Revelation: %d · next throw,Revelation: %d · next throw,启示点数：%d · 下次投掷生效
+Two tarot cards added.,Two tarot cards added.,已获得两张塔罗牌。
+Choose the next three dice,Choose the next three dice,指定下次投掷的三个点数
+Choose odd or even,Choose odd or even,选择奇数或偶数
+Exclude one tarot from future draws,Exclude one tarot from future draws,从后续抽取中排除一种塔罗牌
+ODD · 1 / 3 / 5,ODD · 1 / 3 / 5,奇数 · 1 / 3 / 5
+EVEN · 2 / 4 / 6,EVEN · 2 / 4 / 6,偶数 · 2 / 4 / 6
+Confirm,Confirm,确认
+Cancel,Cancel,取消
+regen %d for %d turns,regen %d for %d turns,每回合恢复%d点，持续%d回合
+DMG +%.1f for %d turns,DMG +%.1f for %d turns,伤害倍率+%.1f，持续%d回合
+Heal %d at turn start.,Heal %d at turn start.,回合开始时恢复%d点生命。
+Adds +%.1f to DMG. Stacks with other bonuses.,Adds +%.1f to DMG. Stacks with other bonuses.,伤害倍率+%.1f，与其他加成叠加。
+The next damaging skill gains one extra use. Excludes buffs and instant kills.,The next damaging skill gains one extra use. Excludes buffs and instant kills.,下次伤害技能增加一次使用次数，不包括增益和即死技能。
+Set all three dice for the next throw. Later dice settings replace this; transformations still apply.,Set all three dice for the next throw. Later dice settings replace this; transformations still apply.,指定下次投掷的三个点数。后使用的点数设定会覆盖此效果，启示等转化仍会生效。
+Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.,Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.,下次技能增加一份基础伤害或增益强度。多张力量的加成相加。
+GIVE ALL 22 TAROTS,GIVE ALL 22 TAROTS,获得全部22张塔罗牌
+"Choose dice, load a wave, or add tarot cards.","Choose dice, load a wave, or add tarot cards.",选择骰子、载入关卡或添加塔罗牌。
+STATUS EFFECTS,STATUS EFFECTS,状态效果
+No active status effects.,No active status effects.,当前无状态效果。
+Permanent,Permanent,永久
+%d stack,%d stack,%d层
+%d stacks,%d stacks,%d层
+%d turn,%d turn,%d回合
+%d turns,%d turns,%d回合

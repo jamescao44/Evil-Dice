@@ -80,8 +80,7 @@ func model_checks() -> void:
 				if m.phase == "executing":
 					check(m.pending.uses_left() == budget-actions and m.statuses[3].count >= 3,"Remaining uses decrease without ending the turn or expiring buffs")
 				if actions > budget: break
-			var expected: int = 1 if not city and values == [6,6,6] else budget
-			check(actions == expected and m.pending.is_empty(),"All modified uses resolve, with immediate stop on a squad wipe")
+			check(actions == budget and m.pending.is_empty(),"All modified uses resolve, including after a squad wipe")
 			check(m.round_number == 1 and m.apply_player_step().is_empty(),"Multiple uses never create extra turns or permit an extra activation")
 			if values == [5,5,5]:
 				check(events.filter(func(e): return e.type == "damage").size() == 12,"Doubled Sixfold Ruin deals exactly twelve hits")
@@ -121,6 +120,59 @@ func model_checks() -> void:
 	m.reset_run()
 	check(m.skill_use_modifiers.is_empty() and m.pending.is_empty() and m.saved_skill.is_empty(),"Restart clears all skill instances and run modifiers")
 
+func corpse_checks() -> void:
+	for mode in ["battle","wave","city"]:
+		for values in [[1,2,3],[1,1,2],[1,1,1],[4,4,4],[5,5,1],[5,5,5],[6,6,6]]:
+			var m = Run.new(992) if mode != "battle" else Rules.new(992)
+			if mode == "city": m.load_debug_wave(10); m.city_hp = 1
+			m.begin_round()
+			for enemy in m.enemies: enemy.hp = 1; enemy.shield = 0
+			for id in ["reaper_scythe","bloodstone","magic_shield"]: m.acquire_relic(id)
+			m.hp = 10
+			m.set_skill_use_multiplier("echo",4)
+			m.set_test_roll(values)
+			var cast: MultiHitSkill = m.pending
+			var count: int = m.skill_use_count(cast)
+			var corpses: int = 0
+			for use in range(count):
+				var defeated: bool = m.city_hp == 0 if mode == "city" else m.living().is_empty()
+				var before_hp: int = m.hp
+				var kills: int = m.relics.items[m.relics.index_of("reaper_scythe")].kills
+				var target: int = m.player_target()
+				var state: int = m.rng.state
+				check(m.player_target() == target and m.rng.state == state,"Living and corpse targets lock once per impact")
+				var events: Array = m.apply_player_step(target)
+				var hits: Array = events.filter(func(e): return e.type == "damage")
+				check(not hits.is_empty() and cast.uses_spent == use+1,"Every remaining use makes an impact and spends exactly one use")
+				if defeated:
+					corpses += 1
+					check(hits.all(func(e): return e.get("corpse_hit",false) and e.amount == 0),"Corpse impacts never remove additional HP")
+					check(m.relics.items[m.relics.index_of("reaper_scythe")].kills == kills,"Corpse hits never award duplicate kills")
+					if values != [6,6,6]: check(m.hp == before_hp,"Corpse hits do not grant lifesteal")
+				else: check(hits.all(func(e): return not e.get("corpse_hit",false)),"Corpses are excluded whenever a living target remains")
+				if use < count-1:
+					check(m.phase == "executing" and m.outcome().is_empty(),"Victory waits for the complete locked hit budget")
+					if mode != "battle": check(m.open_relic_offer().is_empty(),"Rewards stay unavailable between remaining hits")
+				if mode == "city" and m.city_hp == 0:
+					check(m.tick_city(0.25).is_empty(),"A destroyed city cannot attack during follow-through")
+			check(corpses > 0 and m.pending.is_empty() and m.outcome() == ("wave_clear" if mode == "wave" else "victory"),"The last corpse hit ends the cast and releases victory")
+			check(m.relics.items[m.relics.index_of("magic_shield")].turns == 1,"The whole chain completes exactly one relic turn")
+			check(m.apply_player_step().is_empty(),"A finished battle cannot start another corpse hit")
+	var saved = Run.new(994)
+	saved.begin_round()
+	saved.enemies[0].hp = 1
+	saved.saved_skill = Rules.classify([5,5,5])
+	var waiting: MultiHitSkill = saved.set_test_roll([3,3,4]).duplicate()
+	saved.begin_saved_cast()
+	var hits: Array = saved.apply_player().filter(func(e): return e.type == "damage")
+	check(hits.size() == 6 and hits.slice(1).all(func(e): return e.corpse_hit),"Saved attacks also spend all remaining hits on corpses")
+	check(saved.saved_skill.same_as(waiting) and saved.pending.is_empty(),"A saved finishing chain preserves the unused current skill for the next wave")
+	var defeated = fresh()
+	defeated.set_test_roll([5,5,5]); defeated.begin_player_cast()
+	for enemy in defeated.enemies: enemy.hp = 0
+	defeated.hp = 0
+	check(defeated.outcome() == "defeat" and defeated.apply_player_step().is_empty(),"Player defeat still stops an unfinished chain immediately")
+
 func prepare(g, values: Array) -> void:
 	g._restart()
 	g.model.stage = 1
@@ -133,6 +185,13 @@ func prepare(g, values: Array) -> void:
 	g.skill_bubble.begin(g.result)
 	g.skill_bubble.age = g.skill_bubble.formation
 	g.view_phase = "skill"
+
+func capture_corpses(g) -> void:
+	# Rendering can pause when a native window is occluded; never block the driver.
+	await RenderingServer.frame_post_draw
+	if not is_instance_valid(g) or not g.is_inside_tree(): return
+	DirAccess.make_dir_recursive_absolute("res://test-output")
+	root.get_texture().get_image().save_png("res://test-output/multi-hit-corpses-%s.png" % ("portrait" if g is Portrait else "landscape"))
 
 func scene_checks(g) -> void:
 	root.add_child(g)
@@ -167,12 +226,37 @@ func scene_checks(g) -> void:
 	var deadline: int = Time.get_ticks_msec()+8000
 	while g.view_phase == "resolving" and Time.get_ticks_msec()<deadline: await process_frame
 	check(g.view_phase == "skill" and g.skill_bubble.orb_count() == 12 and g.model.round_number == turn,"Saved modified chain restores the waiting preview without spending its turn")
+	prepare(g,[5,5,5])
+	for enemy in g.model.enemies: enemy.hp = 1; enemy.shield = 0
+	g.model.set_skill_use_multiplier("echo",2)
+	var cast: MultiHitSkill = g.model.pending
+	Driver.cast_pending(g)
+	var max_used: int = g.skill_bubble.used
+	var continued: bool = false
+	var rewards_locked: bool = true
+	var captured: bool = false
+	deadline = Time.get_ticks_msec()+8000
+	while g.view_phase == "resolving" and Time.get_ticks_msec()<deadline:
+		max_used = maxi(max_used,g.skill_bubble.used)
+		if g.model.living().is_empty() and cast.uses_left() > 0:
+			continued = true
+			rewards_locked = rewards_locked and g.model.outcome().is_empty() and not g._can_claim_chest()
+			if not captured and cast.uses_spent >= 4 and "--visual" in OS.get_cmdline_user_args():
+				captured = true
+				capture_corpses(g)
+		await process_frame
+	check(Time.get_ticks_msec()<deadline and continued and max_used == 12 and cast.uses_spent == 12,"Scene consumes every orb after killing the last creature")
+	check(rewards_locked,"Scene keeps rewards locked while hitting bodies")
+	check(g.view_phase == "relic_reward","Wave reward appears only after the complete chain")
+	g.fallen[0] = 1.0
+	check(g._enemy_impact_point(0).is_equal_approx(g._enemy_feet(0)-Vector2(0,g._enemy_side()*0.08)),"Follow-through aims at the body on the floor")
 	g.queue_free()
 	await process_frame
 
 func run() -> void:
 	object_checks()
 	model_checks()
+	corpse_checks()
 	await scene_checks(Battle.new())
 	await scene_checks(Portrait.new())
 	print("Multi-hit skills: %d checks, %d failures" % [checks,failures])

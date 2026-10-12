@@ -12,21 +12,29 @@ const STUNNED := 102
 const DARKNESS := 103
 const CORROSION := 104
 const PLAGUE := 105
+const HIDDEN := 106
 const HARMFUL := [FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE]
-const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE]
+const PLAYER_HARMFUL := [FROZEN, BURNING, STUNNED, DARKNESS, CORROSION]
+const ENEMY_HARMFUL := [FROZEN, BURNING, DARKNESS, CORROSION, PLAGUE]
+const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE, HIDDEN]
 enum Attribute { NONE, ICE, FIRE, SHOCK, DARK, ACID, DISEASE }
+var permanent: bool = false
+var potency: float = 1.0
 var id: int
 var count: int = 0:
-	set(value): count = clampi(value, 0, MAX_BURNING_STACKS) if id == BURNING else maxi(0, value)
+	set(value):
+		count = clampi(value, 0, MAX_BURNING_STACKS) if id == BURNING else maxi(0, value)
+		if count == 0: potency = 1.0
 
 func _init(effect_id: int) -> void:
 	id = effect_id
 
-func apply(amount: int) -> void:
+func apply(amount: int, effect_potency: float = 1.0) -> void:
 	count = count+maxi(0,amount) if is_stacking() else maxi(0,amount)
+	if count > 0: potency = maxf(1.0,effect_potency)
 
 func consume(amount: int = 1) -> void:
-	count -= amount
+	if not permanent: count -= amount
 
 func is_harmful() -> bool:
 	return id in HARMFUL

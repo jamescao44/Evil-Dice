@@ -3,6 +3,8 @@ extends Node2D
 const Pixel = preload("res://scripts/pixel_paint.gd")
 const Orb = preload("res://scripts/skill_orb_paint.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
+const DragFeedback = preload("res://scripts/cast_drag_feedback.gd")
+var drag_feedback = DragFeedback.new()
 var battle
 var stored: bool = false
 var roll: MultiHitSkill = MultiHitSkill.new()
@@ -34,6 +36,7 @@ func _ready() -> void:
 	z_index = 40
 
 func begin(value: MultiHitSkill) -> void:
+	drag_feedback.reset()
 	slam_age = SLAM_DURATION
 	roll = value.duplicate(true)
 	age = 0
@@ -49,6 +52,7 @@ func begin(value: MultiHitSkill) -> void:
 	fragments.clear()
 
 func clear() -> void:
+	drag_feedback.reset()
 	slam_age = SLAM_DURATION
 	roll = MultiHitSkill.new()
 	caption.clear()
@@ -59,6 +63,7 @@ func clear() -> void:
 	dissolve_age = 0
 	fragments.clear()
 	self_modulate = Color.WHITE
+	z_index = 40
 	queue_redraw()
 
 func lock_cast_position(at: Vector2) -> void:
@@ -88,8 +93,12 @@ func is_casting() -> bool:
 	return battle.view_phase == "resolving" and battle.casting_source == ("saved" if stored else "current")
 
 func display_radius() -> float:
-	if stored: return (battle._skill_radius() if is_active_saved() else battle._saved_slot_radius()*0.84) * slam_scale()
-	return battle._skill_radius()*radius_scale()*(0.7 if battle.skill_dragging and battle.skill_source == "current" else 1.0)*slam_scale()
+	var preview_scale: float = drag_feedback.scale_factor() if is_dragging() else 1.0
+	if stored: return (battle._skill_radius() if is_active_saved() else battle._saved_slot_radius()*0.84) * slam_scale()*preview_scale
+	return battle._skill_radius()*radius_scale()*(0.7 if is_dragging() else 1.0)*slam_scale()*preview_scale
+
+func is_dragging() -> bool:
+	return battle.view_phase == "targeting" and battle.skill_dragging and battle.skill_source == ("saved" if stored else "current")
 
 func display_center() -> Vector2:
 	if cast_position != Vector2.INF: return cast_position - Vector2(0, battle._skill_radius() * slam_lift())
@@ -159,9 +168,12 @@ func radius_scale() -> float:
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
+	var selected: bool = battle.skill_source == ("saved" if stored else "current")
+	z_index = battle.HELD_ITEM_Z if selected and battle.view_phase == "targeting" and (battle.skill_pressed or battle.skill_dragging) else 40
 	# Once taken out, the saved skill still plays its cast and dissolve effects.
 	var locked_saved: bool = stored and not is_casting() and not battle._can_use_saved()
 	if not battle._menus_open():
+		drag_feedback.advance(delta,is_dragging(),battle.ARENA.has_point(battle.skill_pointer),battle.reduced)
 		age += delta
 		if not locked_saved: rotation_clock += delta * battle._world_time_scale()
 		cast_age += delta
@@ -173,6 +185,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if is_instance_valid(battle) and is_instance_valid(battle.tarot_ui) and battle.tarot_ui.inventory_visible(): return
 	if not is_instance_valid(battle) or battle._menus_open(): return
 	var source: String = "saved" if stored else "current"
 	var selected: bool = battle.skill_source == source
@@ -190,11 +203,8 @@ func _draw() -> void:
 		return
 	var progress: float = 1 if stored else clampf(age*entrance_speed/converge,0,1)
 	var dragging: bool = battle.skill_dragging and selected
-	if aiming:
-		if battle._skill_needs_target(roll):
-			for target in battle._skill_targets(): _draw_target(target, target == battle.hover_target, color)
-		elif dragging:
-			draw_rect(battle.ARENA.grow(-8), Color(color,0.85 if battle._field_drop_valid(battle.skill_pointer) else 0.35),false,3)
+	if aiming and dragging and not battle._skill_needs_target(roll):
+		draw_rect(battle.ARENA.grow(-8), Color(color,0.85 if battle._field_drop_valid(battle.skill_pointer) else 0.35),false,3)
 	if progress < 1:
 		var travel: float = 1.0 - pow(1.0 - progress, 3)
 		for i in range(3):
@@ -204,6 +214,8 @@ func _draw() -> void:
 			_mini_die(p, int(roll.dice[i]), lerpf(38 if portrait else 24, 8, travel), 1.0-progress)
 	var appear: float = smoothstep(0.25, 0.85, progress)
 	if appear <= 0: return
+	# Fade only the sprite; target brackets, labels, and energy stay bright.
+	if is_dragging(): appear *= drag_feedback.opacity()
 	var pulse: float = 0.5 if battle.reduced else (sin(rotation_clock * 3.6) + 1) * 0.5
 	for i in range(5, 0, -1):
 		Pixel.circle(self, at, radius + i*4, Color(color, (0.035 + pulse*0.025)*appear), 4)
@@ -223,6 +235,9 @@ func _draw() -> void:
 		Pixel.line(self, p-direction*5, p+direction*5, Color(color, appear), 3)
 		if i % 2 == 0: Pixel.line(self, p-direction.orthogonal()*4, p+direction.orthogonal()*4, Color(color, appear), 2)
 	_draw_icon(at, radius*0.66, Color(1,1,1,appear))
+	if is_dragging(): drag_feedback.paint(self,at,Vector2.ONE*radius,color,battle.reduced)
+	if aiming and battle._skill_needs_target(roll):
+		for target in battle._skill_targets(): _draw_target(target, target == battle.hover_target, color)
 	if progress >= 1:
 		if orb_count() > 1: _draw_uses(at, radius, color)
 		if not stored or aiming or casting: _draw_caption(at,radius,portrait,aiming,color)
@@ -262,7 +277,7 @@ func value_text() -> String:
 	if Rules.is_attack(roll): return battle.model.damage_caption(roll, battle.hover_target if selected else -1)
 	if roll.face == 2:
 		if battle.model.status_count(battle.Status.DARKNESS) > 0: return "+0 HP"
-		if roll.kind == Rules.Kind.PAIR: return "5 HP (x%d)" % roll.spare
+		if roll.kind == Rules.Kind.PAIR: return "%d HP (x%d)" % [roundi(5*battle.model.tarot_effects.skill_factor(roll)),roll.spare]
 		return "+%d HP" % maxi(0, battle.model.max_hp-battle.model.hp)
 	return ""
 
@@ -301,21 +316,7 @@ func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, col
 	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font)
 
 func _draw_target(target: int, selected: bool, color: Color) -> void:
-	var rect: Rect2 = battle._target_rect(target)
-	var tint := Color(color, 1.0 if selected else 0.38)
-	var size: float = 17 if selected else 10
-	if selected:
-		draw_rect(rect, Color(color, 0.11))
-		Pixel.disc(self, Vector2(rect.get_center().x, rect.end.y), rect.size.x*0.55, Color(color,0.3),3,0.18)
-	for x in [rect.position.x, rect.end.x]:
-		for y in [rect.position.y, rect.end.y]:
-			var p := Vector2(x,y)
-			Pixel.line(self,p,p+Vector2(size if x == rect.position.x else -size,0),tint,3)
-			Pixel.line(self,p,p+Vector2(0,size if y == rect.position.y else -size),tint,3)
-	if selected:
-		var p := Vector2(rect.get_center().x,rect.position.y-12)
-		Pixel.line(self,p-Vector2(9,8),p,tint,3)
-		Pixel.line(self,p+Vector2(9,-8),p,tint,3)
+	DragFeedback.paint_target(self,battle._target_rect(target),selected,color,battle.fx.canvas_size.y > battle.fx.canvas_size.x)
 
 func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
 	var kind: int = roll.kind

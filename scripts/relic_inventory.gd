@@ -62,9 +62,9 @@ func _fuse() -> void:
 		items = items.filter(func(item): return item.id not in Catalog.STONES)
 		items.insert(first, _new_item("prismatic_stone"))
 
-func offers(rng: RandomNumberGenerator) -> Array:
+func offers(rng: RandomNumberGenerator, count: int = 3) -> Array:
 	var choices: Array = []
-	for slot in range(3):
+	for slot in range(count):
 		var id: String = draw_one(rng,choices)
 		if id.is_empty(): break
 		choices.append(id)

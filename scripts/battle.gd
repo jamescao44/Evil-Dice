@@ -5,6 +5,7 @@ var home_enabled: bool = false
 var selected_ancient_id: String = "horror"
 var selected_dice_id: String = "bone"
 
+const HELD_ITEM_Z := 400
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const SkillBubble = preload("res://scripts/skill_bubble.gd")
@@ -12,6 +13,11 @@ const ScreenRipple = preload("res://scripts/screen_ripple.gd")
 var screen_ripple: CanvasLayer
 const RelicUI = preload("res://scripts/relic_ui.gd")
 var relic_ui: Node2D
+const TarotUI = preload("res://scripts/tarot_ui.gd")
+var tarot_ui: Node2D
+const TarotCast = preload("res://scripts/tarot_cast.gd")
+var tarot_cast: Node2D
+var dice_group: Node2D
 const DamageFeedback = preload("res://scripts/damage_feedback.gd")
 var damage_feedback: Node2D
 var status_layout_key: String = ""
@@ -61,6 +67,7 @@ var DEBUG_REPEAT := Rect2(888, 176, 252, 40)
 var DEBUG_PERFECT := Rect2(888, 228, 252, 40)
 var DEBUG_WAVE_INPUT := Rect2(238, 626, 100, 40)
 var DEBUG_WAVE_LOAD := Rect2(356, 626, 160, 40)
+var DEBUG_TAROTS := Rect2(808,568,332,44)
 var REWARD_CENTER := Vector2(195, 625)
 var CITY_POINT := Vector2(925, 282)
 const HORROR_SIZES := [224.0, 248.0, 260.0, 272.0, 280.0, 288.0, 296.0, 308.0, 320.0, 288.0]
@@ -156,11 +163,13 @@ func _ready() -> void:
 	pixel_font.oversampling = 1.0
 	debug_rng.randomize()
 	_create_debug_wave_input()
+	dice_group = Node2D.new()
+	add_child(dice_group)
 	for i in range(3):
 		var die = Die.new()
 		die.position = DICE_POSITIONS[i]
 		die.face = i + 1
-		add_child(die)
+		dice_group.add_child(die)
 		die.landed.connect(_die_landed.bind(i))
 		dice.append(die)
 	fx = Effects.new()
@@ -192,6 +201,12 @@ func _ready() -> void:
 	add_child(enemy_inspection)
 	chest = RewardChest.new()
 	add_child(chest)
+	tarot_ui = TarotUI.new()
+	tarot_ui.battle = self
+	add_child(tarot_ui)
+	tarot_cast = TarotCast.new()
+	tarot_cast.battle = self
+	add_child(tarot_cast)
 	auto_claim_notice = Node2D.new()
 	auto_claim_notice.z_index = 100
 	add_child(auto_claim_notice)
@@ -252,6 +267,7 @@ func _process(delta: float) -> void:
 	for index in fallen:
 		fallen[index] += delta
 	var modal: bool = _menus_open()
+	chest.paused = tarot_ui.ceremony.active()
 	debug_wave_input.visible = debug_open
 	auto_claim_notice.visible = not modal and view_phase == "over" and auto_claim_remaining > 0
 	auto_claim_notice.queue_redraw()
@@ -290,7 +306,7 @@ func _process(delta: float) -> void:
 	if guide:
 		interactive = GUIDE_CLOSE.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
 	elif debug_open:
-		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse) or DEBUG_WAVE_LOAD.has_point(mouse)
+		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse) or DEBUG_WAVE_LOAD.has_point(mouse) or DEBUG_TAROTS.has_point(mouse)
 		for i in range(-1, 13):
 			interactive = interactive or _debug_option_rect(i).has_point(mouse)
 	elif menu_open:
@@ -310,6 +326,7 @@ func _exit_tree() -> void:
 	get_viewport().canvas_transform = Transform2D.IDENTITY
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(tarot_ui): tarot_ui.cancel_gesture()
 	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(relic_ui): relic_ui.cancel_hold()
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		active_touch = -1
@@ -329,7 +346,7 @@ func _configure_effects() -> void:
 		die.scale = Vector2.ONE * die.base_scale
 
 func _menus_open() -> bool:
-	return menu_open or guide or debug_open
+	return menu_open or guide or debug_open or (is_instance_valid(tarot_ui) and tarot_ui.ceremony.active())
 
 func _create_debug_wave_input() -> void:
 	debug_wave_input = LineEdit.new()
@@ -376,6 +393,12 @@ func _debug_load_wave(value: String) -> void:
 		return
 	_restart(trimmed.to_int())
 
+func _debug_give_tarots() -> void:
+	if not debug_open: return
+	# Debug grants deliberately ignore ownership and Hanged Man's reward exclusions.
+	for id in Run.Tarot.ITEMS: model.tarots.add(id)
+	_sound("confirmation_002",1,-14)
+
 func _pointer_position() -> Vector2:
 	return touch_position if active_touch >= 0 else get_global_mouse_position()
 
@@ -412,6 +435,8 @@ func _in_dice_range(mouse: Vector2) -> bool:
 	return mouse.distance_squared_to(DICE_CENTER) <= DICE_RADIUS * DICE_RADIUS
 
 func _handle_click(mouse: Vector2) -> void:
+	if is_instance_valid(tarot_cast) and tarot_cast.click(mouse): return
+	if is_instance_valid(tarot_ui) and tarot_ui.click(mouse): return
 	if view_phase == "reward" and chest.can_skip() and chest.skip_rect().has_point(mouse):
 		model.discard_unclaimed_rewards()
 		chest.skip_remaining()
@@ -436,6 +461,7 @@ func _handle_click(mouse: Vector2) -> void:
 		if DEBUG_CLOSE.has_point(mouse): _close_debug()
 		elif DEBUG_REPEAT.has_point(mouse): debug_repeat = not debug_repeat
 		elif DEBUG_PERFECT.has_point(mouse): debug_perfect = not debug_perfect
+		elif DEBUG_TAROTS.has_point(mouse): _debug_give_tarots()
 		elif DEBUG_WAVE_LOAD.has_point(mouse): _debug_load_wave(debug_wave_input.text)
 		else:
 			for i in range(-1, 13):
@@ -530,6 +556,7 @@ func _in_saved_slot(point: Vector2) -> bool:
 	return point.distance_to(_saved_slot_center()) <= _saved_slot_radius()+12
 
 func _can_use_saved() -> bool:
+	if is_instance_valid(tarot_ui) and tarot_ui.inventory_visible(): return false
 	return not model.saved_skill.is_empty() and view_phase in ["ready", "skill", "targeting"] and not _menus_open() and model.outcome().is_empty()
 
 func _source_roll(source: String) -> MultiHitSkill:
@@ -624,6 +651,8 @@ func _handle_skill_click(point: Vector2) -> void:
 		else: _cancel_targeting()
 
 func _handle_motion(point: Vector2) -> void:
+	if is_instance_valid(tarot_cast) and tarot_cast.active(): return
+	if is_instance_valid(tarot_ui) and tarot_ui.motion(point): return
 	if is_instance_valid(relic_ui) and relic_ui.motion(point): return
 	if pressed_enemy >= 0:
 		if not _enemy_hold_rect(pressed_enemy).grow(12).has_point(point): _cancel_enemy_hold()
@@ -634,6 +663,8 @@ func _handle_motion(point: Vector2) -> void:
 	hover_target = _target_at(point)
 
 func _handle_release(point: Vector2) -> void:
+	if is_instance_valid(tarot_cast) and tarot_cast.active(): return
+	if is_instance_valid(tarot_ui) and tarot_ui.release(point): return
 	if is_instance_valid(relic_ui) and relic_ui.release(point): return
 	if pressed_enemy >= 0:
 		var target: int = pressed_enemy
@@ -731,6 +762,7 @@ func _begin_cast_cinematic(kind: int) -> void:
 	fx.time_factor = 0
 
 func _world_time_scale() -> float:
+	if is_instance_valid(tarot_ui) and tarot_ui.ceremony.active(): return 0.0
 	if inspecting_enemy >= 0: return 0.0
 	if is_instance_valid(damage_feedback) and damage_feedback.building: return 0.0
 	if cinematic_remaining <= 0: return 1.0
@@ -814,7 +846,7 @@ func _draw_power_meter(rect: Rect2, text_size: int = 16) -> void:
 		var central: float = 1.0 - absf(float(x) / rect.size.x - 0.5) * 2
 		draw_rect(Rect2(rect.position + Vector2(x, 0), Vector2(minf(4, rect.size.x - x), rect.size.y)), PURPLE.darkened(0.65).lerp(GOLD, central * central))
 	var center: float = rect.get_center().x
-	draw_rect(Rect2(center - ThrowMeter.PERFECT_TOLERANCE * unit, rect.position.y, 2 * ThrowMeter.PERFECT_TOLERANCE * unit, rect.size.y), CREAM)
+	draw_rect(Rect2(center - ThrowMeter.perfect_tolerance_pixels() * unit, rect.position.y, 2 * ThrowMeter.perfect_tolerance_pixels() * unit, rect.size.y), CREAM)
 	if flash > 0: draw_rect(rect, Color(1, 1, 1, flash))
 	var marker: float = rect.position.x + stopped.position * rect.size.x
 	draw_rect(Rect2(marker - unit * 5, rect.position.y - 6, unit * 10, rect.size.y + 12), INK)
@@ -840,6 +872,12 @@ func _enemy_feet(index: int) -> Vector2:
 
 func _enemy_point(index: int) -> Vector2:
 	return _enemy_feet(index) - Vector2(0,_enemy_side()*0.48)
+
+func _enemy_impact_point(index: int) -> Vector2:
+	var point: Vector2 = _enemy_point(index)
+	if model.is_enemy_alive(index): return point
+	var fall: float = minf(1,fallen.get(index,0.0)/0.3)
+	return point.lerp(_enemy_feet(index)-Vector2(0,_enemy_side()*0.08),fall)
 
 func _player_feet() -> Vector2:
 	return Vector2(259, 414)
@@ -1010,6 +1048,10 @@ func _skill_caption(roll: MultiHitSkill) -> Dictionary:
 		description = ["instant kill", "full heal", "DMG +2.0 for 3 turns", "attack all x2", "random attack", ""][roll.face - 1]
 		if model.is_city() and roll.face == 1: description = "attack x5"
 	if model.is_city() and roll.kind >= Rules.Kind.SPECIAL and roll.face == 5: description = "city attack"
+	var factor: float = model.tarot_effects.skill_factor(roll)
+	if not Rules.is_attack(roll) and factor > 1:
+		if roll.face == 2 and roll.kind == Rules.Kind.PAIR: description = GameText.format("regen %d for %d turns",[roundi(5*factor),roll.spare])
+		elif roll.face == 3: description = GameText.format("DMG +%.1f for %d turns",[(0.5 if roll.kind == Rules.Kind.PAIR else 2.0)*factor,roll.spare if roll.kind == Rules.Kind.PAIR else 3])
 	return {"name": label, "description": description}
 
 func _die_landed(index: int) -> void:
@@ -1032,7 +1074,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 	# waits for the modifier buildup and impact animation below.
 	bubble.consume_use()
 	if attacking and not model.is_instant_kill(roll):
-		damage_feedback.start(model.attack_multiplier_steps(roll))
+		damage_feedback.start(model.attack_damage_steps(roll))
 		while damage_feedback.building:
 			await get_tree().process_frame
 			if not _valid_turn(token): return
@@ -1062,7 +1104,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 			attack_target = target
 			var targets: Array = [CITY_POINT] if model.is_city() else []
 			if not model.is_city():
-				for hit in model.preview(roll, target): targets.append(_enemy_point(hit.target))
+				for hit in model.preview(roll, target): targets.append(_enemy_impact_point(hit.target))
 			var face: int = roll.face if kind >= Rules.Kind.SPECIAL or kind == Rules.Kind.PAIR else 0
 			var duration: float = 0.18 if count > 1 else 1.6 if kind == Rules.Kind.ULTIMATE else 0.7 if kind >= Rules.Kind.SPECIAL else 0.38
 			fx.cast(face, _player_point(), targets, duration / _roll_speed())
@@ -1096,7 +1138,11 @@ func _resolve_player(target: int, source: String = "current") -> void:
 		status_title = "SKILL READY" if view_phase == "skill" else "FEVER" if model.is_city() else "READY"
 		status_color = [CREAM, TEAL, PURPLE, GOLD][result.kind] if not result.is_empty() else GOLD if model.is_city() else TEAL
 		return
-	if model.is_city():
+	if model.phase == "roll":
+		result = MultiHitSkill.new()
+		view_phase = "ready"
+		status_title = "EXTRA THROW"
+	elif model.is_city():
 		result = MultiHitSkill.new()
 		view_phase = "ready"
 		status_title = "FEVER"
@@ -1112,7 +1158,7 @@ func _enemy_phase() -> void:
 		var human: Dictionary = model.enemies[i]
 		status_title = "ENEMY TURN"
 		if not await _wait(0.12, token): return
-		if not human.canceled and model.enemy_status_count(i, Status.FROZEN) == 0 and human.intent.type == "attack":
+		if not human.canceled and model.status_count(Status.HIDDEN) == 0 and model.enemy_status_count(i, Status.FROZEN) == 0 and human.intent.type == "attack":
 			fx.enemy_cast(human.role, _enemy_point(i), _player_point(), 0.22 / speed, human.intent.get("attribute", Status.Attribute.NONE))
 			_sound("slash" if human.role != 2 else "bell", 1.4, -17)
 			if not await _wait(0.18, token): return
@@ -1155,6 +1201,7 @@ func _pick_reward(point: Vector2) -> void:
 		relic_ui.chest_slot = index
 
 func _claim_chest_reward(index: int, replace_index: int = -1, discard: bool = false) -> bool:
+	if not discard and model.reward_item(index).get("id","") == "tarot": return tarot_ui.begin_reward("chest",index)
 	var previous_ids: Array = model.relics.items.map(func(relic): return relic.id)
 	var item: Dictionary = model.claim_reward(index,replace_index,discard)
 	if item.is_empty(): return false
@@ -1168,14 +1215,16 @@ func _claim_chest_reward(index: int, replace_index: int = -1, discard: bool = fa
 	_sound("rumble" if item.id == "curse" else "confirmation_002", 0.65 if item.id == "curse" else 1.0, -12)
 	return true
 
-func _reward_sequence(tier: int = 0, automatic: bool = false) -> void:
+func _reward_sequence(tier: int = 0, automatic: bool = false, bonus: bool = false) -> void:
 	if automatic:
 		if view_phase != "over" or model.outcome() != "victory" or model.open_rewards.is_empty(): return
+	elif bonus:
+		if view_phase not in ["ready","skill"]: return
 	elif not _can_claim_chest(): return
 	var token: int = run_id
 	var previous_phase: String = view_phase
 	var previous_title: String = status_title
-	var outcomes: Array = model.open_rewards.duplicate() if automatic else model.open_chest(tier)
+	var outcomes: Array = model.open_rewards.duplicate() if automatic else model.open_bonus_chest() if bonus else model.open_chest(tier)
 	if outcomes.is_empty(): return
 	view_phase = "reward"
 	status_title = "TREASURE"
@@ -1190,9 +1239,9 @@ func _reward_sequence(tier: int = 0, automatic: bool = false) -> void:
 	if not await _wait(0.18 * _roll_speed(), token): return
 	var prizes: Array = []
 	for slot in range(outcomes.size()): prizes.append(model.reward_item(slot))
-	chest.start(outcomes, fx.canvas_size, pixel_font, reduced, prizes, model.reward_weights)
+	chest.start(outcomes, fx.canvas_size, pixel_font, reduced, prizes)
 	_sound("rumble", 0.7, -18)
-	while chest.active or not model.rewards_collected() or relic_ui.pickup.active:
+	while chest.active or not model.rewards_collected() or relic_ui.pickup.active or tarot_ui.ceremony.active():
 		await get_tree().process_frame
 		if not _valid_turn(token): return
 	if not chest.skip_requested and not await _wait(1.65 * _roll_speed(), token): return
@@ -1215,6 +1264,7 @@ func _check_over() -> bool:
 	if model.phase == "turn_end" and model.hp > 0: return false
 	var outcome: String = model.outcome()
 	if outcome.is_empty(): return false
+	if is_instance_valid(tarot_ui): tarot_ui.close_inventory()
 	if view_phase in ["over", "reward", "relic_reward"]: return true
 	_clear_skill()
 	if outcome == "wave_clear":
@@ -1232,9 +1282,9 @@ func _check_over() -> bool:
 func _offer_relics(token: int) -> bool:
 	model.open_relic_offer()
 	view_phase = "relic_reward"
-	status_title = "CHOOSE A RELIC"
+	status_title = "CHOOSE ONE REWARD"
 	relic_ui.reset()
-	while not model.relic_offer_resolved or relic_ui.pickup.active:
+	while not model.relic_offer_resolved or relic_ui.pickup.active or tarot_ui.ceremony.active():
 		await get_tree().process_frame
 		if not _valid_turn(token): return false
 	_sound("book", 1.0, -12)
@@ -1302,6 +1352,8 @@ func _advance_wave() -> void:
 func _restart(wave_number: int = 1) -> void:
 	run_id += 1
 	if is_instance_valid(relic_ui): relic_ui.reset()
+	if is_instance_valid(tarot_ui): tarot_ui.reset()
+	if is_instance_valid(tarot_cast): tarot_cast.reset()
 	_clear_skill()
 	chest.cancel()
 	auto_claim_tier = 0
@@ -1357,6 +1409,7 @@ func _show_events(events: Array) -> void:
 	var offsets: Dictionary = {}
 	for event in events:
 		var point: Vector2 = _player_point() if event.target == -1 else CITY_POINT if event.target == -2 else _enemy_point(event.target)
+		if event.target >= 0 and event.get("corpse_hit",false): point = _enemy_impact_point(event.target)
 		if event.type == "spawn":
 			fx.burst(_city_gate_point(), GOLD, 10, 40)
 			continue
@@ -1402,7 +1455,7 @@ func _show_events(events: Array) -> void:
 			offsets[event.target] = offset + _event_font_size(event)
 		if event.type == "damage":
 			if event.target >= -1: hit_times[event.target + 1] = 1.0
-			if event.amount > 0:
+			if event.amount > 0 or event.get("corpse_hit",false):
 				fx.slash(point, event.target == -2)
 				if event.target == -1: _sound("hit", 0.8, -17)
 				elif event.target == -2:
@@ -1657,7 +1710,7 @@ func _draw_player() -> void:
 	var dx: float = snappedf(sin(clock_time * 45) * hurt * 5, 2) if not reduced and not model.is_frozen() else 0.0
 	_shadow(Vector2(259, 413), monster_side * 0.48, 0.27)
 	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
-	_art("eldritch", Rect2(Vector2(259 - monster_side / 2 + dx, 414 - monster_side + bob), Vector2.ONE * monster_side), Color.WHITE.lerp(RED, hurt * 0.6))
+	_art("eldritch", Rect2(Vector2(259 - monster_side / 2 + dx, 414 - monster_side + bob), Vector2.ONE * monster_side), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
 	_draw_player_afflictions()
 	_hp_plate(Rect2(129, 382, 260, 56), "HORROR %d" % (model.stage+1), model.hp, model.max_hp, model.shield, TEAL)
 
@@ -1672,9 +1725,11 @@ func _draw_human(index: int) -> void:
 	if human.hp <= 0:
 		var t: float = minf(1, fallen.get(index, 1.0) / 0.3)
 		var center: Vector2 = point.lerp(Vector2(point.x, floor_y-side*0.08), t)
+		var hurt: float = hit_times[index + 1]
+		if not reduced: center.x += sin(clock_time*46)*hurt*minf(6,side*0.03)
 		_shadow(Vector2(point.x, floor_y-2), side * 0.42, 0.2 * corpse_alpha)
 		draw_set_transform(center, t * PI / 2, Vector2(lerpf(1, 0.36, t), 1))
-		_art(key, Rect2(Vector2.ONE * -side / 2, Vector2.ONE * side), Color(0.64, 0.52, 0.49, corpse_alpha))
+		_art(key, Rect2(Vector2.ONE * -side / 2, Vector2.ONE * side), Color(0.64, 0.52, 0.49, corpse_alpha).lerp(Color(RED,corpse_alpha),hurt*0.6))
 		draw_set_transform(Vector2.ZERO)
 		return
 	if selected or active_human == index:
@@ -1716,7 +1771,7 @@ func _draw_enemy_statuses(index: int) -> void:
 		var at: Vector2 = bar.get_center()+Vector2((i-(items.size()-1)/2.0)*step,bar.size.y/2+radius+8)
 		Pixel.disc(self,at,radius+3,INK,2)
 		StatusPaint.icon(self,at,radius,items[i].icon,items[i].color)
-		_text(at+Vector2(radius*0.55,radius+5),str(items[i].turns),12,CREAM)
+		_text(at+Vector2(radius*0.55,radius+5),"∞" if items[i].permanent else str(items[i].turns),12,CREAM)
 
 func _elite_color(role: int) -> Color:
 	return [Color("ffe388"), Color("82dfff"), Color("ff9955")][role]
@@ -1982,6 +2037,8 @@ func _draw_statuses() -> void:
 func _status_description(id: int, count: int) -> String:
 	if id == Status.IMMUNITY and model.is_city():
 		return GameText.format("Invincible for %.1f more seconds. Each stack lasts 2 seconds.",model.city_immunity_seconds())
+	if id == Status.REGEN: return GameText.format("Heal %d at turn start.",roundi(5*model.statuses[id].potency))+" "+GameText.remaining(count,"turn")
+	if id in [Status.MIGHT,Status.ASCENSION]: return GameText.format("Adds +%.1f to DMG. Stacks with other bonuses.",(0.5 if id == Status.MIGHT else 2.0)*model.statuses[id].potency)+" "+GameText.remaining(count,"turn")
 	var unit: String = "stack" if id in [Status.BURNING,Status.DARKNESS,Status.CORROSION,Status.PLAGUE] else "throw" if id == Status.STUNNED else "turn"
 	return GameText.text(Statuses.ENTRIES[id].text)+" "+GameText.remaining(count,unit)
 
@@ -2008,6 +2065,7 @@ func _show_dice_links() -> bool:
 	return view_phase == "rolling" and dice.all(func(die): return die.visible) and not last_result.is_empty() and last_result.kind != Rules.Kind.NORMAL
 
 func _draw_saved_slot() -> void:
+	if is_instance_valid(tarot_ui) and tarot_ui.inventory_visible(): return
 	if view_phase in ["over", "reward"]: return
 	var at: Vector2 = _saved_slot_center()
 	var radius: float = _saved_slot_radius()
@@ -2026,6 +2084,7 @@ func _draw_saved_slot() -> void:
 	_center(at+Vector2(0,radius+27 if fx.canvas_size.y > fx.canvas_size.x else radius+20),"SAVE" if model.saved_skill.is_empty() else "SAVED",20 if fx.canvas_size.y > fx.canvas_size.x else 12,color)
 
 func _draw_perfect_combo() -> void:
+	if is_instance_valid(tarot_ui) and tarot_ui.inventory_visible(): return
 	if view_phase in ["over", "reward"]: return
 	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
 	var at: Vector2 = _perfect_combo_center()
@@ -2050,6 +2109,7 @@ func _draw_perfect_combo() -> void:
 func _draw_dice_circle() -> void:
 	_draw_saved_slot()
 	_draw_perfect_combo()
+	if is_instance_valid(tarot_ui): draw_set_transform_matrix(tarot_ui.dice_transform())
 	var layout_scale: float = DICE_RADIUS / 144.0
 	var available: bool = view_phase in ["ready", "charging"] and not _menus_open()
 	var spent: bool = _dice_spent()
@@ -2094,6 +2154,7 @@ func _draw_dice_circle() -> void:
 		var at := get_global_mouse_position().snapped(Vector2.ONE * 2)
 		Pixel.line(self, at - Vector2(10, 0), at + Vector2(10, 0), Color(GOLD, ring_hover), 2)
 		Pixel.line(self, at - Vector2(0, 10), at + Vector2(0, 10), Color(GOLD, ring_hover), 2)
+	draw_set_transform(Vector2.ZERO)
 
 func _rune(at: Vector2, index: int, color: Color, unit: int = 2) -> void:
 	var patterns := ["00100/01110/10101/00100/01010/10001/00100", "10001/01010/00100/11111/00100/00100/00100", "11110/10001/11110/10100/10010/10001/10000", "00100/01010/10001/01010/00100/00100/01110", "10001/10001/01110/00100/01110/10001/10001", "00100/10101/01110/10101/00100/01010/10001"]
@@ -2226,7 +2287,8 @@ func _draw_debug() -> void:
 		for i in range(3):
 			_mini_die(rect.position + Vector2(30 + i * 44, 38), 0 if choice <= 6 and i == 2 else face, CREAM.darkened(0.3) if choice <= 6 and i == 2 else CREAM)
 		_center(rect.get_center() + Vector2(0, 32), "%d%d" % [face, face] if choice <= 6 else "%d%d%d" % [face, face, face], 16, color)
-	_text(Vector2(136, 601), "Choose dice, or start fresh at a wave below. 10 = city.", 16, CREAM)
+	_text(Vector2(136, 601), "Choose dice, load a wave, or add tarot cards.", 16, CREAM)
+	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS")
 	_text(Vector2(136, 653), "WAVE", 16, GOLD)
 	_button(DEBUG_WAVE_LOAD,"LOAD")
 	_text(Vector2(548,653),debug_wave_error,16,RED)

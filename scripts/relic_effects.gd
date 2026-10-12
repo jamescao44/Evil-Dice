@@ -82,7 +82,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Ar
 			extra = "EXTRA HITS"
 			extra_values.clear()
 		if not is_equal_approx(before,value*critical) or not extra.is_empty():
-			steps.append({"source":"relic","id":item.id,"slot":slot,"before":before,"after":value*critical,"note":extra,"note_values":extra_values})
+			steps.append({"source":"relic","id":item.id,"slot":slot,"before":before,"after":value*critical,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0))})
 	if skill.critical and critical == 1.0:
 		steps.append({"source":"critical","id":"","slot":-1,"before":value,"after":value*CRITICAL_FACTOR,"note":""})
 	return steps

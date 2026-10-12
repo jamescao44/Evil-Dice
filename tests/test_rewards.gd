@@ -50,8 +50,8 @@ func partial_claim_checks(game) -> void:
 	game.model.reward_weights = [0,1,0,0,0,0,0]
 	game._reward_sequence()
 	await wait_for_chest(game)
-	var picked: String = game.model.chest_relics[0]
-	game._handle_click(game.chest.reel_rect(0).get_center())
+	var picked: String = game.model.chest_relics[1]
+	game._handle_click(game.chest.reel_rect(1).get_center())
 	check(game.relic_ui.pickup.active,"A chest relic starts its flight immediately on pickup")
 	game._handle_click(game.chest.skip_rect().get_center())
 	await wait_for_exit(game,"ready")
@@ -68,13 +68,13 @@ func partial_claim_checks(game) -> void:
 	game._restart()
 	for id in ["heart","armor","coin","bracelet","magic_shield","magic_sword","twin_scythes","orange_stone","blue_stone","cursed_bow"]: game.model.acquire_relic(id)
 	var owned: Array = game.model.relics.items.duplicate(true)
-	game.model.perfect_progress = 3
+	game.model.perfect_progress = 6
 	game.model.reward_weights = [0,1,0,0,0,0,0]
 	game.chest.playback_speed = 100
 	game._reward_sequence()
 	await wait_for_chest(game)
-	game._handle_click(game.chest.reel_rect(0).get_center())
-	check(game.relic_ui.chest_slot == 0,"An unclaimed relic opens full-inventory replacement")
+	game._handle_click(game.chest.reel_rect(1).get_center())
+	check(game.relic_ui.chest_slot == 1,"An unclaimed relic opens full-inventory replacement")
 	await capture(game,"replacement-skip")
 	game._handle_click(game.chest.skip_rect().get_center())
 	await wait_for_exit(game,"ready")
@@ -99,7 +99,11 @@ func test_model() -> void:
 		var before: int = model.reward_history.size()
 		check(not model.close_chest(), "Uncollected gifts prevent closure")
 		for slot in range(results.size()-1,-1,-1):
-			check(not model.claim_reward(slot,0).is_empty(), "Every slot can be collected in any order, replacing a relic when full")
+			if model.open_rewards[slot] == Run.Rewards.Category.TAROT:
+				model.begin_tarot_reward("chest",slot)
+				check(not model.choose_tarot(0).is_empty(),"Tarot picks can be collected in any reward order")
+			else:
+				check(not model.claim_reward(slot,0).is_empty(), "Every slot can be collected in any order, replacing a relic when full")
 			check(model.claim_reward(slot).is_empty(), "Repeated pickup cannot duplicate a reward")
 		check(model.rewards_collected() and model.reward_history.size() == before+results.size(), "All results claimed exactly once")
 		check(model.close_chest() and model.open_chest().is_empty(), "Chest closes only after pickups")
@@ -238,6 +242,7 @@ func test_scene(game) -> void:
 			check(game._chest_tier_at(game._diamond_center(tier*3-1)) == expected,"Only the rarest available diamond is claimable")
 			check(game._chest_tier_at(game._diamond_center(tier*3-1)+Vector2(0,38)*game._reward_scale()) == expected,"Only the rarest CLAIM label is interactive")
 	game.model.perfect_progress = 9
+	game.model.reward_weights = [1,0,0,0,0,0,1] # Dedicated tarot scene tests cover the ceremony.
 	game._handle_click(game._diamond_center(8 if game.model.chest_tier() == 3 else 5 if game.model.chest_tier() == 2 else 2))
 	var city_clock: float = game.model.volley_clock
 	game._handle_click(game.DICE_CENTER)

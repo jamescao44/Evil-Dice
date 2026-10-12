@@ -112,6 +112,13 @@ func _initialize() -> void:
 	check(m.enemies[0].max_hp == 1,"Enemy plague max health has a floor of one")
 	m._tick_enemy_statuses()
 	check(m.enemy_status_count(0,Status.PLAGUE) == 101 and m.enemy_status_count(1,Status.PLAGUE) == 1,"Plague grows and spreads once, without recursive spread")
+	m = fresh()
+	var plague_hp: int = m.hp
+	check(m.apply_affliction(Status.PLAGUE,100).is_empty() and m.status_count(Status.PLAGUE) == 0 and m.hp == plague_hp and m.max_hp == plague_hp,"The player is immune to plague without relics or protection")
+	m.apply_affliction(Status.CORROSION,3)
+	check(m.apply_affliction(Status.PLAGUE,1).is_empty(),"Corrosion cannot bypass innate plague immunity")
+	m.set_status_counts({Status.PLAGUE:10})
+	check(m.status_count(Status.PLAGUE) == 0 and m.max_hp == plague_hp,"Restoring player statuses cannot reintroduce plague")
 	m = fresh(); m.acquire_relic("cursed_watch"); m.acquire_relic("cursed_die")
 	for i in range(300):
 		m.phase = "roll"
@@ -153,6 +160,10 @@ func chest_checks() -> void:
 		check(m.open_chest() == rewards and m.chest_relics == locked,"Opening a chest again preserves its locked prizes")
 		var seen: Array = []
 		for slot in range(rewards.size()):
+			if m.open_rewards[slot] == Run.Rewards.Category.TAROT:
+				m.begin_tarot_reward("chest",slot)
+				check(not m.choose_tarot(0).is_empty(),"The substituted tarot slot grants one card")
+				continue
 			var gift: Dictionary = m.reward_item(slot)
 			check(gift.has("relic_id"),"Both relic weight entries use the complete rarity table")
 			var id: String = gift.relic_id

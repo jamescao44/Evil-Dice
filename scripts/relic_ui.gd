@@ -3,6 +3,7 @@ const Catalog = preload("res://scripts/relic_catalog.gd")
 const Paint = preload("res://scripts/relic_paint.gd")
 const Pixel = preload("res://scripts/pixel_paint.gd")
 const Pickup = preload("res://scripts/relic_pickup.gd")
+const TarotPaint = preload("res://scripts/tarot_paint.gd")
 var pickup = Pickup.new()
 var pickup_choices: Array = []
 var battle
@@ -91,6 +92,9 @@ func click(at: Vector2) -> bool:
 			reset()
 		return true
 	if battle.view_phase == "relic_reward":
+		if card_rect(2).has_point(at):
+			battle.tarot_ui.begin_reward("wave")
+			return true
 		if skip_rect().has_point(at):
 			battle.model.skip_relic()
 			reset()
@@ -178,6 +182,7 @@ func _process(delta: float) -> void:
 				chest_slot = -1
 	self_modulate = Color(0.25,0.25,0.25) if battle.inspecting_enemy >= 0 else Color.WHITE
 	if not interactable(): pressed = -1; dragging = false
+	z_index = battle.HELD_ITEM_Z if pressed >= 0 else 110
 	queue_redraw()
 
 func _text(at: Vector2, value: String, size: int, color: Color) -> void:
@@ -294,7 +299,7 @@ func _draw_offer() -> void:
 	draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color("131811",0.97))
 	var mid: float = battle.fx.canvas_size.x/2
 	_center(Vector2(mid,220 if portrait() else 82),GameText.format("WAVE %d CLEARED", battle.model.stage+1),38 if portrait() else 28,Color("dfb866"))
-	_center(Vector2(mid,284 if portrait() else 126),"CHOOSE ONE RELIC",28 if portrait() else 22,Color("eee0b9"))
+	_center(Vector2(mid,284 if portrait() else 126),"CHOOSE ONE REWARD",28 if portrait() else 22,Color("eee0b9"))
 	var choices: Array = pickup_choices if pickup.active else battle.model.relic_choices
 	for i in range(choices.size()):
 		var id: String = choices[i]
@@ -308,6 +313,13 @@ func _draw_offer() -> void:
 		_text(text_at,Catalog.RARITY_NAMES[item.rarity],20 if portrait() else 16,color)
 		_wrap(text_at+Vector2(0,40 if portrait() else 32),item.name,rect.size.x-(158 if portrait() else 44),26 if portrait() else 22,Color("fff1ca"))
 		_wrap(rect.position+Vector2(24,132 if portrait() else 186),item.text,rect.size.x-48,28 if portrait() else 22,Color("eee0b9"))
+	var tarot_rect: Rect2 = card_rect(2)
+	_frame(tarot_rect,Color("c5a4de"))
+	TarotPaint.card(self,"",card_icon(2),Vector2(56,86))
+	var tarot_text: Vector2 = tarot_rect.position+(Vector2(138,42) if portrait() else Vector2(22,106))
+	_text(tarot_text,"TAROT",20 if portrait() else 16,Color("c5a4de"))
+	_wrap(tarot_text+Vector2(0,40 if portrait() else 32),"Draw Tarot",tarot_rect.size.x-(158 if portrait() else 44),26 if portrait() else 22,Color("fff1ca"))
+	_wrap(tarot_rect.position+Vector2(24,132 if portrait() else 186),"Draw three cards. Keep one.",tarot_rect.size.x-48,28 if portrait() else 22,Color("eee0b9"))
 	var line: String = "CHOOSE A RELIC ABOVE, THEN REPLACE ONE BELOW" if replacement_choice >= 0 else "DRAG RELICS TO ORDER THEIR EFFECTS LEFT TO RIGHT"
 	_wrap(Vector2(48 if portrait() else 260,1270 if portrait() else 558),line,708 if portrait() else 760,22 if portrait() else 16,Color("d8c694"))
 	var skip: Rect2 = skip_rect()

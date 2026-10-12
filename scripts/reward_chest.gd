@@ -8,14 +8,14 @@ const Catalog = preload("res://scripts/reward_catalog.gd")
 const Icons = preload("res://scripts/reward_icons.gd")
 const Pixel = preload("res://scripts/pixel_paint.gd")
 const Relics = preload("res://scripts/relic_catalog.gd")
-const RelicDrops = preload("res://scripts/relic_drop_table.gd")
 var symbols: Array = Catalog.ITEMS.duplicate(true)
-var scroll_relics: Array = []
+var scroll_symbols: Array = [Catalog.Category.RUBY,Catalog.Category.SHARD,Catalog.Category.TAROT]
 var relic_symbols: Dictionary = {}
 var relic_atlas: Texture2D
 const OPEN_TIME := 0.65
 const SPIN_TIME := 1.55
 const REEL_STEPS := 64
+var reel_steps: int = REEL_STEPS
 var rewards: Array = []
 var collected: Array = []
 var art: Dictionary = {}
@@ -23,6 +23,7 @@ var font: Font
 var size := Vector2(1280, 800)
 var elapsed: float = 0
 var active: bool = false
+var paused: bool = false
 var skip_requested: bool = false
 var reduced: bool = false
 var playback_speed: float = 1.0
@@ -44,12 +45,12 @@ func _ready() -> void:
 		var item: Dictionary = Relics.ITEMS[id]
 		symbols.append({"id":"curse" if item.rarity == Relics.Rarity.CURSED else "relic", "name":item.name,"text":item.text,"color":Relics.color(id),"relic_id":id})
 		relic_symbols[id] = symbols.size()-1
-		if not item.get("fusion",false): scroll_relics.append(id)
+		if not item.get("fusion",false): scroll_symbols.append(symbols.size()-1)
 	for key in ["chest_closed", "chest_open", "ruby", "contract", "relic", "curse", "damage", "multiplier", "potion"]:
 		art[key] = load("res://assets/art/rewards/" + key + ".png")
 	hide()
 
-func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false, prizes: Array = [], category_weights: Array = Catalog.DEFAULT_WEIGHTS) -> void:
+func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false, prizes: Array = []) -> void:
 	rewards = values.duplicate()
 	for i in range(mini(prizes.size(),rewards.size())):
 		if prizes[i].has("relic_id"):
@@ -67,24 +68,29 @@ func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = fals
 	focused = -1
 	celebrations.clear()
 	sequences.clear()
+	reel_steps = maxi(REEL_STEPS,scroll_symbols.size())
 	for outcome in rewards:
-		var sequence: Array = []
-		for i in range(REEL_STEPS+4):
-			sequence.append(_scroll_symbol(category_weights))
-		sequence[REEL_STEPS] = outcome
+		var sequence: Array = _scroll_sequence()
+		sequence[reel_steps] = outcome
 		sequences.append(sequence)
 	active = not rewards.is_empty()
 	visible = active
 
-func _scroll_symbol(category_weights: Array = Catalog.DEFAULT_WEIGHTS) -> int:
-	# Theater only: use the same category/rarity rules with a separate RNG.
-	var category: int = Catalog.draw_category(cosmetic,category_weights)
-	if category == Catalog.Category.RELIC:
-		return relic_symbols[RelicDrops.draw(cosmetic,scroll_relics)]
-	return category
+func _scroll_sequence() -> Array:
+	# Every obtainable reward gets screen time, independent of the locked winner
+	# and its drop odds. Each cosmetic bag is exhausted before any item repeats.
+	var sequence: Array = []
+	while sequence.size() < reel_steps+4:
+		var bag: Array = scroll_symbols.duplicate()
+		while not bag.is_empty() and sequence.size() < reel_steps+4:
+			var index: int = cosmetic.randi_range(0,bag.size()-1)
+			if not sequence.is_empty() and bag.size() > 1 and bag[index] == sequence[-1]: index = (index+1)%bag.size()
+			sequence.append(bag.pop_at(index))
+	return sequence
 
 func cancel() -> void:
 	active = false
+	paused = false
 	skip_requested = false
 	rewards.clear()
 	collected.clear()
@@ -97,7 +103,7 @@ func stop_time(index: int) -> float:
 
 func travel(index: int) -> float:
 	var t: float = clampf((elapsed-SPIN_TIME)/(stop_time(index)-SPIN_TIME), 0, 1)
-	return REEL_STEPS * (1.0-pow(1.0-t, 2.3))
+	return reel_steps * (1.0-pow(1.0-t, 2.3))
 
 func reel_rect(index: int) -> Rect2:
 	var portrait: bool = size.y > size.x
@@ -154,7 +160,7 @@ func celebrate(index: int) -> void:
 	celebrations.append({"id":item.id,"at":reel_rect(index).get_center(),"color":item.color,"born":elapsed,"specks":specks})
 
 func _process(delta: float) -> void:
-	if not visible or rewards.is_empty(): return
+	if paused or not visible or rewards.is_empty(): return
 	elapsed += delta * playback_speed
 	celebrations = celebrations.filter(func(event): return elapsed-event.born < 4.2)
 	if active:
@@ -232,7 +238,7 @@ func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 	var scroll: float = travel(reel)
 	var step: float = rect.size.y*0.72
 	for row in range(floori(scroll)-1,floori(scroll)+3):
-		var item_index: int = sequences[reel][clampi(row,0,REEL_STEPS+3)]
+		var item_index: int = sequences[reel][clampi(row,0,reel_steps+3)]
 		var side: float = rect.size.x*0.61
 		var item_rect := Rect2(rect.get_center()-Vector2.ONE*side/2+Vector2(0,(row-scroll)*step),Vector2.ONE*side)
 		var clipped := item_rect.intersection(rect.grow(-8))

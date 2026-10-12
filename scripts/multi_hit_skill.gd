@@ -16,6 +16,8 @@ var uses_spent: int = 0
 var _cast_uses: int = 0
 var perfect: bool = false
 var critical: bool = false
+var effect_multiplier: float = 1.0
+var amplifier_locked: bool = false
 
 func _init(skill_kind: int = -1, skill_face: int = 0, values: Array = [], uses: int = 1) -> void:
 	kind = skill_kind
@@ -76,7 +78,9 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 	copy._cast_uses = _cast_uses
 	copy.perfect = perfect
 	copy.critical = critical
+	copy.effect_multiplier = effect_multiplier
+	copy.amplifier_locked = amplifier_locked
 	return copy
 
 func same_as(other: MultiHitSkill) -> bool:
-	return other != null and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical
+	return other != null and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked

@@ -7,6 +7,8 @@ const Skill = preload("res://scripts/multi_hit_skill.gd")
 const Status = preload("res://scripts/status_effect.gd")
 const Relics = preload("res://scripts/relic_inventory.gd")
 const RelicEffects = preload("res://scripts/relic_effects.gd")
+const TarotEffects = preload("res://scripts/tarot_effects.gd")
+var tarot_effects = TarotEffects.new()
 const DiceOdds = preload("res://scripts/dice_odds.gd")
 const ELITE_CONTROL_CHANCE := 0.5
 const Kind = Skill.Kind
@@ -31,7 +33,7 @@ var base_max_hp: int = MAX_HP
 var max_hp: int:
 	get:
 		var value: float = RelicEffects.max_health(relics.items,base_max_hp)
-		return maxi(1, floori(value + 0.000001) - status_count(Status.PLAGUE) * 10)
+		return maxi(1, floori(value + 0.000001))
 	set(value): base_max_hp = value
 var relics = Relics.new()
 var perfect_relic_ready: bool = false
@@ -52,6 +54,7 @@ var pending: MultiHitSkill = Skill.new()
 var saved_skill: MultiHitSkill = Skill.new()
 var bonus_resume: Dictionary = {}
 var buff_ticks: Dictionary = {}
+var turn_boon_refreshes: Dictionary = {}
 # Future buffs/relics can add or remove named use multipliers without changing skills.
 var skill_use_modifiers: Dictionary = {}
 var phase: String = "new"
@@ -68,6 +71,7 @@ func _init(seed_value: int = -1) -> void:
 	reset()
 
 func reset() -> void:
+	tarot_effects = TarotEffects.new()
 	relics.clear()
 	perfect_relic_ready = false
 	relic_turn_closed = false
@@ -92,6 +96,7 @@ func reset() -> void:
 	saved_skill = Skill.new()
 	bonus_resume = {}
 	buff_ticks.clear()
+	turn_boon_refreshes.clear()
 	skill_use_modifiers.clear()
 	phase = "new"
 	category_weights = [1.0, 1.0, 1.0]
@@ -108,7 +113,7 @@ func set_status_counts(counts: Dictionary) -> void:
 	statuses.clear()
 	for id in Status.IDS:
 		statuses[id] = Status.new(id)
-		statuses[id].count = int(counts.get(id, 0))
+		statuses[id].count = 0 if id == Status.PLAGUE else int(counts.get(id, 0))
 
 func status_count(id: int) -> int:
 	return statuses[id].count if statuses.has(id) else 0
@@ -126,7 +131,7 @@ func is_stunned() -> bool:
 
 func apply_affliction(id: int, amount: int) -> Array:
 	if hp <= 0 or (status_count(Status.IMMUNITY) > 0 and status_count(Status.CORROSION) == 0): return []
-	if id not in Status.HARMFUL: return []
+	if id not in Status.PLAYER_HARMFUL: return []
 	var protector: String = RelicEffects.immunity_source(relics.items,id)
 	if not protector.is_empty():
 		relic_activated.emit(protector)
@@ -136,7 +141,6 @@ func apply_affliction(id: int, amount: int) -> Array:
 	if id == Status.BURNING:
 		amount = status_count(id) - before
 		if amount <= 0: return []
-	if id == Status.PLAGUE: hp = mini(hp, max_hp)
 	var applied := event(-1, amount, "status", status_label(id, amount))
 	applied.status = id
 	return [applied]
@@ -223,7 +227,7 @@ func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) 
 				index = Weighted.pick(rng, weights)
 			values.append(index+1)
 			weights[index] = 0.0
-	pending = classify(RelicEffects.modify_dice(self,values,perfect,rates))
+	pending = classify(tarot_effects.modify_dice(self,RelicEffects.modify_dice(self,values,perfect,rates)))
 	pending.perfect = perfect
 	record_perfect(perfect)
 	statuses[Status.STUNNED].consume()
@@ -235,7 +239,7 @@ func set_test_roll(dice: Array, perfect: bool = false) -> MultiHitSkill:
 	if phase != "roll" or classify(dice).is_empty():
 		return Skill.new()
 	perfect = perfect or forces_perfect()
-	var result := classify(RelicEffects.modify_dice(self,dice.duplicate(),perfect,throw_rates(0,perfect)))
+	var result := classify(tarot_effects.modify_dice(self,RelicEffects.modify_dice(self,dice.duplicate(),perfect,throw_rates(0,perfect))))
 	if result.is_empty():
 		return Skill.new()
 	pending = result
@@ -255,7 +259,7 @@ func record_perfect(perfect: bool) -> void:
 				relic_activated.emit(item.id)
 
 func forces_perfect() -> bool:
-	return RelicEffects.has_flag(relics.items,"always_perfect")
+	return tarot_effects.star_throws > 0 or RelicEffects.has_flag(relics.items,"always_perfect")
 
 func combo_multiplier() -> float:
 	return 1.0 + perfect_combo * 0.1
@@ -275,21 +279,32 @@ func living() -> Array:
 			result.append(i)
 	return result
 
+func has_pending_attack_hits() -> bool:
+	return phase == "executing" and pending.is_attack() and pending.uses_left() > 0
+
+func player_attack_targets() -> Array:
+	var targets: Array = living()
+	# Only an already-started cast can follow through on the defeated squad.
+	if targets.is_empty() and has_pending_attack_hits(): return range(enemies.size())
+	return targets
+
 func outcome() -> String:
 	if hp <= 0:
 		return "defeat"
-	if not has_living_enemies():
+	if not has_living_enemies() and not has_pending_attack_hits():
 		return "victory"
 	return ""
 
 func begin_round() -> Array:
 	if not outcome().is_empty() or phase not in ["new", "round_end"]:
 		return []
+	tarot_effects.begin_round()
+	turn_boon_refreshes.clear()
 	round_number += 1
 	relic_turn_closed = false
 	var events: Array = []
 	if statuses[2].count > 0:
-		var healed := heal(5)
+		var healed := heal(roundi(5*statuses[2].potency))
 		buff_ticks[2] = true
 		events.append(event(-1, healed, "heal", "Regrowth +%d" % healed))
 	for i in living():
@@ -300,6 +315,7 @@ func begin_round() -> Array:
 	return events
 
 func _prepare_player_turn() -> void:
+	if is_frozen(): tarot_effects.extra_rolls = 0
 	phase = "frozen" if is_frozen() else "roll"
 	ice_hits_remaining = 3 if is_frozen() else 0
 
@@ -355,11 +371,16 @@ func skill_use_count(skill: MultiHitSkill) -> int:
 	return skill.use_count(skill_modifiers_for(skill))
 
 func skill_modifiers_for(skill: MultiHitSkill) -> Dictionary:
-	return RelicEffects.use_modifiers(relics.items,skill,skill_use_modifiers)
+	var modifiers: Dictionary = RelicEffects.use_modifiers(relics.items,skill,skill_use_modifiers)
+	if skill.is_attack() and not is_instant_kill(skill) and tarot_effects.extra_uses > 0: modifiers["high_priestess"] = {"add":tarot_effects.extra_uses}
+	return modifiers
 
 func begin_player_cast() -> bool:
 	if phase != "player" or pending.is_empty() or not outcome().is_empty(): return false
 	pending.begin_cast(skill_modifiers_for(pending))
+	if pending.is_attack() and not is_instant_kill(pending): tarot_effects.extra_uses = 0
+	tarot_effects.begin_skill(pending)
+	if pending.is_attack(): statuses[Status.HIDDEN].count = 0
 	if is_attack(pending) and RelicEffects.begin_attack(relics.items): pending.critical = true
 	phase = "executing"
 	return true
@@ -368,14 +389,20 @@ static func hits_all(result: MultiHitSkill) -> bool:
 	return result.hits_all()
 
 func attack_multiplier() -> float:
-	return 1.0 + (0.5 if statuses[3].count > 0 else 0.0) + (2.0 if statuses[33].count > 0 else 0.0)
+	return 1.0 + (0.5*statuses[3].potency if statuses[3].count > 0 else 0.0) + (2.0*statuses[33].potency if statuses[33].count > 0 else 0.0)
 
 func boon_turns(face: int) -> int:
 	return (statuses[33].count if statuses[33].count > 0 else statuses[3].count) if face == 3 else int(status_count(face))
 
 func attack_base(result: MultiHitSkill) -> float:
-	if result.kind == Kind.NORMAL: return (result.sum + reward_base_damage) * DAMAGE_PER_PIP + relic_base_damage()
-	var amount: float = regular_attack_power()
+	return attack_base_with_bonus(result,relic_base_damage())*tarot_effects.skill_factor(result)
+
+func regular_base_damage() -> float:
+	return REGULAR_ATTACK_POWER + reward_base_damage * DAMAGE_PER_PIP
+
+func attack_base_with_bonus(result: MultiHitSkill, bonus: float) -> float:
+	if result.kind == Kind.NORMAL: return (result.sum + reward_base_damage) * DAMAGE_PER_PIP + bonus
+	var amount: float = regular_base_damage() + bonus
 	if result.kind == Kind.PAIR:
 		if result.face == 1: amount *= 1.5
 		elif result.face == 4: amount *= 2.0 / 3.0
@@ -385,7 +412,7 @@ func attack_base(result: MultiHitSkill) -> float:
 	return amount
 
 func regular_attack_power() -> float:
-	return REGULAR_ATTACK_POWER + reward_base_damage * DAMAGE_PER_PIP + relic_base_damage()
+	return regular_base_damage() + relic_base_damage()
 
 func relic_base_damage() -> float:
 	return RelicEffects.base_damage(relics.items)
@@ -401,9 +428,11 @@ func damage_multiplier(result: MultiHitSkill = null) -> float:
 	if status_count(Status.DARKNESS) > 0: value *= 0.5
 	return value
 
-func attack_multiplier_steps(result: MultiHitSkill) -> Array:
+func attack_damage_steps(result: MultiHitSkill) -> Array:
 	# Read-only trace of the same formula used by hits. Never consumes charges/RNG.
-	var steps: Array = []
+	if not is_attack(result) or is_instant_kill(result): return []
+	var base: float = attack_base_with_bonus(result,0)
+	var steps: Array = [{"source":"skill","id":"","slot":-1,"before":1.0,"after":1.0,"base_before":regular_base_damage(),"base_after":base,"note":""}]
 	var value: float = 1.0
 	var bonuses: Array = [
 		{"source":"baseline","amount":damage_baseline()-1.0},
@@ -420,6 +449,22 @@ func attack_multiplier_steps(result: MultiHitSkill) -> Array:
 	if not relic_steps.is_empty(): value = relic_steps.back().after
 	if status_count(Status.DARKNESS) > 0:
 		steps.append({"source":"darkness","id":"","slot":-1,"before":value,"after":value*0.5,"note":""})
+	if status_count(Status.DARKNESS) > 0: value *= 0.5
+	var strength_factor: float = tarot_effects.skill_factor(result)
+	var base_bonus: float = 0
+	for step in steps:
+		if step.source == "skill": continue
+		step.base_before = base
+		base_bonus += step.get("base_bonus",0.0)
+		base = attack_base_with_bonus(result,base_bonus)
+		step.base_after = base
+		if not is_equal_approx(step.base_before,base):
+			step.note = "+%s BASE"
+			step.note_values = [str(snappedf(base-step.base_before,0.01))]
+	var strength_base: float = base
+	for i in range(roundi(strength_factor)-1):
+		steps.append({"source":"tarot","id":"","slot":-1,"before":value,"after":value,"base_before":base,"base_after":base+strength_base,"note":"STRENGTH"})
+		base += strength_base
 	return steps
 
 func cast_damage_multiplier(result: MultiHitSkill) -> float:
@@ -458,8 +503,8 @@ func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 
 func player_target() -> int:
 	if phase not in ["player", "executing"] or not is_attack(pending) or not outcome().is_empty(): return -1
-	if not is_enemy_alive(pending.target):
-		var candidates: Array = living()
+	var candidates: Array = player_attack_targets()
+	if pending.target not in candidates:
 		if candidates.is_empty(): return -1
 		pending.target = candidates[rng.randi_range(0, candidates.size() - 1)]
 	return pending.target
@@ -467,23 +512,27 @@ func player_target() -> int:
 func preview(result: MultiHitSkill, primary: int) -> Array:
 	# Preview one impact, without drawing RNG or consuming resources.
 	var hits: Array = []
-	if not is_attack(result) or not is_enemy_alive(primary): return hits
-	var targets: Array = living() if hits_all(result) else [primary]
+	var candidates: Array = player_attack_targets()
+	if not is_attack(result) or primary not in candidates: return hits
+	var targets: Array = candidates if hits_all(result) else [primary]
 	for i in targets:
 		var execute: bool = is_instant_kill(result)
 		var damage: int = enemies[i].hp if execute else attack_damage(result, i)
 		var hp_loss: int = 0 if enemies[i].shield > 0 and not execute and enemy_status_count(i, Status.CORROSION) == 0 else mini(enemies[i].hp, damage)
-		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss})
+		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss, "corpse_hit": not is_enemy_alive(i)})
 	return hits
 
 func _apply_support(result: MultiHitSkill) -> Array:
 	if result.kind == Kind.PAIR:
-		statuses[result.face].apply(result.spare)
+		statuses[result.face].apply(result.spare,tarot_effects.skill_factor(result))
 		buff_ticks.erase(result.face)
+		# Stored skills are free actions; the waiting attack can use a boon turn.
+		if bonus_resume.is_empty(): turn_boon_refreshes[result.face] = true
 		return [event(-1, 0, "buff", PAIR_NAMES[result.face - 1])]
 	if result.face == 2:
 		return [event(-1, heal(max_hp), "heal", "FULL HEAL")]
-	statuses[33].apply(3)
+	statuses[33].apply(3,tarot_effects.skill_factor(result))
+	if bonus_resume.is_empty(): turn_boon_refreshes[33] = true
 	return [event(-1, 0, "buff", SPECIAL_NAMES[2])]
 
 func _finish_player_action(result: MultiHitSkill) -> void:
@@ -498,10 +547,15 @@ func _finish_player_action(result: MultiHitSkill) -> void:
 		pending = resume.pending if outcome().is_empty() else Skill.new()
 		phase = resume.phase if outcome().is_empty() else "finished"
 		return
+	if tarot_effects.extra_rolls > 0 and outcome().is_empty():
+		tarot_effects.extra_rolls -= 1
+		pending = Skill.new()
+		phase = "roll"
+		return
 	# Keep counters and effects active until every enemy has finished acting.
 	for face in [3, 33]:
 		var refreshed: bool = (result.kind == Kind.PAIR and result.face == face) or (result.kind == Kind.SPECIAL and result.face == 3 and face == 33)
-		if not refreshed: buff_ticks[face] = true
+		if not refreshed and not turn_boon_refreshes.has(face): buff_ticks[face] = true
 	buff_ticks[6] = true
 	pending = Skill.new()
 	phase = "enemy" if outcome().is_empty() else "finished"
@@ -531,7 +585,7 @@ func apply_player_step(primary: int = -1) -> Array:
 	if phase not in ["player", "executing"] or pending.is_empty() or not outcome().is_empty(): return []
 	if is_attack(pending):
 		if primary < 0: primary = player_target()
-		if not is_enemy_alive(primary): return []
+		if primary not in player_attack_targets(): return []
 		pending.target = primary
 	if phase == "player": begin_player_cast()
 	var result: MultiHitSkill = pending.duplicate()
@@ -540,6 +594,11 @@ func apply_player_step(primary: int = -1) -> Array:
 	else:
 		lifesteal_used = 0
 		for hit in preview(result, primary):
+			if hit.corpse_hit:
+				var follow_through: Dictionary = damage_event(hit.target,0,hit.damage,"damage",hit.ignore)
+				follow_through.corpse_hit = true
+				events.append(follow_through)
+				continue
 			var previous_shield: int = enemies[hit.target].shield
 			var loss: int = hit_enemy(hit.target, hit.damage, hit.ignore)
 			if previous_shield > 0 and not hit.ignore and enemy_status_count(hit.target,Status.CORROSION) == 0:
@@ -554,7 +613,7 @@ func apply_player_step(primary: int = -1) -> Array:
 	return events
 
 func _complete_skill_use(result: MultiHitSkill, events: Array) -> void:
-	if result.kind == Kind.ULTIMATE: events.append(event(-1, heal(12), "heal", "+12 HP"))
+	if result.kind == Kind.ULTIMATE: events.append(event(-1, heal(roundi(12*tarot_effects.skill_factor(result))), "heal", "+12 HP"))
 	pending.consume_use()
 	if pending.random_target_per_use(): pending.target = -1
 	if pending.uses_left() == 0 or not outcome().is_empty():
@@ -655,9 +714,6 @@ func _finish_turn_end() -> void:
 	statuses[Status.BURNING].consume()
 	statuses[Status.DARKNESS].consume()
 	statuses[Status.CORROSION].consume()
-	if status_count(Status.PLAGUE) > 0:
-		statuses[Status.PLAGUE].apply(1)
-		hp = mini(hp, max_hp)
 	_end_buff_turn()
 	phase = "round_end" if outcome().is_empty() else "finished"
 
@@ -688,12 +744,16 @@ func relic_immune(id: int) -> bool:
 func acquire_relic(id: String, replace_index: int = -1) -> bool:
 	var old_max: int = max_hp
 	if not relics.add(id, replace_index): return false
+	refresh_relic_health(old_max)
+	return true
+
+func refresh_relic_health(old_max: int) -> void:
 	for status in Status.HARMFUL:
 		if relic_immune(status): statuses[status].count = 0
 	hp = clampi(hp + maxi(0, max_hp - old_max), 0, max_hp)
-	return true
 
 func receive_damage(amount: int, burning: bool = false) -> Array:
+	if not burning and status_count(Status.HIDDEN) > 0: return [event(-1,0,"relic","UNTARGETABLE")]
 	var corroded: bool = status_count(Status.CORROSION) > 0
 	if status_count(Status.IMMUNITY) > 0 and not corroded: return [event(-1,0,"immune","INVINCIBLE")]
 	var incoming: float = maxf(0, amount) * (1.5 if corroded else 1.0)
@@ -716,6 +776,8 @@ func receive_damage(amount: int, burning: bool = false) -> Array:
 func _complete_relic_turn() -> Array:
 	if relic_turn_closed: return []
 	relic_turn_closed = true
+	tarot_effects.end_round()
+	statuses[Status.HIDDEN].consume()
 	return RelicEffects.turn_finished(self)
 
 static func status_label(id: int, amount: int) -> String:
@@ -727,7 +789,7 @@ func enemy_status_count(index: int, id: int) -> int:
 	return effects[id].count if effects.has(id) else 0
 
 func apply_enemy_status(index: int, id: int, amount: int) -> Array:
-	if not is_enemy_alive(index) or id == Status.STUNNED or id not in Status.HARMFUL: return []
+	if not is_enemy_alive(index) or id not in Status.ENEMY_HARMFUL: return []
 	var enemy: Dictionary = enemies[index]
 	if not enemy.has("statuses"): enemy.statuses = {}
 	if not enemy.statuses.has(id): enemy.statuses[id] = Status.new(id)

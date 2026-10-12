@@ -3,6 +3,7 @@ extends RefCounted
 const Rules = preload("res://scripts/battle_rules.gd")
 const Status = preload("res://scripts/status_effect.gd")
 const ENTRIES := {
+	Status.HIDDEN: {"name":"Invisible", "icon":"dark", "text":"Untargetable for 3 turns. Using an attack skill breaks invisibility.", "color":Color("aaa9bf")},
 	2: {"name": Rules.PAIR_NAMES[1], "icon": "heal", "text": "Heal 5 at turn start.", "color": Color("aed085")},
 	3: {"name": Rules.PAIR_NAMES[2], "icon": "attack", "text": "Adds +0.5 to DMG. Stacks with other bonuses.", "color": Color("dfb866")},
 	33: {"name": Rules.SPECIAL_NAMES[2], "icon": "crown", "text": "Adds +2.0 to DMG. Stacks with other bonuses.", "color": Color("c5a4de")},
@@ -22,6 +23,7 @@ static func active(statuses: Dictionary) -> Array:
 		var entry: Dictionary = ENTRIES[id].duplicate()
 		entry.id = id
 		entry.turns = statuses[id].count
+		entry.permanent = statuses[id].permanent
 		entry.stacking = statuses[id].is_stacking()
 		items.append(entry)
 	return items

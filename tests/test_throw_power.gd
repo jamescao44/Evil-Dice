@@ -29,12 +29,20 @@ func timing_checks() -> void:
 	for expected in [0.0, 0.5, 1.0, 0.5, 0.0]:
 		check(is_equal_approx(meter.position_ratio(), expected), "Meter traverses both ends and center")
 		meter.advance(Meter.PERIOD / 4)
+	for crossing in [Meter.PERIOD / 4.0, Meter.PERIOD * 3.0 / 4.0]:
+		for sign_value in [-1, 1]:
+			meter.elapsed = crossing + sign_value * 0.030
+			check(meter.sample().perfect and meter.sample().position == 0.5, "Both +/-30 ms boundaries qualify on both passes")
+			check(is_equal_approx(absf(meter.position_ratio() - 0.5) * Meter.WIDTH, Meter.perfect_tolerance_pixels()), "Visible Perfect zone matches the time boundary")
+			meter.elapsed = crossing + sign_value * 0.030001
+			check(not meter.sample().perfect, "A stop just outside +/-30 ms misses")
+			meter.elapsed = crossing + sign_value * 0.025
+			check(meter.sample().perfect, "25 ms offset qualifies within the widened window")
+	# Stun retains the visible zone despite its random crossing schedule.
 	for sign_value in [-1, 1]:
-		var edge: Dictionary = Meter.sample_at(0.5 + sign_value * 4.0 / Meter.WIDTH)
-		check(edge.perfect and edge.position == 0.5, "Both +/-4 pixel edges qualify and snap to center")
-		var outside: Dictionary = Meter.sample_at(0.5 + sign_value * 4.001 / Meter.WIDTH)
-		check(not outside.perfect and outside.position != 0.5, "Unrounded position outside window neither qualifies nor snaps")
-		check(Meter.sample_at(0.5 + sign_value * 3.0 / Meter.WIDTH).perfect, "New window accepts stops that missed the old window")
+		var edge: Dictionary = Meter.sample_at(0.5 + sign_value * Meter.perfect_tolerance_pixels() / Meter.WIDTH)
+		check(edge.perfect and edge.position == 0.5, "Stunned meter accepts the visible zone boundary")
+		check(not Meter.sample_at(0.5 + sign_value * (Meter.perfect_tolerance_pixels() + 0.001) / Meter.WIDTH).perfect, "Stunned meter rejects positions beyond the visible zone")
 	check(Meter.sample_at(0.5).power == 1 and Meter.sample_at(0.0).power == 0, "Power spans zero to one")
 	check(is_equal_approx(Meter.sample_at(0.1).power, Meter.sample_at(0.9).power), "Power is symmetric")
 	meter.elapsed = Meter.PERIOD / 4
@@ -46,18 +54,29 @@ func timing_checks() -> void:
 	check(center_step > meter.position_ratio() * 1.5, "Marker still accelerates toward the center")
 	var previous_peak_step: float = PI / Meter.PERIOD * 0.001
 	check(center_step < previous_peak_step * 0.8 and center_step > previous_peak_step * 0.7, "Center peak is modestly slower without changing the cycle")
-	# Check real time inside the widened pixel window, not just curve constants.
+	# Check the complete time window, including both exact boundaries.
 	var available_ms: int = 0
-	for ms in range(-20,21):
+	for ms in range(-40,41):
 		meter.elapsed = Meter.PERIOD/4 + ms/1000.0
 		if meter.sample().perfect: available_ms += 1
-	check(available_ms >= 29 and available_ms <= 33, "Perfect timing opportunity doubles with the +/-4 pixel window")
+	check(available_ms == 61, "Perfect covers exactly -30 through +30 ms inclusive")
 	for fps in [15, 20, 30, 60, 120]:
 		meter.reset()
 		for frame in range(fps): meter.advance(1.0 / fps)
 		var direct := Meter.new()
 		direct.advance(1)
 		check(is_equal_approx(meter.position_ratio(), direct.position_ratio()), "Meter is frame-rate independent at %d FPS" % fps)
+		for offset in [-0.031, -0.030, 0.0, 0.030, 0.031]:
+			meter.reset()
+			var tap_time: float = Meter.PERIOD / 4.0 + offset
+			var frames: int = floori(tap_time * fps)
+			for frame in range(frames): meter.advance(1.0 / fps)
+			meter.advance(tap_time - frames / float(fps))
+			check(meter.sample().perfect == (absf(offset) <= 0.030), "Same tap judgment at %d FPS, offset %.3f" % [fps, offset])
+	meter.reset()
+	meter.advance(Meter.PERIOD / 4.0 - 0.040)
+	meter.advance(0.080)
+	check(not meter.sample().perfect, "A frame hitch across the zone does not automatically award Perfect")
 
 func rate_checks() -> void:
 	var modified := Rules.new(845)

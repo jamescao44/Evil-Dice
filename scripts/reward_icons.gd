@@ -3,7 +3,12 @@ extends RefCounted
 const Pixel = preload("res://scripts/pixel_paint.gd")
 
 static func paint(canvas: CanvasItem, art: Dictionary, key: String, rect: Rect2, clip: Rect2 = Rect2(), tint: Color = Color.WHITE) -> void:
-	var texture: Texture2D = art["contract" if key == "shard" else key]
+	var texture: Texture2D = preload("res://assets/art/tarot/back.png") if key == "tarot" else art["contract" if key == "shard" else key]
+	if key == "tarot":
+		preload("res://scripts/tarot_paint.gd").soften(canvas)
+		# Keep the tall card's proportions inside square treasure reels.
+		var width: float = rect.size.y * texture.get_width() / texture.get_height()
+		rect = Rect2(rect.get_center()-Vector2(width,rect.size.y)/2,Vector2(width,rect.size.y))
 	# Isolate the gemstone from its necklace; retain the original source asset.
 	var source := Rect2(12, 18, 12, 12) if key == "ruby" else Rect2(Vector2.ZERO, texture.get_size())
 	var visible_rect: Rect2 = rect.intersection(clip) if clip.has_area() else rect
