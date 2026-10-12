@@ -125,15 +125,13 @@ func _draw() -> void:
 	if view_phase == "over":
 		_draw_ending()
 		_draw_reward_progress(REWARD_CENTER,1.5)
-	if guide: _draw_guide()
-	elif debug_open: _draw_debug()
-	elif menu_open: _draw_menu()
-	else: _draw_tooltips()
+	if not _menus_open(): _draw_tooltips()
 
-func _button(rect: Rect2, value: String, enabled: bool = true) -> void:
+func _button(rect: Rect2, value: String, enabled: bool = true, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
 	var hover: bool = enabled and rect.has_point(_pointer_position())
-	_frame(rect, Color("5f563a") if hover else Color("443c2d"), GOLD if hover else EDGE)
-	_center(rect.get_center() + Vector2(0, 10), value, 28, GOLD if enabled else MUTED)
+	_frame(rect, Color("5f563a") if hover else Color("443c2d"), GOLD if hover else EDGE, canvas)
+	_center(rect.get_center() + Vector2(0, 10), value, 28, GOLD if enabled else MUTED, canvas)
 
 func _draw_header() -> void:
 	_text(Vector2(48, 163), "%d / %d" % [model.stage + 1, Run.WAVE_NAMES.size()], 32, GOLD)
@@ -265,32 +263,33 @@ func _draw_ending() -> void:
 func _home_rect() -> Rect2:
 	return Rect2(478, 132, 160, 88) if guide else Rect2(162, 1490, 480, 104)
 
-func _draw_guide() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.98))
-	_text(Vector2(40, 188), "GRIMOIRE", 42, GOLD)
-	_button(GUIDE_CLOSE, "X")
-	if home_enabled: _button(_home_rect(), "HOME")
+func _draw_guide(canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), INK)
+	_text(Vector2(40, 188), "GRIMOIRE", 42, GOLD, canvas)
+	_button(GUIDE_CLOSE, "X", true, canvas)
+	if home_enabled: _button(_home_rect(), "HOME", true, canvas)
 	var intro: String = "Tap twice to throw. Drag skills to the field, or tap targeted skills to choose a foe. SAVE banks a bonus cast."
 	var rule: String = "Perfect: pair or triple. Normal: sum. 666 clears the squad."
 	if model.is_city():
 		intro = "Tap twice to throw. City skills cast automatically after the reveal. Drag saved skills out for a bonus cast."
 		rule = "Perfect: triple. 666: 2000 x DMG; clear troops; +12 HP."
-	_wrapped(Vector2(40, 258), intro, 718, CREAM, 26)
-	_wrapped(Vector2(40, 390), rule, 718, MUTED, 24)
-	_button(GUIDE_PAIRS, "PAIRS")
-	_button(GUIDE_TRIPLES, "TRIPLES")
-	draw_rect((GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3), TEAL if guide_page == 0 else PURPLE, false, 3)
+	_wrapped(Vector2(40, 258), intro, 718, CREAM, 26, canvas)
+	_wrapped(Vector2(40, 390), rule, 718, MUTED, 24, canvas)
+	_button(GUIDE_PAIRS, "PAIRS", true, canvas)
+	_button(GUIDE_TRIPLES, "TRIPLES", true, canvas)
+	canvas.draw_rect((GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3), TEAL if guide_page == 0 else PURPLE, false, 3)
 	for i in range(6):
 		var y: float = 584 + i * 145
 		var code: String = str(i + 1).repeat(2 if guide_page == 0 else 3)
 		var label: String = Rules.PAIR_NAMES[i] if guide_page == 0 else Rules.SPECIAL_NAMES[i]
-		_text(Vector2(40, y), code + "  " + GameText.text(label), 28, TEAL if guide_page == 0 else GOLD if i == 5 else PURPLE)
-		_wrapped(Vector2(40, y + 42), _pair_description(i) if guide_page == 0 else _special_description(i), 718, CREAM, 28)
-		draw_rect(Rect2(40, y + 108, 724, 2), EDGE.darkened(0.35))
+		_text(Vector2(40, y), code + "  " + GameText.text(label), 28, TEAL if guide_page == 0 else GOLD if i == 5 else PURPLE, canvas)
+		_wrapped(Vector2(40, y + 42), _pair_description(i) if guide_page == 0 else _special_description(i), 718, CREAM, 28, canvas)
+		canvas.draw_rect(Rect2(40, y + 108, 724, 2), EDGE.darkened(0.35))
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage, 3)]
-	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.", caps), 718, MUTED, 24)
-	_wrapped(Vector2(40, 1554), "Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.", 718, MUTED, 24)
-	_wrapped(Vector2(40, 1620), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22)
+	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.", caps), 718, MUTED, 24, canvas)
+	_wrapped(Vector2(40, 1554), "Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.", 718, MUTED, 24, canvas)
+	_wrapped(Vector2(40, 1620), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22, canvas)
 
 func _debug_option_rect(choice: int) -> Rect2:
 	if choice == -1: return Rect2(40, 262, 724, 88)
@@ -298,25 +297,26 @@ func _debug_option_rect(choice: int) -> Rect2:
 	var item: int = (choice - 1) % 6
 	return Rect2(40 + (item % 3) * 248, (550 if choice <= 6 else 998) + floori(item / 3.0) * 164, 228, 140)
 
-func _draw_debug() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color(INK, 0.98))
-	_text(Vector2(40, 188), "DEBUG", 42, GOLD)
-	_button(DEBUG_CLOSE, "X")
-	_button(_debug_option_rect(-1), "NATURAL RANDOM")
-	_button(_debug_option_rect(0), "RANDOM SINGLES")
-	_text(Vector2(40, 516), "DOUBLES / SKILLS", 28, TEAL)
-	_text(Vector2(40, 964), "TRIPLES / SPELL", 28, PURPLE)
+func _draw_debug(canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), INK)
+	_text(Vector2(40, 188), "DEBUG", 42, GOLD, canvas)
+	_button(DEBUG_CLOSE, "X", true, canvas)
+	_button(_debug_option_rect(-1), "NATURAL RANDOM", true, canvas)
+	_button(_debug_option_rect(0), "RANDOM SINGLES", true, canvas)
+	_text(Vector2(40, 516), "DOUBLES / SKILLS", 28, TEAL, canvas)
+	_text(Vector2(40, 964), "TRIPLES / SPELL", 28, PURPLE, canvas)
 	for choice in range(1, 13):
 		var rect := _debug_option_rect(choice)
 		var face: int = choice if choice <= 6 else choice - 6
 		var color: Color = TEAL if choice <= 6 else GOLD if choice == 12 else PURPLE
-		_frame(rect, Color("53613d") if debug_choice == choice else PANEL, color if debug_choice == choice or rect.has_point(_pointer_position()) else EDGE)
-		for i in range(3): _mini_die(rect.position + Vector2(54 + i * 60, 48), 0 if choice <= 6 and i == 2 else face)
-		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 3), 30, color)
-	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS")
-	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"))
-	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"))
-	if debug_perfect: draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
-	_text(Vector2(40,1634),"WAVE",28,GOLD)
-	_button(DEBUG_WAVE_LOAD,"LOAD")
-	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "Start fresh at wave 1-10. 10 = city.",24,RED if not debug_wave_error.is_empty() else MUTED)
+		_frame(rect, Color("53613d") if debug_choice == choice else PANEL, color if debug_choice == choice or rect.has_point(_pointer_position()) else EDGE, canvas)
+		for i in range(3): _mini_die(rect.position + Vector2(54 + i * 60, 48), 0 if choice <= 6 and i == 2 else face, CREAM, canvas)
+		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 3), 30, color, canvas)
+	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS", true, canvas)
+	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"), true, canvas)
+	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"), true, canvas)
+	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
+	_text(Vector2(40,1634),"WAVE",28,GOLD, canvas)
+	_button(DEBUG_WAVE_LOAD,"LOAD", true, canvas)
+	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "Start fresh at wave 1-10. 10 = city.",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)

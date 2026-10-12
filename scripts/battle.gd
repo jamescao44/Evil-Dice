@@ -6,6 +6,7 @@ var selected_ancient_id: String = "horror"
 var selected_dice_id: String = "bone"
 
 const HELD_ITEM_Z := 400
+const MENU_Z := 500
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const SkillBubble = preload("res://scripts/skill_bubble.gd")
@@ -93,6 +94,7 @@ var speed: float = 1.0
 var guide: bool = false
 var debug_open: bool = false
 var menu_open: bool = false
+var menu_canvas: Node2D
 var debug_wave_input: LineEdit
 var debug_wave_error: String = ""
 var debug_choice: int = -1 # -1 natural; 0 all-different; 1..6 pairs; 7..12 triples.
@@ -162,6 +164,12 @@ func _ready() -> void:
 	GameText.prepare_font(pixel_font)
 	pixel_font.oversampling = 1.0
 	debug_rng.randomize()
+	# Modal pages must cover every battle sprite and held item.
+	menu_canvas = Node2D.new()
+	menu_canvas.name = "MenuCanvas"
+	menu_canvas.z_index = MENU_Z
+	add_child(menu_canvas)
+	menu_canvas.draw.connect(_draw_menu_canvas)
 	_create_debug_wave_input()
 	dice_group = Node2D.new()
 	add_child(dice_group)
@@ -269,6 +277,8 @@ func _process(delta: float) -> void:
 	var modal: bool = _menus_open()
 	chest.paused = tarot_ui.ceremony.active()
 	debug_wave_input.visible = debug_open
+	menu_canvas.visible = menu_open or guide or debug_open
+	menu_canvas.queue_redraw()
 	auto_claim_notice.visible = not modal and view_phase == "over" and auto_claim_remaining > 0
 	auto_claim_notice.queue_redraw()
 	for die in dice:
@@ -348,11 +358,16 @@ func _configure_effects() -> void:
 func _menus_open() -> bool:
 	return menu_open or guide or debug_open or (is_instance_valid(tarot_ui) and tarot_ui.ceremony.active())
 
+func _draw_menu_canvas() -> void:
+	if guide: _draw_guide(menu_canvas)
+	elif debug_open: _draw_debug(menu_canvas)
+	elif menu_open: _draw_menu(menu_canvas)
+
 func _create_debug_wave_input() -> void:
 	debug_wave_input = LineEdit.new()
 	debug_wave_input.position = DEBUG_WAVE_INPUT.position
 	debug_wave_input.size = DEBUG_WAVE_INPUT.size
-	debug_wave_input.z_index = 100
+	debug_wave_input.z_index = 1
 	debug_wave_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	debug_wave_input.max_length = 2
 	debug_wave_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
@@ -368,7 +383,7 @@ func _create_debug_wave_input() -> void:
 		style.set_border_width_all(3 if style_name == "focus" else 2)
 		debug_wave_input.add_theme_stylebox_override(style_name, style)
 	debug_wave_input.hide()
-	add_child(debug_wave_input)
+	menu_canvas.add_child(debug_wave_input)
 	debug_wave_input.text_submitted.connect(_debug_load_wave)
 	debug_wave_input.text_changed.connect(func(_value): debug_wave_error = "")
 
@@ -1496,32 +1511,28 @@ func _draw() -> void:
 	if view_phase == "over":
 		_draw_ending()
 		_draw_reward_progress(REWARD_CENTER,1.0)
-	if guide:
-		_draw_guide()
-	elif debug_open:
-		_draw_debug()
-	elif menu_open:
-		_draw_menu()
-	else:
-		_draw_tooltips()
+	if not _menus_open(): _draw_tooltips()
 
-func _text(at: Vector2, value: String, size: int = 16, color: Color = CREAM) -> void:
+func _text(at: Vector2, value: String, size: int = 16, color: Color = CREAM, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
 	value = GameText.text(value)
 	# Latin pixel font with bundled CJK fallback; integer baselines.
 	var p := at.round()
-	draw_string(pixel_font, p + Vector2(2, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(INK, color.a))
-	draw_string(pixel_font, p, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+	canvas.draw_string(pixel_font, p + Vector2(2, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(INK, color.a))
+	canvas.draw_string(pixel_font, p, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
-func _center(at: Vector2, value: String, size: int = 16, color: Color = CREAM) -> void:
+func _center(at: Vector2, value: String, size: int = 16, color: Color = CREAM, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
 	value = GameText.text(value)
 	var width: float = pixel_font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	_text(at - Vector2(width / 2, 0), value, size, color)
+	_text(at - Vector2(width / 2, 0), value, size, color, canvas)
 
-func _wrapped(at: Vector2, value: String, width: float, color: Color = MUTED, size: int = 16) -> float:
+func _wrapped(at: Vector2, value: String, width: float, color: Color = MUTED, size: int = 16, canvas: CanvasItem = null) -> float:
+	if canvas == null: canvas = self
 	size = maxi(size,22)
 	var y: float = at.y
 	for line in GameText.lines(value, description_font, size, width):
-		draw_string(description_font,Vector2(at.x,y).round(),line,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
+		canvas.draw_string(description_font,Vector2(at.x,y).round(),line,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
 		y += size+6
 	return maxf(at.y,y-size-6)
 
@@ -1536,30 +1547,33 @@ func _art(key: String, rect: Rect2, tint: Color = Color.WHITE) -> void:
 	if art.has(key):
 		draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, tint)
 
-func _stone(rect: Rect2, tint: Color, key: String = "stone", unit: int = 64) -> void:
-	draw_rect(rect, PANEL)
+func _stone(rect: Rect2, tint: Color, key: String = "stone", unit: int = 64, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(rect, PANEL)
 	if not art.has(key): return
 	for y in range(int(rect.position.y), int(rect.end.y), unit):
 		for x in range(int(rect.position.x), int(rect.end.x), unit):
 			var size := Vector2(minf(unit, rect.end.x - x), minf(unit, rect.end.y - y))
 			# Crop the dark grout from UI stone so it does not compete with text.
 			var inset: float = 3.0 if key == "stone" else 0.0
-			draw_texture_rect_region(art[key], Rect2(Vector2(x, y), size), Rect2(Vector2.ONE * inset, size * (32.0 - inset * 2) / unit), tint)
+			canvas.draw_texture_rect_region(art[key], Rect2(Vector2(x, y), size), Rect2(Vector2.ONE * inset, size * (32.0 - inset * 2) / unit), tint)
 
-func _frame(rect: Rect2, fill: Color = PANEL, border: Color = EDGE) -> void:
-	draw_rect(Rect2(rect.position + Vector2(4, 6), rect.size), Color(INK, 0.6))
-	_stone(rect, fill)
-	draw_rect(rect, INK, false, 4)
-	draw_rect(rect.grow(-3), border.darkened(0.35), false, 2)
-	draw_rect(Rect2(rect.position + Vector2(5, 5), Vector2(rect.size.x - 10, 2)), border)
-	draw_rect(Rect2(rect.position + Vector2(5, 5), Vector2(2, rect.size.y - 10)), border)
+func _frame(rect: Rect2, fill: Color = PANEL, border: Color = EDGE, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(Rect2(rect.position + Vector2(4, 6), rect.size), Color(INK, 0.6))
+	_stone(rect, fill, "stone", 64, canvas)
+	canvas.draw_rect(rect, INK, false, 4)
+	canvas.draw_rect(rect.grow(-3), border.darkened(0.35), false, 2)
+	canvas.draw_rect(Rect2(rect.position + Vector2(5, 5), Vector2(rect.size.x - 10, 2)), border)
+	canvas.draw_rect(Rect2(rect.position + Vector2(5, 5), Vector2(2, rect.size.y - 10)), border)
 	for p in [rect.position + Vector2(5, 5), Vector2(rect.end.x - 9, rect.position.y + 5), rect.end - Vector2(9, 9), Vector2(rect.position.x + 5, rect.end.y - 9)]:
-		draw_rect(Rect2(p, Vector2(4, 4)), border.lightened(0.2))
+		canvas.draw_rect(Rect2(p, Vector2(4, 4)), border.lightened(0.2))
 
-func _button(rect: Rect2, value: String, enabled: bool = true) -> void:
+func _button(rect: Rect2, value: String, enabled: bool = true, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
 	var hover: bool = enabled and rect.has_point(get_global_mouse_position())
-	_frame(rect, Color("5f563a") if hover else Color("443c2d"), GOLD if hover else EDGE)
-	_center(rect.get_center() + Vector2(0, 6), value, 16, GOLD if enabled else MUTED)
+	_frame(rect, Color("5f563a") if hover else Color("443c2d"), GOLD if hover else EDGE, canvas)
+	_center(rect.get_center() + Vector2(0, 6), value, 16, GOLD if enabled else MUTED, canvas)
 
 func _draw_header() -> void:
 	_text(Vector2(42, 53), "%d / %d" % [model.stage + 1, Run.WAVE_NAMES.size()], 32, GOLD)
@@ -1576,22 +1590,23 @@ func _draw_menu_icon() -> void:
 		var at: Vector2 = MENU_RECT.get_center() + Vector2(0,row*6*scale_factor)
 		draw_rect(Rect2(at-Vector2(10*scale_factor,scale_factor),Vector2(20*scale_factor,2*scale_factor)),GOLD)
 
-func _draw_menu() -> void:
+func _draw_menu(canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
 	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
-	draw_rect(Rect2(Vector2.ZERO,fx.canvas_size),Color(INK,0.98))
-	if not portrait: _frame(Rect2(360,120,560,560),PANEL,GOLD)
-	_text(Vector2(40,188) if portrait else Vector2(400,184),"MENU",42 if portrait else 32,GOLD)
-	_button(MENU_CLOSE,"X")
-	_button(DEBUG_RECT,"DEBUG")
-	_button(FX_RECT,"EFFECTS: " + ("REDUCED" if reduced else "FULL"))
-	_button(GUIDE_RECT,"HELP / GRIMOIRE")
-	_text(LANGUAGE_RECT.position-Vector2(0,14 if portrait else 12),"LANGUAGE",24 if portrait else 16,MUTED)
+	canvas.draw_rect(Rect2(Vector2.ZERO,fx.canvas_size),INK)
+	if not portrait: _frame(Rect2(360,120,560,560),PANEL,GOLD, canvas)
+	_text(Vector2(40,188) if portrait else Vector2(400,184),"MENU",42 if portrait else 32,GOLD, canvas)
+	_button(MENU_CLOSE,"X", true, canvas)
+	_button(DEBUG_RECT,"DEBUG", true, canvas)
+	_button(FX_RECT,"EFFECTS: " + ("REDUCED" if reduced else "FULL"), true, canvas)
+	_button(GUIDE_RECT,"HELP / GRIMOIRE", true, canvas)
+	_text(LANGUAGE_RECT.position-Vector2(0,14 if portrait else 12),"LANGUAGE",24 if portrait else 16,MUTED, canvas)
 	for i in range(GameText.LANGUAGES.size()):
 		var rect := _language_rect(i)
-		_button(rect,GameText.LANGUAGE_NAMES[i])
-		if GameText.language == GameText.LANGUAGES[i]: draw_rect(rect.grow(-4),TEAL,false,3)
-	_button(MENU_RESUME,"RESUME")
-	_center(Vector2(402,1350) if portrait else Vector2(640,650),"BATTLE PAUSED",24 if portrait else 16,MUTED)
+		_button(rect,GameText.LANGUAGE_NAMES[i], true, canvas)
+		if GameText.language == GameText.LANGUAGES[i]: canvas.draw_rect(rect.grow(-4),TEAL,false,3)
+	_button(MENU_RESUME,"RESUME", true, canvas)
+	_center(Vector2(402,1350) if portrait else Vector2(640,650),"BATTLE PAUSED",24 if portrait else 16,MUTED, canvas)
 
 func _language_rect(index: int) -> Rect2:
 	var gap: float = 16 if fx.canvas_size.y > fx.canvas_size.x else 12
@@ -2229,26 +2244,27 @@ func _draw_ending() -> void:
 func _home_rect() -> Rect2:
 	return Rect2(974, 96, 140, 36) if guide else Rect2(531, 548, 218, 53)
 
-func _draw_guide() -> void:
-	draw_rect(Rect2(0, 0, 1280, 800), Color(0.06, 0.08, 0.05, 0.97))
-	_frame(Rect2(86, 76, 1108, 681), Color("333b2e"), GOLD)
-	_text(Vector2(116, 126), "DICE GRIMOIRE", 32, GOLD)
-	_button(GUIDE_CLOSE, "X")
-	if home_enabled: _button(_home_rect(), "HOME")
-	_text(Vector2(116, 165), "City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast." if model.is_city() else "Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.", 16, CREAM)
+func _draw_guide(canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(Rect2(0, 0, 1280, 800), Color(0.06, 0.08, 0.05))
+	_frame(Rect2(86, 76, 1108, 681), Color("333b2e"), GOLD, canvas)
+	_text(Vector2(116, 126), "DICE GRIMOIRE", 32, GOLD, canvas)
+	_button(GUIDE_CLOSE, "X", true, canvas)
+	if home_enabled: _button(_home_rect(), "HOME", true, canvas)
+	_text(Vector2(116, 165), "City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast." if model.is_city() else "Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.", 16, CREAM, canvas)
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage,3)]
-	_text(Vector2(116, 194), "CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP. Skills ignore caps; 666 clears the wave.", caps), 16, MUTED)
-	_text(Vector2(116, 238), "PAIRS / SKILLS", 16, TEAL)
-	_text(Vector2(656, 238), "TRIPLES / SPELLS", 16, PURPLE)
-	draw_rect(Rect2(632, 220, 2, 478), EDGE.darkened(0.25))
+	_text(Vector2(116, 194), "CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP. Skills ignore caps; 666 clears the wave.", caps), 16, MUTED, canvas)
+	_text(Vector2(116, 238), "PAIRS / SKILLS", 16, TEAL, canvas)
+	_text(Vector2(656, 238), "TRIPLES / SPELLS", 16, PURPLE, canvas)
+	canvas.draw_rect(Rect2(632, 220, 2, 478), EDGE.darkened(0.25))
 	for i in range(6):
 		var y: float = 280 + i * 67
-		_text(Vector2(116, y), "%d%d  %s" % [i+1,i+1,GameText.text(Rules.PAIR_NAMES[i])], 16, TEAL)
-		_wrapped(Vector2(116, y + 25), _pair_description(i), 496)
-		_text(Vector2(656, y), "%d%d%d  %s" % [i+1,i+1,i+1,GameText.text(Rules.SPECIAL_NAMES[i])], 16, GOLD if i==5 else PURPLE)
-		_wrapped(Vector2(656, y + 25), _special_description(i), 504)
-	_text(Vector2(116, 713), "Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.", 16, MUTED)
-	_text(Vector2(116, 739), "Art: Dungeon Crawl Stone Soup / CC0    Sound: Kenney", 16, MUTED)
+		_text(Vector2(116, y), "%d%d  %s" % [i+1,i+1,GameText.text(Rules.PAIR_NAMES[i])], 16, TEAL, canvas)
+		_wrapped(Vector2(116, y + 25), _pair_description(i), 496, MUTED, 16, canvas)
+		_text(Vector2(656, y), "%d%d%d  %s" % [i+1,i+1,i+1,GameText.text(Rules.SPECIAL_NAMES[i])], 16, GOLD if i==5 else PURPLE, canvas)
+		_wrapped(Vector2(656, y + 25), _special_description(i), 504, MUTED, 16, canvas)
+	_text(Vector2(116, 713), "Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.", 16, MUTED, canvas)
+	_text(Vector2(116, 739), "Art: Dungeon Crawl Stone Soup / CC0    Sound: Kenney", 16, MUTED, canvas)
 
 func _debug_option_rect(choice: int) -> Rect2:
 	if choice == -1: return Rect2(136, 176, 250, 40)
@@ -2256,39 +2272,41 @@ func _debug_option_rect(choice: int) -> Rect2:
 	var face: int = choice if choice <= 6 else choice - 6
 	return Rect2(136 + (face - 1) * 158, 282 if choice <= 6 else 449, 148, 103)
 
-func _mini_die(at: Vector2, face: int, tint: Color = CREAM) -> void:
-	draw_rect(Rect2(at - Vector2(17, 17), Vector2(34, 36)), Color("6e583e"))
-	draw_rect(Rect2(at - Vector2(16, 18), Vector2(32, 32)), tint)
+func _mini_die(at: Vector2, face: int, tint: Color = CREAM, canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(Rect2(at - Vector2(17, 17), Vector2(34, 36)), Color("6e583e"))
+	canvas.draw_rect(Rect2(at - Vector2(16, 18), Vector2(32, 32)), tint)
 	if face == 0:
-		_center(at + Vector2(0, 4), "?", 16, INK)
+		_center(at + Vector2(0, 4), "?", 16, INK, canvas)
 		return
 	var layouts := [[4], [0,8], [0,4,8], [0,2,6,8], [0,2,4,6,8], [0,2,3,5,6,8]]
 	for pip in layouts[face - 1]:
 		var p: Vector2 = at + Vector2((pip % 3 - 1) * 9 - 2, (floori(pip / 3.0) - 1) * 9 - 4)
-		draw_rect(Rect2(p, Vector2(4, 4)), INK)
+		canvas.draw_rect(Rect2(p, Vector2(4, 4)), INK)
 
-func _draw_debug() -> void:
-	draw_rect(Rect2(0, 0, 1280, 800), Color(INK, 0.96))
-	_frame(Rect2(106, 100, 1070, 592), PANEL, GOLD)
-	_text(Vector2(136, 148), "DEBUG", 32, GOLD)
-	_button(DEBUG_CLOSE, "X")
-	_button(_debug_option_rect(-1), "NATURAL RANDOM")
-	_button(_debug_option_rect(0), "RANDOM SINGLES")
-	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"))
-	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"))
-	if debug_perfect: draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 2)
-	_text(Vector2(136, 259), "DOUBLES / SKILLS", 16, TEAL)
-	_text(Vector2(136, 426), "TRIPLES / SPELL", 16, PURPLE)
+func _draw_debug(canvas: CanvasItem = null) -> void:
+	if canvas == null: canvas = self
+	canvas.draw_rect(Rect2(0, 0, 1280, 800), INK)
+	_frame(Rect2(106, 100, 1070, 592), PANEL, GOLD, canvas)
+	_text(Vector2(136, 148), "DEBUG", 32, GOLD, canvas)
+	_button(DEBUG_CLOSE, "X", true, canvas)
+	_button(_debug_option_rect(-1), "NATURAL RANDOM", true, canvas)
+	_button(_debug_option_rect(0), "RANDOM SINGLES", true, canvas)
+	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"), true, canvas)
+	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"), true, canvas)
+	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 2)
+	_text(Vector2(136, 259), "DOUBLES / SKILLS", 16, TEAL, canvas)
+	_text(Vector2(136, 426), "TRIPLES / SPELL", 16, PURPLE, canvas)
 	for choice in range(1, 13):
 		var rect: Rect2 = _debug_option_rect(choice)
 		var face: int = choice if choice <= 6 else choice - 6
 		var color: Color = TEAL if choice <= 6 else GOLD if choice == 12 else PURPLE
-		_frame(rect, Color("53613d") if choice == debug_choice else PANEL, color if rect.has_point(get_global_mouse_position()) or choice == debug_choice else EDGE)
+		_frame(rect, Color("53613d") if choice == debug_choice else PANEL, color if rect.has_point(get_global_mouse_position()) or choice == debug_choice else EDGE, canvas)
 		for i in range(3):
-			_mini_die(rect.position + Vector2(30 + i * 44, 38), 0 if choice <= 6 and i == 2 else face, CREAM.darkened(0.3) if choice <= 6 and i == 2 else CREAM)
-		_center(rect.get_center() + Vector2(0, 32), "%d%d" % [face, face] if choice <= 6 else "%d%d%d" % [face, face, face], 16, color)
-	_text(Vector2(136, 601), "Choose dice, load a wave, or add tarot cards.", 16, CREAM)
-	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS")
-	_text(Vector2(136, 653), "WAVE", 16, GOLD)
-	_button(DEBUG_WAVE_LOAD,"LOAD")
-	_text(Vector2(548,653),debug_wave_error,16,RED)
+			_mini_die(rect.position + Vector2(30 + i * 44, 38), 0 if choice <= 6 and i == 2 else face, CREAM.darkened(0.3) if choice <= 6 and i == 2 else CREAM, canvas)
+		_center(rect.get_center() + Vector2(0, 32), "%d%d" % [face, face] if choice <= 6 else "%d%d%d" % [face, face, face], 16, color, canvas)
+	_text(Vector2(136, 601), "Choose dice, load a wave, or add tarot cards.", 16, CREAM, canvas)
+	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS", true, canvas)
+	_text(Vector2(136, 653), "WAVE", 16, GOLD, canvas)
+	_button(DEBUG_WAVE_LOAD,"LOAD", true, canvas)
+	_text(Vector2(548,653),debug_wave_error,16,RED, canvas)
