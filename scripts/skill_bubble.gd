@@ -275,9 +275,8 @@ func value_text() -> String:
 	var held: bool = battle.view_phase == "skill" and not stored
 	if not selected and not (held and not battle._skill_needs_target(roll)): return ""
 	if Rules.is_attack(roll): return battle.model.damage_caption(roll, battle.hover_target if selected else -1)
-	if roll.face == 2:
+	if roll.face == 2 and roll.kind == Rules.Kind.SPECIAL:
 		if battle.model.status_count(battle.Status.DARKNESS) > 0: return "+0 HP"
-		if roll.kind == Rules.Kind.PAIR: return "%d HP (x%d)" % [roundi(5*battle.model.tarot_effects.skill_factor(roll)),roll.spare]
 		return "+%d HP" % maxi(0, battle.model.max_hp-battle.model.hp)
 	return ""
 
@@ -327,6 +326,9 @@ func _draw_target(target: int, selected: bool, color: Color) -> void:
 	DragFeedback.paint_target(self,battle._target_rect(target),selected,color,battle.fx.canvas_size.y > battle.fx.canvas_size.x)
 
 func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
+	if roll.is_freeze():
+		preload("res://scripts/status_paint.gd").icon(self,at,side*0.43,"ice",Color("82dfff",tint.a))
+		return
 	var kind: int = roll.kind
 	var face: int = roll.face
 	var key: String = "attack"

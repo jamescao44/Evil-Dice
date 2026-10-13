@@ -21,5 +21,7 @@
   "heal": "gui/skills/transmutations.png",
   "feast": "gui/skills/necromancy.png",
   "crown": "gui/skills/invocations.png",
-  "fx": "gui/skills/spellcasting.png"
+  "fx": "gui/skills/spellcasting.png",
+  "paladin": "monster/holy/paladin.png",
+  "high_priest": "monster/deep_elf_high_priest.png"
 }

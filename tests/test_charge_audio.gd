@@ -43,9 +43,9 @@ func run() -> void:
 	game.guide = true
 	game._process(0.1)
 	check(not layer.player.playing, "Modal pauses silence the texture")
-	check(game.sounds.has("click_001"), "Existing dice click sound remains available")
+	check(game.sounds.has("dice/click_001"), "Existing dice click sound remains available")
 	for clip in ["soft_sweep", "perfect"]:
-		check(game.sounds[clip] is AudioStreamWAV and game.sounds[clip].resource_path.ends_with(clip+".wav"), "Finished WAV is imported for "+clip)
+		check(game.sounds["dice/"+clip] is AudioStreamWAV and game.sounds["dice/"+clip].resource_path.ends_with(clip+".wav"), "Finished WAV is imported for "+clip)
 	game.queue_free()
 	await process_frame
 	# Let the audio mixer release stopped playback voices before exiting.

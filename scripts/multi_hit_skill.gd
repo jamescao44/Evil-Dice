@@ -34,6 +34,9 @@ func is_attack() -> bool:
 	if is_empty(): return false
 	return face in [1,4,5] if kind in [Kind.PAIR,Kind.SPECIAL] else true
 
+func is_freeze() -> bool:
+	return kind == Kind.PAIR and face == 2
+
 func hits_all() -> bool:
 	return kind == Kind.ULTIMATE or (kind in [Kind.PAIR,Kind.SPECIAL] and face == 4)
 

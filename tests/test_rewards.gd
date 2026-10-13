@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
@@ -61,10 +62,25 @@ func partial_claim_checks(game) -> void:
 	game.chest.playback_speed = 1
 	game._reward_sequence()
 	await wait_for_chest(game,false)
-	check(game.chest.active and game.chest.can_skip(),"Skip is available during the rolling animation")
+	check(game.chest.active and not game.chest.can_skip(),"Preparing treasure accepts animation skips before discard controls appear")
+	var locked: Array = game.model.open_rewards.duplicate()
+	var reward_rng: int = game.model.reward_rng.state
+	game._handle_click(game.chest.reel_rect(0).get_center())
+	game._handle_release(game.chest.reel_rect(0).get_center())
+	check(not game.chest.active and game.chest.can_skip() and game.model.claimed_slots.is_empty(),"A tap over a reel reveals all prizes without collecting one")
+	check(game.model.open_rewards == locked and game.model.reward_rng.state == reward_rng and not game.chest.skip_requested,"Animation skip preserves locked rewards and never discards them")
 	game._handle_click(game.chest.skip_rect().get_center())
 	await wait_for_exit(game,"ready")
 	check(game.model.reward_history.is_empty() and game.model.perfect_progress == 0,"Skipping the whole chest awards nothing and cannot reopen the consumed chest")
+	game._restart()
+	game.model.perfect_progress = 3
+	game._reward_sequence()
+	game._handle_click(Vector2(10,10))
+	game._handle_release(Vector2(10,10))
+	await wait_for_chest(game)
+	check(not game.chest.active and game.model.claimed_slots.is_empty(),"A tap during the initial chest delay also reveals rewards without claiming")
+	game._handle_click(game.chest.skip_rect().get_center())
+	await wait_for_exit(game,"ready")
 	game._restart()
 	for id in ["heart","armor","coin","bracelet","magic_shield","magic_sword","twin_scythes","orange_stone","blue_stone","cursed_bow"]: game.model.acquire_relic(id)
 	var owned: Array = game.model.relics.items.duplicate(true)
@@ -103,7 +119,7 @@ func test_model() -> void:
 				model.begin_tarot_reward("chest",slot)
 				check(not model.choose_tarot(0).is_empty(),"Tarot picks can be collected in any reward order")
 			else:
-				check(not model.claim_reward(slot,0).is_empty(), "Every slot can be collected in any order, replacing a relic when full")
+				check(not model.claim_reward(slot,0 if not model.relics.items.is_empty() else -1).is_empty(), "Every slot can be collected in any order, replacing a relic when full")
 			check(model.claim_reward(slot).is_empty(), "Repeated pickup cannot duplicate a reward")
 		check(model.rewards_collected() and model.reward_history.size() == before+results.size(), "All results claimed exactly once")
 		check(model.close_chest() and model.open_chest().is_empty(), "Chest closes only after pickups")
@@ -126,7 +142,7 @@ func test_model() -> void:
 	model.discard_unclaimed_rewards()
 	model.close_chest()
 	model.relics.items.clear()
-	model.stage = 9
+	model.stage = Waves.CITY_STAGE
 	model.city_hp = 100000 # Measure reward scaling before the remaining-health cap.
 	check(model.siege_damage(Rules.classify([6,6,6])) == 2000, "Treasure no longer inflates Annihilation damage")
 	check(model.siege_damage(Rules.classify([1,1,1])) == 75, "City execution keeps its unmodified base damage")
@@ -156,7 +172,7 @@ func test_model() -> void:
 		check(model.auto_claim_victory_chest() == 0 and model.perfect_progress == progress,"Active runs never auto-claim treasure")
 		for e in model.enemies: e.hp = 0
 		check(model.auto_claim_victory_chest() == 0 and model.perfect_progress == progress,"Squad wave clears preserve the bank")
-		model.stage = 9
+		model.stage = Waves.CITY_STAGE
 		model.city_hp = 0
 		model.hp = 0
 		check(model.auto_claim_victory_chest() == 0 and model.perfect_progress == progress,"Defeat never auto-claims treasure")
@@ -174,17 +190,17 @@ func test_model() -> void:
 	model.reset_run()
 
 	var roles: Dictionary = {}
-	for stage in range(9):
+	for stage in range(Waves.CITY_STAGE):
 		model.stage = stage
 		model._load_wave()
 		check(model.enemies.filter(func(e): return not e.elite).size() == Run.WAVE_COUNTS[stage][0] and model.enemies.filter(func(e): return e.elite).size() == Run.WAVE_COUNTS[stage][1], "Exact normal/elite counts for wave %d" % (stage+1))
 		for e in model.enemies: roles[e.role] = true
-	check(roles.size() == 3, "Wave generation uses all three roles")
+	check(roles.size() == 5, "Wave generation uses all five roles")
 	for elite in [false,true]:
 		for role in range(3):
 			var enemy: Dictionary = Rules.make_enemy(role,1.0,elite)
 			check(enemy.shield == (10 if elite else 0), "Every elite starts with ten shield")
-			check(enemy.max_hp == ([150,100,75] if elite else [75,50,35])[role] and enemy.damage == ([10.0,10.0,15.0] if elite else [5.0,7.5,10.0])[role], "Role stats match requested multipliers")
+			check(enemy.max_hp == ([150,100,75] if elite else [75,50,35])[role] and enemy.damage == ([10.0,10.0,15.0] if elite else [5.0,7.0,10.0])[role], "Role stats match requested multipliers")
 	model.enemies = [Rules.make_enemy(0),Rules.make_enemy(1,1,true),Rules.make_enemy(2,1,true)]
 	model.stage = 0
 	model.hp = 100
@@ -215,22 +231,22 @@ func test_model() -> void:
 		for i in range(200):
 			var intent: Dictionary = model.choose_intent(role)
 			seen[intent.type] = true
-			if intent.type == "heal": check(intent.target == role and intent.amount == 23, "Mage chooses 30% self-heal")
-			if intent.type == "empower": check(intent.target != role, "Mage never empowers itself")
-		check(seen.has("attack") and seen.has("team_heal" if role == 1 else "heal"), "Support actions remain randomized with attacks")
+			if intent.type == "heal": check(intent.target == role and intent.amount == roundi(model.enemies[role].max_hp*0.3), "Archer chooses 30% self-heal")
+			if intent.type == "empower": check(intent.target in model.living() and not model.enemies[intent.target].attack_boost, "Mage blesses an eligible living ally or itself")
+		check(seen.has("attack") and seen.has("team_heal" if role == 1 else "empower"), "Support actions remain randomized with attacks")
 
 func test_scene(game) -> void:
 	root.add_child(game)
 	game.muted = true
 	game.speed = 30
 	game.chest.playback_speed = 30
-	for stage in range(9):
+	for stage in range(Waves.CITY_STAGE):
 		game.model.stage = stage
 		game.model._load_wave()
 		game.visual_stage = stage
 		for i in range(game.model.enemies.size()):
 			check(game.ARENA.has_point(game._enemy_feet(i)), "All enemy positions fit battle area")
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
 	game.model.begin_round()
 	game.model.perfect_progress = 9
@@ -254,9 +270,9 @@ func test_scene(game) -> void:
 		check(game.selected_status == -1, "Treasure overlay blocks status taps")
 	await create_timer(0.1).timeout
 	check(game.view_phase == "reward" and not game.guide and game.model.volley_clock == city_clock and game.model.pending.is_empty(), "Chest blocks combat and pauses siege")
-	check(not game.chest.visible, "Brief pause precedes treasure reveal")
+	check(game.chest.visible and not game.chest.active, "Tapping during preparation skips directly to the locked rewards")
 	await create_timer(0.32).timeout
-	check(not game.fx.flashes.is_empty() and not game.chest.visible, "Flash precedes chest")
+	check(game.model.reward_history.is_empty(), "Animation-skip taps never claim a reward")
 	await create_timer(0.6).timeout
 	check(not game.chest.active and game.view_phase == "reward" and game.model.reward_history.is_empty(), "Landed rewards wait for manual pickup")
 	for i in range(5):
@@ -299,7 +315,7 @@ func test_scene(game) -> void:
 	game._restart()
 
 	for tier in range(1,4):
-		game.model.stage = 9
+		game.model.stage = Waves.CITY_STAGE
 		game.model._load_wave()
 		game._start_round()
 		game.model.city_hp = 1
@@ -340,7 +356,7 @@ func test_scene(game) -> void:
 		check(game.view_phase == "over" and not game.chest.visible and game.model.open_rewards.is_empty(),"Collecting every gift returns to the success screen")
 		game._handle_click(game.REPLAY_RECT.get_center())
 		check(game.auto_claim_tier == 0 and game.auto_claim_remaining == 0 and game.model.reward_history.is_empty(),"Restart clears the message and run rewards")
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model.city_hp = 0
 	game.model.perfect_progress = 2
 	game._check_over()

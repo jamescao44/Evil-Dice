@@ -1,4 +1,5 @@
 extends Node2D
+const Run = preload("res://scripts/run_rules.gd")
 ## Collection shell. Battles remain separate scenes with the same combat model.
 const Catalog = preload("res://scripts/home_catalog.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
@@ -54,7 +55,7 @@ func _ready() -> void:
 	preview_die.set_process(false)
 	add_child(preview_die)
 	click_audio = AudioStreamPlayer.new()
-	click_audio.stream = preload("res://assets/audio/click_001.ogg")
+	click_audio.stream = preload("res://assets/audio/ui/click_001.ogg")
 	click_audio.volume_db = -20
 	add_child(click_audio)
 	_configure_layout()
@@ -385,14 +386,16 @@ func _draw_play() -> void:
 	_center(at, ancients[ancient_index].name, 42 if portrait else 36, CREAM)
 	_center(at + Vector2(0, 50 if portrait else 42), ancients[ancient_index].style, 24 if portrait else 20, GREEN)
 	var y: float = 1128 if portrait else 348
-	var start: float = 130 if portrait else 726
-	var step: float = 136 if portrait else 104
-	for i in range(10):
-		var p := Vector2(start + (i % 5) * step, y + floori(i/5.0) * (84 if portrait else 74))
-		if i % 5 < 4: Pixel.line(self, p, p + Vector2(step, 0), EDGE.darkened(0.4), 3)
-		Pixel.disc(self, p, 23 if portrait else 20, INK, 4)
-		_art("crown" if i == 9 else ["vanguard", "archer", "mage"][i % 3], Rect2(p - Vector2.ONE * 20, Vector2.ONE * 40), GOLD if i in [2,7,9] else MUTED)
-		_center(p + Vector2(0, 43), ["1", "3", "1E", "5", "2+1E", "3+2E", "5+2E", "4E", "5+5E", "CITY"][i], 20 if portrait else 16, GOLD if i in [2,7,9] else MUTED)
+	var start: float = 78 if portrait else 702
+	var step: float = 72 if portrait else 52
+	for i in range(Run.Waves.COUNT):
+		var p := Vector2(start+(i%10)*step,y+floori(i/10.0)*(84 if portrait else 74))
+		if i%10 < 9: Pixel.line(self,p,p+Vector2(step,0),EDGE.darkened(0.4),3)
+		var special: bool = i == Run.Waves.CITY_STAGE or not Run.Waves.SQUADS[i].special.is_empty() or Run.Waves.SQUADS[i].general[1] > 0
+		var key: String = "crown" if i == Run.Waves.CITY_STAGE else Run.EnemyCatalog.ITEMS[Run.Waves.SQUADS[i].special[0][0]].art if not Run.Waves.SQUADS[i].special.is_empty() else ["vanguard","archer","mage"][i%3]
+		Pixel.disc(self,p,23 if portrait else 19,INK,4)
+		_art(key,Rect2(p-Vector2.ONE*18,Vector2.ONE*36),GOLD if special else MUTED)
+		_center(p+Vector2(0,43),str(i+1),20 if portrait else 16,GOLD if special else MUTED)
 	_center(Vector2(at.x, 1290 if portrait else 482), dices[dice_index].name, 24 if portrait else 20, MUTED)
 	var button := play_rect()
 	_button(button, "", true, GREEN)
@@ -505,6 +508,7 @@ func _draw_skills() -> void:
 		var name_at := rect.position + (Vector2(158, 38) if portrait else Vector2(106, 27))
 		var label: String = Rules.PAIR_NAMES[i] if skill_page == 1 else Rules.SPECIAL_NAMES[i]
 		var description: String = Rules.PAIR_TEXT[i] if skill_page == 1 else (Rules.CITY_SPECIAL_TEXT[i] if city_skills else Rules.SPECIAL_TEXT[i])
+		if city_skills and skill_page == 1 and i == 1: description = "City is immune to freeze."
 		_text(name_at, label, 24 if portrait else 18, color)
 		_wrapped(rect.position + (Vector2(12, 76) if portrait else Vector2(10, 62)), description, 684 if portrait else 440, 28 if portrait else 22, CREAM)
 

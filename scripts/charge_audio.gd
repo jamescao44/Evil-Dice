@@ -1,6 +1,6 @@
 extends Node
 ## Continuous texture under the dice clicks; volume follows the live meter.
-const LOOP = preload("res://assets/audio/magic_leak_loop.wav")
+const LOOP = preload("res://assets/audio/dice/magic_leak_loop.wav")
 const EDGE_DB := -38.0
 const CENTER_DB := -14.0
 const VOLUME_SCALE := 0.25

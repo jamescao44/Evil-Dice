@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Motion = preload("res://scripts/combat_motion.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
@@ -12,6 +13,12 @@ func check(value: bool, label: String) -> void:
 	if not value: failures += 1; push_error(label)
 
 func motion_checks() -> void:
+	var stretch: Vector2 = Motion.growth_scale(0.18)
+	var squash: Vector2 = Motion.growth_scale(0.36)
+	var swell: Vector2 = Motion.growth_scale(0.65)
+	check(stretch.y > 1 and stretch.x < 1 and squash.y < 1 and squash.x > 1,"Growth stretches vertically then compresses")
+	check(swell.x > 1 and swell.y > 1 and Motion.growth_scale(1) == Vector2.ONE,"Growth swells beyond the target then settles exactly")
+	check(Motion.growth_scale(0) == Vector2.ONE and Motion.growth_scale(0.65,true) == Vector2.ONE,"Growth starts at rest and respects reduced effects")
 	var motion = Motion.new()
 	for target in [-2,-1,0]: motion.hit(target)
 	check(motion.offset(0,160,0) == 0 and motion.offset(-1,240,0) == 0,"Hits start at the actor's original position")
@@ -34,12 +41,21 @@ func scene_checks(portrait: bool) -> void:
 	g.muted = true
 	g.set_process(false)
 	g.damage_feedback.set_process(false)
+	g._restart(Waves.COUNT)
+	g.view_phase = "transition"
+	for progress in [0.0,0.18,0.36,0.65,1.0]:
+		g.travel_progress = progress
+		var rect: Rect2 = g._player_sprite_rect(0,3)
+		check(rect.end.y == g._player_feet().y and rect.get_center().x == g._player_feet().x,"Growth stays anchored at the feet in both layouts")
+		check(g.ARENA.encloses(rect) and g.monster_side == 288,"Cosmetic growth stays inside the arena without changing the set size")
+	g._restart()
+	check(g._player_sprite_rect().size == Vector2.ONE*224,"Restart clears growth deformation")
 	g._show_events([Rules.damage_event(0,5,5),Rules.damage_event(-1,5,5),Rules.damage_event(-2,5,5)])
 	g.combat_motion.advance(0.05)
 	check(g.combat_motion.offset(0,100,0)>0 and g.combat_motion.offset(-1,240,0)<0 and not g.combat_motion.hits.has(-2),"Damage events drive actor recoil in either layout")
 	g._show_events([Rules.event(0,0,"skip","IMMOBILIZED")])
 	check(g.combat_motion.blocked.has(0),"Skipped enemy actions trigger nudge feedback")
-	g._restart(10)
+	g._restart(Waves.COUNT)
 	g.speed = 1
 	g.model.set_test_roll([1,1,3])
 	g.model.begin_player_cast()

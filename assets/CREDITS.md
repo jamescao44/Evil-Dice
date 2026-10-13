@@ -14,6 +14,8 @@ The treasure chest and seven reward category icons are copied unchanged from the
 | Vanguard | `monster/vault/vault_guard_new.png` |
 | Elf Archer | `monster/deep_elf_master_archer.png` |
 | Mage | `monster/deep_elf_mage.png` |
+| Paladin | `monster/holy/paladin.png` |
+| High Priest | `monster/deep_elf_high_priest.png` |
 | Fleeing civilians | `monster/human_new.png`, `monster/human_old.png` |
 | Fleeing aristocrats | `monster/enchantress_human.png` |
 | Courtyard paving | `dungeon/floor/limestone_0.png` through `_3.png` |
@@ -28,7 +30,7 @@ The actors use 32×32 source images with nearest-neighbor sampling and stepped i
 
 ## Relic inventory artwork
 
-Relic sprites use unchanged CC0 tiles from the same **Dungeon Crawl Stone Soup Full** archive above: scrolls, rings, armor, shields, weapons, runestones, a skull, an hourglass, and the bread/crystal/book icons used for Fortune Cookie, Crystal Ball and Ancient Prophecy. Exact source paths are recorded in [relic sources.json](art/relics/sources.json). The six elemental magic stones and Prismatic Stone instead share the project's original `magic_gem.svg`, tinted at draw time by element; Prismatic Stone uses a multicolor tint. The previous stone PNGs remain as unused source references. Transparent margins are trimmed at draw time; source PNGs are unmodified. The chest atlas is rendered from the same shared renderer by `tests/render_relic_atlas.gd`.
+Relic sprites use unchanged CC0 tiles from the same **Dungeon Crawl Stone Soup Full** archive above: scrolls, rings, armor, shields, weapons, runestones, a skull, an hourglass, and the bread/crystal/book icons used for Fortune Cookie, Crystal Ball and Ancient Prophecy. Exact source paths are recorded in [relic sources.json](art/relics/sources.json). The six elemental magic stones and Prismatic Stone instead share the project's original `magic_gem.svg`, tinted at draw time by element; Prismatic Stone uses a multicolor tint. The previous stone PNGs remain as unused source references. Transparent margins are trimmed at draw time; source PNGs are unmodified. The added weapon, pet, helmet, mask and tentacle sprites also use unchanged tiles from this archive. Clover, ice rose and six pip-marked cursed dice use original project pixel-vector SVGs, recorded in the same source manifest. Fries and Hamburger use **thekingphoenix**’s [Icons: Food.](https://opengameart.org/content/icons-food), licensed **CC0**. The source PNG is unchanged; AtlasTexture resources select the matching sprites. See [food icon provenance](licenses/Food-Icons.txt). The former food SVGs are unused references. The chest atlas is rendered from the same shared renderer by `tests/render_relic_atlas.gd`.
 
 ## Silkscreen — all active text and numbers
 
@@ -46,7 +48,7 @@ Five unchanged clips are active again: `click_001` for tumbling, `drop_001` for 
 
 Creator: **Kenney**. Sources: [Impact Sounds](https://kenney.nl/assets/impact-sounds) and [RPG Audio](https://kenney.nl/assets/rpg-audio). Both packs are **CC0**. Original notices are retained: [Impact Sounds license](licenses/Kenney-Impact-Sounds.txt), [RPG Audio license](licenses/Kenney-RPG-Audio.txt).
 
-Nine OGG clips are copied unchanged into `audio/combat/`; [source mapping](audio/combat/sources.json) records the original archive paths. Seven are used for weapon strikes, spells, boons, feeding, and destruction; the heavier dice landing/rattle clips are retained but unused. A Combat bus limiter bounds the mix.
+Nine distinct combat recordings are copied unchanged into source folders under `audio/`; [source mapping](audio/sources.json) records every file’s original archive path and checksum. Clips reused by different sources have separate copies so they can be replaced independently. Seven are used for weapon strikes, spells, boons, feeding, and destruction; the heavier dice landing/rattle clips are retained but unused. A Combat bus limiter bounds the mix.
 
 | Project clip | Original clip | Use |
 | --- | --- | --- |
@@ -77,11 +79,13 @@ Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_re
 
 ## User-provided charge-loop audio
 
-`audio/magic_leak_loop.wav` derives from the user-provided `magic_leak.wav`. It is not part of the Kenney CC0 packs. The source excerpt, crossfade and normalization details are recorded in [magic_leak_loop.txt](audio/magic_leak_loop.txt). `scripts/charge_audio.gd` controls its runtime volume.
+`audio/dice/magic_leak_loop.wav` derives from the user-provided `magic_leak.wav`. It is not part of the Kenney CC0 packs. The source excerpt, crossfade and normalization details are recorded in [magic_leak_loop.txt](audio/dice/magic_leak_loop.txt). `scripts/charge_audio.gd` controls its runtime volume.
 
 ## User-provided finished sound effects
 
-`audio/soft_sweep.wav` and `audio/perfect.wav` are copied unchanged from the user’s finished-SFX folder, `/Users/James/Desktop/Music Files/Station A/Evil Dice/outs-FXs`. The soft sweep replaces the scraping dice-throw sweep; the Perfect clip layers onto accepted Perfect throws. These are user-provided project audio, not part of the Kenney CC0 packs. The existing magic-leak charging loop now plays at 25% of its original runtime amplitude across its entire power curve. The soft sweep plays 6 dB louder than its initial mix; source WAV files remain unchanged.
+`audio/item/card_draw.wav`, `audio/item/deck_flip.wav`, and `audio/item/deck_flip2.wav` are copied unchanged from the same user-owned `outs-FXs` folder. Card draw plays on a successful fan pick; one of the two single-card flips is selected with equal probability at each card's visual departure during shuffling, with a quieter mix for the faster reduced-effects animation. All three import as uncompressed PCM and are separate from the Kenney packs.
+
+`audio/dice/soft_sweep.wav` and `audio/dice/perfect.wav` are copied unchanged from the user’s finished-SFX folder, `/Users/James/Desktop/Music Files/Station A/Evil Dice/outs-FXs`. The soft sweep replaces the scraping dice-throw sweep; the Perfect clip layers onto accepted Perfect throws. These are user-provided project audio, not part of the Kenney CC0 packs. The existing magic-leak charging loop now plays at 25% of its original runtime amplitude across its entire power curve. The soft sweep plays 6 dB louder than its initial mix; source WAV files remain unchanged.
 
 - **Noto Sans SC**: bundled Chinese font from [Google Fonts / Adobe](https://github.com/google/fonts/tree/main/ofl/notosanssc), SIL Open Font License 1.1. License: `fonts/NotoSansSC-LICENSE.txt`.
 

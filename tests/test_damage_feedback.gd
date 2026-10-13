@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -70,7 +71,7 @@ func hit_display_checks() -> void:
 	check(hit.amount == 1 and Battle._damage_popup(hit) == "-9","Player damage display includes defense before remaining-HP clamp")
 	for values in [[1,1,1],[6,6,6]]:
 		m = Run.new(19)
-		m.load_debug_wave(10)
+		m.load_debug_wave(Waves.COUNT)
 		m.begin_round()
 		m.city_hp = 1
 		m.set_test_roll(values)
@@ -80,7 +81,7 @@ func hit_display_checks() -> void:
 		check(hit.amount == 1 and hit.display_amount == expected and not hit.instant_kill and m.city_hp == 0,"City 111 and 666 remain numeric attacks on the killing blow")
 	for city in [false,true]:
 		m = Run.new(20)
-		if city: m.load_debug_wave(10)
+		if city: m.load_debug_wave(Waves.COUNT)
 		m.begin_round()
 		if city: m.city_hp = 1
 		else:
@@ -95,7 +96,7 @@ func model_checks() -> void:
 		for order in [["codex_page","cursed_skull","magic_sword","cursed_bow"],["magic_sword","cursed_skull","codex_page","cursed_bow"],["bracelet","reaper_scythe","ancient_codex","mithril_blade","twin_scythes"]]:
 			for dark in [false,true]:
 				var m = Run.new(854)
-				if city: m.stage = 9; m._load_wave()
+				if city: m.stage = Waves.CITY_STAGE; m._load_wave()
 				m.begin_round()
 				for id in order: m.acquire_relic(id)
 				for item in m.relics.items: item.kills = 3; item.waves = 2; item.charges = 1
@@ -124,7 +125,7 @@ func model_checks() -> void:
 				check(m.rng.state == state and m.relics.items == inventory,"Tracing does not roll effects or spend charges")
 	for example in [[[1,2,3],false,9.0,19.0],[[1,1,2],false,25.5,40.5],[[4,4,2],false,13.0,59.0/3.0],[[5,5,2],false,18.0,28.0],[[4,4,4],false,30.0,50.0],[[5,5,5],false,15.0,25.0],[[1,1,1],true,75.0,125.0],[[6,6,6],true,2000.0,2010.0]]:
 		var trace_model = Run.new(901)
-		if example[1]: trace_model.load_debug_wave(10)
+		if example[1]: trace_model.load_debug_wave(Waves.COUNT)
 		trace_model.begin_round()
 		trace_model.acquire_relic("bracelet")
 		trace_model.set_test_roll(example[0]); trace_model.begin_player_cast()
@@ -306,7 +307,7 @@ func scene_checks(portrait: bool) -> void:
 	check(panel.building and panel.value == 1 and g.model.enemies[0].hp == hp,"Actual cast waits for buildup before damaging its target")
 	await Driver.resolve_held(g)
 	check(g.model.enemies[0].hp == hp-expected and not panel.active,"Attack deals its original damage once and hides the display")
-	g._restart(10)
+	g._restart(Waves.COUNT)
 	g.result = g.model.set_test_roll([2,2,2])
 	g.skill_bubble.begin(g.result); g.skill_bubble.age = 1
 	g.view_phase = "skill"
@@ -330,10 +331,37 @@ func scene_checks(portrait: bool) -> void:
 		GameText.set_language(locale,false)
 	g.queue_free(); await process_frame
 
+func retrigger_speed_checks() -> void:
+	var g = Battle.new()
+	root.add_child(g)
+	g.muted = true
+	g.set_process(false); g.relic_ui.set_process(false); g.damage_feedback.set_process(false)
+	g.speed = 1
+	g.view_phase = "resolving"
+	for id in ["bracelet","disguise_mask","ancient_tentacle"]: g.model.acquire_relic(id)
+	var panel = g.damage_feedback
+	panel.start(g.model.attack_damage_steps(Rules.classify([1,2,3])))
+	panel.cursor = 0; panel._advance() # Original Bracelet.
+	panel._process(0.17)
+	check(not panel.landed,"Original relic flight keeps its normal timing")
+	panel.cursor = 1; panel._advance() # Mask copy.
+	panel._process(0.17)
+	check(panel.landed,"Retrigger flight lands in two-thirds of the original time")
+	g.relic_ui._process(0.2)
+	check(is_equal_approx(g.relic_ui.activations.disguise_mask.age,0.3),"Retrigger glow and tilt also run at 1.5x")
+	panel._process(0.07)
+	check(panel.cursor == 3,"Retrigger advances after 0.24 seconds rather than 0.36")
+	g.model.stage = Waves.CITY_STAGE; g.model._load_wave()
+	panel.cursor = 1; panel._advance()
+	panel._process(0.085)
+	check(panel.landed,"Retrigger pacing composes with the city's double playback speed")
+	g.queue_free(); await process_frame
+
 func run() -> void:
 	hit_display_checks()
 	model_checks()
 	await scene_checks(false)
 	await scene_checks(true)
+	await retrigger_speed_checks()
 	print("Cast damage feedback: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

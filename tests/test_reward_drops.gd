@@ -47,6 +47,41 @@ func distribution_checks() -> void:
 	check(inventory.draw_one(rng,all).is_empty(),"Fully excluded pools return no relic")
 	check(Drops.draw(rng,["ancient_codex","prismatic_stone"]).is_empty(),"Fusion-only entries cannot enter reward rolls")
 
+func wave_curve_checks() -> void:
+	check(Drops.weights_for_wave(1) == Relics.RARITY_WEIGHTS,"Wave one uses the documented starting rarity rates")
+	for wave in range(2,101):
+		var previous: Array = Drops.weights_for_wave(wave-1)
+		var current: Array = Drops.weights_for_wave(wave)
+		check(is_equal_approx(current.reduce(func(sum,value): return sum+value,0.0),100),"Rarity curve remains normalized")
+		for rarity in range(5):
+			check(is_equal_approx(current[rarity],previous[rarity]+(20-previous[rarity])*0.1),"Every rarity moves ten percent of the remaining distance")
+	var late: Array = Drops.weights_for_wave(20)
+	check(absf(late[0]-25.133236)<0.00001 and absf(late[3]-17.433382)<0.00001,"Wave twenty approaches rather than reaches equal odds")
+	var model = Run.new(240)
+	model.load_debug_wave(20)
+	check(model.relic_drop_weights() == late,"Run exposes its current wave rates")
+	var counts := [0,0,0,0,0]
+	model.reward_weights = [0,1,0,0,0,0,0]
+	for n in range(10000):
+		model.perfect_progress = 6
+		model.open_chest()
+		counts[Relics.ITEMS[model.reward_item(1).relic_id].rarity] += 1
+		model.discard_unclaimed_rewards(); model.close_chest()
+	for rarity in range(5): frequency(counts[rarity],10000,late[rarity]/100,"Late-wave chests use the shifted rates")
+	var mirror := RandomNumberGenerator.new()
+	mirror.state = model.reward_rng.state
+	var expected: Array = model.relics.offers(mirror,2,late)
+	model.city_hp = 0
+	check(model.open_relic_offer() == expected,"Wave completion uses the same curve")
+	for wave in [1,10,20]:
+		model.load_debug_wave(wave); model.begin_round()
+		var card: Dictionary = model.tarots.add("emperor")
+		mirror.state = model.reward_rng.state
+		var pool: Array = Relics.ITEMS.keys().filter(func(id): return model.relics.can_add(id))
+		var expected_relic: String = Drops.draw(mirror,pool,model.relic_drop_weights())
+		model.tarot_effects.prepare(model,card.instance_id)
+		check(model.tarot_effects.locked_grants[card.instance_id] == expected_relic,"Emperor uses the current wave rates before its animation")
+
 func chest_distribution_checks() -> void:
 	var model = Run.new(890)
 	var categories := [0,0,0,0,0,0,0,0]
@@ -136,6 +171,7 @@ func presentation_checks() -> void:
 
 func run() -> void:
 	distribution_checks()
+	wave_curve_checks()
 	chest_distribution_checks()
 	presentation_checks()
 	print("Reward rarity and locked presentation: %d checks, %d failures" % [checks,failures])

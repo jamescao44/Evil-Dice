@@ -90,7 +90,7 @@ func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) 
 	if not model.outcome().is_empty() or (not repeating and not usable(model)): return "Use tarot between actions, before or after rolling."
 	if not Catalog.ITEMS.has(id): return "Unknown tarot card."
 	if id in ["death","judgement"] and model.is_city(): return "This card cannot affect the city."
-	if id == "death" and not model.is_enemy_alive(choice.get("target",-1)): return "Drag Death onto a living enemy."
+	if id == "death" and choice.get("target",-1) not in model.attack_targets(): return "Drag Death onto an eligible enemy. Paladins protect their allies."
 	if id == "judgement" and (model.living().is_empty() or model.living().size()%6 != 0): return "Judgement needs a multiple of six living enemies."
 	if id == "fool" and model.relics.items.is_empty(): return "No relics to reroll."
 	if id == "hanged_man" and banned.size() >= Catalog.ITEMS.size()-1: return "At least one tarot must remain in the deck."
@@ -110,7 +110,7 @@ func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			var eligible: Array = []
 			for relic_id in Relics.ITEMS:
 				if model.relics.can_add(relic_id) and (id != "world" or Relics.ITEMS[relic_id].rarity == Relics.Rarity.LEGENDARY): eligible.append(relic_id)
-			var rolled: String = Drops.draw(model.reward_rng,eligible)
+			var rolled: String = Drops.draw(model.reward_rng,eligible,model.relic_drop_weights())
 			if rolled.is_empty(): return {"error":"No eligible relic is available."}
 			locked_grants[instance_id] = rolled
 		var reward: String = locked_grants[instance_id]
@@ -134,8 +134,8 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			if not Catalog.ITEMS.has(choice.get("ban","")) or choice.ban in banned: return {"error":"Choose a tarot still in the deck."}
 		"replace":
 			if choice.get("replace",-1) < 0 or choice.replace >= model.relics.items.size(): return {"error":"Choose a relic to replace."}
-	var repeat_after: bool = not repeating and model.RelicEffects.has_flag(model.relics.items,"tarot_repeat")
-	if repeating or repeat_after: model.relic_activated.emit("ancient_prophecy")
+	var repeats: Array = pending_repeat.get("sources",[]).duplicate() if repeating else model.RelicEffects.repeat_sources(model.relics.items,"ancient_prophecy")
+	if repeating and not repeats.is_empty(): model.RelicEffects.Sequence.activate(model,repeats.pop_front())
 	if id in Catalog.ROLL_FACE_SETTINGS:
 		magician.clear()
 		parity = -1
@@ -153,15 +153,16 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			var pool: Array = Relics.ITEMS.keys().filter(func(key): return key not in original)
 			var replacements: Array = []
 			for i in range(original.size()):
-				var replacement: String = Drops.draw(model.reward_rng,pool)
+				var replacement: String = Drops.draw(model.reward_rng,pool,model.relic_drop_weights())
 				if replacement.is_empty(): return {"error":"No eligible relic is available."}
 				replacements.append(model.relics._new_item(replacement))
 				pool.erase(replacement)
+				if Relics.CURSED_DICE.has(replacement): pool = pool.filter(func(key): return not Relics.CURSED_DICE.has(key))
 			var old_max: int = model.max_hp
 			model.relics.items = replacements
 			model.relics._fuse()
 			model.refresh_relic_health(old_max)
-			for item in replacements: model.RelicEffects.acquired(model,item.id)
+			for item in replacements: model.RelicEffects.acquired(model,item.id,true)
 		"magician": magician = choice.dice.duplicate()
 		"high_priestess": extra_uses += 1
 		"empress":
@@ -187,29 +188,29 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			model._finish_player_action(Skill.new(Skill.Kind.NORMAL))
 		"death": events.append_array(_execute(model,choice.target))
 		"judgement":
-			var targets: Array = model.living()
-			var count: int = targets.size()/2
-			for i in range(count): events.append_array(_execute(model,targets.pop_at(model.rng.randi_range(0,targets.size()-1))))
+			var count: int = model.living().size()/2
+			for i in range(count):
+				var targets: Array = model.attack_targets()
+				events.append_array(_execute(model,targets[model.rng.randi_range(0,targets.size()-1)]))
 		"chariot": events.append_array(_chariot(model))
 		"moon":
 			for target in model.living():
-				events.append_array(model.apply_enemy_status(target,Status.DARKNESS,3))
+				events.append_array(model.apply_enemy_status(target,Status.DARKNESS,1))
 				model.enemies[target].statuses[Status.DARKNESS].permanent = true
 		"sun":
 			events.append(model.event(-1,model.heal(model.max_hp),"heal","FULL HEAL"))
 			for target in model.living(): events.append_array(_status(model,target,Status.BURNING,1))
 		"tower":
 			for i in range(10):
-				var targets: Array = model.living()+[-1]
+				var targets: Array = model.attack_targets()+[-1]
 				# The city is immune; its troops are not separately targetable characters.
 				var target: int = targets[model.rng.randi_range(0,targets.size()-1)]
 				var statuses: Array = Status.PLAYER_HARMFUL if target == -1 else Status.ENEMY_HARMFUL
 				var status: int = statuses[model.rng.randi_range(0,statuses.size()-1)]
-				pending_steps.append({"target":target,"status":status,"count":3 if status in [Status.DARKNESS,Status.CORROSION] else 1})
+				pending_steps.append({"target":target,"status":status,"count":1})
 	if repeating: dismiss_repeat()
-	else:
-		model.tarots.remove_instance(instance_id)
-		if repeat_after: pending_repeat = {"id":id,"instance_id":-instance_id}
+	else: model.tarots.remove_instance(instance_id)
+	if not repeats.is_empty(): pending_repeat = {"id":id,"instance_id":-absi(instance_id),"sources":repeats}
 	if pending_steps.is_empty(): _finish_effect(model,events)
 	return {"id":id,"events":events,"relic":reward,"repeated":repeating}
 
@@ -236,9 +237,6 @@ func _finish_effect(model, events: Array) -> void:
 		model._prepare_player_turn()
 
 func _status(model, target: int, status: int, count: int) -> Array:
-	if model.relics.has("runestone"):
-		count += 1
-		model.relic_activated.emit("runestone")
 	return model.apply_affliction(status,count) if target == -1 else model.apply_enemy_status(target,status,count)
 
 func _execute(model, target: int) -> Array:
@@ -248,4 +246,4 @@ func _execute(model, target: int) -> Array:
 func _chariot(model) -> Array:
 	var skill = Skill.new(Skill.Kind.SPECIAL,4)
 	skill.amplifier_locked = true # Strength and stored critical belong to the next skill.
-	return preload("res://scripts/area_attack.gd").apply(model,50.0,skill)
+	return preload("res://scripts/area_attack.gd").apply_fixed(model,50,skill)

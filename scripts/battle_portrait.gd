@@ -39,7 +39,8 @@ func _configure_layout() -> void:
 	GUIDE_CLOSE = Rect2(660, 132, 104, 88)
 	GUIDE_STATUSES = Rect2(538,432,226,88)
 	DEBUG_CLOSE = GUIDE_CLOSE
-	DEBUG_TAROTS = Rect2(40,1350,724,88)
+	DEBUG_TAROTS = Rect2(40,1350,350,88)
+	DEBUG_TAROT_DRAW = Rect2(414,1350,350,88)
 	DEBUG_REPEAT = Rect2(40, 1470, 350, 88)
 	DEBUG_PERFECT = Rect2(414, 1470, 350, 88)
 	DEBUG_WAVE_INPUT = Rect2(220, 1578, 150, 88)
@@ -93,10 +94,10 @@ func _enemy_feet(index: int) -> Vector2:
 	if count == 1: return Vector2(530, 662 if model.stage == 0 else 610)
 	if count <= 3:
 		var bottom: float = minf(550, _player_feet().y-monster_side-132)
-		return Vector2(486+(index-(count-1)/2.0)*144,bottom+[-12,0,-8][index])
+		return Vector2(486+(index-(count-1)/2.0)*maxf(144,_enemy_side()+12),bottom+[-12,0,-8][index])
 	# Stagger compact groups through the upper center and open right flank.
 	# The lower left stays clear for the Horror and its two rows of statuses.
-	var rows: Array = [2,2] if count == 4 else [3,2] if count == 5 else [4,count-4] if count <= 7 else [4,3,count-7]
+	var rows: Array = [2,2] if count == 4 else [3,2] if count == 5 else [3,3] if count == 6 and _enemy_side() > 110 else [4,count-4] if count <= 7 else [4,3,count-7]
 	var row: int = 0
 	var column: int = index
 	while column >= rows[row]:
@@ -104,7 +105,8 @@ func _enemy_feet(index: int) -> Vector2:
 		row += 1
 	var center: float = (436 if count == 4 else 444) if count <= 5 and row == 0 else 556 if row > 0 else 402
 	var bottom: float = (470+row*166) if count <= 5 else (438+row*182) if count <= 7 else (408+row*158)
-	var spacing: float = 112 if count <= 5 else 108
+	var spacing: float = maxf(112 if count <= 5 else 108,_enemy_side()+12)
+	center = minf(center,ARENA.end.x-10-_enemy_side()/2-(rows[row]-1)*spacing/2)
 	return Vector2(center+(column-(rows[row]-1)/2.0)*spacing,bottom+[0,-8,-4,0][column])
 
 func _city_gate_point() -> Vector2:
@@ -203,9 +205,9 @@ func _draw_player() -> void:
 	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	var feet := _player_feet()
-	_shadow(feet, monster_side * 0.48, 0.27)
+	_shadow(feet, monster_side * _player_growth_scale().x * 0.48, 0.27)
 	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
-	_art("eldritch", Rect2(feet + Vector2(-monster_side / 2 + dx, -monster_side + bob), Vector2.ONE * monster_side), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
+	_art("eldritch", _player_sprite_rect(dx,bob), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
 	_draw_player_afflictions()
 	_meter(Rect2(48, 910, 708, 34), model.hp / float(model.max_hp), TEAL)
 	_center(Vector2(402, 935), "%d / %d" % [model.hp, model.max_hp], 28)
@@ -320,9 +322,10 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 		for i in range(3): _mini_die(rect.position + Vector2(54 + i * 60, 48), 0 if choice <= 6 and i == 2 else face, CREAM, canvas)
 		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 3), 30, color, canvas)
 	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS", true, canvas)
+	_button(DEBUG_TAROT_DRAW,"DRAW TAROT", true, canvas)
 	_button(DEBUG_REPEAT, "REPEAT: " + ("ON" if debug_repeat else "OFF"), true, canvas)
 	_button(DEBUG_PERFECT, "PERFECT: " + ("ON" if debug_perfect else "OFF"), true, canvas)
 	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
 	_text(Vector2(40,1634),"WAVE",28,GOLD, canvas)
 	_button(DEBUG_WAVE_LOAD,"LOAD", true, canvas)
-	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "Start fresh at wave 1-10. 10 = city.",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)
+	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "Start fresh at wave 1-20. 20 = city.",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)

@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 var checks := 0
@@ -12,8 +13,8 @@ func check(value: bool, message: String) -> void:
 
 func clear_wave(game) -> void:
 	game.begin_round()
-	game.set_test_roll([6, 6, 6])
-	game.apply_player(0)
+	game.set_test_roll([6,6,6])
+	game.apply_player()
 	check(game.advance_wave(), "Cleared wave can advance")
 
 func city():
@@ -33,14 +34,14 @@ func _initialize() -> void:
 	var game = Run.new(13)
 	check(game.enemies.size() == 1 and game.max_hp == 100, "Run starts 1v1")
 	check(not game.advance_wave(), "Living enemies prevent growth")
-	for wave in range(9):
-		check(game.enemies.size() == [1, 3, 1, 5, 3, 5, 7, 4, 10][wave], "Wave size progression")
+	for wave in range(Waves.CITY_STAGE):
+		check(game.enemies.size() == Run.WAVE_COUNTS[wave][0]+Run.WAVE_COUNTS[wave][1], "Wave size progression")
 		game.begin_round()
 		game.statuses[2].count = 1
 		game.statuses[33].count = 3
 		for kind in [Rules.Kind.NORMAL]:
 			var result: MultiHitSkill = Rules.classify([4, 5, 6] if kind == Rules.Kind.NORMAL else [1, 1, 1])
-			for index in game.living():
+			for index in game.attack_targets():
 				check(game.preview(result, index)[0].damage <= game.damage_cap(kind, index), "Growth and buffs respect individual caps")
 		game.hp = 40
 		game.shield = 7
@@ -53,11 +54,11 @@ func _initialize() -> void:
 		check(not game.advance_wave(), "Repeated advance cannot grow again")
 	check(game.is_city() and game.enemies.is_empty(), "Final battle uses city rather than squad")
 	var boosted = Run.new(13)
-	for wave in range(9):
+	for wave in range(Waves.CITY_STAGE):
 		var normal: MultiHitSkill = Rules.classify([4,5,6])
-		check(boosted.preview(normal,0)[0].damage == mini(floori(22.5 * boosted.power), boosted.damage_cap(Rules.Kind.NORMAL,0)), "Existing normal stage caps remain")
+		check(boosted.preview(normal,boosted.attack_targets()[0])[0].damage == mini(floori(22.5 * boosted.power), boosted.damage_cap(Rules.Kind.NORMAL,boosted.attack_targets()[0])), "Existing normal stage caps remain")
 		var special: MultiHitSkill = Rules.classify([4,4,4])
-		check(boosted.preview(special,0)[0].damage == floori(30.0 * boosted.power), "Skills now ignore former stage caps")
+		check(boosted.preview(special,boosted.attack_targets()[0]).all(func(hit): return hit.damage == floori(30.0*boosted.power*boosted.area_damage_factor(hit.target,boosted.taunting_enemies()))), "Skills now ignore former stage caps")
 		clear_wave(boosted)
 	check(boosted.siege_damage(Rules.classify([1,2,3])) == 9, "Normal city damage uses base multiplier one")
 	for values in [[1,1,1],[4,4,4],[5,5,5]]:
@@ -67,17 +68,17 @@ func _initialize() -> void:
 	game.hp = 100
 	force(game, [2,2,4])
 	game.begin_round()
-	check(game.hp == 105 and game.statuses[2].count == 4, "City regen heals on next roll start and retains its count until the roll ends")
+	check(game.hp == 100 and game.statuses[2].count == 0, "City freeze is immune and grants no regeneration")
 	game.begin_round()
-	check(game.hp == 105, "Duplicate start cannot repeat regen")
+	check(game.hp == 100, "Duplicate start does not heal")
 	game.set_test_roll([6,6,2])
 	game.apply_player()
 	tick(game, 2)
-	check(game.hp == 105 and game.statuses[6].count == 1 and is_equal_approx(game.city_immunity_seconds(),2), "City immunity loses one stack after two seconds")
+	check(game.hp == 100 and game.statuses[6].count == 1 and is_equal_approx(game.city_immunity_seconds(),2), "City immunity loses one stack after two seconds")
 	force(game, [3,3,1])
-	check(game.hp == 110 and game.statuses[6].count == 1, "Extra throws do not shorten timed immunity")
+	check(game.hp == 100 and game.statuses[6].count == 1, "Extra throws do not shorten timed immunity")
 	tick(game, 1.95)
-	check(game.hp == 110 and game.statuses[6].count == 1,"Immunity protects until its final fraction of a second")
+	check(game.hp == 100 and game.statuses[6].count == 1,"Immunity protects until its final fraction of a second")
 	var before_hp: int = game.hp
 	tick(game, 0.1)
 	check(game.hp < before_hp and game.statuses[6].count == 0, "City immunity expires at four seconds even without another roll")
@@ -117,15 +118,15 @@ func _initialize() -> void:
 		game.phase = "roll"
 		game.set_test_roll([1,2,3])
 		var target: int = game.player_target()
-		check(target in [0,2,4], "Automatic target never chooses dead foes")
+		check(target in [0,2], "Automatic target never chooses dead foes")
 		selected[target] = true
 		var rng_state: int = game.rng.state
 		check(game.player_target() == target and game.rng.state == rng_state, "Target stays locked without another random sample")
-	check(selected.size() == 3, "Random selection can reach every living foe")
+	check(selected.size() == 2, "Random selection can reach every living foe")
 	var hp_before: Array = game.enemies.map(func(e): return e.hp)
 	var locked: int = game.player_target()
 	game.apply_player()
-	for i in [0,2,4]:
+	for i in [0,2]:
 		check((game.enemies[i].hp < hp_before[i]) == (i == locked), "Automatic normal damages exactly the locked living target")
 	game.phase = "roll"
 	game.set_test_roll([2,2,1])
@@ -133,7 +134,7 @@ func _initialize() -> void:
 	check(game.player_target() == -1 and game.rng.state == pair_rng, "Pairs do not choose a foe or consume target RNG")
 	var wins := 0
 	var total_rolls := 0
-	var defeats := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+	var defeats: Array = []; defeats.resize(Waves.COUNT); defeats.fill(0)
 	for seed_value in range(100):
 		game = Run.new(seed_value)
 		for turn in range(200):

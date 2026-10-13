@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 ## Render regression: changing dice/held sprites cannot change modal-page pixels.
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
@@ -25,7 +26,7 @@ func layout(portrait: bool) -> void:
 	root.add_child(g)
 	g.muted = true
 	g.set_process_input(false)
-	g._restart(10)
+	g._restart(Waves.COUNT)
 	g.touch_position = Vector2(-100,-100)
 	g.active_touch = 0
 	var marker := Polygon2D.new()

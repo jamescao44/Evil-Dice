@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
@@ -67,10 +68,10 @@ func run() -> void:
 	g.status_title = "FROZEN"
 	await shot("crowded")
 	g._restart()
-	g.model.stage = 9
+	g.model.stage = Waves.CITY_STAGE
 	g.model._load_wave()
 	g.model.begin_round()
-	g.visual_stage = 9
+	g.visual_stage = Waves.CITY_STAGE
 	g.monster_side = g.HORROR_SIZES[9]
 	g.model.set_test_roll([6,6,4])
 	g.model.apply_player()

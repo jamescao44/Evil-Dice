@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
@@ -120,7 +121,7 @@ func run() -> void:
 	check(game._in_dice_range(game.DICE_CENTER), "Space between dice is clickable")
 	check(not game._in_dice_range(game.DICE_CENTER + Vector2.ONE * game.DICE_RADIUS * 0.8), "Circle excludes bounding-box corner")
 	await ultimate_wave()
-	check(game.model.stage == 1 and game.model.enemies.size() == 3 and game.monster_side > 240, "First feeding and pan reach 1v3")
+	check(game.model.stage == 1 and game.model.enemies.size() == 2 and game.monster_side == Waves.player_size(1), "First feeding and pan reach wave two with gradual growth")
 	for enemy in game.model.enemies:
 		enemy.hp = 1
 		enemy.shield = 0
@@ -131,21 +132,21 @@ func run() -> void:
 	game.debug_choice = 12
 	await game._roll()
 	await Driver.resolve_held(game)
-	check(game.view_phase == "feeding" and game.fallen.size() == 3, "All bodies persist at start of feeding")
+	check(game.view_phase == "feeding" and game.fallen.size() == 2, "All bodies persist at start of feeding")
 	await settle()
 	check(game.model.stage == 2 and game.model.enemies.size() == 1 and game.model.enemies[0].elite and game.fallen.is_empty(), "Bodies fade before elite wave")
 	await ultimate_wave()
-	check(game.model.stage == 3 and game.model.enemies.size() == 5, "Fourth stage contains five adventurers")
+	check(game.model.stage == 3 and game.model.enemies.size() == 4, "Fourth stage contains four adventurers")
 	var rows: Dictionary = {}
-	for i in range(5): rows[game._enemy_feet(i).y] = true
+	for i in range(4): rows[game._enemy_feet(i).y] = true
 	check(rows.size() >= 4, "Adventurers have varied depth rather than a straight row")
 	game.debug_choice = 2
 	var party_round: int = game.model.round_number
 	await game._roll()
 	await Driver.resolve_held(game)
-	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All five acted and the next round prepared successfully")
-	for stage in range(3,9): await ultimate_wave()
-	check(game.model.is_city() and game.model.stage == 9 and game.monster_side == 288 and game.model.max_hp == 370, "Final transition reaches the smaller city sprite without reducing player health")
+	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All four acted and the next round prepared successfully")
+	for stage in range(3,Waves.CITY_STAGE): await ultimate_wave()
+	check(game.model.is_city() and game.model.stage == Waves.CITY_STAGE and game.monster_side == 288 and game.model.max_hp == 100+30*Waves.CITY_STAGE, "Final transition reaches the full city size without reducing player health")
 	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.DEBUG_RECT.get_center())
 	var city_clock: float = game.model.volley_clock

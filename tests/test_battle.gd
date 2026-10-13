@@ -75,7 +75,7 @@ func _test_caps() -> void:
 
 func _test_buffs() -> void:
 	for spare in range(1, 7):
-		for face in [2,3,6]:
+		for face in [3,6]:
 			if spare == face: continue
 			var game = fresh()
 			game.set_test_roll([face, spare, face])
@@ -85,14 +85,11 @@ func _test_buffs() -> void:
 	game.hp = 40
 	game.set_test_roll([2,2,3])
 	game.apply_player()
-	check(game.hp == 40, "Regen does not heal on granting turn")
+	check(game.hp == 40 and game.statuses[2].count == 0,"Double-2 no longer grants regeneration")
+	check(game.living().all(func(i): return game.enemy_status_count(i,Rules.Status.FROZEN) == 1),"Double-2 freezes all living enemies")
 	finish_round(game)
-	for expected in [45,50,55,55]:
-		game.begin_round()
-		check(game.hp == expected, "Regen heals 5 for exactly three starts")
-		game.set_test_roll([3,3,1])
-		game.apply_player()
-		finish_round(game)
+	game.begin_round()
+	check(game.hp == 40,"Freeze grants no healing on the next turn")
 	game.phase = "roll"
 	game.set_test_roll([2,2,2])
 	game.apply_player()
@@ -107,13 +104,18 @@ func _test_buffs() -> void:
 	game.apply_player()
 	check(game.statuses[33].count == 3 and game.attack_multiplier() == 3.5, "Both attack boons add their bonuses without multiplying them")
 	finish_round(game)
+	game.begin_round()
+	game.set_test_roll([2,2,2])
+	game.apply_player()
+	finish_round(game)
+	check(game.statuses[3].count == 2 and game.statuses[33].count == 3,"Support casts and enemy turns preserve attack charges")
 	for remaining in [2,1,0]:
 		game.begin_round()
-		game.set_test_roll([2,2,2])
+		game.set_test_roll([1,2,3])
 		game.apply_player()
-		check(game.statuses[33].count == remaining+1, "Boost countdown waits for enemy skills")
+		check(game.statuses[33].count == remaining,"One completed attack spends one charge")
 		finish_round(game)
-		check(game.statuses[33].count == remaining, "Boost durations count turns, including support turns")
+		check(game.statuses[33].count == remaining,"Enemy phase spends no additional attack charges")
 	check(game.attack_multiplier() == 1.0, "Power returns to normal after expiration")
 
 func _test_human_phase() -> void:

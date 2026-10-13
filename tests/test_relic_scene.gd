@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 var checks := 0
@@ -266,7 +267,7 @@ func run() -> void:
 	await game._resolve_turn_end(game.run_id)
 	check(game.view_phase == "relic_reward" and game.model.hp == 85 and game.model.status_count(game.Status.BURNING) == 2,"Enemy burn victory waits for every player burn tick before relic choices")
 	check(game.model.relics.items[0].charges == 1,"A status-effect victory completes the sixth relic turn")
-	game._restart(10)
+	game._restart(Waves.COUNT)
 	game.model.city_hp = 0; game.model.perfect_progress = 9
 	game._check_over()
 	check(game.view_phase == "relic_reward","City victory also offers a relic")

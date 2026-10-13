@@ -31,6 +31,7 @@ const Pixel = preload("res://scripts/pixel_paint.gd")
 const City = preload("res://scripts/city_paint.gd")
 const CityLife = preload("res://scripts/city_life.gd")
 const ThrowMeter = preload("res://scripts/throw_meter.gd")
+const SoundCatalog = preload("res://scripts/sound_catalog.gd")
 const ChargeAudio = preload("res://scripts/charge_audio.gd")
 const RewardChest = preload("res://scripts/reward_chest.gd")
 const RewardIcons = preload("res://scripts/reward_icons.gd")
@@ -73,12 +74,13 @@ var DEBUG_PERFECT := Rect2(888, 228, 252, 40)
 var DEBUG_WAVE_INPUT := Rect2(238, 626, 100, 40)
 var DEBUG_WAVE_LOAD := Rect2(356, 626, 160, 40)
 var DEBUG_TAROTS := Rect2(808,568,332,44)
+var DEBUG_TAROT_DRAW := Rect2(808,626,332,40)
 var REWARD_CENTER := Vector2(195, 625)
 var CITY_POINT := Vector2(925, 282)
-const HORROR_SIZES := [224.0, 248.0, 260.0, 272.0, 280.0, 288.0, 296.0, 308.0, 320.0, 288.0]
-const HUMAN_SIZES := [192.0, 96.0, 100.0, 84.0, 86.0, 76.0, 64.0, 54.0, 44.0, 20.0]
-const PAVING_SIZES := [96.0, 56.0, 48.0, 40.0, 32.0, 28.0, 24.0, 20.0, 16.0, 16.0]
-const SCENERY_SIZES := [128.0, 80.0, 64.0, 56.0, 48.0, 40.0, 32.0, 24.0, 16.0, 12.0]
+static var HORROR_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.player_size)
+static var HUMAN_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.enemy_size)
+static var PAVING_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.paving_size)
+static var SCENERY_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.scenery_size)
 
 var model = Run.new()
 var pixel_font: FontFile = preload("res://assets/fonts/Silkscreen-Regular.ttf").duplicate()
@@ -109,6 +111,7 @@ var status_color: Color = TEAL
 var active_human: int = -1
 var hit_times: Array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 var chest: Node2D
+var chest_skip_intro: bool = false
 var fallen: Dictionary = {}
 var city_corpses: Array = []
 var city_life = CityLife.new()
@@ -223,32 +226,27 @@ func _ready() -> void:
 	auto_claim_notice.z_index = 100
 	add_child(auto_claim_notice)
 	auto_claim_notice.draw.connect(_draw_auto_claim)
-	chest.ticked.connect(func(): _sound("click_001", 0.9 + chest.elapsed * 0.08, -16))
+	chest.ticked.connect(func(): _sound("item/click_001", 0.9 + chest.elapsed * 0.08, -16))
 	chest.opened.connect(func():
-		_sound("book", 0.65, -10)
-		_sound("crash", 1.25, -20)
-		_sound("bell", 1.4, -15))
+		_sound("item/book", 0.65, -10)
+		_sound("item/crash", 1.25, -20)
+		_sound("item/bell", 1.4, -15))
 	chest.landed.connect(func(index):
-		_sound("drop_001", 0.8, -9)
-		_sound("pluck_001", 1.0 + index * 0.3, -10)
-		_sound("bell", 1.0 + index * 0.2, -17))
+		_sound("item/drop_001", 0.8, -9)
+		_sound("item/pluck_001", 1.0 + index * 0.3, -10)
+		_sound("item/bell", 1.0 + index * 0.2, -17))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="):
 			start_snapshot = arg.trim_prefix("--capture=")
-	for key in ["eldritch", "vanguard", "archer", "mage", "civilian", "civilian_gray", "aristocrat", "floor0", "floor1", "floor2", "floor3", "stone", "arch", "column", "mangrove", "grass", "book", "shield", "attack", "heal", "feast", "crown", "fx"]:
+	for key in ["eldritch", "vanguard", "archer", "mage", "paladin", "high_priest", "civilian", "civilian_gray", "aristocrat", "floor0", "floor1", "floor2", "floor3", "stone", "arch", "column", "mangrove", "grass", "book", "shield", "attack", "heal", "feast", "crown", "fx"]:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
-	for key in ["vanguard", "archer", "mage"]:
+	for key in ["vanguard", "archer", "mage", "paladin", "high_priest"]:
 		var silhouette: Image = art[key].get_image()
 		for y in range(silhouette.get_height()):
 			for x in range(silhouette.get_width()):
 				silhouette.set_pixel(x, y, Color(1, 1, 1, silhouette.get_pixel(x, y).a))
 		art[key+"_glow"] = ImageTexture.create_from_image(silhouette)
-	for key in ["hit", "crash", "rumble", "bell", "slash", "chop", "book"]:
-		sounds[key] = load("res://assets/audio/combat/" + key + ".ogg")
-	for key in ["click_001", "drop_001", "confirmation_002", "bong_001", "pluck_001"]:
-		sounds[key] = load("res://assets/audio/" + key + ".ogg")
-	for key in ["soft_sweep", "perfect"]:
-		sounds[key] = load("res://assets/audio/" + key + ".wav")
+	sounds = SoundCatalog.load_streams()
 	if AudioServer.get_bus_index("Combat") == -1:
 		AudioServer.add_bus()
 		var bus: int = AudioServer.bus_count - 1
@@ -309,19 +307,19 @@ func _process(delta: float) -> void:
 		if rattle_clock <= 0:
 			var energy: float = throw_meter.sample().power
 			rattle_clock = lerpf(0.19, 0.07, energy)
-			_sound("click_001", lerpf(0.7, 1.5, energy), lerpf(-32, -23, energy))
+			_sound("dice/click_001", lerpf(0.7, 1.5, energy), lerpf(-32, -23, energy))
 	if view_phase == "rolling" and not modal and dice.any(func(die): return die.rolling):
 		rattle_clock -= delta
 		if rattle_clock <= 0:
 			rattle_clock = 0.1 / _roll_speed()
-			_sound("click_001", 0.8 + fmod(clock_time * 2, 0.6) + throw_power * 0.25, -27 + throw_power * 7)
+			_sound("dice/click_001", 0.8 + fmod(clock_time * 2, 0.6) + throw_power * 0.25, -27 + throw_power * 7)
 	var in_ring: bool = _in_dice_range(mouse) and view_phase in ["ready", "charging"] and not modal
 	ring_hover = move_toward(ring_hover, 1.0 if in_ring else 0.0, delta * 7)
 	var interactive := in_ring or MENU_RECT.has_point(mouse) or AUDIO_RECT.has_point(mouse) or SPEED_RECT.has_point(mouse)
 	if guide:
 		interactive = GUIDE_CLOSE.has_point(mouse) or GUIDE_STATUSES.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
 	elif debug_open:
-		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse) or DEBUG_WAVE_LOAD.has_point(mouse) or DEBUG_TAROTS.has_point(mouse)
+		interactive = DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse) or DEBUG_WAVE_LOAD.has_point(mouse) or DEBUG_TAROTS.has_point(mouse) or DEBUG_TAROT_DRAW.has_point(mouse)
 		for i in range(-1, 13):
 			interactive = interactive or _debug_option_rect(i).has_point(mouse)
 	elif menu_open:
@@ -376,7 +374,7 @@ func _create_debug_wave_input() -> void:
 	debug_wave_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	debug_wave_input.max_length = 2
 	debug_wave_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
-	debug_wave_input.placeholder_text = "1-10"
+	debug_wave_input.placeholder_text = "1-%d" % Run.Waves.COUNT
 	debug_wave_input.add_theme_font_override("font", preload("res://assets/fonts/Silkscreen-Regular.ttf"))
 	debug_wave_input.add_theme_font_size_override("font_size", 28 if DEBUG_WAVE_INPUT.size.y > 50 else 22)
 	debug_wave_input.add_theme_color_override("font_color", CREAM)
@@ -409,15 +407,19 @@ func _debug_load_wave(value: String) -> void:
 	if not debug_open: return
 	var trimmed: String = value.strip_edges()
 	if not trimmed.is_valid_int() or trimmed.to_int() < 1 or trimmed.to_int() > Run.WAVE_NAMES.size():
-		debug_wave_error = "Enter a wave from 1 to 10."
+		debug_wave_error = GameText.format("Enter a wave from 1 to %d.",Run.WAVE_NAMES.size())
 		return
 	_restart(trimmed.to_int())
 
 func _debug_give_tarots() -> void:
 	if not debug_open: return
 	# Debug grants deliberately ignore ownership and Hanged Man's reward exclusions.
-	for id in Run.Tarot.ITEMS: model.tarots.add(id)
-	_sound("confirmation_002",1,-14)
+	for id in Run.Tarot.ITEMS: model.grant_tarot(id)
+	_sound("ui/confirmation_002",1,-14)
+
+func _debug_draw_tarot() -> void:
+	if not debug_open: return
+	if tarot_ui.begin_reward("debug"): _close_debug(false)
 
 func _pointer_position() -> Vector2:
 	return touch_position if active_touch >= 0 else get_global_mouse_position()
@@ -457,6 +459,12 @@ func _in_dice_range(mouse: Vector2) -> bool:
 func _handle_click(mouse: Vector2) -> void:
 	if is_instance_valid(tarot_cast) and tarot_cast.click(mouse): return
 	if is_instance_valid(tarot_ui) and tarot_ui.click(mouse): return
+	if view_phase == "reward" and not chest.visible:
+		chest_skip_intro = true
+		return
+	if view_phase == "reward" and chest.active:
+		chest.skip_animation()
+		return
 	if view_phase == "reward" and chest.can_skip() and chest.skip_rect().has_point(mouse):
 		model.discard_unclaimed_rewards()
 		chest.skip_remaining()
@@ -483,13 +491,14 @@ func _handle_click(mouse: Vector2) -> void:
 		elif DEBUG_REPEAT.has_point(mouse): debug_repeat = not debug_repeat
 		elif DEBUG_PERFECT.has_point(mouse): debug_perfect = not debug_perfect
 		elif DEBUG_TAROTS.has_point(mouse): _debug_give_tarots()
+		elif DEBUG_TAROT_DRAW.has_point(mouse): _debug_draw_tarot()
 		elif DEBUG_WAVE_LOAD.has_point(mouse): _debug_load_wave(debug_wave_input.text)
 		else:
 			for i in range(-1, 13):
 				if _debug_option_rect(i).has_point(mouse):
 					debug_choice = i
 					_close_debug(false)
-					_sound("book", 1.4, -17)
+					_sound("ui/book", 1.4, -17)
 		return
 	if menu_open:
 		if MENU_CLOSE.has_point(mouse) or MENU_RESUME.has_point(mouse): menu_open = false
@@ -497,7 +506,7 @@ func _handle_click(mouse: Vector2) -> void:
 		elif GUIDE_RECT.has_point(mouse):
 			menu_open = false
 			guide = true
-			_sound("book", 1.0, -14)
+			_sound("ui/book", 1.0, -14)
 		elif FX_RECT.has_point(mouse):
 			reduced = not reduced
 			fx.reduced = reduced
@@ -598,7 +607,7 @@ func _field_drop_valid(point: Vector2) -> bool:
 
 func _skill_targets() -> Array:
 	if model.is_city(): return [-2] if model.city_hp > 0 else []
-	return model.living()
+	return model.attack_targets()
 
 func _target_rect(target: int) -> Rect2:
 	if target == -2:
@@ -665,7 +674,7 @@ func _handle_skill_click(point: Vector2) -> void:
 		skill_pressed = true
 		skill_press_origin = point
 		skill_pointer = point
-		_sound("book", 1.3, -19)
+		_sound("player/book", 1.3, -19)
 	elif view_phase == "targeting" and _skill_needs_target():
 		var target: int = _target_at(point)
 		if target != -1: _activate_skill(target)
@@ -734,7 +743,7 @@ func _save_skill() -> void:
 	result = MultiHitSkill.new()
 	last_result = MultiHitSkill.new()
 	fx.activate_circle(_saved_slot_center(), GOLD, _saved_slot_radius()+8, 0.6)
-	_sound("book", 1.1, -14)
+	_sound("player/book", 1.1, -14)
 	view_phase = "resolving"
 	status_title = "SAVED"
 	if model.is_city():
@@ -758,7 +767,7 @@ func _activate_skill(target: int, cast_point: Vector2 = Vector2.INF) -> void:
 	status_color = [CREAM, TEAL, PURPLE, GOLD][roll.kind]
 	fx.burst(cast_point, status_color, 20, 150)
 	fx.activate_circle(_player_point(), status_color, monster_side*0.4, 0.4)
-	_sound("confirmation_002", 0.85, -18)
+	_sound("player/confirmation_002", 0.85, -18)
 	_resolve_player(target, source)
 
 func _begin_cinematic(ultimate: bool) -> void:
@@ -886,12 +895,16 @@ func _enemy_side() -> float:
 
 func _enemy_feet(index: int) -> Vector2:
 	var count: int = model.enemies.size()
-	if count == 1: return Vector2(856,414)
-	var cols: int = ceili(count/2.0) if count > 5 else count
+	if count == 1: return Vector2(856,384)
+	var spacing: float = maxf(92,_enemy_side()+12)
+	var cols: int = ceili(count/2.0) if count > mini(5,floori(730/spacing)) else count
 	var row: int = index / cols
 	var row_count: int = mini(cols,count-row*cols)
-	var spacing: float = clampf(_enemy_side()*1.6,92,128)
-	return Vector2(824 + (index%cols-(row_count-1)/2.0)*spacing, (254 if count > 5 else 396) + row*160 + [0,-10,8,-5,4][index%cols])
+	var two_rows: bool = count > cols
+	var top: float = maxf(242,ARENA.position.y+_enemy_side()+42)
+	var stagger: float = (row-0.5)*spacing*0.5 if two_rows else 0
+	var y: float = (lerpf(top,386,float(row)) if two_rows else 380)+[0,-6,4,-2,3][index%cols]
+	return Vector2(824+stagger+(index%cols-(row_count-1)/2.0)*spacing,y)
 
 func _enemy_point(index: int) -> Vector2:
 	return _enemy_feet(index) - Vector2(0,_enemy_side()*0.48)
@@ -907,6 +920,15 @@ func _player_feet() -> Vector2:
 
 func _player_point() -> Vector2:
 	return Vector2(259, 414 - monster_side * 0.48)
+
+func _player_growth_scale() -> Vector2:
+	return CombatMotion.growth_scale(travel_progress,reduced) if view_phase == "transition" else Vector2.ONE
+
+func _player_sprite_rect(dx: float = 0, bob: float = 0) -> Rect2:
+	var size: Vector2 = Vector2.ONE*monster_side*_player_growth_scale()
+	# Keep growth grounded; ordinary idle bob and hit recoil still use their own offsets.
+	var feet: Vector2 = _player_feet()+Vector2(dx,0 if view_phase == "transition" else bob)
+	return Rect2(feet-Vector2(size.x/2,size.y),size)
 
 func _city_gate_point() -> Vector2:
 	return City.gate_point()
@@ -944,7 +966,7 @@ func _hit_ice(point: Vector2) -> void:
 	var events: Array = model.break_ice()
 	if events.is_empty(): return
 	fx.burst(point,Color("b9f2ff"),12,140)
-	_sound("crash",1.7,-21)
+	_sound("player/crash",1.7,-21)
 	if model.is_frozen(): return
 	_show_events(events)
 	view_phase = "resolving"
@@ -992,26 +1014,27 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 	status_title = "ROLLING"
 	status_color = CREAM
 	fx.activate_circle(DICE_CENTER, GOLD, DICE_RADIUS, 0.8 / _roll_speed())
-	_sound("soft_sweep", 1.0, lerpf(-21, -8, throw_power))
-	if throw_power > 0.7: _sound("rumble", 1.2, -24 + throw_power * 5)
+	_sound("dice/soft_sweep", 1.0, lerpf(-21, -8, throw_power))
+	if throw_power > 0.7: _sound("dice/rumble", 1.2, -24 + throw_power * 5)
 	if throw_perfect:
-		_sound("perfect", 1.0, -14)
+		_sound("dice/perfect", 1.0, -14)
 		fx.reveal_perfect(DICE_CENTER - Vector2(0, DICE_RADIUS * 0.62))
 		fx.burst(DICE_CENTER, GOLD, 35, 200)
-		_sound("confirmation_002", 1.7, -10)
-		_sound("bell", 1.8, -19)
+		_sound("dice/confirmation_002", 1.7, -10)
+		_sound("dice/bell", 1.8, -19)
 	for i in range(3):
 		dice[i].roll_to(result.dice[i], i, 2.0 if model.is_city() else speed, throw_power)
 	while dice.any(func(die): return die.rolling):
 		await get_tree().process_frame
 		if not _valid_turn(token): return
 	if not await _wait(0.12, token): return
-	if model.perfect_relic_ready:
-		_show_events(model.resolve_perfect_relic())
+	while model.perfect_relic_ready:
+		var relic_speed: float = model.roll_relic_animation_speed()
+		_show_events(model.resolve_roll_relic_step())
 		_sync_corpses()
 		fx.burst(_player_point(), Color("d9bfff"), 30, 180)
-		_sound("bell", 1.3, -12)
-		if not await _wait(0.25,token): return
+		_sound("dice/bell", 1.3, -12)
+		if not await _wait(0.25/relic_speed,token): return
 		if _check_over(): return
 	last_result = result.duplicate(true)
 	var kind: int = result.kind
@@ -1026,17 +1049,17 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 		fx.reveal_combo(combo_word, DICE_CENTER, status_color)
 		fx.activate_circle(DICE_CENTER, status_color, DICE_RADIUS + 7, 0.9)
 		if kind == Rules.Kind.PAIR:
-			_sound("confirmation_002", 1.1, -12)
+			_sound("dice/confirmation_002", 1.1, -12)
 			if not await _wait(0.35, token): return
 		else:
-			_sound("bong_001", 0.8 if kind == Rules.Kind.SPECIAL else 0.55, -8)
+			_sound("dice/bong_001", 0.8 if kind == Rules.Kind.SPECIAL else 0.55, -8)
 			if not await _combo_chime(kind == Rules.Kind.ULTIMATE, token): return
 			_begin_cinematic(kind == Rules.Kind.ULTIMATE)
 	view_phase = "forming"
 	last_result = MultiHitSkill.new()
 	fx.skill.clear()
 	skill_bubble.begin(result)
-	_sound("bell", 1.2, -20)
+	_sound("dice/bell", 1.2, -20)
 	while skill_bubble.age < skill_bubble.formation:
 		await get_tree().process_frame
 		if not _valid_turn(token): return
@@ -1052,42 +1075,44 @@ func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 
 func _combo_chime(ultimate: bool, token: int) -> bool:
 	for pitch in [1.0, 1.25, 1.5, 2.0]:
-		_sound("pluck_001", pitch * (0.75 if ultimate else 1.0), -14)
+		_sound("dice/pluck_001", pitch * (0.75 if ultimate else 1.0), -14)
 		if not await _wait(0.09, token): return false
 	return true
 
 func _skill_caption(roll: MultiHitSkill) -> Dictionary:
+	if roll.is_freeze():
+		var stacks: int = roundi(model.tarot_effects.skill_factor(roll))
+		var description: String = GameText.text("City is immune to freeze.") if model.is_city() else GameText.format("Freeze all: %d stack. No attack." if stacks == 1 else "Freeze all: %d stacks. No attack.",stacks)
+		return {"name": Rules.PAIR_NAMES[1], "description": description}
 	var label: String = Rules.NORMAL_NAME
 	var description: String = "attack"
 	if roll.kind == Rules.Kind.PAIR:
 		label = Rules.PAIR_NAMES[roll.face - 1]
 		var spare_text: String = str(roll.spare * Rules.DAMAGE_PER_PIP) if roll.face in [1,4,5] else str(roll.spare)
-		var template: String = ["attack x1.5 +%s", "regen 5 for %s turns", "DMG +0.5 for %s turns", "attack all +%s", "random attack +%s", "invincible for %s turns"][roll.face - 1]
+		var template: String = ["attack x1.5 +%s", "", "DMG +0.5 for %s attacks", "attack all +%s", "random attack +%s", "invincible for %s turns"][roll.face - 1]
 		if model.is_city() and roll.face == 5: template = "city attack +%s"
 		description = GameText.format(template,spare_text)
 		if model.is_city() and roll.face == 6: description = GameText.format("invincible for %d seconds",roll.spare*2)
 	elif roll.kind >= Rules.Kind.SPECIAL:
 		label = Rules.SPECIAL_NAMES[roll.face - 1]
-		description = ["instant kill", "full heal", "DMG +2.0 for 3 turns", "attack all x2", "random attack", ""][roll.face - 1]
+		description = ["instant kill", "full heal", "DMG +2.0 for 3 attacks", "attack all x2", "random attack", ""][roll.face - 1]
 		if model.is_city() and roll.face == 1: description = "attack x5"
 	if model.is_city() and roll.kind >= Rules.Kind.SPECIAL and roll.face == 5: description = "city attack"
 	var factor: float = model.tarot_effects.skill_factor(roll)
 	if not Rules.is_attack(roll) and factor > 1:
-		if roll.face == 2 and roll.kind == Rules.Kind.PAIR: description = GameText.format("regen %d for %d turns",[roundi(5*factor),roll.spare])
-		elif roll.face == 3: description = GameText.format("DMG +%.1f for %d turns",[(0.5 if roll.kind == Rules.Kind.PAIR else 2.0)*factor,roll.spare if roll.kind == Rules.Kind.PAIR else 3])
+		if roll.face == 3: description = GameText.format("DMG +%.1f for %d attacks",[(0.5 if roll.kind == Rules.Kind.PAIR else 2.0)*factor,roll.spare if roll.kind == Rules.Kind.PAIR else 3])
 	return {"name": label, "description": description}
 
 func _skill_reapply_bonus(roll: MultiHitSkill) -> String:
 	var id: int = roll.face if roll.kind == Rules.Kind.PAIR else Status.ASCENSION if roll.kind == Rules.Kind.SPECIAL and roll.face == 3 else -1
 	if model.status_count(id) <= 0: return ""
 	match id:
-		Status.REGEN: return GameText.text("Recast: heal remainder.")
 		Status.MIGHT, Status.ASCENSION: return GameText.format("Recast: %d-base shockwave.",10 if id == Status.MIGHT else 50)
 		Status.IMMUNITY: return GameText.text("Recast extends duration.")
 	return ""
 
 func _die_landed(index: int) -> void:
-	_sound("drop_001", 0.95 + index * 0.13 - throw_power * 0.25, -17 + throw_power * 7)
+	_sound("dice/drop_001", 0.95 + index * 0.13 - throw_power * 0.25, -17 + throw_power * 7)
 	fx.burst(dice[index].position + Vector2(0, 35), GOLD, roundi(12 + throw_power * 18), 90 + throw_power * 70)
 
 func _resolve_player(target: int, source: String = "current") -> void:
@@ -1120,15 +1145,20 @@ func _resolve_player(target: int, source: String = "current") -> void:
 		fx.ring(bubble.cast_position, GOLD, _skill_radius() * 2.0)
 		fx.burst(bubble.cast_position, GOLD, 16 if reduced else 48, 240)
 		shake = 0.0 if reduced else 14.0
-		_sound("crash", 0.55, -12)
+		_sound("player/crash", 0.55, -12)
 	var count: int = model.skill_use_count(roll)
 	for impact in range(count):
 		if attacking: damage_feedback.sync_value(model.cast_damage_multiplier(roll))
 		if impact > 0: bubble.consume_use()
 		if not attacking:
-			fx.activate_circle(_player_point(), TEAL, monster_side * 0.45, 0.85)
-			fx.burst(_player_point(), TEAL, 30)
-			_sound("bell", 1.6, -16)
+			if roll.is_freeze():
+				var ice: Color = Statuses.ENTRIES[Status.FROZEN].color
+				fx.ring(_player_point(),ice,ARENA.size.x,ARENA)
+				for enemy in model.living(): fx.burst(_enemy_impact_point(enemy),ice,18,120)
+			else:
+				fx.activate_circle(_player_point(), TEAL, monster_side * 0.45, 0.85)
+				fx.burst(_player_point(), TEAL, 30)
+			_sound("player/bell", 1.6, -16)
 			if not await _wait(0.3, token): return
 			_show_events(model.apply_player_step())
 			_sync_corpses()
@@ -1141,15 +1171,15 @@ func _resolve_player(target: int, source: String = "current") -> void:
 			var face: int = roll.face if kind >= Rules.Kind.SPECIAL or kind == Rules.Kind.PAIR else 0
 			var duration: float = 0.18 if count > 1 else 1.6 if kind == Rules.Kind.ULTIMATE else 0.7 if kind >= Rules.Kind.SPECIAL else 0.38
 			fx.cast(face, _player_point(), targets, duration / _roll_speed())
-			_sound("slash", 1.0 + impact * 0.08 if count > 1 else 0.8, -9)
-			if kind >= Rules.Kind.SPECIAL and impact == 0: _sound("rumble", 0.5 if kind == Rules.Kind.ULTIMATE else 0.8, -12)
+			_sound("player/slash", 1.0 + impact * 0.08 if count > 1 else 0.8, -9)
+			if kind >= Rules.Kind.SPECIAL and impact == 0: _sound("player/rumble", 0.5 if kind == Rules.Kind.ULTIMATE else 0.8, -12)
 			if not await _wait(duration * 0.55, token): return
 			if not model.outcome().is_empty(): return
 			for point in targets:
 				fx.burst(point, status_color, 32 if kind >= Rules.Kind.SPECIAL else 14, 205)
 			if kind >= Rules.Kind.SPECIAL and impact == 0: fx.flash(status_color, 0.12)
 			shake = (12.0 if kind >= Rules.Kind.SPECIAL else 3.0) if not reduced else 0.0
-			_sound("crash" if kind == Rules.Kind.ULTIMATE else "hit", 0.65 + impact * 0.08 if kind >= Rules.Kind.SPECIAL else 1.0, -9)
+			_sound("player/crash" if kind == Rules.Kind.ULTIMATE else "player/hit", 0.65 + impact * 0.08 if kind >= Rules.Kind.SPECIAL else 1.0, -9)
 			_show_events(model.apply_player_step(target))
 			_sync_corpses()
 		if model.phase != "executing": break
@@ -1191,20 +1221,22 @@ func _enemy_phase() -> void:
 		var human: Dictionary = model.enemies[i]
 		status_title = "ENEMY TURN"
 		if not await _wait(0.12, token): return
-		var immobilized: bool = model.enemy_cannot_act(i)
-		if not human.canceled and model.status_count(Status.HIDDEN) == 0 and not immobilized and human.intent.type == "attack":
-			fx.enemy_cast(human.role, _enemy_point(i), _player_point(), 0.22 / speed, human.intent.get("attribute", Status.Attribute.NONE))
-			_sound("slash" if human.role != 2 else "bell", 1.4, -17)
-			if not await _wait(0.18, token): return
-		var events: Array = model.enemy_act(i)
-		if not human.canceled and not immobilized and human.intent.type != "attack" and events.size() > 0:
-			for event in events:
-				if event.target >= 0: fx.activate_circle(_enemy_point(event.target), PURPLE if human.intent.type == "empower" else TEAL, maxf(12,_enemy_side()*0.22), 0.4)
-			_sound("bell", 1.7, -20)
-		_show_events(events)
-		_sync_corpses()
-		if not await _wait(0.24, token): return
-		if _check_over(): return
+		while not human.acted and human.hp > 0 and model.phase == "enemy":
+			var immobilized: bool = model.enemy_cannot_act(i) and human.get("action_hit",0) == 0
+			var attacking: bool = human.intent.get("type","") == "attack"
+			if not human.canceled and model.status_count(Status.HIDDEN) == 0 and not immobilized and attacking:
+				fx.enemy_cast(human.role,_enemy_point(i),_player_point(),0.22/speed,human.intent.get("attribute",Status.Attribute.NONE))
+				_sound("enemy/bell" if human.role in [2,4] else "enemy/slash",1.4,-17)
+				if not await _wait(0.18,token): return
+			var events: Array = model.enemy_act_step(i)
+			if not human.canceled and not immobilized and not attacking and not events.is_empty():
+				for event in events:
+					if event.target >= 0: fx.activate_circle(_enemy_point(event.target),PURPLE if human.intent.type in ["empower","team_empower","charge"] else TEAL,maxf(12,_enemy_side()*0.22),0.4)
+				_sound("enemy/bell",1.7,-20)
+			_show_events(events)
+			_sync_corpses()
+			if not await _wait(0.24,token): return
+			if _check_over(): return
 	active_human = -1
 	if not await _resolve_turn_end(token): return
 	_start_round()
@@ -1245,8 +1277,8 @@ func _claim_chest_reward(index: int, replace_index: int = -1, discard: bool = fa
 		var replacing: bool = relic_ui.chest_slot >= 0
 		var origin: Vector2 = Vector2(fx.canvas_size.x/2,620 if relic_ui.portrait() else 280) if replacing else chest.reel_rect(index).get_center()
 		relic_ui.collect(item.relic_id,origin,80 if replacing else chest.reel_rect(index).size.x*0.305,previous_ids)
-	fx.reveal_skill(item.name, item.text, item.color)
-	_sound("rumble" if item.id == "curse" else "confirmation_002", 0.65 if item.id == "curse" else 1.0, -12)
+	fx.reveal_skill(item.name,GameText.format(item.text,item.text_values) if item.has("text_values") else item.text,item.color)
+	_sound("item/rumble" if item.id == "curse" else "item/confirmation_002", 0.65 if item.id == "curse" else 1.0, -12)
 	return true
 
 func _reward_sequence(tier: int = 0, automatic: bool = false, bonus: bool = false) -> void:
@@ -1260,21 +1292,24 @@ func _reward_sequence(tier: int = 0, automatic: bool = false, bonus: bool = fals
 	var previous_title: String = status_title
 	var outcomes: Array = model.open_rewards.duplicate() if automatic else model.open_bonus_chest() if bonus else model.open_chest(tier)
 	if outcomes.is_empty(): return
+	chest_skip_intro = false
 	view_phase = "reward"
 	status_title = "TREASURE"
 	fx.skill.clear()
 	fx.floats.clear()
 	fx.sigils.clear()
 	# Banked treasure can only open between actions, including the ending screen.
-	if not await _wait(0.38 * _roll_speed(), token): return
+	if not await _wait_chest_intro(0.38, token): return
 	fx.z_index = 90
-	fx.flash(Color.WHITE, 0.65)
-	_sound("bong_001", 0.7, -12)
-	if not await _wait(0.18 * _roll_speed(), token): return
+	if not chest_skip_intro:
+		fx.flash(Color.WHITE, 0.65)
+		_sound("item/bong_001", 0.7, -12)
+	if not await _wait_chest_intro(0.18, token): return
 	var prizes: Array = []
 	for slot in range(outcomes.size()): prizes.append(model.reward_item(slot))
 	chest.start(outcomes, fx.canvas_size, pixel_font, reduced, prizes)
-	_sound("rumble", 0.7, -18)
+	if chest_skip_intro: chest.skip_animation()
+	else: _sound("item/rumble", 0.7, -18)
 	while chest.active or not model.rewards_collected() or relic_ui.pickup.active or tarot_ui.ceremony.active():
 		await get_tree().process_frame
 		if not _valid_turn(token): return
@@ -1290,7 +1325,7 @@ func _sync_corpses() -> void:
 		if model.enemies[i].hp <= 0 and not fallen.has(i):
 			fallen[i] = 0.0
 			fx.burst(_enemy_point(i), Color("b9857c"), 14, 80)
-			_sound("chop", 0.7, -15)
+			_sound("enemy/chop", 0.7, -15)
 
 func _check_over() -> bool:
 	# Finish both sides' status ticks before treating a damage-over-time kill as
@@ -1310,7 +1345,7 @@ func _check_over() -> bool:
 	view_phase = "over"
 	for die in dice: die.stop_charge()
 	active_human = -1
-	_sound("rumble", 0.5, -13)
+	_sound("player/rumble", 0.5, -13)
 	return true
 
 func _offer_relics(token: int) -> bool:
@@ -1321,7 +1356,7 @@ func _offer_relics(token: int) -> bool:
 	while not model.relic_offer_resolved or relic_ui.pickup.active or tarot_ui.ceremony.active():
 		await get_tree().process_frame
 		if not _valid_turn(token): return false
-	_sound("book", 1.0, -12)
+	_sound("item/book", 1.0, -12)
 	return _valid_turn(token)
 
 func _finish_victory(token: int) -> void:
@@ -1333,8 +1368,8 @@ func _finish_victory(token: int) -> void:
 	auto_claim_remaining = AUTO_CLAIM_DURATION if auto_claim_tier > 0 else 0.0
 	fx.activate_circle(CITY_POINT, GOLD, 200, 1.5)
 	fx.burst(CITY_POINT, GOLD, 120, 320)
-	_sound("crash", 0.55, -8)
-	_sound("bell", 0.65, -12)
+	_sound("enemy/crash", 0.55, -8)
+	_sound("enemy/bell", 0.65, -12)
 	if auto_claim_tier > 0: _victory_rewards(token)
 
 func _victory_rewards(token: int) -> void:
@@ -1356,7 +1391,7 @@ func _advance_wave() -> void:
 	for i in fallen:
 		fx.feed(_enemy_feet(i) - Vector2(0,_enemy_side()*0.1), _player_point(), 0.85 / speed)
 	fx.activate_circle(_player_point() + Vector2(0, 50), RED, 118, 1.2 / speed)
-	_sound("rumble", 0.55, -10)
+	_sound("player/rumble", 0.55, -10)
 	transition_tween = create_tween()
 	transition_tween.tween_property(self, "corpse_alpha", 0.0, 1.2 / speed)
 	while transition_tween.is_running() and _valid_turn(token):
@@ -1454,7 +1489,7 @@ func _show_events(events: Array) -> void:
 			var radius: float = maxf(ARENA.size.x,ARENA.size.y)
 			fx.ring(_player_point(),tint,radius,ARENA)
 			fx.burst(_player_point(),tint,12 if reduced else 32,240)
-			_sound("rumble",1.15 if event.amount < 50 else 0.8,-16)
+			_sound("player/rumble",1.15 if event.amount < 50 else 0.8,-16)
 			continue
 		if event.type == "spawn":
 			fx.burst(_city_gate_point(), GOLD, 10, 40)
@@ -1464,7 +1499,7 @@ func _show_events(events: Array) -> void:
 			continue
 		if event.type == "volley":
 			fx.enemy_cast(1, _city_wall_point(0) - Vector2(0,38), _player_point(), 0.35)
-			_sound("slash", 0.65, -14)
+			_sound("enemy/slash", 0.65, -14)
 			continue
 		if event.type == "sweep":
 			for i in range(int(event.get("first", 0)), int(event.get("first", 0)) + event.amount):
@@ -1476,7 +1511,7 @@ func _show_events(events: Array) -> void:
 			fx.floating(point-Vector2(0,69), _damage_popup(event), PURPLE,_event_font_size(event))
 			fx.floating(point-Vector2(0,41), event.text, PURPLE)
 			fx.activate_circle(point, PURPLE, maxf(18,_enemy_side()*0.3), 0.3)
-			_sound("bell", 0.7, -14)
+			_sound("player/bell" if event.target == -1 else "enemy/bell", 0.7, -14)
 			continue
 		if event.type == "relic":
 			fx.floating(point-Vector2(0,65),event.text,GOLD)
@@ -1494,7 +1529,7 @@ func _show_events(events: Array) -> void:
 			else: fx.activate_circle(point, tint, monster_side*0.42, 0.45)
 			continue
 		var color: Color = RED if event.type == "damage" else PURPLE if event.type == "cancel" else TEAL
-		var label: String = "INVINCIBLE" if event.type == "immune" else _damage_popup(event) if event.type == "damage" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "+ BOON"
+		var label: String = event.text if event.type == "immune" else _damage_popup(event) if event.type == "damage" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "+ BOON"
 		var offset: int = offsets.get(event.target, 0)
 		if not label.is_empty():
 			fx.floating(point - Vector2(0, 45 + offset), label, color,_event_font_size(event))
@@ -1503,13 +1538,21 @@ func _show_events(events: Array) -> void:
 			if event.target >= -1: hit_times[event.target + 1] = 1.0
 			if event.amount > 0 or event.get("corpse_hit",false):
 				fx.slash(point, event.target == -2)
-				if event.target == -1: _sound("hit", 0.8, -17)
+				if event.target == -1: _sound("player/hit", 0.8, -17)
 				elif event.target == -2:
 					fx.burst(CITY_POINT, GOLD, 16, 190)
 					city_life.sync_destruction(model.city_hp / float(Run.CITY_MAX_HP))
 
 func _valid_turn(token: int) -> bool:
 	return token == run_id and is_inside_tree() and view_phase != "over"
+
+func _wait_chest_intro(seconds: float, token: int) -> bool:
+	while seconds > 0 and not chest_skip_intro:
+		await get_tree().process_frame
+		if not _valid_turn(token): return false
+		if _menus_open(): continue
+		seconds -= get_process_delta_time()*_world_time_scale()
+	return _valid_turn(token)
 
 func _wait(seconds: float, token: int = -1) -> bool:
 	var remaining: float = seconds
@@ -1573,7 +1616,7 @@ func _buff_drag_active() -> bool:
 	return not roll.is_empty() and not Rules.is_attack(roll)
 
 func _art(key: String, rect: Rect2, tint: Color = Color.WHITE) -> void:
-	if _buff_drag_active() and key.trim_suffix("_glow") in ["vanguard", "archer", "mage"]:
+	if _buff_drag_active() and key.trim_suffix("_glow") in ["vanguard", "archer", "mage", "paladin", "high_priest"]:
 		tint *= Color(0.38, 0.38, 0.38, 1)
 	if art.has(key):
 		draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, tint)
@@ -1754,9 +1797,9 @@ func _draw_player() -> void:
 	var hurt: float = hit_times[0]
 	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
-	_shadow(Vector2(259, 413), monster_side * 0.48, 0.27)
+	_shadow(Vector2(259, 413), monster_side * _player_growth_scale().x * 0.48, 0.27)
 	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
-	_art("eldritch", Rect2(Vector2(259 - monster_side / 2 + dx, 414 - monster_side + bob), Vector2.ONE * monster_side), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
+	_art("eldritch", _player_sprite_rect(dx,bob), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
 	_draw_player_afflictions()
 	_hp_plate(Rect2(129, 382, 260, 56), "HORROR %d" % (model.stage+1), model.hp, model.max_hp, model.shield, TEAL)
 
@@ -1766,7 +1809,7 @@ func _draw_human(index: int) -> void:
 	var point: Vector2 = _enemy_point(index)
 	var floor_y: float = _enemy_feet(index).y
 	var side: float = _enemy_side()
-	var key: String = ["vanguard", "archer", "mage"][human.role]
+	var key: String = Rules.EnemyCatalog.ITEMS[human.role].art
 	var selected: bool = attack_target == index and view_phase == "resolving"
 	if human.hp <= 0:
 		var t: float = minf(1, fallen.get(index, 1.0) / 0.3)
@@ -1782,6 +1825,11 @@ func _draw_human(index: int) -> void:
 		var color: Color = GOLD if selected else RED
 		Pixel.disc(self, Vector2(point.x, floor_y-2), side * 0.35, Color(color, 0.35), 6, 0.23)
 		_rune(point - Vector2(0, side * 0.55), 3, color, 3)
+	if human.get("charging",false):
+		var total: int = Rules.EnemyCatalog.ITEMS[human.role].charge_turns
+		for orb in range(total):
+			var at: Vector2 = Vector2(point.x+(orb-(total-1)/2.0)*12,floor_y+8)
+			Pixel.disc(self,at,4,_elite_color(human.role) if orb < human.charge else Color(INK,0.8),2)
 	var hurt: float = hit_times[index + 1]
 	var dx: float = combat_motion.offset(index,side,clock_time,model.enemy_cannot_act(index) or human.canceled,reduced)
 	var bob: float = 0 if reduced or model.enemy_cannot_act(index) else snappedf(sin(clock_time * 2 + index * 2) * minf(2,side/64.0), 2)
@@ -1819,7 +1867,7 @@ func _draw_enemy_statuses(index: int) -> void:
 		_text(at+Vector2(radius*0.55,radius+5),items[i].get("badge","∞" if items[i].permanent else str(items[i].turns)),12,CREAM)
 
 func _elite_color(role: int) -> Color:
-	return [Color("ffe388"), Color("82dfff"), Color("ff9955")][role]
+	return Rules.EnemyCatalog.ITEMS[role].color
 
 func _draw_player_afflictions() -> void:
 	var feet: Vector2 = _player_feet()
@@ -1853,23 +1901,26 @@ func _enemy_intent_data(index: int) -> Dictionary:
 		description = "This enemy will skip its next move."
 	elif intent.type == "attack":
 		var attribute: int = intent.get("attribute",Status.Attribute.NONE)
-		label = ["ATK","ICE","FIRE","STUN"][attribute]
-		detail = str(roundi(intent.amount*(1.5 if enemy.attack_boost else 1.0)*(0.5 if model.enemy_status_count(index,Status.DARKNESS) > 0 else 1.0)))
+		var status: int = intent.get("status",{1:Status.FROZEN,2:Status.BURNING,3:Status.STUNNED}.get(attribute,-1))
+		var amount: int = roundi(intent.amount*(enemy.get("action_multiplier",1.0) if enemy.get("action_hit",0) > 0 else 1.5 if enemy.attack_boost else 1.0)*(0.5 if model.enemy_status_count(index,Status.DARKNESS) > 0 else 1.0))
+		var hits: int = intent.get("hits",1)
+		label = "ATK"
+		detail = str(amount) if hits == 1 else "%d x%d" % [amount,hits]
+		name = intent.get("name","Attack")
 		description = GameText.format("Deal %s damage.",detail)
-		name = ["Attack","Ice Arrow","Burning Bolt","Stunning Blow"][attribute]
-		if attribute == Status.Attribute.ICE: description += " " + GameText.text("Freeze: tap the ice 3 times to end your turn.")
-		elif attribute == Status.Attribute.FIRE: description += " " + GameText.text("Apply 2 burning stacks.")
-		elif attribute == Status.Attribute.SHOCK: description += " " + GameText.text("Stun: randomize your next throw's power marker.")
-		if attribute != Status.Attribute.NONE:
-			label += " " + detail
-			detail = "BURN +2" if attribute == Status.Attribute.FIRE else "SKIP TURN" if attribute == Status.Attribute.ICE else "NEXT THROW"
-		color = [RED,Color("82dfff"),Color("ff9955"),Color("ffe388")][attribute]
+		color = RED
+		if status >= 0:
+			var entry: Dictionary = Statuses.ENTRIES[status]
+			color = entry.color
+			description += " " + GameText.format("Apply %d stack(s) of %s on damage.",[intent.get("stacks",1),GameText.text(entry.name)])
 	elif intent.type == "shield":
 		icon = "shield"
-		name = "Raise Shield"
+		name = intent.get("name","Raise Shield")
 		label = "SHIELD"
-		detail = "+%d" % (0 if model.enemy_status_count(index,Status.CORROSION) > 0 else mini(intent.amount,Rules.SHIELD_CAP-enemy.shield))
-		description = GameText.format("Gain %s shield.",detail.trim_prefix("+"))
+		var target: int = intent.target
+		var amount: int = 0 if not model.is_enemy_alive(target) or model.enemy_status_count(target,Status.CORROSION) > 0 else maxi(0,mini(intent.amount,Rules.EnemyCatalog.shield_cap(model.enemies[target])-model.enemies[target].shield))
+		detail = "+%d" % amount
+		description = GameText.format("Give an ally %s shield." if target != index else "Gain %s shield.",str(amount))
 	elif intent.type == "heal":
 		icon = "plus"
 		name = "Heal"
@@ -1882,13 +1933,25 @@ func _enemy_intent_data(index: int) -> Dictionary:
 		label = "HEAL ALL"
 		detail = "20%"
 		description = "Restore 20% max health to living allies. Darkness blocks healing."
+	elif intent.type == "charge":
+		icon = "charge"
+		name = intent.name
+		label = "CHARGE"
+		detail = "%d / %d" % [intent.progress,intent.total]
+		color = _elite_color(enemy.role)
+		description = GameText.format("Charge %d/%d. After charging, attack %d times next turn. Freeze or immobilization resets charging.",[intent.progress,intent.total,2 if enemy.role == Rules.EnemyCatalog.Role.PALADIN else 6])
+	elif intent.type == "rest":
+		icon = "skip"; name = "Rest"; label = "REST"; color = MUTED
+		description = "Rest this turn."
 	else:
 		icon = "boost"
-		name = "Empower"
+		name = intent.get("name","Blessing")
 		label = "BOOST"
 		detail = "ALLY x1.5"
 		color = PURPLE
-		description = "Give one ally 1.5x damage on its next attack."
+		description = "Give all living allies, including self, 1.5x damage on their next attack." if intent.type == "team_empower" else "Give one ally or self 1.5x damage on its next attack."
+	if index in model.taunting_enemies():
+		description += " " + GameText.text("Taunt: protects allies from targeted attacks and halves area damage to them. 666 bypasses this.")
 	return {"label":label,"detail":detail,"color":color,"icon":icon,"name":name,"description":description}
 
 func _enemy_intent_rect(index: int) -> Rect2:
@@ -1900,7 +1963,13 @@ func _enemy_intent_rect(index: int) -> Rect2:
 		var spacing: float = absf(_enemy_feet(1).x-_enemy_feet(0).x)
 		width = minf(width,spacing-6)
 	var height: float = width
-	return Rect2(Vector2(feet.x-width/2,maxf(ARENA.position.y+8,feet.y-_enemy_side()-height-12)),Vector2(width,height))
+	var rect := Rect2(Vector2(feet.x-width/2,maxf(ARENA.position.y+8,feet.y-_enemy_side()-height-12)),Vector2(width,height))
+	# Staggered rows may put the preceding row's health plate above this head.
+	# Use the gap just below that plate rather than drawing the move on top of it.
+	for other in range(model.enemies.size()):
+		var health: Rect2 = _enemy_health_rect(other)
+		if rect.grow(5).intersects(health.grow(3)): rect.position.y = health.end.y+9
+	return rect
 
 func _draw_enemy_intent(index: int) -> void:
 	var data: Dictionary = _enemy_intent_data(index)
@@ -2087,8 +2156,8 @@ func _draw_statuses() -> void:
 func _status_description(id: int, count: int) -> String:
 	if id == Status.IMMUNITY and model.is_city():
 		return GameText.format("Invincible for %.1f more seconds. Each stack lasts 2 seconds.",model.city_immunity_seconds())+" "+GameText.text("Recast extends duration.")
-	if id == Status.REGEN: return GameText.format("Heal %d at turn start.",roundi(5*model.statuses[id].potency))+" "+GameText.remaining(count,"turn")+" "+GameText.text("Recast pays remaining healing.")
-	if id in [Status.MIGHT,Status.ASCENSION]: return GameText.format("Adds +%.1f to DMG. Stacks with other bonuses.",(0.5 if id == Status.MIGHT else 2.0)*model.statuses[id].potency)+" "+GameText.remaining(count,"turn")+" "+GameText.format("Recast: %d-base shockwave.",10 if id == Status.MIGHT else 50)
+	if id == Status.REGEN: return GameText.format("Heal %d at turn start.",roundi(5*model.statuses[id].potency))+" "+GameText.remaining(count,"turn")
+	if id in [Status.MIGHT,Status.ASCENSION]: return GameText.format("Adds +%.1f to DMG. Stacks with other bonuses.",(0.5 if id == Status.MIGHT else 2.0)*model.statuses[id].potency)+" "+GameText.remaining(count,"attack")+" "+GameText.format("Recast: %d-base shockwave.",10 if id == Status.MIGHT else 50)
 	var unit: String = "stack" if id in [Status.BURNING,Status.DARKNESS,Status.CORROSION,Status.PLAGUE] else "throw" if id == Status.STUNNED else "turn"
 	return GameText.text(Statuses.ENTRIES[id].text)+" "+GameText.remaining(count,unit)
 
@@ -2200,10 +2269,6 @@ func _draw_dice_circle() -> void:
 					Pixel.line(self, DICE_POSITIONS[i], DICE_POSITIONS[j], Color(match_color, 0.75), 3)
 	var label: String = "STOP!" if view_phase == "charging" else "CHARGE" if available else "" if spent else "..."
 	_center(DICE_CENTER + Vector2(0, 104 * layout_scale), label, roundi((22 if fever else 16) * layout_scale), color if available or fever else MUTED)
-	if available and ring_hover > 0.1:
-		var at := get_global_mouse_position().snapped(Vector2.ONE * 2)
-		Pixel.line(self, at - Vector2(10, 0), at + Vector2(10, 0), Color(GOLD, ring_hover), 2)
-		Pixel.line(self, at - Vector2(0, 10), at + Vector2(0, 10), Color(GOLD, ring_hover), 2)
 	draw_set_transform(Vector2.ZERO)
 
 func _rune(at: Vector2, index: int, color: Color, unit: int = 2) -> void:
@@ -2249,19 +2314,19 @@ func _remaining_turns(amount: int) -> String:
 	return GameText.remaining(amount)
 
 func _pair_description(index: int) -> String:
+	if index == 1 and model.is_city(): return "City is immune to freeze."
 	var remaining: int = int(model.status_count(index + 1))
 	if index == 5 and model.is_city():
 		return _status_description(Status.IMMUNITY,remaining) if remaining > 0 else "Invincible for 2 seconds per spare-die stack."
 	if remaining > 0:
 		match index:
-			1: return GameText.text("Heal 5 at turn start.") + " " + _remaining_turns(remaining)
-			2: return GameText.text("Adds +0.5 to DMG. Stacks with other bonuses.") + " " + _remaining_turns(remaining)
+			2: return GameText.text("Adds +0.5 to DMG. Stacks with other bonuses.") + " " + GameText.remaining(remaining,"attack")
 			5: return GameText.text("Invincible.") + " " + _remaining_turns(remaining)
 	return Rules.PAIR_TEXT[index]
 
 func _special_description(index: int) -> String:
 	if index == 2 and model.statuses[33].count > 0:
-		return GameText.text("Adds +2.0 to DMG. Stacks with other bonuses.") + " " + _remaining_turns(model.statuses[33].count)
+		return GameText.text("Adds +2.0 to DMG. Stacks with other bonuses.") + " " + GameText.remaining(model.statuses[33].count,"attack")
 	return Rules.CITY_SPECIAL_TEXT[index] if model.is_city() else Rules.SPECIAL_TEXT[index]
 
 func _draw_ending() -> void:
@@ -2363,6 +2428,7 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 		_center(rect.get_center() + Vector2(0, 32), "%d%d" % [face, face] if choice <= 6 else "%d%d%d" % [face, face, face], 16, color, canvas)
 	_text(Vector2(136, 601), "Choose dice, load a wave, or add tarot cards.", 16, CREAM, canvas)
 	_button(DEBUG_TAROTS,"GIVE ALL 22 TAROTS", true, canvas)
+	_button(DEBUG_TAROT_DRAW,"DRAW TAROT", true, canvas)
 	_text(Vector2(136, 653), "WAVE", 16, GOLD, canvas)
 	_button(DEBUG_WAVE_LOAD,"LOAD", true, canvas)
 	_text(Vector2(548,653),debug_wave_error,16,RED, canvas)

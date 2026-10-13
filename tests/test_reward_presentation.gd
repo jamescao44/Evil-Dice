@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
@@ -46,9 +47,9 @@ func test_layout(game) -> void:
 	game.debug_repeat = true
 	game.debug_choice = 2
 	await game._roll()
-	var expected_turns: int = game.result.spare
+	var rolled_freeze: bool = game.result.is_freeze()
 	await Driver.resolve_held(game)
-	check(game.debug_perfect and game.model.perfect_total == 1 and game.model.statuses[2].count == expected_turns, "Repeat retains Perfect and the chosen combination")
+	check(game.debug_perfect and game.model.perfect_total == 1 and game.model.statuses[2].count == 0 and rolled_freeze, "Repeat retains Perfect and the chosen combination")
 	game._restart()
 	check(game.debug_perfect, "Perfect toggle stays enabled across restart until switched off")
 	for i in range(2):
@@ -67,7 +68,7 @@ func test_layout(game) -> void:
 	check(not game.throw_perfect,"Turning the toggle off restores natural throw power")
 	await Driver.resolve_held(game)
 	game._restart()
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
 	game.model.begin_round()
 	game.debug_perfect = true

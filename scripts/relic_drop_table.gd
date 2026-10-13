@@ -4,6 +4,12 @@ extends RefCounted
 const Catalog = preload("res://scripts/relic_catalog.gd")
 const Weighted = preload("res://scripts/weighted_choice.gd")
 
+static func weights_for_wave(wave_number: int) -> Array:
+	# Move 10% of the remaining distance toward an even split each wave.
+	# Keep the curve independent of the route length so future waves extend it.
+	var remaining: float = pow(0.9,maxi(0,wave_number-1))
+	return Catalog.RARITY_WEIGHTS.map(func(weight): return 20.0+(weight-20.0)*remaining)
+
 static func draw(rng: RandomNumberGenerator, eligible: Array, rarity_weights: Array = Catalog.RARITY_WEIGHTS) -> String:
 	var pools: Array = [[],[],[],[],[]]
 	for id in eligible:

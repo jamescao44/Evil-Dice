@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -29,9 +30,9 @@ func model_checks() -> void:
 	var rng: int = m.rng.state
 	check(m.save_pending_skill(),"First skill fits in the empty slot")
 	check(m.saved_skill.same_as(bank) and m.pending.is_empty() and m.phase == "enemy", "Saving stores the exact dice and passes the turn")
-	check(m.statuses[3].count == 2 and m.rng.state == rng,"Saving defers the existing boon countdown until enemies finish without granting the stored boon or drawing RNG")
+	check(m.statuses[3].count == 2 and m.rng.state == rng,"Saving preserves attack charges without granting the stored boon or drawing RNG")
 	next_round(m)
-	check(m.statuses[3].count == 1,"Saving consumes one boon turn after the enemy phase")
+	check(m.statuses[3].count == 2,"Saving and the enemy phase preserve attack charges")
 	var current: MultiHitSkill = m.set_test_roll([1,2,3]).duplicate(true)
 	check(not m.save_pending_skill() and m.pending.same_as(current) and m.saved_skill.same_as(bank),"Full slot cannot overwrite either skill")
 	var turn: int = m.round_number
@@ -40,9 +41,9 @@ func model_checks() -> void:
 	check(m.pending.same_as(current) and m.phase == "player" and m.round_number == turn,"Bonus restores the waiting roll without spending a turn")
 	check(m.statuses[3].count == 5 and m.saved_skill.is_empty() and m.bonus_resume.is_empty(),"Saved boon applies once and empties the slot")
 	m.apply_player(0)
-	check(m.statuses[3].count == 5,"Normal action keeps the bonus boon active until enemies finish")
+	check(m.statuses[3].count == 4,"The waiting attack spends one charge of the saved boon")
 	next_round(m)
-	check(m.statuses[3].count == 4,"The full turn consumes one attack-boon turn")
+	check(m.statuses[3].count == 4,"Enemy actions do not spend a second attack charge")
 	m.reset_run()
 	m.begin_round()
 	m.enemies[0].hp = 500
@@ -71,7 +72,7 @@ func model_checks() -> void:
 	check(m.advance_wave() and m.saved_skill.face == 1,"Storage carries between waves")
 	m.reset_run()
 	check(m.saved_skill.is_empty() and m.bonus_resume.is_empty(),"New run clears stored skills and suspended state")
-	m.stage = 9
+	m.stage = Waves.CITY_STAGE
 	m._load_wave()
 	m.begin_round()
 	m.saved_skill = Rules.classify([1,1,1])
@@ -148,12 +149,12 @@ func layout_checks(g) -> void:
 	tap(g,g._skill_center())
 	check(g.skill_bubble.value_text().is_empty() and g.skill_bubble.description_text() == "instant kill","Instant kill retains its description without a numeric damage value")
 	g._cancel_targeting()
-	for values in [[2,2,4],[3,3,4],[6,6,4],[3,3,3]]:
+	for values in [[3,3,4],[6,6,4],[3,3,3]]:
 		var caption: Dictionary = g._skill_caption(Rules.classify(values))
 		check(" for " in caption.description and "," not in caption.description,"Buff captions say for N turns without a comma")
 	g.model.phase = "roll"
 	force_roll(g,[2,2,4])
-	check(g.skill_bubble.value_text() == "5 HP (x4)" and g.skill_bubble.value_color().g > g.skill_bubble.value_color().r,"Regeneration shows green per-turn healing above its preserved description")
+	check(g.skill_bubble.value_text().is_empty() and "Freeze all: 1 stack" in g.skill_bubble.description_text(),"Freeze shows its effect without a misleading healing or damage value")
 	g._handle_click(g._skill_center())
 	g._handle_motion(g.ARENA.get_center())
 	check(g._buff_drag_active(),"Dragging support dims enemies")
@@ -273,7 +274,7 @@ func layout_checks(g) -> void:
 	check(g.model.stage == 1 and g.view_phase == "ready" and g.model.saved_skill.dice == [6,6,4],"Bonus wave victory automatically carries the unused summoned skill to the next wave")
 	check(g.saved_bubble.roll.dice == [6,6,4] and g.skill_bubble.roll.is_empty() and g.model.statuses[6].count == 0,"Auto-save updates the slot visual without activating the unused boon")
 	g._restart()
-	g.model.stage = 9
+	g.model.stage = Waves.CITY_STAGE
 	g.model._load_wave()
 	g._start_round()
 	g.model.hp = 1000

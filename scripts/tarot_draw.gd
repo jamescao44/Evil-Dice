@@ -1,7 +1,12 @@
 extends Node2D
 ## Presentation-only reward ceremony. Fan positions never determine the locked outcomes.
 signal picked(index: int)
+signal card_drawn
+signal card_shuffled
 signal finished
+const SHUFFLE_LEAD := 0.16
+const SHUFFLE_STEP := 0.027
+const SHUFFLE_TRAVEL := 0.18
 const Paint = preload("res://scripts/tarot_paint.gd")
 const Swipe = preload("res://scripts/card_swipe.gd")
 var swipe = Swipe.new()
@@ -23,6 +28,7 @@ var press_at := Vector2.ZERO
 var last_at := Vector2.ZERO
 var pressed_card: int = -1
 var collection_target := Vector2.ZERO
+var shuffled_cards: int = 0
 
 func _ready() -> void:
 	z_index = 160
@@ -50,6 +56,7 @@ func reset() -> void:
 	choices.clear()
 	draws.clear()
 	removed.clear()
+	shuffled_cards = 0
 	age = 0
 	sky_age = 0
 	offset = 0
@@ -111,6 +118,8 @@ func keep_rect() -> Rect2:
 func click(point: Vector2) -> bool:
 	if not active(): return false
 	cancel_gesture()
+	# Consume the skip tap; its release must not also draw or select a card.
+	if skip_preparation(): return true
 	pressed = true
 	swipe.reset(offset)
 	swipe.begin()
@@ -135,10 +144,11 @@ func release(point: Vector2) -> bool:
 	motion(point)
 	swipe.release()
 	if not moved:
-		if state == "fan" and pressed_card >= 0 and pressed_card == fan_at(point) and draws.all(func(d): return d.age >= 0.5):
+		if state == "fan" and pressed_card >= 0 and pressed_card == fan_at(point):
 			var pose: Dictionary = fan_pose(pressed_card)
 			draws.append({"from":pose.at,"angle":pose.angle,"age":0.0})
 			removed.append(pressed_card)
+			card_drawn.emit()
 			if draws.size() == 3: state = "drawing"; age = 0
 		elif state == "choose":
 			for i in range(3):
@@ -150,15 +160,33 @@ func release(point: Vector2) -> bool:
 	cancel_gesture()
 	return true
 
+func skip_preparation() -> bool:
+	if state in ["shuffle","drop"] or (state == "fan" and age < 0.55):
+		shuffled_cards = 22
+		state = "fan"
+		age = 0.55
+	elif state in ["drawing","reveal"]:
+		for d in draws: d.age = maxf(d.age,0.85)
+		state = "choose"
+		age = 0
+	else: return false
+	queue_redraw()
+	return true
+
 func advance(delta: float) -> void:
 	if not active(): return
 	age += delta
 	sky_age += delta
+	if state == "shuffle":
+		# Share the visual departure times so each card sounds once, independent of FPS.
+		while shuffled_cards < 22 and age >= shuffle_duration()*(SHUFFLE_LEAD+shuffled_cards*SHUFFLE_STEP):
+			shuffled_cards += 1
+			card_shuffled.emit()
 	if state == "fan":
 		swipe.advance(delta)
 		offset = swipe.position
 	for d in draws: d.age += delta*(3 if reduced else 1)
-	if state == "shuffle" and age >= (0.35 if reduced else 1.28): state = "drop"; age = 0
+	if state == "shuffle" and age >= shuffle_duration(): state = "drop"; age = 0
 	elif state == "drop" and age >= (0.18 if reduced else 0.48): state = "fan"; age = 0
 	elif state == "drawing" and draws[-1].age >= 0.55: state = "reveal"; age = 0
 	elif state == "reveal" and age >= (0.25 if reduced else 1.05): state = "choose"; age = 0
@@ -222,10 +250,12 @@ func _draw() -> void:
 func _deck_left() -> Vector2:
 	return Vector2(canvas_size.x*0.28,870 if portrait() else 370)
 
+func shuffle_duration() -> float:
+	return 0.35 if reduced else 1.00
+
 func shuffle_pose(index: int) -> Dictionary:
-	var duration: float = 0.35 if reduced else 1.28
-	var progress: float = age/duration
-	var t: float = clampf((progress-0.16-index*0.027)/0.18,0,1)
+	var progress: float = age/shuffle_duration()
+	var t: float = clampf((progress-SHUFFLE_LEAD-index*SHUFFLE_STEP)/SHUFFLE_TRAVEL,0,1)
 	var right := Vector2(canvas_size.x*0.72,_deck_left().y)-Vector2(0,(21-index)*1.5)
 	var left: Vector2 = _deck_left()-Vector2(0,index*1.5)
 	return {"at":right.lerp(left,smoothstep(0,1,t)),"t":t}

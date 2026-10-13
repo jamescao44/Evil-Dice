@@ -3,8 +3,18 @@ extends RefCounted
 const HIT_DURATION := 0.26
 const HIT_PUSH := 0.045
 const BLOCK_DURATION := 0.38
+const GROWTH_POSES := [Vector2.ONE,Vector2(0.94,1.12),Vector2(1.08,0.91),Vector2(1.06,1.06),Vector2.ONE]
+const GROWTH_TIMES := [0.0,0.18,0.36,0.65,1.0]
 var hits: Dictionary = {}
 var blocked: Dictionary = {}
+
+static func growth_scale(progress: float, reduced: bool = false) -> Vector2:
+	if reduced: return Vector2.ONE
+	var time: float = clampf(progress,0,1)
+	for i in range(1,GROWTH_TIMES.size()):
+		if time <= GROWTH_TIMES[i]:
+			return GROWTH_POSES[i-1].lerp(GROWTH_POSES[i],smoothstep(GROWTH_TIMES[i-1],GROWTH_TIMES[i],time))
+	return Vector2.ONE
 
 func clear() -> void:
 	hits.clear()

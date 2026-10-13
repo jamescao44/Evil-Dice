@@ -1,0 +1,10 @@
+Icons: Food.
+Author: thekingphoenix
+Source: https://opengameart.org/content/icons-food
+Original file: https://opengameart.org/sites/default/files/Food_1.png
+License: CC0 1.0 Universal (public domain dedication)
+License link: https://creativecommons.org/publicdomain/zero/1.0/
+
+The original 160x160 PNG is included unchanged as art/relics/food_sheet.png.
+AtlasTexture resources select the 32x32 fries and burger cells without altering
+the source artwork. Their display size is controlled by the shared relic renderer.

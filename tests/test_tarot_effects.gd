@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Status = preload("res://scripts/status_effect.gd")
 const Skill = preload("res://scripts/multi_hit_skill.gd")
@@ -11,7 +12,7 @@ func check(value: bool, label: String) -> void:
 	if not value: failures += 1; push_error(label)
 func fresh(city: bool = false):
 	var m = Run.new(604)
-	if city: m.load_debug_wave(10)
+	if city: m.load_debug_wave(Waves.COUNT)
 	else:
 		m.enemies = [m.make_enemy(0),m.make_enemy(1),m.make_enemy(2)]
 		for e in m.enemies: e.hp = 10000; e.max_hp = 10000
@@ -51,14 +52,15 @@ func _initialize() -> void:
 		m.set_test_roll(values)
 		m.apply_player()
 		var id: int = 33 if values == [3,3,3] else values[0]
-		if values != [2,2,2]:
+		if values not in [[2,2,2],[2,2,4]]:
 			check(m.status_count(id) == (3 if id == 33 else 4),"Strength keeps support duration unchanged")
 			if id != 6: check(m.statuses[id].potency == 2,"Strength doubles support potency")
 		if id == 3: check(m.attack_multiplier() == 2,"Double Might adds 1.0 rather than 0.5")
 		if id == 33: check(m.attack_multiplier() == 5,"Double Ascension adds 4.0 rather than 2.0")
 		if values == [2,2,4]:
+			check(m.living().all(func(i): return m.enemy_status_count(i,Status.FROZEN) == 2),"Strength doubles freeze stacks")
 			finish(m); m.begin_round()
-			check(m.hp == 20,"Amplified regen restores ten HP per tick")
+			check(m.hp == 10 and m.status_count(Status.REGEN) == 0,"Freeze replaces regeneration without healing")
 		if values == [2,2,2]: check(m.hp == m.max_hp,"Full healing remains full healing")
 	m = fresh()
 	use(m,"devil"); use(m,"justice"); use(m,"hierophant"); use(m,"lovers",{"parity":0}); use(m,"magician",{"dice":[1,2,3]})
@@ -103,12 +105,28 @@ func _initialize() -> void:
 	check(m.status_count(Status.HIDDEN) == 0,"Using an attack skill breaks invisibility")
 	m = fresh(); use(m,"moon")
 	for i in range(6): m._tick_enemy_statuses()
-	check(m.enemies.all(func(e): return e.statuses[Status.DARKNESS].count == 3 and e.statuses[Status.DARKNESS].permanent),"Moon darkness cannot tick away")
+	check(m.enemies.all(func(e): return e.statuses[Status.DARKNESS].count == 1 and e.statuses[Status.DARKNESS].permanent),"Moon applies one permanent darkness stack that cannot tick away")
 	m = fresh(); m.hp = 1; use(m,"sun")
 	check(m.hp == m.max_hp and m.living().all(func(i): return m.enemy_status_count(i,Status.BURNING) == 1),"Sun fully heals and burns all foes")
 	m = fresh(); m.enemies[0].shield = 20; m.enemies[1].hp = 1; use(m,"chariot")
-	check(m.enemies[0].hp == 10000 and m.enemies[0].shield == 0 and m.enemies[1].hp == 0 and m.enemies[2].hp == 9950,"Chariot applies fifty base damage with shield and overkill rules")
-	m = fresh(true); use(m,"chariot"); check(m.city_hp == 9950,"Chariot can damage the city")
+	check(m.enemies[0].hp == 10000 and m.enemies[0].shield == 0 and m.enemies[1].hp == 0 and m.enemies[2].hp == 9950,"Chariot applies fifty fixed damage with shield and overkill rules")
+	m = fresh(true); use(m,"chariot"); check(m.city_hp == Run.CITY_MAX_HP-50,"Chariot can damage the city")
+	for city in [false,true]:
+		var fixed = fresh(city)
+		fixed.acquire_relic("bracelet")
+		fixed.acquire_relic("codex_page")
+		fixed.perfect_combo = 10
+		fixed.statuses[Status.MIGHT].apply(2)
+		fixed.statuses[Status.ASCENSION].apply(3)
+		fixed.statuses[Status.DARKNESS].apply(2)
+		fixed.tarot_effects.strength = 2
+		fixed.tarot_effects.extra_uses = 3
+		if not city: fixed.apply_enemy_status(0,Status.CORROSION,3)
+		var cast: Dictionary = use(fixed,"chariot")
+		var hits: Array = cast.events.filter(func(e): return e.type == "damage")
+		check(hits.size() == (1 if city else 3) and hits.all(func(e): return e.display_amount == 50),"Chariot ignores flat bonuses, combo, boons, darkness and target vulnerability")
+		check(fixed.city_hp == Run.CITY_MAX_HP-50 if city else fixed.enemies.all(func(e): return e.hp == 9950),"Fixed Chariot removes exactly fifty health per target")
+		check(fixed.status_count(Status.MIGHT) == 2 and fixed.status_count(Status.ASCENSION) == 3 and fixed.tarot_effects.strength == 2 and fixed.tarot_effects.extra_uses == 3,"Chariot preserves next-skill modifiers and attack charges")
 	for id in ["death","judgement"]:
 		var card: Dictionary = m.tarots.add(id)
 		check(m.tarot_effects.cast(m,card.instance_id,{"target":0}).has("error") and m.tarots.find_instance(card.instance_id) >= 0,"Invalid city execution retains the card")
@@ -126,6 +144,7 @@ func _initialize() -> void:
 	for i in range(10):
 		var step: Dictionary = m.tarot_effects.resolve_next_step(m)
 		check(not step.is_empty() and m.tarot_effects.pending_steps.size() == 9-i,"Each Tower step consumes exactly one application")
+		check(step.count == 1 and step.events.filter(func(e): return e.type == "status").all(func(e): return e.amount == 1),"Every Tower status application adds one base stack, including darkness and corrosion")
 		if step.target == -1 and step.status == Status.FROZEN: frozen_applied = true
 		if i < 9: check(m.phase == "roll","Freeze does not hand control back before the burst finishes")
 	check(m.phase == ("frozen" if frozen_applied else "roll") and m.tarot_effects.resolve_next_step(m).is_empty(),"Tower finalizes once, with no extra applications")
@@ -133,7 +152,7 @@ func _initialize() -> void:
 	for effect in m.statuses.values(): total += effect.count
 	for enemy in m.enemies:
 		for effect in enemy.get("statuses",{}).values(): total += effect.count
-	check(total >= 10 and total <= 30,"Tower applies ten random status applications")
+	check(total > 0 and total <= 10,"Ten one-stack Tower applications may refresh existing action locks")
 	m = fresh(); use(m,"tower"); m.hp = 0
 	check(m.tarot_effects.resolve_next_step(m).is_empty() and m.tarot_effects.pending_steps.is_empty(),"Defeat discards unapplied Tower steps")
 	m = fresh(); use(m,"tower"); m.reset_run()
@@ -145,8 +164,9 @@ func _initialize() -> void:
 	use(m,"empress")
 	check(m.tarots.items.size() == 2 and m.tarots.items.all(func(item): return item.id == "fool"),"Empress respects bans and allows duplicates")
 	m = fresh(); use(m,"emperor"); check(m.relics.items.size() == 1,"Emperor grants a real relic")
-	m = fresh(); use(m,"world"); check(m.relics.items.size() == 1 and m.relics.items[0].id in ["mithril_blade","ancient_prophecy"],"World only draws eligible non-fusion legendary relics")
-	m.acquire_relic("ancient_prophecy" if m.relics.has("mithril_blade") else "mithril_blade")
+	m = fresh(); use(m,"world"); check(m.relics.items.size() == 1 and m.Relics.Catalog.ITEMS[m.relics.items[0].id].rarity == 3 and not m.Relics.Catalog.ITEMS[m.relics.items[0].id].get("fusion",false),"World only draws eligible non-fusion legendary relics")
+	for id in m.Relics.Catalog.ITEMS:
+		if m.Relics.Catalog.ITEMS[id].rarity == 3 and not m.Relics.Catalog.ITEMS[id].get("fusion",false): m.acquire_relic(id)
 	var world: Dictionary = m.tarots.add("world")
 	check(m.tarot_effects.cast(m,world.instance_id).has("error") and m.tarots.find_instance(world.instance_id) >= 0,"Exhausted World pool does not consume the card")
 	m = fresh()
@@ -229,7 +249,7 @@ func _initialize() -> void:
 		check(m.tarot_effects.devil == (1 if newer == "hierophant" else 0),"An overwritten Devil is retained for a later triple")
 	m = fresh(); use(m,"temperance"); finish(m); m.begin_round()
 	m.set_test_roll([3,3,4]); m.apply_player(); m.set_test_roll([1,2,3]); m.apply_player(0); finish(m)
-	check(m.status_count(3) == 4,"A boon refreshed on Temperance's first skill retains its full duration after the second skill")
+	check(m.status_count(3) == 3,"Temperance's extra attack spends one charge of the newly applied boon")
 	m = fresh(true); m.set_test_roll([1,2,3]); m.apply_player(); finish(m)
 	var previous_round: int = m.round_number
 	var city_card: Dictionary = m.tarots.add("magician")

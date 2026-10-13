@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 var game
@@ -38,12 +39,12 @@ func capture(portrait: bool) -> void:
 	await snapshot("throw")
 	while game.view_phase not in ["ready", "over"]: await process_frame
 	game._restart()
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model.power = 6.75
 	game.model.max_hp = 220
 	game.model.hp = 220
 	game.model._load_wave()
-	game.visual_stage = 9
+	game.visual_stage = Waves.CITY_STAGE
 	game.monster_side = 320
 	game._start_round()
 	frozen_charge(0.6)

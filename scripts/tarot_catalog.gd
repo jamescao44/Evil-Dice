@@ -6,6 +6,7 @@ enum EffectType { ROLL_SETTING, ROLL_TRIGGER, IMMEDIATE, NEXT_SKILL }
 const ROLL_FACE_SETTINGS := ["magician","lovers","justice"]
 const ROLL_TRIGGERS := ["hierophant","devil"]
 const NEXT_SKILL_MODIFIERS := ["strength","high_priestess"]
+const Weighted = preload("res://scripts/weighted_choice.gd")
 
 static func effect_type(id: String) -> EffectType:
 	if id in ROLL_FACE_SETTINGS or id == "star": return EffectType.ROLL_SETTING
@@ -22,7 +23,7 @@ const ITEMS := {
 	"emperor": {"name": "The Emperor", "design": "Receive a random item.", "target": "self", "art": "res://assets/art/tarot/04.png", "implemented": true},
 	"hierophant": {"name": "The Hierophant", "design": "Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.", "target": "dice", "art": "res://assets/art/tarot/05.png", "implemented": true},
 	"lovers": {"name": "The Lovers", "design": "Choose all odd or all even dice for the next throw.", "target": "dice", "art": "res://assets/art/tarot/06.png", "implemented": true},
-	"chariot": {"name": "The Chariot", "design": "Deal 50 base damage to all enemies.", "target": "all_enemies", "art": "res://assets/art/tarot/07.png", "implemented": true},
+	"chariot": {"name": "The Chariot", "design": "Deal 50 fixed damage to all enemies.", "target": "all_enemies", "art": "res://assets/art/tarot/07.png", "implemented": true},
 	"strength": {"name": "Strength", "design": "Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.", "target": "self", "art": "res://assets/art/tarot/08.png", "implemented": true},
 	"hermit": {"name": "The Hermit", "design": "Become invisible for three turns; attacking breaks invisibility.", "target": "self", "art": "res://assets/art/tarot/09.png", "implemented": true},
 	"wheel": {"name": "Wheel of Fortune", "design": "A 1 in 4 chance of a chest; 1 in 10 of those is rare.", "target": "self", "art": "res://assets/art/tarot/10.png", "implemented": true},
@@ -31,13 +32,20 @@ const ITEMS := {
 	"death": {"name": "Death", "design": "Execute a selected enemy.", "target": "enemy", "art": "res://assets/art/tarot/13.png", "implemented": true},
 	"temperance": {"name": "Temperance", "design": "Skip this turn; gain an extra throw and skill use next turn.", "target": "self", "art": "res://assets/art/tarot/14.png", "implemented": true},
 	"devil": {"name": "The Devil", "design": "The next triple becomes 666.", "target": "dice", "art": "res://assets/art/tarot/15.png", "implemented": true},
-	"tower": {"name": "The Tower", "design": "Apply ten random statuses, each to a random character, including the player.", "target": "random_character", "art": "res://assets/art/tarot/16.png", "implemented": true},
+	"tower": {"name": "The Tower", "design": "Apply 1 stack of a random status to a random character ten times, including the player.", "target": "random_character", "art": "res://assets/art/tarot/16.png", "implemented": true},
 	"star": {"name": "The Star", "design": "The next three throws are Perfect.", "target": "self", "art": "res://assets/art/tarot/17.png", "implemented": true},
 	"moon": {"name": "The Moon", "design": "Apply permanent darkness to all enemies.", "target": "all_enemies", "art": "res://assets/art/tarot/18.png", "implemented": true},
 	"sun": {"name": "The Sun", "design": "Fully heal and apply one burning stack to every enemy.", "target": "all", "art": "res://assets/art/tarot/19.png", "implemented": true},
 	"judgement": {"name": "Judgement", "design": "If the enemy count is a multiple of six, execute a random half.", "target": "all_enemies", "art": "res://assets/art/tarot/20.png", "implemented": true},
-	"world": {"name": "The World", "design": "Receive a random legendary item.", "target": "self", "art": "res://assets/art/tarot/21.png", "implemented": true},
+	"world": {"name": "The World", "design": "Receive a random legendary item.", "target": "self", "art": "res://assets/art/tarot/21.png", "implemented": true, "weight": 0.5},
 }
+
+static func pick_index(rng: RandomNumberGenerator, pool: Array) -> int:
+	return Weighted.pick(rng,pool.map(func(id): return ITEMS[id].get("weight",1.0)))
+
+static func draw_one(rng: RandomNumberGenerator, banned: Array = []) -> String:
+	var pool: Array = ITEMS.keys().filter(func(id): return id not in banned)
+	return "" if pool.is_empty() else pool[pick_index(rng,pool)]
 
 static func draw_choices(rng: RandomNumberGenerator, banned: Array = []) -> Array:
 	var eligible: Array = ITEMS.keys().filter(func(id): return id not in banned)
@@ -46,5 +54,5 @@ static func draw_choices(rng: RandomNumberGenerator, banned: Array = []) -> Arra
 	if pool.is_empty(): return []
 	for i in range(3):
 		if pool.is_empty(): pool = eligible.duplicate()
-		choices.append(pool.pop_at(rng.randi_range(0,pool.size()-1)))
+		choices.append(pool.pop_at(pick_index(rng,pool)))
 	return choices

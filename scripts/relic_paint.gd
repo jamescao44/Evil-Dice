@@ -2,14 +2,19 @@ extends RefCounted
 ## Shared sprites for inventory, reward cards and the chest atlas.
 ## All magic stones use one neutral gem with data-driven element colors.
 const Catalog = preload("res://scripts/relic_catalog.gd")
+const Glow = preload("res://scripts/item_glow.gd")
+const VECTOR_ICONS := ["four_leaf_clover", "five_leaf_clover", "ice_rose", "cursed_die_1", "cursed_die_2", "cursed_die_3", "cursed_die_4", "cursed_die_5", "cursed_die"]
+const SPRITE_FILES := {"fries":"fries.tres","hamburger":"hamburger.tres"}
 static var textures: Dictionary = {}
 static var regions: Dictionary = {}
 
-static func paint(node: CanvasItem, id: String, at: Vector2, radius: float) -> void:
+static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow: bool = true) -> void:
+	if glow: Glow.paint(node,at,radius,Catalog.rarity_color(id))
 	var stone: bool = id in Catalog.STONES or id == "prismatic_stone"
 	var sprite: String = "magic_gem" if stone else id
 	if not textures.has(sprite):
-		var texture: Texture2D = load("res://assets/art/relics/"+sprite+(".svg" if stone else ".png"))
+		var file: String = SPRITE_FILES.get(sprite,sprite+(".svg" if stone or id in VECTOR_ICONS else ".png"))
+		var texture: Texture2D = load("res://assets/art/relics/"+file)
 		textures[sprite] = texture
 		regions[sprite] = Rect2(texture.get_image().get_used_rect())
 	var source: Rect2 = regions[sprite]

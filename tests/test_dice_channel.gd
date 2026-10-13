@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
@@ -155,7 +156,7 @@ func test_layout(game) -> void:
 	Driver.cast_pending(game)
 	check(game.view_phase == "resolving" and game._world_time_scale() == 0,"Support field drop starts casting")
 	await wait_resolved(game)
-	check(game.model.statuses[2].count == 4,"New regeneration keeps its count until its first healing turn ends")
+	check(game.model.statuses[2].count == 0 and game.model.enemies.all(func(e): return e.hp == e.max_hp),"Freeze does not grant regeneration or damage enemies")
 	prepare(game,[4,4,1])
 	Driver.cast_pending(game)
 	await wait_resolved(game)
@@ -194,7 +195,7 @@ func test_layout(game) -> void:
 	tap(game,game._diamond_center(5))
 	check(game.model.open_rewards.size() == 3 and game.model.perfect_progress == 0,"Sixth diamond chooses rare chest and clears remainder")
 	game._restart()
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
 	game._start_round()
 	game.model.hp = 1000
@@ -241,7 +242,7 @@ func test_layout(game) -> void:
 	check(game._world_time_scale() == 1 and game.fx.time_factor == 1,"Restart restores normal time")
 	for choice in [0, 2, 7, 11, 12]:
 		game._restart()
-		game.model.stage = 9
+		game.model.stage = Waves.CITY_STAGE
 		game.model._load_wave()
 		game._start_round()
 		game.model.hp = 1000
@@ -253,10 +254,10 @@ func test_layout(game) -> void:
 		check(game.view_phase == "resolving" and game.casting_source == "current","City rolls start casting automatically after their reveal")
 		await wait_resolved(game)
 		check(game.view_phase == "ready" and game.model.pending.is_empty(),"City auto-cast finishes without a click or drag and permits the next throw")
-		check(game.model.statuses[2].count > 0 if choice == 2 else game.model.city_hp < game.Run.CITY_MAX_HP,"City auto-cast applies both support and attack results")
+		check((game.model.statuses[2].count == 0 and game.model.city_hp == game.Run.CITY_MAX_HP) if choice == 2 else game.model.city_hp < game.Run.CITY_MAX_HP,"City auto-cast applies both support and attack results")
 	game._restart()
 	# Isolate real-time cast beats, including city simulation and menu suspension.
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
 	game._start_round()
 	game.model.hp = 1000

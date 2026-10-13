@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Status = preload("res://scripts/status_effect.gd")
@@ -16,7 +17,7 @@ func check(ok: bool, label: String) -> void:
 func fresh(city: bool = false):
 	var m = Run.new(64) if city else Rules.new(64)
 	if city:
-		m.stage = 9
+		m.stage = Waves.CITY_STAGE
 		m._load_wave()
 	m.max_hp = 1000
 	m.hp = 100
@@ -26,40 +27,45 @@ func fresh(city: bool = false):
 		e.damage = 0
 	return m
 
-func regeneration() -> void:
-	for city in [false,true]:
-		var m = fresh(city)
-		m.statuses[2].apply(4,2)
+func freezing() -> void:
+	for spare in [1,3,4,5,6]:
+		var m = fresh()
 		m.begin_round()
-		check(m.hp == 110,"Old potency heals at round start")
-		m.set_test_roll([2,2,3])
+		m.enemies[0].shield = 20
+		m.enemies[2].hp = 0
+		m.apply_enemy_status(1,Status.FROZEN,2)
+		m.statuses[Status.MIGHT].apply(4)
+		m.statuses[Status.HIDDEN].apply(3)
+		m.tarot_effects.extra_uses = 2
+		m.set_test_roll([2,2,spare])
+		check(not m.pending.is_attack() and m.pending.is_freeze(),"Double-2 is a non-attack freeze")
 		var events: Array = m.apply_player()
-		check(m.hp == 140 and events.filter(func(e): return e.type == "heal")[0].amount == 30,"Recast pays three unpaid amplified ticks, not the already-paid fourth")
-		check(m.status_count(2) == 3 and m.statuses[2].potency == 1,"New regeneration gets its own duration and potency")
-		check(m.apply_player().is_empty() and m.hp == 140,"Repeated resolution cannot pay healing twice")
-		m = fresh(city)
-		m.begin_round()
-		m.statuses[2].apply(3,2)
-		m.saved_skill = Rules.classify([2,2,5])
-		m.set_test_roll([1,2,3])
-		var pending = m.pending.duplicate()
-		check(m.begin_saved_cast(),"Stored regen can reapply before the waiting skill")
-		m.apply_player()
-		check(m.hp == 130 and m.pending.same_as(pending) and m.status_count(2) == 5,"Saved regen pays all unpaid ticks and preserves the waiting action")
-		m = fresh(city)
-		m.begin_round()
-		m.hp = 990
-		m.statuses[2].apply(6)
-		m.set_test_roll([2,2,1])
-		m.apply_player()
-		check(m.hp == 1000 and m.status_count(2) == 1,"Payout respects max HP and still reapplies")
-		m = fresh(city)
-		m.begin_round()
-		m.statuses[2].apply(6)
-		m.statuses[Status.DARKNESS].apply(3)
-		m.set_test_roll([2,2,1])
-		m.apply_player()
-		check(m.hp == 100 and m.status_count(2) == 1,"Darkness blocks payout but not the new regen")
+		check(events.size() == 2 and events.all(func(e): return e.type == "status" and e.amount == 1),"Freeze adds exactly one stack per living enemy regardless of spare die")
+		check(m.enemies[0].hp == 1000 and m.enemies[0].shield == 20 and m.hp == 100 and m.status_count(2) == 0,"Freeze neither damages shields/health nor grants regeneration")
+		check(m.enemy_status_count(0,Status.FROZEN) == 1 and m.enemy_status_count(1,Status.FROZEN) == 3 and m.enemy_status_count(2,Status.FROZEN) == 0,"Freeze adds to existing stacks and ignores corpses")
+		check(m.status_count(Status.MIGHT) == 4 and m.status_count(Status.HIDDEN) == 3 and m.tarot_effects.extra_uses == 2,"Freeze preserves attack charges, invisibility and High Priestess")
+		check(m.apply_player().is_empty(),"A resolved freeze cannot apply twice")
+		for i in m.living():
+			m.enemies[i].intent = {"type":"attack","target":-1,"amount":20}
+			check(m.enemy_act(i)[0].type == "skip","Every frozen enemy skips its queued action")
+		m.end_round()
+		check(m.hp == 100 and m.enemy_status_count(0,Status.FROZEN) == 0 and m.enemy_status_count(1,Status.FROZEN) == 2,"One layer is spent per missed action")
+	var m = fresh()
+	m.begin_round()
+	m.tarot_effects.strength = 2
+	m.saved_skill = Rules.classify([2,2,5])
+	m.set_test_roll([1,2,3])
+	var pending = m.pending.duplicate()
+	check(m.begin_saved_cast(),"Saved freeze can cast before a waiting attack")
+	m.apply_player()
+	check(m.pending.same_as(pending) and m.phase == "player" and m.enemy_status_count(0,Status.FROZEN) == 3,"Strength increases freeze potency and the saved cast preserves the waiting skill")
+	check(m.tarot_effects.strength == 0,"Freeze consumes the next-support Strength modifier")
+	m = fresh(true)
+	m.begin_round()
+	m.set_test_roll([2,2,4])
+	var events: Array = m.apply_player()
+	check(events.size() == 1 and events[0].type == "immune" and events[0].target == -2,"City freeze shows immunity and completes normally")
+	check(m.city_hp == Run.CITY_MAX_HP and m.hp == 100 and m.status_count(2) == 0 and m.pending.is_empty(),"Freeze cannot damage, heal or lock the city")
 
 func shockwaves() -> void:
 	for city in [false,true]:
@@ -200,7 +206,7 @@ func shield_break() -> void:
 	check(m.apply_enemy_status(-2,Status.IMMOBILIZED,1).is_empty(),"City remains immune")
 
 func run() -> void:
-	regeneration()
+	freezing()
 	shockwaves()
 	immunity()
 	enemy_buffs()

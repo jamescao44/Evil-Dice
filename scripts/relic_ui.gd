@@ -16,6 +16,8 @@ var chest_slot: int = -1
 var bar_style: StyleBoxFlat
 var drop_style: StyleBoxFlat
 const ACTIVATION_TIME := 0.65
+const ICON_RADIUS_SCALE := 0.49
+const HELD_RADIUS_SCALE := 0.59
 var activations: Dictionary = {}
 var ready_clock: float = 0.0
 
@@ -39,8 +41,8 @@ func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
 
 func inventory_rect() -> Rect2:
-	if battle.view_phase == "relic_reward" or chest_slot >= 0 or (battle.view_phase == "reward" and pickup.active): return Rect2(48,1360,708,64) if portrait() else Rect2(260,592,760,56)
-	return Rect2(48,962,708,54) if portrait() else Rect2(36,466,480,38)
+	if battle.view_phase == "relic_reward" or chest_slot >= 0 or (battle.view_phase == "reward" and pickup.active): return Rect2(48,1376,708,64) if portrait() else Rect2(260,602,760,56)
+	return Rect2(48,982,708,54) if portrait() else Rect2(36,474,480,38)
 
 func slot_rect(index: int) -> Rect2:
 	var row: Rect2 = inventory_rect()
@@ -142,7 +144,7 @@ func release(at: Vector2) -> bool:
 	if pressed < 0: return false
 	if dragging and interactable():
 		var index: int = drop_index(at)
-		if index >= 0: battle.model.relics.move(pressed,index)
+		if index >= 0: battle.model.move_relic(pressed,index)
 	pressed = -1
 	dragging = false
 	return true
@@ -160,9 +162,10 @@ func reset() -> void:
 	pickup.clear()
 	pickup_choices.clear()
 
-func activate(id: String) -> void:
+func activate(id: String, animation_speed: float = 0.0) -> void:
 	var slot: int = battle.model.relics.index_of(id)
-	if slot >= 0: activations[id] = {"age":0.0,"slot":slot}
+	if animation_speed <= 0: animation_speed = battle.model.relic_activation_speed
+	if slot >= 0: activations[id] = {"age":0.0,"slot":slot,"speed":animation_speed}
 
 func activation_tilt(id: String) -> float:
 	if battle.reduced or not activations.has(id): return 0.0
@@ -173,16 +176,16 @@ func _process(delta: float) -> void:
 	if not battle._menus_open():
 		ready_clock += delta
 		for id in activations.keys():
-			activations[id].age += delta*clampf(battle.speed,1,2)
+			activations[id].age += delta*clampf(battle._roll_speed(),1,2)*activations[id].get("speed",1.0)
 			if activations[id].age >= ACTIVATION_TIME: activations.erase(id)
 		if pickup.active:
-			if pickup.advance(delta*clampf(battle.speed,1,2)): battle._sound("drop_001",0.8,-12)
+			if pickup.advance(delta*clampf(battle.speed,1,2)): battle._sound("item/drop_001",0.8,-12)
 			if not pickup.active:
 				pickup_choices.clear()
 				chest_slot = -1
 	self_modulate = Color(0.25,0.25,0.25) if battle.inspecting_enemy >= 0 else Color.WHITE
 	if not interactable(): pressed = -1; dragging = false
-	z_index = battle.HELD_ITEM_Z if pressed >= 0 else 110
+	z_index = battle.HELD_ITEM_Z if pressed >= 0 else 140 if battle.view_phase == "relic_reward" or chest_slot >= 0 else 110
 	queue_redraw()
 
 func _text(at: Vector2, value: String, size: int, color: Color) -> void:
@@ -200,9 +203,9 @@ func _wrap(at: Vector2, value: String, width: float, size: int, color: Color) ->
 		draw_string(battle.description_font,Vector2(at.x,y).round(),line,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
 		y += size+8
 
-func _frame(rect: Rect2, color: Color) -> void:
+func _frame(rect: Rect2, color: Color, rarity: bool = false) -> void:
 	draw_rect(rect,Color("20271f"))
-	draw_rect(rect,color.darkened(0.35),false,2)
+	draw_rect(rect,color if rarity else color.darkened(0.35),false,3 if rarity else 2)
 	draw_rect(rect.grow(-5),Color(color,0.15),false,1)
 
 func _draw() -> void:
@@ -232,7 +235,7 @@ func _draw() -> void:
 	if interactable(): _draw_tooltip()
 	if pickup.active:
 		var target: Rect2 = slot_rect(pickup.slot)
-		pickup.paint(self,target.get_center(),target.size.y*0.44,battle.reduced)
+		pickup.paint(self,target.get_center(),target.size.y*ICON_RADIUS_SCALE,battle.reduced)
 
 func ready_glow(item: Dictionary) -> float:
 	if not Catalog.charged(item): return 0.0
@@ -243,7 +246,7 @@ func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, la
 	var strength: float = 0.0
 	if activations.has(id): strength = sin(clampf(activations[id].age/ACTIVATION_TIME,0,1)*PI)
 	var at: Vector2 = rect.get_center()
-	var radius: float = rect.size.y*(0.53 if held else 0.44)
+	var radius: float = rect.size.y*(HELD_RADIUS_SCALE if held else ICON_RADIUS_SCALE)
 	var pulse: float = ready_glow(item)
 	if pulse > 0:
 		var gold := Color("dfb866")
@@ -260,7 +263,7 @@ func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, la
 		draw_arc(at,radius*1.18,0,TAU,32,Color(color,strength*0.85),2)
 	var scale_factor: float = 1.0 if battle.reduced else 1.0+strength*0.08
 	draw_set_transform(at,activation_tilt(id),landing_scale*scale_factor)
-	Paint.paint(self,id,Vector2.ZERO,radius)
+	Paint.paint(self,id,Vector2.ZERO,radius,held)
 	draw_set_transform(Vector2.ZERO)
 	_draw_counter(item,at,radius)
 
@@ -305,8 +308,8 @@ func _draw_offer() -> void:
 		var id: String = choices[i]
 		var item: Dictionary = Catalog.ITEMS[id]
 		var rect: Rect2 = card_rect(i)
-		var color: Color = Catalog.COLORS[item.rarity]
-		_frame(rect, color)
+		var color: Color = Catalog.rarity_color(id)
+		_frame(rect, color, true)
 		if replacement_choice == i or (pickup.active and id == pickup.id): draw_rect(rect.grow(-2),Color("fff1ba"),false,4)
 		if not pickup.active or id != pickup.id: Paint.paint(self,id,card_icon(i),40)
 		var text_at: Vector2 = rect.position + (Vector2(138,40) if portrait() else Vector2(22,106))
@@ -324,15 +327,15 @@ func _draw_offer() -> void:
 	_wrap(Vector2(48 if portrait() else 260,1270 if portrait() else 558),line,708 if portrait() else 760,22 if portrait() else 16,Color("d8c694"))
 	var skip: Rect2 = skip_rect()
 	_frame(skip,Color("dfb866"))
-	_center(skip.get_center()+Vector2(0,10),"SKIP  +10 RUBIES",28 if portrait() else 22,Color("e998a4"))
+	_center(skip.get_center()+Vector2(0,10),GameText.format("SKIP  +%d SOUL CRYSTALS",battle.model.soul_crystal_gain_preview(10)),28 if portrait() else 22,Color("e998a4"))
 
 func _draw_tooltip() -> void:
 	var index: int = pressed
 	if index < 0 or index >= battle.model.relics.items.size(): return
 	var item: Dictionary = battle.model.relics.items[index]
 	var rect: Rect2 = tooltip_rect(index)
-	_frame(rect,Catalog.color(item.id))
-	_text(rect.position+Vector2(20,36),Catalog.ITEMS[item.id].name,26 if portrait() else 20,Catalog.color(item.id))
+	_frame(rect,Catalog.rarity_color(item.id),true)
+	_text(rect.position+Vector2(20,36),Catalog.ITEMS[item.id].name,26 if portrait() else 20,Catalog.rarity_color(item.id))
 	_wrap(rect.position+Vector2(20,78),Catalog.description(item,GameText.text),rect.size.x-40,30 if portrait() else 24,Color("fff1ca"))
 
 func tooltip_rect(index: int) -> Rect2:

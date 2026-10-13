@@ -9,7 +9,7 @@ const RETIRED_CATEGORIES := [Category.DAMAGE, Category.MULTIPLIER, Category.POTI
 const DEFAULT_WEIGHTS := [1.0,2.0,0.0,0.0,0.0,0.0,1.0]
 # Retired rows keep old numeric references readable; selection and claiming reject them.
 const ITEMS := [
-	{"id":"ruby", "name":"Blood Rubies", "text":"+100 rubies", "icon":"ruby", "color":Color("fa6086")},
+	{"id":"ruby", "name":"Soul Crystals", "text":"+100 soul crystals", "icon":"ruby", "color":Color("fa6086")},
 	{"id":"relic", "name":"Relic", "text":"A random relic", "icon":"relic", "color":Color("c5a4de")},
 	{"id":"curse", "name":"Cursed Relic", "text":"A random cursed relic", "icon":"curse", "color":Color("e99b81")},
 	{"id":"damage", "name":"Sharpened Hunger", "text":"+7.5 base damage", "icon":"damage", "color":Color("e99b81")},

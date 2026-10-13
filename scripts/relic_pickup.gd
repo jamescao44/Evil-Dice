@@ -53,7 +53,7 @@ func flight_position(target: Vector2, reduced: bool) -> Vector2:
 
 func paint(canvas: CanvasItem, target: Vector2, final_radius: float, reduced: bool) -> void:
 	if not active: return
-	var color: Color = Catalog.color(id).lightened(0.3)
+	var color: Color = Catalog.rarity_color(id).lightened(0.3)
 	if not landed:
 		var t: float = clampf((age-LIFT_TIME)/FLIGHT_TIME,0,1)
 		var at: Vector2 = flight_position(target,reduced)

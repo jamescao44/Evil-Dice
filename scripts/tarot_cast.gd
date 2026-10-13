@@ -88,7 +88,7 @@ func click(point: Vector2) -> bool:
 	match choice_type:
 		"repeat_target":
 			var target: int = battle._enemy_inspect_at(point)
-			if battle.model.is_enemy_alive(target): _cast({"target":target})
+			if target in battle.model.attack_targets(): _cast({"target":target})
 		"magician":
 			for i in range(18):
 				if cell_rect(i,6,4).has_point(point): values[i/6] = i%6+1
@@ -133,7 +133,7 @@ func _cast(selection: Dictionary) -> void:
 		if target not in targets: targets.append(target)
 	if targets.is_empty(): targets.append(battle._player_point())
 	battle.fx.cast(3,drop_point,targets,0.35)
-	battle._sound("bell",1.2,-14)
+	battle._sound("item/bell",1.2,-14)
 	battle._show_events(result.events)
 	battle._sync_corpses()
 	if not result.relic.is_empty(): battle.relic_ui.collect(result.relic,drop_point,50,previous_ids)
@@ -221,7 +221,7 @@ func _resolve_steps(token: int) -> bool:
 		var color: Color = battle.Statuses.ENTRIES[step.status].color
 		battle.fx.burst(at,color,8 if battle.reduced else 14,100)
 		battle.fx.ring(at,color,34 if portrait() else 22)
-		battle._sound("bell",1.1+index*0.045,-21)
+		battle._sound("item/bell",1.1+index*0.045,-21)
 		# Push earlier Tower labels upwards so rapid hits on one target remain readable.
 		for label in battle.fx.floats:
 			if label.get("tower_target",-99) == step.target: label.p.y -= label.get("size",24)*1.15
@@ -247,7 +247,7 @@ func _draw() -> void:
 		var prompt := Rect2(62,1040,680,110) if portrait() else Rect2(340,560,600,80)
 		Paint.panel(self,prompt,Color("211f29"),Paint.GOLD)
 		Paint.wrap(self,battle.description_font,prompt.grow(-12),"Ancient Prophecy: choose another enemy.",26 if portrait() else 20,Paint.GOLD,true)
-		for target in battle.model.living():
+		for target in battle.model.attack_targets():
 			var at: Vector2 = battle._enemy_impact_point(target)
 			draw_arc(at,48 if portrait() else 32,0,TAU,32,Paint.GOLD,3)
 		_label(cancel_rect(),"Skip repeat")
@@ -272,7 +272,7 @@ func _draw() -> void:
 				var columns: int = 4 if portrait() else 6
 				for i in range(ids.size()): _label(cell_rect(i,columns,ceili(ids.size()/float(columns))),Catalog.ITEMS[ids[i]].name,false,22 if portrait() else 17)
 			"replace":
-				Paint.text(self,battle.description_font,panel.position+Vector2(panel.size.x/2,124 if portrait() else 91),Relics.ITEMS[prepared.relic].name,24 if portrait() else 20,Relics.color(prepared.relic))
+				Paint.text(self,battle.description_font,panel.position+Vector2(panel.size.x/2,124 if portrait() else 91),Relics.ITEMS[prepared.relic].name,24 if portrait() else 20,Relics.rarity_color(prepared.relic))
 				Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(28,150 if portrait() else 112),Vector2(panel.size.x-56,122 if portrait() else 66)),Relics.ITEMS[prepared.relic].text,24 if portrait() else 18,Color("eee0d6"),true)
 				for i in range(battle.model.relics.items.size()): _label(cell_rect(i,2,5),Relics.ITEMS[battle.model.relics.items[i].id].name,false,24 if portrait() else 18)
 		_label(cancel_rect(),"Skip repeat" if instance_id < 0 else "Cancel")

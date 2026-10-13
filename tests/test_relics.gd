@@ -15,7 +15,37 @@ func fresh():
 	m.begin_round()
 	return m
 
+func plague_spread_checks() -> void:
+	var m = fresh()
+	m.enemies = [Rules.make_enemy(0),Rules.make_enemy(1),Rules.make_enemy(2),Rules.make_enemy(0)]
+	for enemy in m.enemies: enemy.hp = 500; enemy.max_hp = 500
+	m.apply_enemy_status(0,Status.PLAGUE,1)
+	m.apply_enemy_status(1,Status.PLAGUE,1)
+	m._tick_enemy_statuses()
+	check(m.enemies.map(func(e): return e.statuses[Status.PLAGUE].count) == [2,2,1,1],"Two infected enemies each spread to a different uninfected ally; fresh infections do not grow or spread")
+	var state: int = m.rng.state
+	m._tick_enemy_statuses()
+	check(m.enemies.map(func(e): return e.statuses[Status.PLAGUE].count) == [3,3,2,2],"When everyone is infected, plague only gains its own one stack")
+	check(m.rng.state == state,"No spread target means no extra random roll")
+	m = fresh()
+	m.enemies = [Rules.make_enemy(0),Rules.make_enemy(1),Rules.make_enemy(2)]
+	for enemy in m.enemies: enemy.hp = 500; enemy.max_hp = 500
+	m.apply_enemy_status(0,Status.PLAGUE,1)
+	m._tick_enemy_statuses()
+	check(m.living().filter(func(i): return m.enemy_status_count(i,Status.PLAGUE) > 0).size() == 2,"A new infection cannot cascade during the same turn")
+	m = fresh()
+	m.enemies = [Rules.make_enemy(0),Rules.make_enemy(1),Rules.make_enemy(2)]
+	m.apply_enemy_status(0,Status.PLAGUE,1)
+	m.enemies[1].hp = 0
+	m.enemies[2].hp = 1
+	m.apply_enemy_status(2,Status.BURNING,1)
+	state = m.rng.state
+	m._tick_enemy_statuses()
+	check(m.enemy_status_count(1,Status.PLAGUE) == 0 and m.enemy_status_count(2,Status.PLAGUE) == 0,"Plague excludes dead allies, including one killed by this turn's burning")
+	check(m.enemy_status_count(0,Status.PLAGUE) == 2 and m.rng.state == state,"A lone survivor grows its own plague without spreading it to itself")
+
 func _initialize() -> void:
+	plague_spread_checks()
 	var m = fresh()
 	var counts := [0,0,0,0,0]
 	for n in range(12000):
@@ -24,7 +54,7 @@ func _initialize() -> void:
 		counts[Catalog.ITEMS[offers[0]].rarity] += 1
 		for id in offers: check(not Catalog.ITEMS[id].get("fusion",false),"Fusion relics never drop directly")
 	for tier in range(5): check(absf(counts[tier]/120.0-Catalog.RARITY_WEIGHTS[tier]) < 1.5,"Drop rarity matches specified probability")
-	check(Catalog.ITEMS.size() == 29,"All 29 relic definitions exist")
+	check(Catalog.ITEMS.size() == 53,"All 53 relic definitions exist")
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","codex_page"]:
 		check(m.acquire_relic(id),"Acquire " + id)
 	check(not m.acquire_relic("heart"),"Relics are unique")
@@ -51,14 +81,16 @@ func _initialize() -> void:
 	m.relics.move(0,1)
 	check(is_equal_approx(m.damage_multiplier(roll),2.2),"Skull before page: (1 x 2) + .2")
 	m = fresh()
-	m.acquire_relic("cursed_bow"); m.relics.items[0].waves = 2
+	m.acquire_relic("cursed_bow")
+	check(is_equal_approx(m.damage_multiplier(Rules.classify([1,1,2])),1.0),"New Bow has no penalty before a wave is cleared")
+	m.relics.items[0].waves = 2
 	m.acquire_relic("twin_scythes")
 	roll = Rules.classify([5,5,5])
 	check(m.skill_use_count(roll) == 16,"Bow before scythes: (6 + 2) x 2")
 	m.relics.move(0,1)
 	check(m.skill_use_count(roll) == 14,"Scythes before bow: 6 x 2 + 2")
 	check(m.skill_use_count(Rules.classify([1,2,3])) == 1,"Combo relics do not multiply ordinary attacks")
-	check(is_equal_approx(m.damage_multiplier(roll),0.95) and is_equal_approx(m.damage_multiplier(Rules.classify([4,4,4])),1.0),"Bow reduces each single-target hit, including combo hits, but leaves area attacks unchanged")
+	check(is_equal_approx(m.damage_multiplier(roll),pow(0.95,2)) and is_equal_approx(m.damage_multiplier(Rules.classify([4,4,4])),1.0),"Bow compounds its penalty per cleared wave for single-target and combo hits, leaving area attacks unchanged")
 	m = fresh()
 	m.acquire_relic("runestone"); m.acquire_relic("orange_stone")
 	m.enemies[0].hp = 1000; m.enemies[0].max_hp = 1000
@@ -137,7 +169,7 @@ func _initialize() -> void:
 	check(not m.advance_wave(),"Wave waits for relic decision")
 	check(m.skip_relic() and m.rubies == 20 and not m.skip_relic(),"Skip pays ten exactly once")
 	check(m.advance_wave() and m.power == 1 and m.max_hp == 130,"Wave grows health without free damage multiplier")
-	for wave in range(1,11):
+	for wave in range(1,Run.Waves.COUNT+1):
 		m.load_debug_wave(wave)
 		check(m.damage_baseline() == 1,"Every wave including city starts at base x1")
 	m.begin_round(); m.acquire_relic("prismatic_stone"); m.set_test_roll([2,2,2],true)

@@ -18,7 +18,7 @@ The Horror,The Horror,恐惧之魔
 The uninvited,The uninvited,不速之客
 Conjures forbidden arcane.,Conjures forbidden arcane.,施展禁忌秘术。
 The damned of Rivia tell of a hunger beneath the drowned chapel. They stopped saying its name. It kept answering.,The damned of Rivia tell of a hunger beneath the drowned chapel. They stopped saying its name. It kept answering.,利维亚的受诅咒者传说，沉没的教堂下潜藏着饥饿之物。他们不再呼唤它的名字，它却仍在回应。
-DEVOUR / REGENERATE / OVERWHELM,DEVOUR / REGENERATE / OVERWHELM,吞噬 / 再生 / 碾压
+DEVOUR / FREEZE / OVERWHELM,DEVOUR / FREEZE / OVERWHELM,吞噬 / 冰冻 / 碾压
 Bone Dice,Bone Dice,骨骰
 BASIC,BASIC,基础
 "Three six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.","Three six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.",三颗六面骰子，由来历不明的骨头雕成。熟悉的分量，陌生的低语。
@@ -48,7 +48,7 @@ TRIPLES,TRIPLES,三个一样
 Aim near the center of the power bar for more doubles and triples.,Aim near the center of the power bar for more doubles and triples.,尽量在力量条中央停下，更容易投出两个一样和三个一样。
 Tentacle Swipe,Tentacle Swipe,触手横扫
 Rending Blow,Rending Blow,撕裂重击
-Unnatural Regrowth,Unnatural Regrowth,异化再生
+Abyssal Frost,Abyssal Frost,深渊冰霜
 Eldritch Might,Eldritch Might,邪神之力
 Sweeping Ruin,Sweeping Ruin,毁灭横扫
 Tentacle Flurry,Tentacle Flurry,触手乱舞
@@ -60,14 +60,14 @@ Worldbreaker,Worldbreaker,破界一击
 Sixfold Ruin,Sixfold Ruin,六重毁灭
 Annihilation,Annihilation,湮灭
 1.5x regular attack + 1.5x spare die.,1.5x regular attack + 1.5x spare die.,普通攻击的1.5倍 + 剩余骰子点数的1.5倍。
-Heal 5 at the next spare-die turn starts.,Regen 5 for spare turns. Recast pays remaining healing.,每回合恢复5生命，持续剩余点数回合；重施结清剩余治疗。
-+0.5 damage multiplier for the next spare-die turns.,+0.5 DMG for spare turns. Recast: 10-base shockwave.,倍率+0.5，持续剩余点数回合；重施释放10基础伤害冲击波。
+Apply 1 Frozen stack to every enemy. No attack.,Apply 1 Frozen stack to every enemy. No attack.,对全体敌人施加1层冰冻，不视为攻击。
++0.5 damage multiplier for the next spare-die attacks.,+0.5 DMG for the next spare-die attacks. Recast: 10-base shockwave.,接下来剩余骰子点数次攻击，倍率+0.5；重施释放10基础伤害冲击波。
 Hit all: 2/3 regular attack + 1.5x spare die each.,Hit all: 2/3 regular attack + 1.5x spare die each.,攻击全体：每个目标受到普通攻击的2/3 + 剩余骰子点数的1.5倍伤害。
 "3 automatic random hits, each regular attack + 1.5x spare die.","3 automatic random hits, each regular attack + 1.5x spare die.",自动攻击随机目标3次，每次为普通攻击 + 剩余骰子点数的1.5倍伤害。
 Invincible for spare-die enemy phases / roll intervals.,Invincible for spare turns; 2s/stack in city. Recast extends.,无敌持续剩余点数回合；城市每层2秒。重施延长时间。
 "Instantly kill your chosen foe, ignoring shield.","Instantly kill your chosen foe, ignoring shield.",无视护盾，立即消灭选中的敌人。
 Restore all missing health. No attack.,Restore all missing health. No attack.,恢复全部生命，不进行攻击。
-+2.0 damage multiplier for the next 3 turns.,+2.0 DMG for 3 turns. Recast: 50-base shockwave.,倍率+2.0，持续3回合；重施释放50基础伤害冲击波。
++2.0 damage multiplier for the next 3 attacks.,+2.0 DMG for the next 3 attacks. Recast: 50-base shockwave.,接下来3次攻击，倍率+2.0；重施释放50基础伤害冲击波。
 Hit every foe for 2x regular attack power.,Hit every foe for 2x regular attack power.,攻击所有敌人，造成普通攻击的2倍伤害。
 "6 automatic random hits, each regular attack power.","6 automatic random hits, each regular attack power.",自动攻击随机目标6次，每次造成普通攻击伤害。
 Destroy the squad. Heal 12 HP.,Destroy the squad. Heal 12 HP.,消灭整支敌方小队，恢复12点生命。
@@ -79,7 +79,7 @@ Hit the city for 5x regular attack power.,Hit the city for 5x regular attack pow
 attack,attack,攻击
 attack x1.5 +%s,attack x1.5 +%s,攻击 ×1.5 +%s
 regen 5 for %s turns,regen 5 for %s turns,每回合恢复5点生命，持续%s回合
-DMG +0.5 for %s turns,DMG +0.5 for %s turns,伤害倍率 +0.5，持续%s回合
+DMG +0.5 for %s attacks,DMG +0.5 for %s attacks,伤害倍率+0.5，持续%s次攻击
 attack all +%s,attack all +%s,全体攻击 +%s
 random attack +%s,random attack +%s,随机攻击 +%s
 city attack +%s,city attack +%s,城市攻击 +%s
@@ -87,7 +87,7 @@ invincible for %s turns,invincible for %s turns,无敌，持续%s回合
 invincible for %d seconds,invincible for %d seconds,无敌，持续%d秒
 instant kill,instant kill,立即消灭
 full heal,full heal,恢复全部生命
-DMG +2.0 for 3 turns,DMG +2.0 for 3 turns,伤害倍率 +2.0，持续3回合
+DMG +2.0 for 3 attacks,DMG +2.0 for 3 attacks,伤害倍率+2.0，持续3次攻击
 attack all x2,attack all x2,全体攻击 ×2
 random attack,random attack,随机攻击
 city attack,city attack,城市攻击
@@ -159,7 +159,7 @@ PERFECT: OFF,PERFECT: OFF,完美投掷：关闭
 WAVE,WAVE,波次
 LOAD,LOAD,载入
 Start fresh at wave 1-10. 10 = city.,Start fresh at wave 1-10. 10 = city.,从第1至10波重新开始，第10波为城市战。
-Enter a wave from 1 to 10.,Enter a wave from 1 to 10.,请输入1至10之间的波次。
+Enter a wave from 1 to %d.,Enter a wave from 1 to %d.,请输入1至%d之间的波次。
 City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast.,City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast.,城市战技能在揭晓后自动施放。拖出保存的技能可额外施放一次。
 Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.,Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.,将技能拖至战场，或点击指向技能选择敌人。保存技能可额外施放一次。
 CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack.,CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack.,城市战：666造成2000 × 伤害倍率的伤害。每层无敌持续2秒。
@@ -189,7 +189,7 @@ Stunned,Stunned,晕眩
 Darkness,Darkness,黑暗
 Corrosion,Corrosion,腐蚀
 Plague,Plague,瘟疫
-Heal 5 at turn start.,"Heal 5 at turn start. Recast heals the unpaid remainder, then refreshes.",回合开始恢复5生命；重施结清尚未触发的治疗，再刷新效果。
+Heal 5 at turn start.,Heal 5 at turn start.,回合开始恢复5点生命。
 Adds +0.5 to DMG. Stacks with other bonuses.,"+0.5 DMG, additive. Recast: 10-base shockwave, then refresh.",倍率+0.5，与其他加成相加；重施释放10基础伤害冲击波后刷新。
 Adds +2.0 to DMG. Stacks with other bonuses.,"+2.0 DMG, additive. Recast: 50-base shockwave, then refresh.",倍率+2.0，与其他加成相加；重施释放50基础伤害冲击波后刷新。
 Invincible.,Invincible. Recast adds the new duration to the time remaining.,无敌；重施将新持续时间加到剩余时间上。
@@ -198,7 +198,7 @@ Tap the ice 3 times to break free and end your turn.,Tap the ice 3 times to brea
 The next throw's power marker moves unpredictably.,The next throw's power marker moves unpredictably.,下次投掷的力量指示条将随机移动。
 Attack damage x0.5. Cannot heal. Lose 1 stack each turn.,Attack damage x0.5. Cannot heal. Lose 1 stack each turn.,攻击伤害 ×0.5，无法恢复生命，每回合减少1层。
 "Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.","Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.",护盾、无敌和护甲失效，受到伤害 ×1.5，每回合减少1层。
-"Max HP -10 per stack, minimum 1. Gains 1 stack and spreads 1 stack to a random ally each turn.","Max HP -10 per stack, minimum 1. Gains 1 stack and spreads 1 stack to a random ally each turn.",每层降低10点生命上限，最低为1。每回合增加1层，并向随机一名队友传播1层。
+"Max HP -10 per stack, minimum 1. Gains 1 stack and spreads 1 stack to a random uninfected ally each turn.","Max HP -10 per stack, minimum 1. Gains 1 stack and spreads 1 stack to a random uninfected ally each turn.",每层降低10点生命上限，最低为1。每回合增加1层，并向随机一名未感染的队友传播1层。
 Invincible for %.1f more seconds. Each stack lasts 2 seconds.,Invincible for %.1f more seconds. Each stack lasts 2 seconds.,无敌剩余%.1f秒，每层持续2秒。
 Invincible for 2 seconds per spare-die stack.,Invincible for 2 seconds per spare-die stack.,每点剩余骰子点数提供2秒无敌。
 %d turn remaining.,%d turn remaining.,剩余%d回合。
@@ -234,7 +234,7 @@ WAVE %d CLEARED,WAVE %d CLEARED,第%d波已完成
 CHOOSE ONE RELIC,CHOOSE ONE RELIC,选择一件法具
 "CHOOSE A RELIC ABOVE, THEN REPLACE ONE BELOW","CHOOSE A RELIC ABOVE, THEN REPLACE ONE BELOW",先选择上方的法具，再替换下方的一件法具
 DRAG RELICS TO ORDER THEIR EFFECTS LEFT TO RIGHT,DRAG RELICS TO ORDER THEIR EFFECTS LEFT TO RIGHT,拖动法具调整顺序，效果从左到右触发
-SKIP  +10 RUBIES,SKIP  +10 RUBIES,跳过，获得10红宝石
+SKIP  +%d SOUL CRYSTALS,SKIP  +%d SOUL CRYSTALS,跳过，获得%d灵魂水晶
 COMMON,COMMON,普通
 RARE,RARE,稀有
 EPIC,EPIC,史诗
@@ -251,8 +251,8 @@ FIVE GIFTS,FIVE GIFTS,五件奖励
 THREE GIFTS,THREE GIFTS,三件奖励
 A GIFT FROM THE ABYSS,A GIFT FROM THE ABYSS,来自深渊的馈赠
 CLAIMED,CLAIMED,已领取
-Blood Rubies,Blood Rubies,血红宝石
-+100 rubies,+100 rubies,+100红宝石
+Soul Crystals,Soul Crystals,灵魂水晶
++100 soul crystals,+100 soul crystals,+100灵魂水晶
 Relic,Relic,法具
 A random relic,A random relic,随机法具
 Cursed Relic,Cursed Relic,诅咒法具
@@ -306,7 +306,7 @@ Base damage +10.,Base damage +10.,基础伤害增加10。
 Rusty Armor,Rusty Armor,生锈护甲
 Take 10% less damage.,Take 10% less damage.,受到的伤害减少10%。
 Game Coin,Game Coin,游戏币
-Gain 10 rubies after clearing a wave.,Gain 10 rubies after clearing a wave.,每通关一波，获得10红宝石。
+Gain 10 soul crystals after clearing a wave.,Gain 10 soul crystals after clearing a wave.,每通关一波，获得10灵魂水晶。
 Magic Shield,Magic Shield,魔盾
 "Every 6 completed turns, store a shield that blocks one whole hit.","Every 6 completed turns, store a shield that blocks one whole hit.",每完成6回合，储存一层可完全抵挡一次伤害的护盾。
 Magic Sword,Magic Sword,魔剑
@@ -346,7 +346,7 @@ Perfect rolls always contain 6. Other rolls never contain 6.,Perfect rolls alway
 Reaper's Scythe,Reaper's Scythe,死神之镰
 Each enemy killed multiplies damage by 1.1. Halve max HP. City troops do not count.,Each enemy killed multiplies damage by 1.1. Halve max HP. City troops do not count.,每击杀一名敌人，伤害乘以1.1；最大生命减半。城市士兵不计入。
 Cursed Bow,Cursed Bow,诅咒弓
-Each wave cleared adds 1 combo hit. Single-target damage x0.95.,Each wave cleared adds 1 combo hit. Single-target damage x0.95.,每通关一波，连击技能增加1次攻击。单体伤害 ×0.95。
+Each wave cleared while owned adds 1 combo hit and multiplies single-target damage by 0.95. Compounds each wave.,Each wave cleared while owned adds 1 combo hit and multiplies single-target damage by 0.95. Compounds each wave.,持有期间每通关一波，连击技能增加1次攻击，单体伤害再乘以0.95；逐波累乘。
 Cursed Stopwatch,Cursed Stopwatch,诅咒秒表
 Always Perfect. Never roll 666. Perfects cannot advance the treasure bank.,Always Perfect. Never roll 666. Perfects cannot advance the treasure bank.,始终完美投掷，无法投出666，完美投掷不再增加宝箱进度。
 Pages: %d / 10.,Pages: %d / 10.,残页：%d / 10。
@@ -388,11 +388,11 @@ Receive two random tarot cards.,Receive two random tarot cards.,获得两张随�
 The Emperor,The Emperor,皇帝
 Receive a random item.,Receive a random item.,获得一件随机道具。
 The Hierophant,The Hierophant,教皇
-Gain a revelation face. Rolls containing it become that triple.,Gain a revelation face. Rolls containing it become that triple.,获得启示点数；投掷含有该点数时变为该点数的三骰。
+Gain a revelation face. Rolls containing it become that triple.,Gain a revelation face. Rolls containing it become that triple.,获得启示点数；投掷含有该点数时，变为该点数的三个一样。
 The Lovers,The Lovers,恋人
 Choose all odd or all even dice for the next throw.,Choose all odd or all even dice for the next throw.,指定下次投掷全部为奇数或偶数。
 The Chariot,The Chariot,战车
-Deal 50 base damage to all enemies.,Deal 50 base damage to all enemies.,对全体敌人造成50点基础伤害。
+Deal 50 fixed damage to all enemies.,Deal 50 fixed damage to all enemies.,对全体敌人造成50点固定伤害。
 Strength,Strength,力量
 Double the damage or effect of the next skill.,Double the damage or effect of the next skill.,下次技能的伤害或效果翻倍。
 The Hermit,The Hermit,隐者
@@ -400,7 +400,7 @@ Become invisible for three turns; attacking breaks invisibility.,Become invisibl
 Wheel of Fortune,Wheel of Fortune,命运之轮
 A 1 in 4 chance of a chest; 1 in 10 of those is rare.,A 1 in 4 chance of a chest; 1 in 10 of those is rare.,四分之一概率获得宝箱，其中十分之一为稀有宝箱。
 Justice,Justice,正义
-The next throw is guaranteed to be a triple.,The next throw is guaranteed to be a triple.,下次投掷必定为三骰。
+The next throw is guaranteed to be a triple.,The next throw is guaranteed to be a triple.,下次投掷必定为三个一样。
 The Hanged Man,The Hanged Man,倒吊人
 Choose a tarot card to exclude from future draws.,Choose a tarot card to exclude from future draws.,选择一张塔罗牌，使其不再出现。
 Death,Death,死神
@@ -408,9 +408,9 @@ Execute a selected enemy.,Execute a selected enemy.,处决指定敌人。
 Temperance,Temperance,节制
 Skip this turn; gain an extra throw and skill use next turn.,Skip this turn; gain an extra throw and skill use next turn.,跳过本回合；下回合额外投掷并使用技能一次。
 The Devil,The Devil,恶魔
-The next triple becomes 666.,The next triple becomes 666.,下次三骰变为666。
+The next triple becomes 666.,The next triple becomes 666.,下次三个一样变为666。
 The Tower,The Tower,高塔
-"Apply ten random statuses, each to a random character, including the player.","Apply ten random statuses, each to a random character, including the player.",施加十次随机异常状态，每次随机选择一名角色，包括玩家。
+"Apply 1 stack of a random status to a random character ten times, including the player.","Apply 1 stack of a random status to a random character ten times, including the player.",施加十次随机异常状态，每次随机选择一名角色并施加1层，包括玩家。
 The Star,The Star,星星
 The next three throws are Perfect.,The next three throws are Perfect.,接下来三次投掷必定Perfect。
 The Moon,The Moon,月亮
@@ -423,7 +423,7 @@ The World,The World,世界
 Receive a random legendary item.,Receive a random legendary item.,获得一件随机传奇道具。
 Reroll every owned relic. New relics cannot match any previously owned relic.,Reroll every owned relic. New relics cannot match any previously owned relic.,重置所有已持有的法具。新法具不会与重置前的任何法具重复。
 Choose all three dice for the next throw. Takes priority over other roll effects.,Choose all three dice for the next throw. Takes priority over other roll effects.,指定下次投掷的全部三个点数，优先于其他改变点数的效果。
-"Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.","Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.",为下次投掷随机获得一个启示点数。若投出该点数，则全部骰子变为该点数。
+"Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.","Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.",为下次投掷随机获得一个启示点数。若投出该点数，则变为该点数的三个一样。
 Effect,Effect,效果
 Single use,Single use,一次性消耗品
 SWIPE · TAP TO INSPECT · DRAG TO CAST,SWIPE · TAP TO INSPECT · DRAG TO CAST,滑动浏览 · 点击查看 · 拖至战场使用
@@ -458,13 +458,14 @@ EVEN · 2 / 4 / 6,EVEN · 2 / 4 / 6,偶数 · 2 / 4 / 6
 Confirm,Confirm,确认
 Cancel,Cancel,取消
 regen %d for %d turns,regen %d for %d turns,每回合恢复%d点，持续%d回合
-DMG +%.1f for %d turns,DMG +%.1f for %d turns,伤害倍率+%.1f，持续%d回合
+DMG +%.1f for %d attacks,DMG +%.1f for %d attacks,伤害倍率+%.1f，持续%d次攻击
 Heal %d at turn start.,Heal %d at turn start.,回合开始时恢复%d点生命。
 Adds +%.1f to DMG. Stacks with other bonuses.,Adds +%.1f to DMG. Stacks with other bonuses.,伤害倍率+%.1f，与其他加成叠加。
 The next damaging skill gains one extra use. Excludes buffs and instant kills.,The next damaging skill gains one extra use. Excludes buffs and instant kills.,下次伤害技能增加一次使用次数，不包括增益和即死技能。
 Set all three dice for the next throw. Later dice settings replace this; transformations still apply.,Set all three dice for the next throw. Later dice settings replace this; transformations still apply.,指定下次投掷的三个点数。后使用的点数设定会覆盖此效果，启示等转化仍会生效。
 Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.,Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.,下次技能增加一份基础伤害或增益强度。多张力量的加成相加。
 GIVE ALL 22 TAROTS,GIVE ALL 22 TAROTS,获得全部22张塔罗牌
+DRAW TAROT,DRAW TAROT,抽取塔罗牌
 "Choose dice, load a wave, or add tarot cards.","Choose dice, load a wave, or add tarot cards.",选择骰子、载入关卡或添加塔罗牌。
 STATUS EFFECTS,STATUS EFFECTS,状态效果
 No active status effects.,No active status effects.,当前无状态效果。
@@ -494,7 +495,7 @@ Player: tap the ice 3 times to end the turn. Enemies: skip one turn.,Player: tap
 Player only. The next throw's Perfect marker moves unpredictably.,Player only. The next throw's Perfect marker moves unpredictably.,仅玩家：下次投掷的完美指示条随机移动。
 Attack damage x0.5; cannot heal. Lose 1 stack per turn.,Attack damage x0.5; cannot heal. Lose 1 stack per turn.,攻击伤害减半，无法恢复生命；每回合减少1层。
 "No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.","No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",护盾、无敌与护甲失效，受到伤害×1.5；每回合减少1层。
-Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random ally each turn.,Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random ally each turn.,仅敌人：每层降低10生命上限，最低为1；每回合增加1层，并向随机一名队友传播1层。
+Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random uninfected ally each turn.,Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random uninfected ally each turn.,仅敌人：每层降低10生命上限，最低为1；每回合增加1层，并向随机一名未感染的队友传播1层。
 "Enemy shield broken: skip the next action, then recover.","Enemy shield broken: skip the next action, then recover.",敌人护盾破碎：跳过下次行动，随后恢复。
 Fortune Cookie,Fortune Cookie,幸运饼干
 "Receive a random tarot immediately, then another every 3 completed turns.","Receive a random tarot immediately, then another every 3 completed turns.",立即获得一张随机塔罗牌，此后每完成3回合再获得一张。
@@ -503,7 +504,104 @@ Receive a random tarot after every completed turn.,Receive a random tarot after 
 Turns: %d / 3.,Turns: %d / 3.,回合：%d / 3。
 TAROT +1,TAROT +1,塔罗牌 +1
 Ancient Prophecy,Ancient Prophecy,远古预言
-Each tarot activates twice. Make new choices when needed; normal stacking and overwrite rules apply.,Each tarot activates twice. Make new choices when needed; normal stacking and overwrite rules apply.,每张塔罗牌发动两次；需要时重新选择，仍遵循原有叠加和覆盖规则。
+Each tarot activates twice. Make new choices when needed; normal stacking and overwrite rules apply.,Each tarot activates twice. Choose again if needed; stacking/overwrite rules apply.,每张塔罗牌发动两次；需要时重新选择，仍遵循原有叠加和覆盖规则。
 Finish the tarot effect first.,Finish the tarot effect first.,请先完成当前塔罗牌效果。
 Ancient Prophecy: choose another enemy.,Ancient Prophecy: choose another enemy.,远古预言：再选择一名敌人。
 Skip repeat,Skip repeat,跳过再次发动
+Freeze all: %d stack. No attack.,Freeze all: %d stack. No attack.,全体冰冻%d层，不视为攻击。
+Freeze all: %d stacks. No attack.,Freeze all: %d stacks. No attack.,全体冰冻%d层，不视为攻击。
+City is immune to freeze.,City is immune to freeze.,城市免疫冰冻。
+Regeneration,Regeneration,再生
+%d attack remaining.,%d attack remaining.,剩余%d次攻击。
+%d attacks remaining.,%d attacks remaining.,剩余%d次攻击。
+%d attack,%d attack,%d次攻击
+%d attacks,%d attacks,%d次攻击
+IMMUNE,IMMUNE,免疫
+Worn Dagger,Worn Dagger,破旧匕首
+Combo skills gain 1 extra hit.,Combo skills gain 1 extra hit.,连击技能攻击次数 +1。
+Worn Longbow,Worn Longbow,破旧长弓
+"After each throw, deal 5 fixed damage to a random enemy.","After each throw, deal 5 fixed damage to a random enemy.",每次投掷后，对随机敌人造成 5 点固定伤害。
+Four-leaf Clover,Four-leaf Clover,四叶草
+Two-alike chance +10 percentage points.,Two-alike chance +10 percentage points.,投出两个一样的概率增加 10 个百分点。
+Fries,Fries,薯条
+Damage multiplier +0.5.,Damage multiplier +0.5.,伤害乘数 +0.5。
+Tissue Pack,Tissue Pack,纸巾包
+"After an all-different throw, deal 10 base damage to a random enemy.","After an all-different throw, deal 10 base damage to a random enemy.",投出完全不一样后，对随机敌人造成 10 点基础伤害。
+Pet Bat,Pet Bat,宠物蝙蝠
+Heal 5 HP per attack. Combo hits heal separately.,Heal 5 HP per attack. Combo hits heal separately.,每次攻击恢复 5 点生命；连击每次命中分别恢复。
+Magic Slingshot,Magic Slingshot,魔法弹弓
+"After two alike, the spare die deals its face value as base damage to a random enemy. Not a skill cast.",Two alike: spare die deals its face as base damage to a random foe. No skill cast.,投出两个一样后，第三枚骰子对随机敌人造成点数等额的基础伤害；不算伤害技能。
+Hamburger,Hamburger,汉堡
+Damage multiplier +1.,Damage multiplier +1.,伤害乘数 +1。
+Soul Vessel,Soul Vessel,灵魂容器
+Soul crystal gains +15%. Fractional bonuses carry over.,Soul crystal gains +15%. Fractional bonuses carry over.,灵魂水晶获得量 +15%；不足 1 个的加成会累计保留。
+Pet Lizard,Pet Lizard,宠物蜥蜴
+Apply 1 extra burning stack to enemies.,Apply 1 extra burning stack to enemies.,给敌人附加燃烧时，额外附加 1 层。
+Ice Rose,Ice Rose,冰玫瑰
+Freezing an enemy deals 10 base damage to it.,Freezing an enemy deals 10 base damage to it.,冰冻敌人时，对其造成 10 点基础伤害。
+Pet Slime,Pet Slime,宠物史莱姆
+Corrosion on enemies becomes permanent.,Corrosion on enemies becomes permanent.,敌人的腐蚀状态变为永久。
+Spiked Helmet,Spiked Helmet,尖刺头盔
+Retaliate for 10 fixed damage when attacked. Each Perfect deals 10 base damage to a random enemy.,Retaliate for 10 fixed damage when attacked. Each Perfect deals 10 base damage to a random enemy.,受到攻击时反击 10 点固定伤害；每次 Perfect 对随机敌人造成 10 点基础伤害。
+Royal Dagger,Royal Dagger,皇家匕首
+Combo skills gain 3 extra hits.,Combo skills gain 3 extra hits.,连击技能攻击次数 +3。
+Disguise Mask,Disguise Mask,伪装面具
+"Retrigger the relic immediately to the left once, except Ancient Tentacle.","Retrigger the relic immediately to the left once, except Ancient Tentacle.",额外触发紧邻左侧的道具一次，远古触手除外。
+Five-leaf Clover,Five-leaf Clover,五叶草
+Three-alike chance +5 percentage points.,Three-alike chance +5 percentage points.,投出三个一样的概率增加 5 个百分点。
+Pet Ghost,Pet Ghost,宠物幽灵
+"After each throw, deal 50 fixed damage to all enemies.","After each throw, deal 50 fixed damage to all enemies.",每次投掷后，对所有敌人造成 50 点固定伤害。
+Ancient Tentacle,Ancient Tentacle,远古触手
+Retrigger every relic to the left once.,Retrigger every relic to the left once.,额外触发左侧所有道具一次。
+Pet Dragon,Pet Dragon,宠物龙
+"After each throw, attack random enemies twice for 50 base damage each.","After each throw, attack random enemies twice for 50 base damage each.",每次投掷后，对随机敌人攻击两次，每次 50 点基础伤害。
+Cursed Die - 5,Cursed Die - 5,诅咒骰子-5
+Perfect rolls always contain 5. Other rolls never contain 5.,Perfect rolls always contain 5. Other rolls never contain 5.,Perfect 必定含 5；非 Perfect 必定不含 5。
+Cursed Die - 4,Cursed Die - 4,诅咒骰子-4
+Perfect rolls always contain 4. Other rolls never contain 4.,Perfect rolls always contain 4. Other rolls never contain 4.,Perfect 必定含 4；非 Perfect 必定不含 4。
+Cursed Die - 3,Cursed Die - 3,诅咒骰子-3
+Perfect rolls always contain 3. Other rolls never contain 3.,Perfect rolls always contain 3. Other rolls never contain 3.,Perfect 必定含 3；非 Perfect 必定不含 3。
+Cursed Die - 2,Cursed Die - 2,诅咒骰子-2
+Perfect rolls always contain 2. Other rolls never contain 2.,Perfect rolls always contain 2. Other rolls never contain 2.,Perfect 必定含 2；非 Perfect 必定不含 2。
+Cursed Die - 1,Cursed Die - 1,诅咒骰子-1
+Perfect rolls always contain 1. Other rolls never contain 1.,Perfect rolls always contain 1. Other rolls never contain 1.,Perfect 必定含 1；非 Perfect 必定不含 1。
++%d soul crystals,+%d soul crystals,+%d灵魂水晶
+Only one Cursed Die can be held.,Only one Cursed Die can be held.,最多携带一枚诅咒骰子。
+Paladin,Paladin,圣骑士
+High Priest,High Priest,大祭祀
+Elite Paladin,Elite Paladin,精英圣骑士
+Elite High Priest,Elite High Priest,精英大祭祀
+Guard Ally,Guard Ally,护卫
+Greater Shield,Greater Shield,举盾+
+Elven Healing,Elven Healing,精灵治疗
+Blessing,Blessing,祝福
+Group Blessing,Group Blessing,祝福+
+Fireball,Fireball,火球
+Elemental Strike,Elemental Strike,元素攻击
+Stunning Flurry,Stunning Flurry,晕眩打击+
+Forbidden Rite,Forbidden Rite,禁忌术
+Charge,Charge,蓄力
+Chant,Chant,念咒
+Rest,Rest,休息
+REST,REST,休息
+Charging,Charging,正在蓄力
+Apply %d stack(s) of %s on damage.,Apply %d stack(s) of %s on damage.,造成伤害后施加%d层%s。
+Give an ally %s shield.,Give an ally %s shield.,给予队友%s点护盾。
+"Charge %d/%d. After charging, attack %d times next turn. Freeze or immobilization resets charging.","Charge %d/%d. After charging, attack %d times next turn. Freeze or immobilization resets charging.",蓄力%d/%d。完成后下回合攻击%d次。冰冻或禁动会重置蓄力。
+Rest this turn.,Rest this turn.,本回合休息。
+"Give all living allies, including self, 1.5x damage on their next attack.","Give all living allies, including self, 1.5x damage on their next attack.",让所有存活队友（含自己）的下一次攻击伤害×1.5。
+Give one ally or self 1.5x damage on its next attack.,Give one ally or self 1.5x damage on its next attack.,让一名队友或自己下一次攻击伤害×1.5。
+Taunt: protects allies from targeted attacks and halves area damage to them. 666 bypasses this.,Taunt: protects allies from targeted attacks and halves area damage to them. 666 bypasses this.,嘲讽：保护队友免受指向攻击，并使其受到的范围伤害减半。666不受影响。
+Drag Death onto an eligible enemy. Paladins protect their allies.,Drag Death onto an eligible enemy. Paladins protect their allies.,请将死神拖到可选敌人上。圣骑士会保护队友。
+Start fresh at wave 1-20. 20 = city.,Start fresh at wave 1-20. 20 = city.,从第1至20波重新开始，第20波为城市战。
+THE PALADIN,THE PALADIN,圣骑士
+HOLY ESCORT,HOLY ESCORT,神圣护卫
+ELITE COMPANY,ELITE COMPANY,精英连队
+THE HIGH PRIEST,THE HIGH PRIEST,大祭祀
+SACRED ALLIANCE,SACRED ALLIANCE,神圣同盟
+GOLDEN GUARD,GOLDEN GUARD,黄金卫队
+RITUAL PROCESSION,RITUAL PROCESSION,仪式行列
+TWIN SENTINELS,TWIN SENTINELS,双重守卫
+CATHEDRAL GUARD,CATHEDRAL GUARD,教堂守军
+THE INNER SANCTUM,THE INNER SANCTUM,至圣所
+Single-target damage: x%.3f.,Single-target damage: x%.3f.,单体伤害：×%.3f。

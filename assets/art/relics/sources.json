@@ -15,6 +15,94 @@
         "prismatic_stone"
       ],
       "color": "Element tint from relic_catalog.gd; multicolor for Prismatic Stone"
+    },
+    "four_leaf_clover.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "four_leaf_clover"
+      ]
+    },
+    "five_leaf_clover.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "five_leaf_clover"
+      ]
+    },
+    "ice_rose.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "ice_rose"
+      ]
+    },
+    "cursed_die_1.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "cursed_die_1"
+      ]
+    },
+    "cursed_die_2.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "cursed_die_2"
+      ]
+    },
+    "cursed_die_3.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "cursed_die_3"
+      ]
+    },
+    "cursed_die_4.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "cursed_die_4"
+      ]
+    },
+    "cursed_die_5.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "cursed_die_5"
+      ]
+    },
+    "cursed_die.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "cursed_die"
+      ]
+    },
+    "fries.tres": {
+      "source": "https://opengameart.org/content/icons-food",
+      "author": "thekingphoenix",
+      "license": "CC0 1.0",
+      "original_file": "https://opengameart.org/sites/default/files/Food_1.png",
+      "sheet": "food_sheet.png",
+      "region": [
+        0,
+        128,
+        32,
+        32
+      ],
+      "relics": [
+        "fries"
+      ],
+      "modifications": "Unmodified source PNG; region selected by AtlasTexture"
+    },
+    "hamburger.tres": {
+      "source": "https://opengameart.org/content/icons-food",
+      "author": "thekingphoenix",
+      "license": "CC0 1.0",
+      "original_file": "https://opengameart.org/sites/default/files/Food_1.png",
+      "sheet": "food_sheet.png",
+      "region": [
+        0,
+        96,
+        32,
+        32
+      ],
+      "relics": [
+        "hamburger"
+      ],
+      "modifications": "Unmodified source PNG; region selected by AtlasTexture"
     }
   },
   "files": {
@@ -46,6 +134,20 @@
     "cursed_watch": "dungeon/altars/cheibriados.png",
     "fortune_cookie": "item/food/bread_ration_old.png",
     "crystal_ball": "item/misc/misc_crystal_new.png",
-    "ancient_prophecy": "item/book/gold.png"
+    "ancient_prophecy": "item/book/gold.png",
+    "worn_dagger": "item/weapon/dagger_old.png",
+    "worn_bow": "item/weapon/ranged/longbow_1.png",
+    "tissue_pack": "item/scroll/scroll_old.png",
+    "pet_bat": "monster/animals/bat.png",
+    "magic_slingshot": "item/weapon/ranged/sling_2.png",
+    "soul_vessel": "item/misc/misc_crystal_new.png",
+    "pet_lizard": "monster/animals/giant_lizard.png",
+    "pet_slime": "monster/amorphous/ooze_new.png",
+    "spiked_helmet": "item/armor/headgear/helmet_ego_3.png",
+    "royal_dagger": "item/weapon/elven_dagger.png",
+    "disguise_mask": "item/armor/headgear/green_mask.png",
+    "pet_ghost": "monster/undead/ghost_new.png",
+    "ancient_tentacle": "monster/tentacles/eldritch_ends/eldritch_tentacle_1.png",
+    "pet_dragon": "gui/spells/summoning/summon_dragon.png"
   }
 }

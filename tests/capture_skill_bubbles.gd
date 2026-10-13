@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 var game
@@ -63,7 +64,7 @@ func run() -> void:
 	game.result = game.Rules.classify([2,2,4])
 	game.skill_bubble.begin(game.result)
 	game.skill_bubble.age = 4
-	await shot("regen-held")
+	await shot("freeze-held")
 	game._cancel_targeting()
 	game.result = game.Rules.classify([5,5,3])
 	game.skill_bubble.begin(game.result)
@@ -130,11 +131,11 @@ func run() -> void:
 	await shot("short-meter")
 	for tier in range(1,4):
 		game._restart()
-		game.model.stage = 9
+		game.model.stage = Waves.CITY_STAGE
 		game.model._load_wave()
 		game.model.city_hp = 0
 		game.model.perfect_progress = tier*3
-		game.visual_stage = 9
+		game.visual_stage = Waves.CITY_STAGE
 		game.monster_side = game.HORROR_SIZES[9]
 		game._check_over()
 		game.auto_claim_remaining = 2.0

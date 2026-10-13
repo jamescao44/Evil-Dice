@@ -16,7 +16,7 @@ func render() -> void:
 	canvas.draw.connect(func():
 		var i := 0
 		for id in Catalog.ITEMS:
-			Paint.paint(canvas,id,Vector2(i*64+32,32),26)
+			Paint.paint(canvas,id,Vector2(i*64+32,32),26,false) # Reels paint the glow dynamically with clipping.
 			i += 1)
 	canvas.queue_redraw()
 	await process_frame

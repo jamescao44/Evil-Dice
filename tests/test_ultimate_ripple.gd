@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 var checks := 0
@@ -106,7 +107,7 @@ func run() -> void:
 	game._activate_skill(-1, point)
 	await wait_for_impact()
 	check(game.casting_source == "saved" and game.screen_ripple.origin == point, "Stored 666 uses the same slam")
-	game._restart(10)
+	game._restart(Waves.COUNT)
 	game.debug_choice = 12
 	game._roll()
 	await wait_for_impact()

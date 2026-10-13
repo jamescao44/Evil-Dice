@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 var checks := 0
@@ -46,7 +47,7 @@ func _initialize() -> void:
 	for remaining in range(5,-1,-1):
 		var hits: Array = game.apply_player_step()
 		check(hits[0].amount == 52, "All six hits add both active attack bonuses")
-		check(game.statuses[33].count == 1, "Boost remains through every hit and the upcoming enemy phase")
+		check(game.statuses[33].count == (1 if remaining > 0 else 0), "Boost covers every hit and spends one charge after the final impact")
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
 	check(game.attack_multiplier() == 1.5 and game.statuses[3].count == 1, "Weaker boon resumes with remaining turn")
@@ -83,7 +84,7 @@ func _initialize() -> void:
 	game.apply_player()
 	check(game.statuses[6].count == 5, "Invincibility adds the new duration to the remaining protection")
 	var city = Run.new(42)
-	city.stage = 9
+	city.stage = Waves.CITY_STAGE
 	city.power = 6.75
 	city.max_hp = 220
 	city.hp = 100
@@ -160,7 +161,7 @@ func _test_damage_captions() -> void:
 			var events: Array = game.apply_player_step(0)
 			check(events[0].amount == mini(500,predicted), "Displayed per-hit sum matches actual damage after rewards, growth, buffs and caps")
 	var city := Run.new(42)
-	city.stage = 9
+	city.stage = Waves.CITY_STAGE
 	city.power = 12.375
 	city._load_wave()
 	check(city.damage_caption(Rules.classify([1,1,1])) == "75 + 853 (x1)", "City 111 has scaled numeric damage instead of instant-kill omission")
@@ -181,14 +182,14 @@ func _test_turn_end_buffs() -> void:
 	check(game.hp == 55 and game.statuses[2].count == 1, "Regeneration heals at start without decrementing its badge")
 	game.set_test_roll([1,2,3])
 	game.apply_player(0)
-	check(game.status_counts([2,3,33,6]) == {2:1,3:2,33:1,6:1}, "All counters stay unchanged after the player skill")
+	check(game.status_counts([2,3,33,6]) == {2:1,3:1,33:0,6:1}, "Only attack charges decrease after the player attack")
 	for i in game.living():
 		game.enemies[i].intent = {"type":"attack","target":-1,"amount":5}
 		game.enemy_act(i)
 		check(game.hp == 55 and game.statuses[6].count == 1, "Last immunity turn protects every enemy impact")
 		if i < 2:
 			game.end_round()
-			check(game.status_counts([2,3,33,6]) == {2:1,3:2,33:1,6:1}, "An incomplete enemy phase cannot tick buffs")
+			check(game.status_counts([2,3,33,6]) == {2:1,3:1,33:0,6:1}, "An incomplete enemy phase cannot tick timed buffs")
 	game.end_round()
 	check(game.status_counts([2,3,33,6]) == {2:0,3:1,33:0,6:0}, "All used durations decrease together after the final enemy")
 	game.end_round()
@@ -199,14 +200,14 @@ func _test_turn_end_buffs() -> void:
 	game.apply_player()
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
-	check(game.statuses[2].count == 1, "Fresh regeneration retains its advertised future healing tick")
+	check(game.statuses[2].count == 0 and game.statuses[3].count == 1, "Freeze grants no regeneration and preserves attack charges")
 	game.begin_round()
 	var healed_hp: int = game.hp
 	game.set_test_roll([2,2,3])
 	game.apply_player()
 	for i in game.living(): game.enemy_act(i)
 	game.end_round()
-	check(game.statuses[2].count == 3, "Refreshing regeneration does not charge the old tick against the new duration")
+	check(game.statuses[2].count == 0 and game.statuses[3].count == 1, "Repeated freeze does not spend attack charges")
 	check(game.hp <= healed_hp, "Refresh itself does not heal twice")
 	var run := Run.new(5)
 	run.begin_round()

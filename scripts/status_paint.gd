@@ -13,6 +13,8 @@ static func icon(node: CanvasItem, at: Vector2, radius: float, type: String, col
 		intent_icon(node,at,radius,"shield",color)
 		Pixel.line(node,at+Vector2(radius*0.2,-radius*0.8),at+Vector2(-radius*0.25,0),Color("332b25"),3)
 		Pixel.line(node,at+Vector2(-radius*0.25,0),at+Vector2(radius*0.35,radius*0.55),Color("332b25"),3)
+	elif type == "charge":
+		intent_icon(node,at,radius,"charge",color)
 	elif type in ["shield","attack"]:
 		intent_icon(node,at,radius,"sword" if type == "attack" else "shield",color)
 	elif type == "dark":
@@ -50,6 +52,10 @@ static func intent_icon(node: CanvasItem, at: Vector2, radius: float, type: Stri
 		var points := PackedVector2Array([at+Vector2(-radius*0.7,-radius*0.7),at+Vector2(radius*0.7,-radius*0.7),at+Vector2(radius*0.55,radius*0.35),at+Vector2(0,radius*0.9),at+Vector2(-radius*0.55,radius*0.35)])
 		node.draw_colored_polygon(points,color)
 		Pixel.line(node,at-Vector2(0,radius*0.4),at+Vector2(0,radius*0.45),Color("344639"),2)
+	elif type == "charge":
+		Pixel.circle(node,at,radius*0.8,color,3)
+		Pixel.line(node,at,at-Vector2(0,radius*0.65),color,3)
+		Pixel.line(node,at,at+Vector2(radius*0.45,0),color,3)
 	elif type == "boost":
 		Pixel.line(node,at+Vector2(0,radius*0.8),at-Vector2(0,radius*0.8),color,4)
 		Pixel.line(node,at-Vector2(0,radius*0.8),at+Vector2(-radius*0.65,0),color,3)

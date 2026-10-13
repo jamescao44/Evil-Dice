@@ -13,8 +13,10 @@ var cast_visual: Dictionary = {}
 const Catalog = preload("res://scripts/tarot_catalog.gd")
 const Paint = preload("res://scripts/tarot_paint.gd")
 const Draw = preload("res://scripts/tarot_draw.gd")
+const Pickup = preload("res://scripts/tarot_pickup.gd")
 var battle
 var ceremony = Draw.new()
+var pickup = Pickup.new()
 var opened: bool = false
 var expansion: float = 0.0
 var scroll: float = 0.0
@@ -29,12 +31,19 @@ var clock: float = 0.0
 var reward_source: String = ""
 var reward_slot: int = -1
 var swallow_release: bool = false
+var audio_rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
+	audio_rng.randomize()
 	z_index = 120
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(ceremony)
+	pickup.ui = self
+	add_child(pickup)
+	battle.model.tarot_granted.connect(pickup.enqueue)
 	ceremony.picked.connect(_collect)
+	ceremony.card_drawn.connect(func(): battle._sound("item/card_draw",1.0,-5))
+	ceremony.card_shuffled.connect(func(): battle._sound("item/deck_flip" if audio_rng.randi_range(0,1) == 0 else "item/deck_flip2",1.0,-13 if ceremony.reduced else -7))
 
 func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
@@ -72,7 +81,6 @@ func begin_reward(source: String, slot: int = -1) -> bool:
 	battle._cancel_enemy_hold()
 	battle.relic_ui.cancel_hold()
 	ceremony.start(choices,battle.fx.canvas_size,battle.description_font,icon_rect().get_center(),battle.reduced)
-	battle._sound("book",0.85,-12)
 	return true
 
 func _collect(index: int) -> void:
@@ -84,7 +92,7 @@ func _collect(index: int) -> void:
 	if reward_source == "chest":
 		battle.chest.collected.append(reward_slot)
 		battle.chest.celebrate(reward_slot)
-	battle._sound("confirmation_002",1,-12)
+	battle._sound("item/confirmation_002",1,-12)
 	reward_source = ""
 	reward_slot = -1
 
@@ -98,6 +106,7 @@ func reset() -> void:
 	scroll_target = 0
 	inspected = -1
 	ceremony.reset()
+	pickup.reset()
 	reward_source = ""
 	reward_slot = -1
 	cancel_gesture()
@@ -168,7 +177,7 @@ func click(point: Vector2) -> bool:
 		cancel_gesture()
 		swallow_release = true
 		battle._cancel_enemy_hold()
-		battle._sound("book",1.2 if opened else 0.9,-18)
+		battle._sound("item/book",1.2 if opened else 0.9,-18)
 		return true
 	if not blocks_battle(): return false
 	if expansion < 0.98 or not opened: swallow_release = true; return true
@@ -216,6 +225,7 @@ func release(point: Vector2) -> bool:
 		elif not moved and pressed_card >= 0 and pressed_card == card_at(point):
 			if pressed_card == front_index(): inspected = -1 if inspected == pressed_card else pressed_card
 			else:
+				inspected = -1
 				var count: int = battle.model.tarots.items.size()
 				scroll_target = scroll+wrapf(pressed_card-scroll,-count/2.0,count/2.0)
 				swipe.velocity = 0

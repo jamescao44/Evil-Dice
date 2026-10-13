@@ -25,23 +25,28 @@ func move(from: int, to: int) -> bool:
 	items.insert(to, item)
 	return true
 
-func can_add(id: String) -> bool:
+func can_add(id: String, replace_index: int = -1) -> bool:
+	if Catalog.CURSED_DICE.has(id):
+		for slot in range(items.size()):
+			if slot != replace_index and Catalog.CURSED_DICE.has(items[slot].id): return false
 	if id in Catalog.STONES and has("prismatic_stone"): return false
 	if id == "codex_page" and has("ancient_codex"): return false
 	return Catalog.ITEMS.has(id) and (not has(id) or id == "codex_page")
 
-func draw_one(rng: RandomNumberGenerator, excluded: Array = []) -> String:
+func draw_one(rng: RandomNumberGenerator, excluded: Array = [], rarity_weights: Array = Catalog.RARITY_WEIGHTS) -> String:
 	var eligible: Array = []
 	for id in Catalog.ITEMS:
-		if can_add(id) and id not in excluded: eligible.append(id)
-	return Drops.draw(rng,eligible)
+		if can_add(id) and id not in excluded:
+			if Catalog.CURSED_DICE.has(id) and excluded.any(func(other): return Catalog.CURSED_DICE.has(other)): continue
+			eligible.append(id)
+	return Drops.draw(rng,eligible,rarity_weights)
 
 func add(id: String, replace_index: int = -1) -> bool:
-	if not can_add(id): return false
+	if not can_add(id,replace_index): return false
 	var page: int = index_of("codex_page")
 	if id == "codex_page" and page >= 0:
 		items[page].count += 1
-	elif items.size() >= Catalog.MAX_SLOTS:
+	elif replace_index >= 0 or items.size() >= Catalog.MAX_SLOTS:
 		if replace_index < 0 or replace_index >= items.size(): return false
 		items[replace_index] = _new_item(id)
 	else:
@@ -62,10 +67,10 @@ func _fuse() -> void:
 		items = items.filter(func(item): return item.id not in Catalog.STONES)
 		items.insert(first, _new_item("prismatic_stone"))
 
-func offers(rng: RandomNumberGenerator, count: int = 3) -> Array:
+func offers(rng: RandomNumberGenerator, count: int = 3, rarity_weights: Array = Catalog.RARITY_WEIGHTS) -> Array:
 	var choices: Array = []
 	for slot in range(count):
-		var id: String = draw_one(rng,choices)
+		var id: String = draw_one(rng,choices,rarity_weights)
 		if id.is_empty(): break
 		choices.append(id)
 	return choices

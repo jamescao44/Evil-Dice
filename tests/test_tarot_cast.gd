@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Catalog = preload("res://scripts/tarot_catalog.gd")
@@ -152,7 +153,7 @@ func scene_checks(game) -> void:
 	var second_prize: String = cast_ui.prepared.relic
 	tap(game,cast_ui.cell_rect(2,2,5).get_center()); await settle(game)
 	check(game.model.relics.items[2].id == second_prize and game.view_phase == "ready","Second Emperor reward lands and resumes battle")
-	game._restart(10)
+	game._restart(Waves.COUNT)
 	give_front(game,"magician"); drag(game,game.ARENA.get_center())
 	game.model.hp = 1; game.model.volley_clock = 0.01
 	game._process(0.05)

@@ -296,10 +296,10 @@ func _draw_spell(cast_info: Dictionary) -> void:
 	var color := Color("b395f0")
 	if cast_info.face == -1:
 		var attribute: int = cast_info.get("attribute",0)
-		var tint: Color = [Color("eee0b9"), Color("82dfff"), Color("ff9955"), Color("ffe388")][attribute]
+		var tint: Color = [Color("eee0b9"), Color("82dfff"), Color("ff9955"), Color("ffe388"), Color("c18ce8"), Color("8ad26a"), Color("93899e")][attribute]
 		var target: Vector2 = cast_info.targets[0]
 		var head: Vector2 = cast_info.from.lerp(target, minf(1, progress * 1.6))
-		if cast_info.role == 0:
+		if cast_info.role in [0,3]:
 			Pixel.line(self, target + Vector2(-32, 46) * strength, target + Vector2(32, -46) * strength, tint, 6)
 		elif cast_info.role == 1:
 			Pixel.line(self, head, head + Vector2(42, -2), tint, 3)

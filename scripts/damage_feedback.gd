@@ -25,6 +25,7 @@ var age: float = 0
 var result_age: float = 0
 var tremble_age: float = 0
 var impact_age: float = IMPACT_TIME
+var impact_speed: float = 1.0
 var impact_direction: int = 0
 var base_direction: int = 0
 var mult_direction: int = 0
@@ -61,6 +62,7 @@ func clear() -> void:
 	result_age = 0
 	tremble_age = 0
 	impact_age = IMPACT_TIME
+	impact_speed = 1.0
 	impact_direction = 0
 	base_direction = 0
 	mult_direction = 0
@@ -122,8 +124,9 @@ func _impact(next_base: float, next_mult: float, color: Color) -> void:
 	base_value = next_base
 	value = next_mult
 	impact_age = 0
+	impact_speed = current_step_speed()
 	impact_color = color
-	if impact_direction != 0: battle._sound("drop_001",1.25 if impact_direction > 0 else 0.7,-22)
+	if impact_direction != 0: battle._sound("player/drop_001",1.25 if impact_direction > 0 else 0.7,-22)
 
 func sync_value(next: float) -> void:
 	# A kill can change a Reaper's modifier between hits of one skill.
@@ -139,7 +142,7 @@ func _relic_activated(id: String) -> void:
 	if building:
 		if cursor >= 0 and cursor < steps.size() and steps[cursor].id == id and not landed: steps[cursor].after = next
 		return
-	steps = [{"source":"relic","id":id,"slot":battle.model.relics.index_of(id),"before":value,"after":next,"base_before":base_value,"base_after":base_value,"note":""}]
+	steps = [{"source":"relic","id":id,"slot":battle.model.relics.index_of(id),"speed":battle.model.relic_activation_speed,"before":value,"after":next,"base_before":base_value,"base_after":base_value,"note":""}]
 	cursor = -1
 	building = true
 	_advance()
@@ -147,6 +150,9 @@ func _relic_activated(id: String) -> void:
 func step_color(step: Dictionary) -> Color:
 	if not step.id.is_empty(): return Catalog.color(step.id)
 	return Color("c18ce8") if step.source == "darkness" else Color("dfb866")
+
+func current_step_speed() -> float:
+	return steps[cursor].get("speed",1.0) if phase == "steps" and cursor >= 0 and cursor < steps.size() else 1.0
 
 func _advance() -> void:
 	cursor += 1
@@ -161,21 +167,21 @@ func _advance() -> void:
 	if step.source == "skill": flight_from = battle._source_bubble(battle.casting_source).cast_position
 	if step.slot >= 0:
 		flight_from = battle.relic_ui.slot_rect(step.slot).get_center()
-		battle.relic_ui.activate(step.id)
+		for id in step.get("activators",[step.id]): battle.relic_ui.activate(id,step.get("speed",1.0))
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
 	visible = active and not battle._menus_open() and battle.view_phase == "resolving"
 	if battle._menus_open() or not active: return
 	var elapsed: float = delta*clampf(battle._roll_speed(),1,2)
-	impact_age += elapsed
+	impact_age += elapsed*impact_speed
 	tremble_age += elapsed
 	if phase == "result": result_age += elapsed
 	if fade_age >= 0:
 		fade_age += elapsed
 		if fade_age >= 0.2: clear(); return
 	if building:
-		age += elapsed
+		age += elapsed*current_step_speed()
 		if phase == "intro":
 			if age >= INTRO: _advance()
 		elif phase == "combine":
@@ -183,7 +189,7 @@ func _process(delta: float) -> void:
 				phase = "result"
 				result_age = 0
 				building = false
-				battle._sound("drop_001",1.5,-20)
+				battle._sound("player/drop_001",1.5,-20)
 		elif phase == "steps":
 			if not landed and age >= FLIGHT_TIME:
 				landed = true

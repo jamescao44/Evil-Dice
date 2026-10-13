@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Status = preload("res://scripts/status_effect.gd")
@@ -29,7 +30,7 @@ func enemy_turn(m, attribute: int = Status.Attribute.NONE, damage: int = 0) -> A
 	m.phase = "enemy"
 	for e in m.enemies:
 		e.acted = false
-		e.intent = {"type":"attack","target":-1,"amount":damage,"attribute":attribute}
+		e.intent = {"type":"attack","target":-1,"amount":damage,"attribute":attribute,"stacks":2 if attribute == Status.Attribute.FIRE else 1}
 	return m.enemy_act(0)
 
 func model_checks() -> void:
@@ -38,13 +39,13 @@ func model_checks() -> void:
 	for role in range(3):
 		m = fresh(role)
 		var procs := 0
-		for i in range(4000):
+		for i in range(1000):
 			var intent: Dictionary = m.choose_intent(0)
 			procs += int(intent.attribute != Status.Attribute.NONE)
-			check(intent.type == "attack" and intent.attribute in [Status.Attribute.NONE,m.enemies[0].attribute],"Elite attributes only match their own attack type")
-		check(procs == 4000 if role == 2 else procs > 1850 and procs < 2150,"Mage attacks always burn; archer and vanguard control attacks occur 50% of the time")
+			check(intent.attribute in [Status.Attribute.NONE,m.enemies[0].attribute],"Elite special attacks retain their matching attribute")
+		check(procs > 0 and procs < 1000,"Weighted pools include both normal and special moves")
 		m = fresh(role,false)
-		for i in range(40): check(m.choose_intent(0).attribute == Status.Attribute.NONE,"Normal enemies have no attributes")
+		for i in range(40): check(m.choose_intent(0).attribute == Status.Attribute.NONE,"General normal enemies have no elemental attacks")
 	m = fresh()
 	var effects: Array = enemy_turn(m,Status.Attribute.FIRE,15)
 	check(m.hp == 85 and m.status_count(Status.BURNING) == 2 and effects[-1].text == "BURN +2","Fire damage applies two burning stacks")
@@ -135,7 +136,7 @@ func model_checks() -> void:
 	enemy_turn(m)
 	check(m.end_round().size() == 1 and m.hp == 0 and m.phase == "finished","Lethal burning stops immediately and never produces negative HP")
 	var city = Run.new(4)
-	city.stage = 9
+	city.stage = Waves.CITY_STAGE
 	city._load_wave()
 	city.begin_round()
 	city.apply_affliction(Status.BURNING,3)
@@ -185,7 +186,7 @@ func layout_checks(g) -> void:
 	root.add_child(g)
 	g.muted = true
 	g.speed = 20
-	for stage in range(9):
+	for stage in range(Waves.CITY_STAGE):
 		g._restart()
 		g.model.stage = stage
 		g.model._load_wave()
@@ -222,7 +223,7 @@ func layout_checks(g) -> void:
 	check(g.model.rng.state == rng,"Intent previews never consume combat RNG")
 	var archer: Dictionary = g.model.enemies[1]
 	archer.intent = {"type":"attack","target":-1,"amount":10,"attribute":Status.Attribute.ICE}
-	check(g._enemy_intent_data(1).label == "ICE 10" and g._enemy_intent_data(1).detail == "SKIP TURN","Chosen ice move shows its damage and turn skip")
+	check(g._enemy_intent_data(1).detail == "10" and "Frozen" in g._enemy_intent_data(1).description,"Chosen ice move shows its damage and turn skip")
 	g.model.phase = "enemy"
 	g.model.enemy_act(1)
 	check(g.model.is_frozen() and g._enemy_intent_data(1).is_empty(),"The telegraphed move applies its advertised status and clears after acting")
@@ -303,6 +304,7 @@ func layout_checks(g) -> void:
 	await process_frame
 
 func run() -> void:
+	GameText.set_language("en",false)
 	model_checks()
 	meter_checks()
 	await layout_checks(Battle.new())

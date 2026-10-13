@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -19,7 +20,7 @@ func _initialize() -> void:
 func fresh(city: bool = false):
 	var m = Run.new(441) if city else Rules.new(441)
 	if city:
-		m.stage = 9
+		m.stage = Waves.CITY_STAGE
 		m._load_wave()
 		m.city_hp = 100000 # Leave room for both modified Annihilation uses.
 	m.begin_round()
@@ -86,7 +87,7 @@ func model_checks() -> void:
 				check(events.filter(func(e): return e.type == "damage").size() == 12,"Doubled Sixfold Ruin deals exactly twelve hits")
 			if values == [4,4,4] and not city:
 				check(m.enemies.all(func(e): return e.hp == 2910),"Doubled AoE strikes every living foe twice")
-			if values == [2,2,4]: check(m.statuses[2].count == 4,"Repeating a regeneration cast preserves its refresh rules instead of stacking durations")
+			if values == [2,2,4]: check(m.statuses[2].count == 0 and (city or m.enemy_status_count(0,m.Status.FROZEN) == budget),"Repeated freeze adds one stack per use; city stays immune")
 			if values == [2,2,2]: check(m.hp == m.max_hp,"Repeated full heals never overheal")
 			if values == [6,6,6] and city: check(m.hp == 74,"Each completed ultimate use applies its healing as well as damage")
 	var m = fresh()
@@ -124,7 +125,7 @@ func corpse_checks() -> void:
 	for mode in ["battle","wave","city"]:
 		for values in [[1,2,3],[1,1,2],[1,1,1],[4,4,4],[5,5,1],[5,5,5],[6,6,6]]:
 			var m = Run.new(992) if mode != "battle" else Rules.new(992)
-			if mode == "city": m.load_debug_wave(10); m.city_hp = 1
+			if mode == "city": m.load_debug_wave(Waves.COUNT); m.city_hp = 1
 			m.begin_round()
 			for enemy in m.enemies: enemy.hp = 1; enemy.shield = 0
 			for id in ["reaper_scythe","bloodstone","magic_shield"]: m.acquire_relic(id)

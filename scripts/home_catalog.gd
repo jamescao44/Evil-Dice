@@ -4,7 +4,7 @@ const ANCIENTS := [{
 	"id": "horror", "name": "The Horror", "epithet": "The uninvited",
 	"art": "eldritch", "style": "Conjures forbidden arcane.",
 	"lore": "The damned of Rivia tell of a hunger beneath the drowned chapel. They stopped saying its name. It kept answering.",
-	"traits": "DEVOUR / REGENERATE / OVERWHELM",
+	"traits": "DEVOUR / FREEZE / OVERWHELM",
 	"skill_set": "horror",
 }]
 const DICES := [{

@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -18,7 +19,7 @@ func check(value: bool, label: String) -> void:
 func fresh(city: bool = false):
 	var m = Run.new(732)
 	if city:
-		m.stage = 9
+		m.stage = Waves.CITY_STAGE
 		m._load_wave()
 	else:
 		m.enemies = [Rules.make_enemy(0,20)]
@@ -110,7 +111,7 @@ func additive_checks() -> void:
 	check(m.damage_multiplier() == 2.0, "Missing Perfect removes only combo; treasure and remaining buff persist")
 	m.power = 2
 	check(m.damage_multiplier() == 3.0, "Growth changes baseline without multiplying reward or buff bonuses")
-	m.stage = 9
+	m.stage = Waves.CITY_STAGE
 	check(m.damage_multiplier() == 3.0, "City preserves the same baseline and additive bonuses")
 	m.city_hp = 100000
 	check(m.siege_damage(Rules.classify([6,6,6])) == 6000, "Annihilation uses the same multiplier as every other numeric city attack")
@@ -169,7 +170,7 @@ func scene_checks(portrait: bool) -> void:
 		await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("res://test-output/perfect-combo-"+("portrait" if portrait else "landscape")+".png")
-		g._restart(10)
+		g._restart(Waves.COUNT)
 		for status in Status.IDS: g.model.statuses[status].count = 3
 		g.model.perfect_combo = 5
 		g.queue_redraw()

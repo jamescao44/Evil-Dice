@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
 const Meter = preload("res://scripts/throw_meter.gd")
@@ -102,7 +103,7 @@ func rate_checks() -> void:
 	for fever in [false, true]:
 		for strength in [0.0, 0.25, 0.5, 0.75, 0.9999, 1.0]:
 			var rules := preload("res://scripts/run_rules.gd").new(97531)
-			rules.stage = 9 if fever else 0
+			rules.stage = Waves.CITY_STAGE if fever else 0
 			var counts := [0, 0, 0]
 			for i in range(12000):
 				rules.phase = "roll"
@@ -111,7 +112,7 @@ func rate_checks() -> void:
 			for i in range(3): check(absf(counts[i] / 12000.0 - rates[["normal", "pair", "triple"][i]]) < 0.018, "Observed odds match power %.4f fever %s category %d" % [strength, fever, i])
 			print("Power %.4f fever %s: normal / pair / triple %s" % [strength, fever, counts])
 		var perfect_rules := preload("res://scripts/run_rules.gd").new(7913)
-		perfect_rules.stage = 9 if fever else 0
+		perfect_rules.stage = Waves.CITY_STAGE if fever else 0
 		var perfect_counts := [0, 0, 0]
 		var faces := [0, 0, 0, 0, 0, 0]
 		for i in range(12000):
@@ -183,7 +184,7 @@ func scene_checks(portrait: bool) -> void:
 	game._start_charge()
 	game._restart()
 	check(game.view_phase == "ready" and game.throw_meter.elapsed == 0 and game.fx.perfect.is_empty(), "Restart clears charging and Perfect feedback")
-	game.model.stage = 9
+	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
 	game._start_round()
 	game._start_charge()

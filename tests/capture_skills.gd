@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 var game
@@ -61,7 +62,7 @@ func run() -> void:
 		await shot("pairs")
 		if portrait: game.guide_page = 1
 		await shot("triples")
-		game.model.stage = 9
+		game.model.stage = Waves.CITY_STAGE
 		game.model._load_wave()
 		await shot("city-guide")
 		game.queue_free()

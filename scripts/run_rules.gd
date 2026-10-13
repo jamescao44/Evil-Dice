@@ -3,17 +3,18 @@ extends "res://scripts/battle_rules.gd"
 const Rewards = preload("res://scripts/reward_catalog.gd")
 const Tarot = preload("res://scripts/tarot_catalog.gd")
 const TarotInventory = preload("res://scripts/tarot_inventory.gd")
+signal tarot_granted(item: Dictionary)
 var tarots = TarotInventory.new()
 var wave_tarots: Array = []
 var chest_tarots: Dictionary = {}
 var tarot_choices: Array = []
 var tarot_source: String = ""
 var tarot_slot: int = -1
-const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "THE CHAMPION", "CROSSROADS", "WATCH POST", "WAR CAMP", "CITY ROAD", "ELITE GUARD", "LAST STAND", "THE CITY"]
-# Normal / elite counts. Roles are independently randomized and then shuffled.
-const WAVE_COUNTS := [[1,0], [3,0], [0,1], [5,0], [2,1], [3,2], [5,2], [0,4], [5,5]]
-const WAVE_BOOSTS := [1.0, 1.0, 1.5, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25, 2.25]
-const CITY_MAX_HP := 10000
+const Waves = preload("res://scripts/wave_catalog.gd")
+const WAVE_NAMES := ["OUTSKIRTS","OLD ROAD","THE CHAMPION","CROSSROADS","WATCH POST","WAR CAMP","CITY ROAD","ELITE GUARD","LAST STAND","THE PALADIN","HOLY ESCORT","ELITE COMPANY","THE HIGH PRIEST","SACRED ALLIANCE","GOLDEN GUARD","RITUAL PROCESSION","TWIN SENTINELS","CATHEDRAL GUARD","THE INNER SANCTUM","THE CITY"]
+static var WAVE_COUNTS: Array = Waves.counts()
+const WAVE_BOOSTS := [1.0,1.0,1.5,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25]
+const CITY_MAX_HP := Waves.CITY_HP
 const CITY_ULTIMATE_DAMAGE := 2000
 const CITY_IMMUNITY_SECONDS_PER_STACK := 2.0
 var city_immunity_clock: float = 0.0
@@ -33,19 +34,37 @@ var reward_weights: Array = Rewards.DEFAULT_WEIGHTS.duplicate()
 var open_rewards: Array = []
 var chest_relics: Dictionary = {}
 var reward_history: Array = []
-var rubies: int = 0
+var rubies: int = 0 # Stable internal currency key; displayed as Soul Crystals.
+var soul_crystal_remainder: float = 0.0
 var summon_shards: int = 0
 var reward_rng := RandomNumberGenerator.new()
 var relic_choices: Array = []
 var relic_offer_resolved: bool = true
 var relic_reward_stage: int = -1
 
+func soul_crystal_gain_preview(amount: int) -> int:
+	return floori(amount*RelicEffects.currency_factor(relics.items)+soul_crystal_remainder+0.000001)
+
+func gain_soul_crystals(amount: int) -> int:
+	if amount <= 0: return 0
+	var total: float = RelicEffects.currency_bonus(self,amount)+soul_crystal_remainder
+	var gained: int = floori(total+0.000001)
+	soul_crystal_remainder = maxf(0,total-gained)
+	rubies += gained
+	return gained
+
 func grant_random_tarots(count: int) -> Array:
-	var pool: Array = Tarot.ITEMS.keys().filter(func(id): return id not in tarot_effects.banned)
 	var granted: Array = []
-	if pool.is_empty(): return granted
-	for i in range(count): granted.append(tarots.add(pool[reward_rng.randi_range(0,pool.size()-1)]))
+	for i in range(count):
+		var id: String = Tarot.draw_one(reward_rng,tarot_effects.banned)
+		if id.is_empty(): break
+		granted.append(grant_tarot(id))
 	return granted
+
+func grant_tarot(id: String) -> Dictionary:
+	var item: Dictionary = tarots.add(id)
+	if not item.is_empty(): tarot_granted.emit(item.duplicate())
+	return item
 
 func _init(seed_value: int = -1) -> void:
 	super(seed_value)
@@ -71,6 +90,7 @@ func reset_run() -> void:
 	chest_relics.clear()
 	reward_history.clear()
 	rubies = 0
+	soul_crystal_remainder = 0.0
 	summon_shards = 0
 	relic_choices.clear()
 	relic_offer_resolved = true
@@ -124,7 +144,7 @@ func _roll_chest(tier: int) -> Array:
 				index = Rewards.Category.TAROT
 				chest_tarots[i] = Tarot.draw_choices(reward_rng,tarot_effects.banned)
 			else:
-				var id: String = relics.draw_one(reward_rng,chest_relics.values())
+				var id: String = relics.draw_one(reward_rng,chest_relics.values(),relic_drop_weights())
 				if id.is_empty(): index = Rewards.Category.RUBY
 				else:
 					chest_relics[i] = id
@@ -139,7 +159,7 @@ func reward_item(slot: int) -> Dictionary:
 		var id: String = chest_relics[slot]
 		item.name = Relics.Catalog.ITEMS[id].name
 		item.text = Relics.Catalog.ITEMS[id].text
-		item.color = Relics.Catalog.color(id)
+		item.color = Relics.Catalog.rarity_color(id)
 		item.relic_id = id
 	return item
 
@@ -158,7 +178,9 @@ func claim_reward(slot: int, replace_index: int = -1, discard: bool = false) -> 
 		item.text = "Relic discarded."
 		return item
 	match item.id:
-		"ruby": rubies += 100
+		"ruby":
+			item.text = "+%d soul crystals"
+			item.text_values = [gain_soul_crystals(100)]
 		"shard": summon_shards += 1
 	reward_history.append(index)
 	return item.duplicate()
@@ -194,7 +216,10 @@ func auto_claim_victory_chest() -> int:
 	return tier
 
 func is_city() -> bool:
-	return stage == WAVE_COUNTS.size()
+	return stage == Waves.CITY_STAGE
+
+func relic_drop_weights() -> Array:
+	return Relics.Drops.weights_for_wave(stage+1)
 
 func roll(throw_power: float = 0.0, perfect: bool = false, _fever: bool = false) -> MultiHitSkill:
 	return super.roll(throw_power, perfect, is_city())
@@ -205,16 +230,7 @@ func damage_cap(kind: int, target: int) -> int:
 
 func _load_wave() -> void:
 	city_immunity_clock = 0.0
-	enemies.clear()
-	if not is_city():
-		for tier in range(2):
-			for i in range(WAVE_COUNTS[stage][tier]):
-				enemies.append(make_enemy(rng.randi_range(0, 2), 1.0, tier == 1))
-		for i in range(enemies.size() - 1, 0, -1):
-			var other: int = rng.randi_range(0, i)
-			var temp: Dictionary = enemies[i]
-			enemies[i] = enemies[other]
-			enemies[other] = temp
+	enemies = Waves.create(stage,rng)
 	pending = Skill.new()
 	phase = "new"
 
@@ -241,13 +257,13 @@ func advance_wave() -> bool:
 func _record_relic_wave_clear() -> void:
 	if relic_reward_stage == stage: return
 	relic_reward_stage = stage
-	rubies += RelicEffects.wave_cleared(self)
+	gain_soul_crystals(RelicEffects.wave_cleared(self))
 
 func open_relic_offer() -> Array:
 	if not relic_offer_resolved: return relic_choices.duplicate()
 	if outcome() not in ["wave_clear", "victory"] or relic_reward_stage == stage: return []
 	_record_relic_wave_clear()
-	relic_choices = relics.offers(reward_rng,2)
+	relic_choices = relics.offers(reward_rng,2,relic_drop_weights())
 	wave_tarots = Tarot.draw_choices(reward_rng,tarot_effects.banned)
 	relic_offer_resolved = false
 	return relic_choices.duplicate()
@@ -264,7 +280,7 @@ func choose_relic(index: int, replace_index: int = -1) -> bool:
 func skip_relic() -> bool:
 	if not tarot_source.is_empty(): return false
 	if relic_offer_resolved: return false
-	rubies += 10
+	gain_soul_crystals(10)
 	relic_offer_resolved = true
 	relic_choices.clear()
 	wave_tarots.clear()
@@ -280,6 +296,9 @@ func begin_tarot_reward(source: String, slot: int = -1) -> Array:
 	elif source == "chest":
 		if slot in claimed_slots or not chest_tarots.has(slot): return []
 		tarot_choices = chest_tarots[slot].duplicate()
+	elif source == "debug":
+		tarot_choices = Tarot.draw_choices(reward_rng,tarot_effects.banned)
+		if tarot_choices.is_empty(): return []
 	else: return []
 	tarot_source = source
 	tarot_slot = slot
@@ -293,7 +312,7 @@ func choose_tarot(index: int) -> Dictionary:
 		relic_offer_resolved = true
 		relic_choices.clear()
 		wave_tarots.clear()
-	else:
+	elif tarot_source == "chest":
 		claimed_slots.append(tarot_slot)
 		reward_history.append(Rewards.Category.TAROT)
 	_clear_tarot_draw()
@@ -310,7 +329,6 @@ func begin_round() -> Array:
 	if not outcome().is_empty() or phase not in ["new", "round_end"]:
 		return []
 	tarot_effects.begin_round()
-	turn_boon_refreshes.clear()
 	round_number += 1
 	relic_turn_closed = false
 	var events: Array = []
@@ -414,6 +432,7 @@ func apply_player_step(primary: int = -1) -> Array:
 			var sweep: Dictionary = event(-2, crushed, "sweep", "TROOPS CRUSHED")
 			sweep["first"] = troops
 			events.append(sweep)
+	if result.is_attack(): events.append_array(RelicEffects.attack_used(self))
 	_complete_skill_use(result, events)
 	return events
 
@@ -455,19 +474,6 @@ func tick_city(delta: float, immunity_delta: float = -1.0) -> Array:
 	return events
 
 func _city_hit(amount: int) -> Array:
-	var events: Array = receive_damage(amount)
+	var events: Array = receive_damage(amount,false,-2)
 	if not outcome().is_empty(): phase = "finished"
-	return events
-
-func resolve_perfect_relic() -> Array:
-	if not is_city(): return super.resolve_perfect_relic()
-	if not perfect_relic_ready or not outcome().is_empty(): return []
-	relic_activated.emit("prismatic_stone")
-	perfect_relic_ready = false
-	lifesteal_used = 0
-	var damage: int = floori((RelicEffects.PERFECT_STRIKE_BASE + relic_base_damage()) * damage_multiplier(pending))
-	var loss: int = mini(city_hp,damage)
-	city_hp -= loss
-	var events: Array = [damage_event(-2,loss,damage)]
-	events.append_array(_attack_relic_effects(-2,loss,Skill.new(Kind.NORMAL)))
 	return events

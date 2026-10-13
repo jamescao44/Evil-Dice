@@ -8,6 +8,7 @@ const Catalog = preload("res://scripts/reward_catalog.gd")
 const Icons = preload("res://scripts/reward_icons.gd")
 const Pixel = preload("res://scripts/pixel_paint.gd")
 const Relics = preload("res://scripts/relic_catalog.gd")
+const Glow = preload("res://scripts/item_glow.gd")
 var symbols: Array = Catalog.ITEMS.duplicate(true)
 var scroll_symbols: Array = [Catalog.Category.RUBY,Catalog.Category.SHARD,Catalog.Category.TAROT]
 var relic_symbols: Dictionary = {}
@@ -43,7 +44,7 @@ func _ready() -> void:
 	relic_atlas = load("res://assets/art/relic_atlas.png")
 	for id in Relics.ITEMS:
 		var item: Dictionary = Relics.ITEMS[id]
-		symbols.append({"id":"curse" if item.rarity == Relics.Rarity.CURSED else "relic", "name":item.name,"text":item.text,"color":Relics.color(id),"relic_id":id})
+		symbols.append({"id":"curse" if item.rarity == Relics.Rarity.CURSED else "relic", "name":item.name,"text":item.text,"color":Relics.rarity_color(id),"relic_id":id})
 		relic_symbols[id] = symbols.size()-1
 		if not item.get("fusion",false): scroll_symbols.append(symbols.size()-1)
 	for key in ["chest_closed", "chest_open", "ruby", "contract", "relic", "curse", "damage", "multiplier", "potion"]:
@@ -124,7 +125,18 @@ func skip_rect() -> Rect2:
 	return Rect2(152,130,500,88) if size.y > size.x else Rect2(944,64,304,56)
 
 func can_skip() -> bool:
-	return visible and not skip_requested and collected.size() < rewards.size()
+	return visible and not active and not skip_requested and collected.size() < rewards.size()
+
+func skip_animation() -> void:
+	if not active or paused or rewards.is_empty(): return
+	# Reveal the already locked prizes without claiming or discarding any of them.
+	elapsed = stop_time(rewards.size()-1)+0.65
+	did_open = true
+	announced = rewards.size()
+	focused = rewards.size()-1
+	active = false
+	completed.emit()
+	queue_redraw()
 
 func skip_remaining() -> void:
 	active = false
@@ -232,12 +244,18 @@ func _draw() -> void:
 	draw_skip_button(self)
 
 func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
-	draw_rect(rect.grow(7),Color("6e5738"))
-	draw_rect(rect.grow(3),Color("1b2420"))
-	draw_rect(rect,Color("344032"))
 	var scroll: float = travel(reel)
+	# Follow the visible reel symbol, never the hidden locked prize during a spin.
+	var shown: Dictionary = symbols[sequences[reel][clampi(roundi(scroll),0,reel_steps+3)]]
+	var color: Color = shown.color if shown.has("relic_id") else gold
+	var revealed: bool = elapsed >= stop_time(reel)
+	draw_rect(rect.grow(7),Color(color,0.3))
+	draw_rect(rect.grow(3),Color("1b2420"))
+	draw_rect(rect,Color("20271f"))
+	if shown.has("relic_id"): draw_rect(rect,Color(color,0.14 if revealed else 0.08))
 	var step: float = rect.size.y*0.72
 	for row in range(floori(scroll)-1,floori(scroll)+3):
+		if revealed and row != reel_steps: continue # Settled prizes must not inherit a neighboring glow.
 		var item_index: int = sequences[reel][clampi(row,0,reel_steps+3)]
 		var side: float = rect.size.x*0.61
 		var item_rect := Rect2(rect.get_center()-Vector2.ONE*side/2+Vector2(0,(row-scroll)*step),Vector2.ONE*side)
@@ -245,18 +263,22 @@ func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 		if not clipped.has_area(): continue
 		_paint_symbol(item_index,item_rect,rect.grow(-8))
 	for y in [rect.position.y,rect.end.y-16]: draw_rect(Rect2(rect.position.x,y,rect.size.x,16),Color(0.04,0.08,0.06,0.8))
-	draw_rect(rect,gold if reel == focused or active else gold.darkened(0.5),false,4 if reel == focused else 2)
+	draw_rect(rect,color,false,4 if reel == focused or shown.has("relic_id") else 2)
+	if revealed and shown.has("relic_id"):
+		var label: String = Relics.RARITY_NAMES[Relics.ITEMS[shown.relic_id].rarity]
+		_text(Vector2(rect.get_center().x,rect.end.y-18),label,20 if size.y > size.x else 16,color)
 	var blink: float = clampf(1-(elapsed-stop_time(reel))*4,0,1) if elapsed >= stop_time(reel) else 0
 	if not reduced and blink > 0: draw_rect(rect.grow(2),Color(1,1,0.8,blink*0.35))
 	for direction in [-1,1]:
 		var at := Vector2(rect.get_center().x+direction*(rect.size.x/2+9),rect.get_center().y)
-		draw_colored_polygon(PackedVector2Array([at+Vector2(direction*9,-10),at+Vector2(-direction*5,0),at+Vector2(direction*9,10)]),gold)
+		draw_colored_polygon(PackedVector2Array([at+Vector2(direction*9,-10),at+Vector2(-direction*5,0),at+Vector2(direction*9,10)]),color)
 
 func _paint_symbol(index: int, rect: Rect2, clip: Rect2 = Rect2(), tint: Color = Color.WHITE) -> void:
 	var item: Dictionary = symbols[index]
 	if not item.has("relic_id"):
 		Icons.paint(self,art,item.icon,rect,clip,tint)
 		return
+	Glow.paint(self,rect.get_center(),rect.size.x*0.49,Relics.rarity_color(item.relic_id),clip,tint.a)
 	var position: int = Relics.ITEMS.keys().find(item.relic_id)
 	var source := Rect2(position*64,0,64,64)
 	var visible_rect: Rect2 = rect.intersection(clip) if clip.has_area() else rect

@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Rules = preload("res://scripts/battle_rules.gd")
@@ -16,7 +17,7 @@ func _initialize() -> void: call_deferred("run")
 
 func city(stack: int):
 	var m = Run.new(82)
-	m.stage = 9
+	m.stage = Waves.CITY_STAGE
 	m._load_wave()
 	m.begin_round()
 	m.set_test_roll([6,6,stack])
@@ -118,7 +119,7 @@ func layout_checks(g) -> void:
 	g._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
 	check(g.inspecting_enemy < 0,"Focus loss clears inspection")
 	g._restart()
-	g.model.stage = 9
+	g.model.stage = Waves.CITY_STAGE
 	g.model._load_wave()
 	g.model.begin_round()
 	g.model.set_test_roll([6,6,2])
@@ -134,7 +135,7 @@ func layout_checks(g) -> void:
 	g._begin_cast_cinematic(Rules.Kind.ULTIMATE)
 	g._process(0.05)
 	check(g._world_time_scale() == 0 and is_equal_approx(g.model.city_immunity_seconds(),3.45),"Cast anticipation pauses siege motion without stopping the real seconds countdown")
-	check(g.HORROR_SIZES[9] < g.HORROR_SIZES[8] and g.HUMAN_SIZES[2] > 88 and g.HUMAN_SIZES[8] > 24,"Larger later enemies and a smaller city Horror are applied")
+	check(g.HORROR_SIZES[Waves.CITY_STAGE] == 288 and g.HORROR_SIZES[Waves.CITY_STAGE-1] < 288 and g.HUMAN_SIZES[Waves.CITY_STAGE-1] == 44 and g.HUMAN_SIZES[Waves.CITY_STAGE] == 20,"Final squad keeps the old wave nine size and the Horror grows to 288 at the city")
 	g.queue_free()
 	await process_frame
 

@@ -11,14 +11,15 @@ const AreaAttack = preload("res://scripts/area_attack.gd")
 const TarotEffects = preload("res://scripts/tarot_effects.gd")
 var tarot_effects = TarotEffects.new()
 const DiceOdds = preload("res://scripts/dice_odds.gd")
-const ELITE_CONTROL_CHANCE := 0.5
+const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
+const EnemyActions = preload("res://scripts/enemy_actions.gd")
 const Kind = Skill.Kind
 const NORMAL_NAME = "Tentacle Swipe"
-const PAIR_NAMES = ["Rending Blow", "Unnatural Regrowth", "Eldritch Might", "Sweeping Ruin", "Tentacle Flurry", "Beyond Harm"]
-const PAIR_TEXT = ["1.5x regular attack + 1.5x spare die.", "Heal 5 at the next spare-die turn starts.", "+0.5 damage multiplier for the next spare-die turns.", "Hit all: 2/3 regular attack + 1.5x spare die each.", "3 automatic random hits, each regular attack + 1.5x spare die.", "Invincible for spare-die enemy phases / roll intervals."]
+const PAIR_NAMES = ["Rending Blow", "Abyssal Frost", "Eldritch Might", "Sweeping Ruin", "Tentacle Flurry", "Beyond Harm"]
+const PAIR_TEXT = ["1.5x regular attack + 1.5x spare die.", "Apply 1 Frozen stack to every enemy. No attack.", "+0.5 damage multiplier for the next spare-die attacks.", "Hit all: 2/3 regular attack + 1.5x spare die each.", "3 automatic random hits, each regular attack + 1.5x spare die.", "Invincible for spare-die enemy phases / roll intervals."]
 const SPECIAL_NAMES = ["Death Sentence", "Abyssal Renewal", "Eldritch Ascension", "Worldbreaker", "Sixfold Ruin", "Annihilation"]
-const SPECIAL_TEXT = ["Instantly kill your chosen foe, ignoring shield.", "Restore all missing health. No attack.", "+2.0 damage multiplier for the next 3 turns.", "Hit every foe for 2x regular attack power.", "6 automatic random hits, each regular attack power.", "Destroy the squad. Heal 12 HP."]
-const CITY_SPECIAL_TEXT = ["Hit the city for 5x regular attack power.", "Restore all missing health. No attack.", "+2.0 damage multiplier for the next 3 rolls.", "2x city attack; clear all troops.", "6 automatic city hits; each clears one troop.", "2000 base damage x DMG multiplier; clear troops; heal 12."]
+const SPECIAL_TEXT = ["Instantly kill your chosen foe, ignoring shield.", "Restore all missing health. No attack.", "+2.0 damage multiplier for the next 3 attacks.", "Hit every foe for 2x regular attack power.", "6 automatic random hits, each regular attack power.", "Destroy the squad. Heal 12 HP."]
+const CITY_SPECIAL_TEXT = ["Hit the city for 5x regular attack power.", "Restore all missing health. No attack.", "+2.0 damage multiplier for the next 3 attacks.", "2x city attack; clear all troops.", "6 automatic city hits; each clears one troop.", "2000 base damage x DMG multiplier; clear troops; heal 12."]
 const REGULAR_ATTACK_POWER = 15.0
 const DAMAGE_PER_PIP = 1.5
 const MAX_HP = 100
@@ -38,9 +39,16 @@ var max_hp: int:
 	set(value): base_max_hp = value
 var relics = Relics.new()
 var perfect_relic_ready: bool = false
+var roll_relic_actions: Array = []
+var active_relic_procs: Array = []
+var relic_activation_speed: float = 1.0
 var relic_turn_closed: bool = false
 var turn_end_events: Array = []
-var lifesteal_used: int = 0
+var lifesteal_budgets: Dictionary = {}
+var lifesteal_used: int = 0:
+	set(value):
+		lifesteal_used = value
+		if value == 0: lifesteal_budgets.clear()
 var power: float = 1.0
 var reward_base_damage: float = 0.0
 var reward_damage_multiplier: float = 0.0
@@ -55,7 +63,6 @@ var pending: MultiHitSkill = Skill.new()
 var saved_skill: MultiHitSkill = Skill.new()
 var bonus_resume: Dictionary = {}
 var buff_ticks: Dictionary = {}
-var turn_boon_refreshes: Dictionary = {}
 # Future buffs/relics can add or remove named use multipliers without changing skills.
 var skill_use_modifiers: Dictionary = {}
 var phase: String = "new"
@@ -75,6 +82,9 @@ func reset() -> void:
 	tarot_effects = TarotEffects.new()
 	relics.clear()
 	perfect_relic_ready = false
+	roll_relic_actions.clear()
+	active_relic_procs.clear()
+	relic_activation_speed = 1.0
 	relic_turn_closed = false
 	turn_end_events.clear()
 	hp = MAX_HP
@@ -97,7 +107,6 @@ func reset() -> void:
 	saved_skill = Skill.new()
 	bonus_resume = {}
 	buff_ticks.clear()
-	turn_boon_refreshes.clear()
 	skill_use_modifiers.clear()
 	phase = "new"
 	category_weights = [1.0, 1.0, 1.0]
@@ -106,9 +115,7 @@ func reset() -> void:
 	face_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 static func make_enemy(role: int, health_scale: float = 1.0, elite: bool = false) -> Dictionary:
-	# Keep exact half-HP thresholds stable despite decimal scale rounding.
-	var health: int = roundi(([150, 100, 75] if elite else [75, 50, 35])[role] * health_scale + 0.0001)
-	return {"name": ("Elite " if elite else "") + ["Vanguard", "Elf Archer", "Mage"][role], "role": role, "elite": elite, "attribute": [Status.Attribute.SHOCK, Status.Attribute.ICE, Status.Attribute.FIRE][role] if elite else Status.Attribute.NONE, "hp": health, "max_hp": health, "shield": 10 if elite else 0, "damage": ([10.0, 10.0, 15.0] if elite else [5.0, 7.5, 10.0])[role], "attack_boost": false, "weight": [70, 70, 65][role], "heals": 0, "intent": {}, "canceled": false, "acted": false}
+	return EnemyCatalog.make(role,health_scale,elite)
 
 func set_status_counts(counts: Dictionary) -> void:
 	statuses.clear()
@@ -121,6 +128,9 @@ func status_count(id: int) -> int:
 
 func is_city() -> bool:
 	return false
+
+func relic_drop_weights() -> Array:
+	return Relics.Drops.weights_for_wave(1)
 
 func status_counts(ids: Array = Status.IDS) -> Dictionary:
 	var counts: Dictionary = {}
@@ -190,14 +200,14 @@ func roll_rates(throw_power: float, perfect: bool = false, fever: bool = false) 
 	for i in range(3):
 		values[i] *= maxf(0, category_weights[i])
 		total += values[i]
-	if total <= 0: return base
+	if total <= 0: return RelicEffects.category_rates(relics.items,base,perfect and fever)
 	var triple: float = values[2] / total
 	if perfect:
 		triple = minf(triple, 1.0 if fever else 0.5)
-		return {"normal":0.0, "pair":1.0-triple, "triple":triple}
+		return RelicEffects.category_rates(relics.items,{"normal":0.0, "pair":1.0-triple, "triple":triple},fever)
 	triple = minf(triple, NON_PERFECT_TRIPLE_CAP * (1.5 if fever else 1.0))
 	var pair: float = minf(values[1] / total, NON_PERFECT_PAIR_CAP)
-	return {"normal":maxf(0, 1.0-pair-triple), "pair":pair, "triple":triple}
+	return RelicEffects.category_rates(relics.items,{"normal":maxf(0, 1.0-pair-triple), "pair":pair, "triple":triple})
 
 func _weighted_face(weights: Array) -> int:
 	var index: int = Weighted.pick(rng, weights)
@@ -256,7 +266,8 @@ func set_test_roll(dice: Array, perfect: bool = false) -> MultiHitSkill:
 func record_perfect(perfect: bool) -> void:
 	# Only accepted throws change the streak; skips and bonus casts preserve it.
 	perfect_combo = perfect_combo + RelicEffects.perfect_combo_gain(relics.items) if perfect else 0
-	perfect_relic_ready = perfect and relics.has("prismatic_stone")
+	roll_relic_actions = RelicEffects.roll_actions(self,perfect)
+	perfect_relic_ready = not roll_relic_actions.is_empty()
 	if perfect:
 		for item in relics.items:
 			if RelicEffects.STATS.get(item.id,{}).get("always_perfect",false) or RelicEffects.STONES.get(item.id,{}).get("combo_gain",0) > 0:
@@ -286,8 +297,19 @@ func living() -> Array:
 func has_pending_attack_hits() -> bool:
 	return phase == "executing" and pending.is_attack() and pending.uses_left() > 0
 
-func player_attack_targets() -> Array:
+func taunting_enemies() -> Array:
 	var targets: Array = living()
+	return targets.filter(func(i): return EnemyCatalog.taunts(enemies[i])) if targets.size() > 1 else []
+
+func attack_targets() -> Array:
+	var guards: Array = taunting_enemies()
+	return guards if not guards.is_empty() else living()
+
+func area_damage_factor(target: int, guards: Array) -> float:
+	return 0.5 if not guards.is_empty() and target not in guards else 1.0
+
+func player_attack_targets() -> Array:
+	var targets: Array = attack_targets()
 	# Only an already-started cast can follow through on the defeated squad.
 	if targets.is_empty() and has_pending_attack_hits(): return range(enemies.size())
 	return targets
@@ -303,7 +325,6 @@ func begin_round() -> Array:
 	if not outcome().is_empty() or phase not in ["new", "round_end"]:
 		return []
 	tarot_effects.begin_round()
-	turn_boon_refreshes.clear()
 	round_number += 1
 	relic_turn_closed = false
 	var events: Array = []
@@ -314,6 +335,7 @@ func begin_round() -> Array:
 	for i in living():
 		enemies[i].canceled = false
 		enemies[i].acted = false
+		enemies[i].action_hit = 0
 		enemies[i].intent = choose_intent(i)
 	_prepare_player_turn()
 	return events
@@ -336,29 +358,7 @@ func skip_frozen_turn() -> Array:
 	return [event(-1, 0, "skip", "TURN SKIPPED")]
 
 func choose_intent(index: int) -> Dictionary:
-	var e: Dictionary = enemies[index]
-	var role: int = e.role
-	var support: Array = []
-	if role == 0 and e.shield < SHIELD_CAP:
-		support.append({"type": "shield", "target": index, "amount": 6, "name": "Raise Shield"})
-	if role == 2 and e.hp < e.max_hp:
-		support.append({"type": "heal", "target": index, "amount": roundi(e.max_hp * 0.3), "name": "Self Mend"})
-	if role == 1 and e.elite and living().any(func(i): return enemies[i].hp < enemies[i].max_hp):
-		support.append({"type": "team_heal", "target": index, "amount": 0, "name": "Renewing Volley"})
-	if role == 2 and e.elite:
-		var allies: Array = living().filter(func(i): return i != index and not enemies[i].attack_boost)
-		if not allies.is_empty():
-			support.append({"type": "empower", "target": allies[rng.randi_range(0, allies.size() - 1)], "amount": 0, "name": "Arcane Empowerment"})
-	if not support.is_empty() and rng.randi_range(1, 100) > e.weight:
-		return support[rng.randi_range(0, support.size() - 1)]
-	var intent := {"type": "attack", "target": -1, "amount": e.damage, "name": ["Sword Slash", "Arrow Shot", "Arcane Bolt"][role], "attribute": Status.Attribute.NONE}
-	# Decide once when the turn starts, so the displayed move is the actual move.
-	# These intents execute after the current player turn. If it is frozen,
-	# archers must leave the following player turn available after the ice breaks.
-	if e.elite and not (role == 1 and is_frozen()) and (role == 2 or rng.randf() < ELITE_CONTROL_CHANCE):
-		intent.attribute = e.attribute
-		intent.name = ["Stunning Blow", "Ice Arrow", "Burning Bolt"][role]
-	return intent
+	return EnemyActions.choose(self,index)
 
 func damage_cap(kind: int, target: int) -> int:
 	var max_hp: int = enemies[target].max_hp
@@ -493,12 +493,13 @@ func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 	if not is_attack(result) or is_instant_kill(result): return ""
 	var base: int = floori(attack_base(result))
 	var damage: int = unmitigated_damage(result)
-	var targets: Array = [primary] if is_enemy_alive(primary) else living()
+	var targets: Array = living() if hits_all(result) else [primary] if primary in attack_targets() else attack_targets()
+	var guards: Array = taunting_enemies()
 	if targets.is_empty(): return ""
-	var low: int = _target_damage(result,damage,targets[0])-base
+	var low: int = floori(_target_damage(result,damage,targets[0])*(area_damage_factor(targets[0],guards) if hits_all(result) else 1.0))-base
 	var high: int = low
 	for target in targets:
-		var modifier: int = _target_damage(result,damage,target)-base
+		var modifier: int = floori(_target_damage(result,damage,target)*(area_damage_factor(target,guards) if hits_all(result) else 1.0))-base
 		low = mini(low,modifier)
 		high = maxi(high,modifier)
 	var modifier: String = str(low) if low == high else "%d to %d" % [low,high]
@@ -518,36 +519,36 @@ func preview(result: MultiHitSkill, primary: int) -> Array:
 	var hits: Array = []
 	var candidates: Array = player_attack_targets()
 	if not is_attack(result) or primary not in candidates: return hits
-	var targets: Array = candidates if hits_all(result) else [primary]
+	var targets: Array = (living() if has_living_enemies() else candidates) if hits_all(result) else [primary]
+	var guards: Array = taunting_enemies()
 	for i in targets:
 		var execute: bool = is_instant_kill(result)
 		var damage: int = enemies[i].hp if execute else attack_damage(result, i)
+		if not execute and hits_all(result): damage = floori(damage*area_damage_factor(i,guards))
 		var hp_loss: int = 0 if enemies[i].shield > 0 and not execute and enemy_status_count(i, Status.CORROSION) == 0 else mini(enemies[i].hp, damage)
 		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss, "corpse_hit": not is_enemy_alive(i)})
 	return hits
 
 func _apply_support(result: MultiHitSkill) -> Array:
 	var events: Array = []
+	if result.is_freeze():
+		if is_city(): return [event(-2,0,"immune","IMMUNE")]
+		var stacks: int = roundi(tarot_effects.skill_factor(result))
+		for target in living():
+			events.append_array(apply_enemy_status(target,Status.FROZEN,enemy_status_count(target,Status.FROZEN)+stacks))
+		return events
 	var id: int = result.face if result.kind == Kind.PAIR else Status.ASCENSION
 	if result.kind == Kind.SPECIAL and result.face == 2:
 		return [event(-1, heal(max_hp), "heal", "FULL HEAL")]
-	if id == Status.REGEN and status_count(id) > 0:
-		# Counts tick after enemies act; this turn's start heal was already paid.
-		var remaining: int = maxi(0,status_count(id)-(1 if buff_ticks.has(id) else 0))
-		var restored: int = heal(remaining*roundi(5*statuses[id].potency))
-		if restored > 0: events.append(event(-1,restored,"heal","REGROWTH"))
-	elif id in [Status.MIGHT,Status.ASCENSION] and status_count(id) > 0:
+	if id in Status.ATTACK_BOONS and status_count(id) > 0:
 		events.append_array(_boon_shockwave(result,10.0 if id == Status.MIGHT else 50.0))
 	if result.kind == Kind.PAIR:
 		var duration: int = result.spare + (status_count(id) if id == Status.IMMUNITY else 0)
 		statuses[id].apply(duration,tarot_effects.skill_factor(result))
 		buff_ticks.erase(result.face)
-		# Stored skills are free actions; the waiting attack can use a boon turn.
-		if bonus_resume.is_empty(): turn_boon_refreshes[result.face] = true
 		events.append(event(-1, 0, "buff", PAIR_NAMES[result.face - 1]))
 	else:
 		statuses[Status.ASCENSION].apply(3,tarot_effects.skill_factor(result))
-		if bonus_resume.is_empty(): turn_boon_refreshes[Status.ASCENSION] = true
 		events.append(event(-1, 0, "buff", SPECIAL_NAMES[2]))
 	return events
 
@@ -558,7 +559,7 @@ func _boon_shockwave(result: MultiHitSkill, base_damage: float) -> Array:
 	events.append_array(AreaAttack.apply(self,base_damage,wave))
 	return events
 
-func _finish_player_action(result: MultiHitSkill) -> void:
+func _finish_player_action(_result: MultiHitSkill) -> void:
 	if not bonus_resume.is_empty():
 		# A banked skill is a bonus: preserve the current roll and its turn clocks.
 		var resume: Dictionary = bonus_resume
@@ -575,10 +576,7 @@ func _finish_player_action(result: MultiHitSkill) -> void:
 		pending = Skill.new()
 		phase = "roll"
 		return
-	# Keep counters and effects active until every enemy has finished acting.
-	for face in [3, 33]:
-		var refreshed: bool = (result.kind == Kind.PAIR and result.face == face) or (result.kind == Kind.SPECIAL and result.face == 3 and face == 33)
-		if not refreshed and not turn_boon_refreshes.has(face): buff_ticks[face] = true
+	# Invulnerability remains active through every enemy action.
 	buff_ticks[6] = true
 	pending = Skill.new()
 	phase = "enemy" if outcome().is_empty() else "finished"
@@ -632,6 +630,7 @@ func apply_player_step(primary: int = -1) -> Array:
 				events.append(damage_event(hit.target,loss,hit.damage,"damage",hit.ignore))
 			if loss > 0:
 				events.append_array(_attack_relic_effects(hit.target, loss, result))
+	if result.is_attack(): events.append_array(RelicEffects.attack_used(self))
 	_complete_skill_use(result, events)
 	return events
 
@@ -640,6 +639,10 @@ func _complete_skill_use(result: MultiHitSkill, events: Array) -> void:
 	pending.consume_use()
 	if pending.random_target_per_use(): pending.target = -1
 	if pending.uses_left() == 0 or not outcome().is_empty():
+		# One charge covers the whole cast, including every multi-hit impact.
+		# Saving, skipping and immediate item effects never pass through here.
+		if result.is_attack():
+			for id in Status.ATTACK_BOONS: statuses[id].consume()
 		_finish_player_action(result)
 		if not outcome().is_empty(): events.append_array(_complete_relic_turn())
 
@@ -672,61 +675,17 @@ func heal(amount: int) -> int:
 	hp += actual
 	return actual
 
+func enemy_act_step(index: int) -> Array:
+	if phase != "enemy" or not outcome().is_empty() or not is_enemy_alive(index) or enemies[index].acted: return []
+	var events: Array = EnemyActions.step(self,index)
+	if not outcome().is_empty(): phase = "finished"
+	return events
+
 func enemy_act(index: int) -> Array:
-	if phase != "enemy" or not outcome().is_empty():
-		return []
-	var e: Dictionary = enemies[index]
-	if e.hp <= 0 or e.acted:
-		return []
-	e.acted = true
-	if enemy_cannot_act(index):
-		var reason: String = "IMMOBILIZED" if enemy_status_count(index,Status.IMMOBILIZED) > 0 else "FROZEN"
-		# Overlapping immobilization effects use the same missed action.
-		for id in Status.ENEMY_ACTION_LOCKS:
-			if enemy_status_count(index,id) > 0: e.statuses[id].consume()
-		return [event(index, 0, "skip", reason)]
-	if e.canceled:
-		return [event(index, 0, "cancel", "Lost in thought.")]
-	var intent: Dictionary = e.intent
-	if intent.is_empty():
-		return []
+	# Model callers can resolve a whole action; the UI plays individual impacts.
 	var events: Array = []
-	if intent.type == "attack":
-		# Keep 7.5 archer damage exact until impact, then round once for integer HP.
-		var amount: int = roundi(intent.amount * (1.5 if e.attack_boost else 1.0) * (0.5 if enemy_status_count(index, Status.DARKNESS) > 0 else 1.0))
-		e.attack_boost = false
-		events.append_array(receive_damage(amount))
-		if events.any(func(hit): return hit.type == "damage" and hit.amount > 0):
-			match intent.get("attribute", Status.Attribute.NONE):
-				Status.Attribute.ICE: events.append_array(apply_affliction(Status.FROZEN, 1))
-				Status.Attribute.FIRE: events.append_array(apply_affliction(Status.BURNING, 2))
-				Status.Attribute.SHOCK: events.append_array(apply_affliction(Status.STUNNED, 1))
-	elif intent.type == "team_heal":
-		for target_index in living():
-			var target: Dictionary = enemies[target_index]
-			var actual: int = 0 if enemy_status_count(target_index, Status.DARKNESS) > 0 else mini(roundi(target.max_hp * 0.2), target.max_hp - target.hp)
-			target.hp += actual
-			events.append(event(target_index, actual, "heal", "TEAM MEND"))
-	elif intent.type == "empower":
-		var allies: Array = living().filter(func(i): return i != index and not enemies[i].attack_boost)
-		if not allies.is_empty():
-			var target: int = intent.target if intent.target in allies else allies[rng.randi_range(0, allies.size() - 1)]
-			enemies[target].attack_boost = true
-			events.append(event(target, 0, "buff", "ATTACK x1.5"))
-	elif intent.target >= 0 and intent.target < enemies.size() and enemies[intent.target].hp > 0:
-		var target: Dictionary = enemies[intent.target]
-		if intent.type == "heal":
-			var actual: int = 0 if enemy_status_count(intent.target, Status.DARKNESS) > 0 else mini(intent.amount, target.max_hp - target.hp)
-			target.hp += actual
-			if actual > 0:
-				e.heals += 1
-			events.append(event(intent.target, actual, "heal", "+%d HP" % actual))
-		else:
-			var actual: int = 0 if enemy_status_count(intent.target, Status.CORROSION) > 0 else mini(intent.amount, SHIELD_CAP - target.shield)
-			target.shield += actual
-			events.append(event(intent.target, actual, "buff", "+%d SHIELD" % actual))
-	if not outcome().is_empty():
-		phase = "finished"
+	while phase == "enemy" and outcome().is_empty() and is_enemy_alive(index) and not enemies[index].acted:
+		events.append_array(enemy_act_step(index))
 	return events
 
 func _begin_turn_end() -> void:
@@ -775,6 +734,12 @@ func acquire_relic(id: String, replace_index: int = -1) -> bool:
 	RelicEffects.acquired(self,id)
 	return true
 
+func move_relic(from: int, to: int) -> bool:
+	if not relics.move(from,to): return false
+	# Reordering passive health bonuses changes capacity, never grants free healing.
+	hp = mini(hp,max_hp)
+	return true
+
 func grant_random_tarots(_count: int) -> Array:
 	# Standalone battles have no run inventory; RunRules owns consumable rewards.
 	return []
@@ -784,14 +749,14 @@ func refresh_relic_health(old_max: int) -> void:
 		if relic_immune(status): statuses[status].count = 0
 	hp = clampi(hp + maxi(0, max_hp - old_max), 0, max_hp)
 
-func receive_damage(amount: int, burning: bool = false) -> Array:
+func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> Array:
 	if not burning and status_count(Status.HIDDEN) > 0: return [event(-1,0,"relic","UNTARGETABLE")]
 	var corroded: bool = status_count(Status.CORROSION) > 0
-	if status_count(Status.IMMUNITY) > 0 and not corroded: return [event(-1,0,"immune","INVINCIBLE")]
+	if status_count(Status.IMMUNITY) > 0 and not corroded: return [event(-1,0,"immune","INVINCIBLE")] + (RelicEffects.retaliation(self,attacker) if not burning else [])
 	var incoming: float = maxf(0, amount) * (1.5 if corroded else 1.0)
 	var defense: Dictionary = RelicEffects.incoming(relics.items,incoming,corroded,burning)
 	for id in defense.activated: relic_activated.emit(id)
-	if defense.blocked: return [event(-1,0,"relic","SHIELD BLOCK")]
+	if defense.blocked: return [event(-1,0,"relic","SHIELD BLOCK")] + RelicEffects.retaliation(self,attacker)
 	incoming = defense.amount
 	var loss: int = roundi(incoming)
 	if not corroded and not burning:
@@ -803,6 +768,7 @@ func receive_damage(amount: int, burning: bool = false) -> Array:
 	hp -= loss
 	var events: Array = [damage_event(-1,loss,hit_damage,"burn" if burning else "damage")]
 	if hp <= 0: events.append_array(RelicEffects.prevent_death(self))
+	if not burning: events.append_array(RelicEffects.retaliation(self,attacker))
 	return events
 
 func _complete_relic_turn() -> Array:
@@ -823,22 +789,24 @@ func enemy_status_count(index: int, id: int) -> int:
 	var effects: Dictionary = enemies[index].get("statuses", {})
 	return effects[id].count if effects.has(id) else 0
 
-func apply_enemy_status(index: int, id: int, amount: int) -> Array:
+func apply_enemy_status(index: int, id: int, amount: int, modify_stacks: bool = true) -> Array:
 	if not is_enemy_alive(index) or id not in Status.ENEMY_HARMFUL: return []
+	if modify_stacks: amount += RelicEffects.status_bonus(self,id)
 	var enemy: Dictionary = enemies[index]
 	if not enemy.has("statuses"): enemy.statuses = {}
 	if not enemy.statuses.has(id): enemy.statuses[id] = Status.new(id)
 	var before: int = enemy.statuses[id].count
 	enemy.statuses[id].apply(amount)
+	if id in Status.ENEMY_ACTION_LOCKS and amount > 0: EnemyActions.interrupt(enemy)
 	var added: int = enemy.statuses[id].count - before
-	if added <= 0: return []
+	if added <= 0: return RelicEffects.status_applied(self,index,id) if amount > 0 else []
 	if id == Status.PLAGUE:
 		if not enemy.has("healthy_max_hp"): enemy.healthy_max_hp = enemy.max_hp
 		enemy.max_hp = maxi(1, enemy.healthy_max_hp - enemy.statuses[id].count * 10)
 		enemy.hp = mini(enemy.hp, enemy.max_hp)
 	var effect: Dictionary = event(index, added, "status", status_label(id, added))
 	effect.status = id
-	return [effect]
+	return [effect] + RelicEffects.status_applied(self,index,id)
 
 func _attack_relic_effects(target: int, damage: int, skill: MultiHitSkill) -> Array:
 	return RelicEffects.after_hit(self,target,damage,skill)
@@ -859,33 +827,40 @@ func _tick_enemy_statuses() -> Array:
 			if enemy_status_count(i,id) > 0: enemies[i].statuses[id].consume()
 	for i in infected:
 		if not is_enemy_alive(i): continue
-		events.append_array(apply_enemy_status(i,Status.PLAGUE,1))
-		var allies: Array = living().filter(func(ally): return ally != i)
-		if not allies.is_empty(): events.append_array(apply_enemy_status(allies[rng.randi_range(0,allies.size()-1)],Status.PLAGUE,1))
+		events.append_array(apply_enemy_status(i,Status.PLAGUE,1,false))
+		var allies: Array = living().filter(func(ally): return ally != i and enemy_status_count(ally,Status.PLAGUE) == 0)
+		if not allies.is_empty(): events.append_array(apply_enemy_status(allies[rng.randi_range(0,allies.size()-1)],Status.PLAGUE,1,false))
 	return events
 
-func resolve_perfect_relic() -> Array:
-	if not perfect_relic_ready or not outcome().is_empty(): return []
-	relic_activated.emit("prismatic_stone")
-	perfect_relic_ready = false
-	lifesteal_used = 0
-	var candidates: Array = living()
-	var target: int = candidates[rng.randi_range(0,candidates.size()-1)]
-	var amount: int = floori((RelicEffects.PERFECT_STRIKE_BASE + relic_base_damage()) * damage_multiplier(pending))
-	if enemy_status_count(target,Status.CORROSION) > 0: amount = floori(amount * 1.5)
-	var previous_shield: int = enemies[target].shield
-	var loss: int = hit_enemy(target,amount)
-	var events: Array = [damage_event(target,loss,amount)]
-	if loss == 0 and previous_shield > 0:
-		var blocked: Dictionary = damage_event(target,previous_shield-enemies[target].shield,amount,"shield_hit")
-		blocked.text = "SHIELD BREAK" if enemies[target].shield == 0 else "BLOCKED"
-		events = [blocked]
-	if loss > 0: events.append_array(_attack_relic_effects(target,loss,Skill.new(Kind.NORMAL)))
+func roll_relic_animation_speed() -> float:
+	return RelicEffects.Sequence.animation_speed(roll_relic_actions[0].activation) if not roll_relic_actions.is_empty() else 1.0
+
+func resolve_roll_relic_step() -> Array:
+	if roll_relic_actions.is_empty():
+		perfect_relic_ready = false
+		return []
 	if not outcome().is_empty():
-		if saved_skill.is_empty(): saved_skill = pending.duplicate()
+		roll_relic_actions.clear()
+		perfect_relic_ready = false
+		return []
+	var action: Dictionary = roll_relic_actions.pop_front()
+	RelicEffects.Sequence.activate(self,action.activation)
+	var events: Array = RelicEffects.Attack.apply(self,action.id,action.amount,action.fixed,action.area)
+	perfect_relic_ready = not roll_relic_actions.is_empty()
+	if not outcome().is_empty():
+		roll_relic_actions.clear()
+		perfect_relic_ready = false
+		if not is_city() and saved_skill.is_empty(): saved_skill = pending.duplicate()
 		pending = Skill.new()
 		phase = "finished"
 		events.append_array(_complete_relic_turn())
+	return events
+
+func resolve_perfect_relic() -> Array:
+	# Compatibility for model simulations; presentation resolves one proc at a time.
+	if perfect_relic_ready and roll_relic_actions.is_empty(): roll_relic_actions = RelicEffects.roll_actions(self,true)
+	var events: Array = []
+	while not roll_relic_actions.is_empty(): events.append_array(resolve_roll_relic_step())
 	return events
 
 func _six_probability(rates: Dictionary) -> float:

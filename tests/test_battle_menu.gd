@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
@@ -30,7 +31,7 @@ func snapshot(g, label: String, portrait: bool) -> void:
 
 func model_checks() -> void:
 	var m = Run.new(193)
-	for wave in range(1,11):
+	for wave in range(1,Waves.COUNT+1):
 		m.hp = 0
 		m.perfect_combo = 8
 		m.perfect_progress = 6
@@ -40,13 +41,13 @@ func model_checks() -> void:
 		check(m.stage == wave-1 and m.hp == 100+(wave-1)*30 and m.hp == m.max_hp,"Wave gets matching full player health")
 		check(m.power == 1.0,"Every wave keeps base damage multiplier at one")
 		check(m.phase == "new" and m.round_number == 0 and m.pending.is_empty() and m.saved_skill.is_empty() and m.perfect_combo == 0 and m.perfect_progress == 0 and m.status_count(6) == 0,"Wave starts with fresh turn, treasure, skills and statuses")
-		check(m.city_hp == 10000 and m.troops == 0,"Fresh city has 10000 HP and fresh siege clocks")
-		if wave < 10:
+		check(m.city_hp == Run.CITY_MAX_HP and m.troops == 0,"Fresh city has its configured HP and fresh siege clocks")
+		if wave < Waves.COUNT:
 			check(m.enemies.size() == Run.WAVE_COUNTS[wave-1][0]+Run.WAVE_COUNTS[wave-1][1],"Wave gets its enemy formation")
-		else: check(m.is_city() and m.enemies.is_empty(),"Wave ten loads the city")
-	for invalid in [-1,0,11,999]:
+		else: check(m.is_city() and m.enemies.is_empty(),"Final wave loads the city")
+	for invalid in [-1,0,Waves.COUNT+1,999]:
 		var state: int = m.rng.state
-		check(not m.load_debug_wave(invalid) and m.stage == 9 and m.rng.state == state,"Invalid wave leaves the run untouched")
+		check(not m.load_debug_wave(invalid) and m.stage == Waves.CITY_STAGE and m.rng.state == state,"Invalid wave leaves the run untouched")
 
 func scene_checks(portrait: bool) -> void:
 	if not portrait:
@@ -56,8 +57,8 @@ func scene_checks(portrait: bool) -> void:
 	root.add_child(g)
 	g.muted = true
 	g.home_enabled = true
-	g._restart(10)
-	check(g.model.is_city() and g.monster_side == 288 and g.model.hp == 370 and g.model.phase == "roll","Scene prepares the requested city immediately")
+	g._restart(Waves.COUNT)
+	check(g.model.is_city() and g.monster_side == 288 and g.model.hp == 100+Waves.CITY_STAGE*30 and g.model.phase == "roll","Scene prepares the requested city immediately")
 	g._start_charge()
 	g._handle_click(g.MENU_RECT.get_center())
 	var elapsed: float = g.throw_meter.elapsed
@@ -74,7 +75,7 @@ func scene_checks(portrait: bool) -> void:
 	g._handle_click(g.GUIDE_CLOSE.get_center())
 	check(g.menu_open and not g.guide,"Help returns to the menu")
 	g._handle_click(g.DEBUG_RECT.get_center())
-	check(g.debug_open and g.debug_wave_input.visible and g.debug_wave_input.text == "10","Debug shows a wave number field")
+	check(g.debug_open and g.debug_wave_input.visible and g.debug_wave_input.text == str(Waves.COUNT),"Debug shows a wave number field")
 	check(g.DEBUG_WAVE_INPUT.encloses(g.debug_wave_input.get_rect()),"Native number field fits the debug layout")
 	await snapshot(g,"debug",portrait)
 	g.model.tarots.add("tower")
@@ -89,17 +90,39 @@ func scene_checks(portrait: bool) -> void:
 	check(g.model.tarots.items.size() == 45 and g.debug_open,"Repeated debug grants add another full set without leaving debug")
 	check(g.model.rng.state == combat_rng and g.model.reward_rng.state == reward_rng,"Debug grants do not change combat or reward RNG")
 	for other in [g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD,g._debug_option_rect(12)]: check(not g.DEBUG_TAROTS.intersects(other),"New debug button does not overlap existing controls")
-	for invalid in ["", "x", "0", "11", "1.5"]:
+	for invalid in ["", "x", "0", str(Waves.COUNT+1), "1.5"]:
 		g._debug_load_wave(invalid)
-		check(g.debug_open and g.model.stage == 9 and not g.debug_wave_error.is_empty(),"Invalid text shows an error without loading")
+		check(g.debug_open and g.model.stage == Waves.CITY_STAGE and not g.debug_wave_error.is_empty(),"Invalid text shows an error without loading")
 	g.debug_wave_input.text = "4"
 	g._handle_click(g.DEBUG_WAVE_LOAD.get_center())
 	check(g.model.stage == 3 and g.visual_stage == 3 and g.monster_side == g.HORROR_SIZES[3] and g.model.phase == "roll","Load button prepares the selected fight and visuals")
 	check(not g._menus_open() and not g.debug_wave_input.visible and g.view_phase == "ready" and g.dice.all(func(d): return not d.charging and not d.rolling),"Loading exits menus and clears old dice motion")
-	var previous_sizes: Array = [84,76,66,56,46,38]
-	for wave in range(4,10):
+	g._open_debug()
+	for other in [g.DEBUG_TAROTS,g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD]:
+		check(not g.DEBUG_TAROT_DRAW.intersects(other),"Tarot draw debug button fits without overlapping controls")
+	g._handle_click(g.DEBUG_TAROT_DRAW.get_center())
+	var ceremony = g.tarot_ui.ceremony
+	check(ceremony.state == "shuffle" and not g.debug_open and not g.debug_wave_input.visible,"Debug draw closes its menu and starts the real ceremony")
+	ceremony.advance(ceremony.shuffle_duration()+0.01)
+	ceremony.advance(0.5)
+	ceremony.advance(0.6)
+	for i in range(3):
+		var backs: Array = ceremony.fan_order().filter(func(index): return index not in ceremony.removed)
+		backs.sort_custom(func(a,b): return absf(ceremony.fan_pose(a).step) < absf(ceremony.fan_pose(b).step))
+		var point: Vector2 = ceremony.fan_pose(backs[0]).at
+		g._handle_click(point)
+		g._handle_release(point)
+		ceremony.advance(0.6)
+	ceremony.advance(1.1)
+	for point in [ceremony.row_point(0),ceremony.keep_rect().get_center()]:
+		g._handle_click(point)
+		g._handle_release(point)
+	ceremony.advance(1.0)
+	check(g.model.tarots.items.size() == 1 and not ceremony.active() and g.view_phase == "ready","Debug ceremony collects one card and returns to the current battle")
+	check(g.model.claimed_slots.is_empty() and g.model.reward_history.is_empty() and g.model.tarot_source.is_empty(),"Debug collection does not claim a chest slot or leave a pending transaction")
+	for wave in range(1,Waves.COUNT):
 		g._restart(wave)
-		check(g._enemy_side() == 84 if wave == 4 else g._enemy_side() > previous_sizes[wave-4] and g._enemy_side() <= previous_sizes[wave-4]*1.2,"Fight four keeps its size; fights five through nine grow modestly")
+		check(g._enemy_side() > g.HUMAN_SIZES[-1] and g._enemy_side() <= g.HUMAN_SIZES[0],"Squad display sizes remain between initial and city scales")
 		for i in range(g.model.enemies.size()): check(g.ARENA.has_point(g._enemy_feet(i)),"Larger enemy feet stay inside the arena")
 		if wave in [4,7,9]: await snapshot(g,"wave-"+str(wave),portrait)
 	g._handle_click(g.MENU_RECT.get_center())
@@ -124,7 +147,7 @@ func scene_checks(portrait: bool) -> void:
 	g._restart(7)
 	await create_timer(0.1).timeout
 	check(g.model.stage == 6 and g.model.pending.is_empty() and g.view_phase == "ready","Wave load invalidates the old roll coroutine")
-	g.model.stage = 9
+	g.model.stage = Waves.CITY_STAGE
 	g.model.city_hp = 0
 	g.model.perfect_progress = 9
 	g._check_over()
@@ -145,7 +168,7 @@ func scene_checks(portrait: bool) -> void:
 	await create_timer(0.05).timeout
 	check(g.model.stage == 4 and g.model.open_rewards.is_empty() and not g.chest.visible,"Loading a wave cancels a pending victory chest")
 	if "--capture" in OS.get_cmdline_user_args():
-		g._restart(10)
+		g._restart(Waves.COUNT)
 		g.model.city_hp = 0
 		g.model.perfect_progress = 9
 		g._check_over()
@@ -170,7 +193,7 @@ func scene_checks(portrait: bool) -> void:
 			g._handle_click(g.chest.reel_rect(slot).get_center())
 			if g.tarot_ui.ceremony.active():
 				var draw = g.tarot_ui.ceremony
-				for delta in [1.4,0.5,0.6]: g.tarot_ui._process(delta)
+				for delta in [draw.shuffle_duration()+0.01,0.5,0.6]: g.tarot_ui._process(delta)
 				for i in range(3):
 					var remaining: Array = draw.fan_order().filter(func(index): return index not in draw.removed)
 					remaining.sort_custom(func(a,b): return absf(draw.fan_pose(a).step) < absf(draw.fan_pose(b).step))
@@ -194,13 +217,13 @@ func sound_checks() -> void:
 	var g := SoundBattle.new()
 	root.add_child(g)
 	g._roll(0,false)
-	check(g.played.count("soft_sweep") == 1 and "slash" not in g.played and "perfect" not in g.played,"Ordinary throw replaces the scrape with one soft sweep")
-	check(g.levels.soft_sweep == -21,"Soft sweep is six dB louder on a low-power throw")
+	check(g.played.count("dice/soft_sweep") == 1 and "player/slash" not in g.played and "dice/perfect" not in g.played,"Ordinary throw replaces the scrape with one soft sweep")
+	check(g.levels["dice/soft_sweep"] == -21,"Soft sweep is six dB louder on a low-power throw")
 	g._restart()
 	g.played.clear()
 	g._roll(1,true)
-	check(g.played.count("soft_sweep") == 1 and g.played.count("perfect") == 1 and "confirmation_002" in g.played,"Perfect sound layers once with the existing confirmation")
-	check(g.levels.soft_sweep == -8,"Soft sweep is six dB louder on a Perfect throw")
+	check(g.played.count("dice/soft_sweep") == 1 and g.played.count("dice/perfect") == 1 and "dice/confirmation_002" in g.played,"Perfect sound layers once with the existing confirmation")
+	check(g.levels["dice/soft_sweep"] == -8,"Soft sweep is six dB louder on a Perfect throw")
 	g._restart()
 	g.queue_free()
 	await process_frame

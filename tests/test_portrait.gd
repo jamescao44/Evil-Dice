@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -54,7 +55,7 @@ func run() -> void:
 	for i in range(3):
 		check(game.DICE_POSITIONS[i].distance_to(game.DICE_CENTER) + 77 * game.dice[i].base_scale < game.DICE_RADIUS, "Enlarged dice remain inside the roll circle")
 	var landscape := Battle.new()
-	check(landscape.DICE_CENTER == Vector2(639, 640) and landscape.DICE_RADIUS == 144 and landscape.ARENA == Rect2(24, 80, 1232, 409), "Portrait geometry does not mutate restored landscape layout")
+	check(landscape.DICE_CENTER == Vector2(639, 640) and landscape.DICE_RADIUS == 144 and landscape.ARENA == Rect2(24, 80, 1232, 372), "Portrait geometry does not mutate restored landscape layout")
 	landscape.free()
 	if not game.menu_open: tap(game.MENU_RECT.get_center())
 	tap(game.GUIDE_RECT.get_center())
@@ -85,10 +86,9 @@ func run() -> void:
 	check(game.muted and game.model.pending.same_as(pending), "Synthetic mouse does not double-fire touch")
 	touch(game.DICE_CENTER, false)
 	tap(game.DICE_CENTER)
-	var regeneration_turns: int = game.result.spare
 	await settle()
-	check(game.model.round_number == 2 and game.model.statuses[2].count == regeneration_turns, "Touch applies regeneration and preserves its count until a healing turn ends")
-	for stage in range(9):
+	check(game.model.round_number == 2 and game.model.statuses[2].count == 0 and game.model.enemies.all(func(e): return e.hp == e.max_hp), "Touch applies non-damaging freeze and advances past skipped enemy actions")
+	for stage in range(Waves.CITY_STAGE):
 		game.debug_choice = 12
 		await game._roll()
 		await Driver.resolve_held(game)

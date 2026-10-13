@@ -40,7 +40,7 @@ Ordered effects must not be sorted, combined across inventory positions or cache
 
 ## Reward selection and presentation
 
-For each relic reward, roll rarity once at 58% common, 30% rare, 10% epic, 1% legendary and 1% cursed, then select uniformly among eligible items in that rarity. Adding more items to a rarity divides its existing probability; it never increases that rarity's total weight. Owned unique relics, reserved prizes and fusion-only items are excluded. Empty rarity pools redistribute their weight proportionally among the remaining pools. A fully exhausted relic pool falls back to rubies in treasure chests.
+For each relic reward, roll rarity once using the current wave’s weights, then select uniformly among eligible items in that rarity. Wave 1 starts at 58/30/10/1/1%; `relic_drop_table.gd` moves each weight 10% of its remaining distance toward 20% per wave. Adding more items to a rarity divides its existing probability; it never increases that rarity's total weight. Owned unique relics, reserved prizes and fusion-only items are excluded. Empty rarity pools redistribute their weight proportionally among the remaining pools. A fully exhausted relic pool falls back to rubies in treasure chests.
 
 Treasure categories are a separate roll: relics have weight 2 (50%), rubies and summon shards weight 1 each (25%). Retired flat-damage, multiplier and potion IDs retain their numeric positions, but are excluded from both actual rolls and cosmetic filler even when custom weights request them; they cannot grant rewards. Cursed is a relic rarity, not a separate reward roll. The legacy curse index remains only for presentation and compatibility; any input weight assigned to it joins the relic category.
 
@@ -118,3 +118,9 @@ The before measurement is one baseline run; the after numbers are medians of thr
 Run `godot --headless --path . --script tests/test_localization.gd` for translation coverage, placeholder/glyph checks, text wrapping, preference persistence, and switching without resetting a run. Add `-- --capture` without `--headless` to capture both layouts and languages. Tests write preferences to an isolated temporary path.
 
 Run `godot --headless --path . --script tests/test_translation_live_reload.gd` to test saves without reimport, debouncing, malformed files, quoted CSV, atomic replacements, runtime updates, and preservation of paused battle state. Add `-- --capture` without `--headless` for before/after screenshots. The fixture is isolated under `user://`; tests never edit the real CSV.
+
+## Enemy and wave catalogs
+
+`enemy_catalog.gd` owns the five enemy identities, normal/elite stats and weighted skill pools. `enemy_actions.gd` filters valid options, locks an intent and resolves one impact at a time; `battle_rules.gd` exposes complete-action and per-impact entry points. Taunt targeting and area protection are shared by skills, relic attacks and tarot. `wave_catalog.gd` holds the twenty-wave route and display sizes: player 224→288 by wave 20; enemies 192→44 by wave 19, then city troops 20; paving/scenery shrink steadily. `run_rules.gd` owns progression. `combat_motion.gd` samples the growth squash/stretch from transition progress; both layouts render it around the player’s feet without changing combat state or the final size.
+
+`relic_drop_table.weights_for_wave` moves each starting rarity rate 10% toward an even 20% split per wave. The run passes its current weights to wave offers, chest rewards and tarot relic effects. Concrete rewards remain locked before presentation.

@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Run = preload("res://scripts/run_rules.gd")
 const Catalog = preload("res://scripts/tarot_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
@@ -68,6 +69,14 @@ func model_checks() -> void:
 	m.reward_weights = [1,0,0,0,0,0,0]
 	m.perfect_progress = 9
 	check(m.open_chest() == [0,0,0,0,0] and m.chest_tarots.is_empty(),"Tarot never replaces currency or adds a reward slot")
+	m.reset_run()
+	for e in m.enemies: e.hp = 0
+	m.open_relic_offer()
+	var wave_choices: Array = m.wave_tarots.duplicate()
+	var relic_choices: Array = m.relic_choices.duplicate(true)
+	check(m.begin_tarot_reward("debug").size() == 3,"Debug can open a standalone tarot reward")
+	check(not m.choose_tarot(0).is_empty() and m.tarots.items.size() == 1,"Standalone debug reward grants the chosen card")
+	check(not m.relic_offer_resolved and m.wave_tarots == wave_choices and m.relic_choices == relic_choices,"Debug reward preserves the real wave offer")
 
 func capture(game, label: String) -> void:
 	if "--visual" not in OS.get_cmdline_user_args(): return
@@ -111,7 +120,7 @@ func scene_checks(game) -> void:
 	tap(game,game.relic_ui.card_rect(2).get_center())
 	check(draw.active() and game._menus_open(),"Wave tarot card starts a blocking ceremony")
 	await capture(game,"shuffle")
-	ui._process(1.4)
+	ui._process(draw.shuffle_duration()+0.01)
 	ui._process(0.5)
 	ui._process(0.6)
 	await capture(game,"fan")
@@ -174,9 +183,22 @@ func scene_checks(game) -> void:
 	tap(game,ui.carousel_pose(ui.front_index()).at)
 	check(ui.inspected >= 0,"Tapping the front card opens its planned description")
 	await capture(game,"inspect")
+	var other: int = -1
+	for i in range(game.model.tarots.items.size()):
+		if i != ui.front_index() and ui.card_at(ui.carousel_pose(i).at) == i:
+			other = i
+			break
+	check(other >= 0,"Another card remains selectable while inspecting")
+	if other >= 0:
+		tap(game,ui.carousel_pose(other).at)
+		check(ui.inspected == -1,"Selecting another card dismisses the previous description immediately")
+		for i in range(40): ui._process(0.02)
+		check(ui.front_index() == other and ui.inspected == -1,"Carousel settles on the selected card without stale inspection")
+		tap(game,ui.carousel_pose(other).at)
+		check(ui.inspected == other,"The newly selected card opens its own description")
 	tap(game,Vector2(10,10))
 	check(ui.inspected == -1 and game.view_phase == "ready","Closing inspection cannot send a battle action")
-	game.model.load_debug_wave(10)
+	game.model.load_debug_wave(Waves.COUNT)
 	game.model.begin_round()
 	var volley: float = game.model.volley_clock
 	game._process(2)
@@ -205,7 +227,7 @@ func scene_checks(game) -> void:
 func resolve_ceremony(game) -> void:
 	var ui = game.tarot_ui
 	var draw = ui.ceremony
-	ui._process(1.4)
+	ui._process(draw.shuffle_duration()+0.01)
 	ui._process(0.5)
 	ui._process(0.6)
 	for i in range(3):
@@ -277,6 +299,36 @@ func angular_swipe_checks(game) -> void:
 	game.queue_free()
 	await process_frame
 
+func skip_checks(game) -> void:
+	root.add_child(game)
+	game.muted = true
+	game.set_process(false)
+	game.tarot_ui.set_process(false)
+	var draw = game.tarot_ui.ceremony
+	for reduced in [false,true]:
+		game._restart()
+		game.reduced = reduced
+		game.tarot_ui.begin_reward("debug")
+		var choices: Array = draw.choices.duplicate()
+		var rng_state: int = game.model.reward_rng.state
+		tap(game,draw.fan_pose(0).at)
+		check(draw.state == "fan" and draw.age >= 0.55 and draw.draws.is_empty(),"Preparation skip opens the fan and consumes the tap")
+		for i in range(3):
+			var backs: Array = draw.fan_order().filter(func(index): return index not in draw.removed)
+			backs.sort_custom(func(a,b): return absf(draw.fan_pose(a).step) < absf(draw.fan_pose(b).step))
+			tap(game,draw.fan_pose(backs[0]).at)
+			check(draw.draws.size() == i+1 and draw.draws[0].age == 0,"Cards can be drawn consecutively without waiting for flight")
+		check(draw.state == "drawing" and draw.removed.size() == 3,"Rapid taps draw exactly three distinct backs")
+		tap(game,draw.row_point(0))
+		check(draw.state == "choose" and draw.selected == -1 and game.model.tarots.items.is_empty(),"Reveal skip finishes movement without selecting or awarding a card")
+		check(draw.choices == choices and game.model.reward_rng.state == rng_state,"Skipping and rapid draws preserve locked outcomes")
+		tap(game,draw.row_point(1))
+		tap(game,draw.keep_rect().get_center())
+		draw.advance(1)
+		check(not draw.active() and game.model.tarots.items.size() == 1,"Streamlined draw still collects exactly one chosen card")
+	game.queue_free()
+	await process_frame
+
 func run() -> void:
 	GameText.set_language("en" if "--english" in OS.get_cmdline_user_args() else "zh_CN",false)
 	model_checks()
@@ -284,6 +336,8 @@ func run() -> void:
 	await scene_checks(Portrait.new())
 	await angular_swipe_checks(Battle.new())
 	await angular_swipe_checks(Portrait.new())
+	await skip_checks(Battle.new())
+	await skip_checks(Portrait.new())
 	await integration_checks()
 	print("Tarot: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

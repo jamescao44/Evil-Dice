@@ -1,6 +1,6 @@
 class_name StatusEffect
 extends RefCounted
-## One boon or affliction. Counts mean remaining turns/throws, or burning stacks.
+## One boon or affliction. Counts mean remaining turns, throws, attack casts or status stacks.
 const REGEN := 2
 const MIGHT := 3
 const ASCENSION := 33
@@ -18,6 +18,7 @@ const ENEMY_ACTION_LOCKS := [FROZEN, IMMOBILIZED]
 const HARMFUL := [FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE, IMMOBILIZED]
 const PLAYER_HARMFUL := [FROZEN, BURNING, STUNNED, DARKNESS, CORROSION]
 const ENEMY_HARMFUL := [FROZEN, BURNING, DARKNESS, CORROSION, PLAGUE, IMMOBILIZED]
+const ATTACK_BOONS := [MIGHT, ASCENSION]
 const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED, DARKNESS, CORROSION, PLAGUE, HIDDEN, IMMOBILIZED]
 enum Attribute { NONE, ICE, FIRE, SHOCK, DARK, ACID, DISEASE }
 var permanent: bool = false

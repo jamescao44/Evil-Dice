@@ -1,4 +1,5 @@
 extends SceneTree
+const Waves = preload("res://scripts/wave_catalog.gd")
 const Battle = preload("res://scripts/battle.gd")
 const Portrait = preload("res://scripts/battle_portrait.gd")
 var checks: int = 0
@@ -95,7 +96,7 @@ func scene_checks(g) -> void:
 	g._restart()
 	await create_timer(0.2).timeout
 	check(g.model.tarot_effects.pending_steps.is_empty() and g.model.statuses.values().all(func(effect): return effect.count == 0) and g.view_phase == "ready","Restart invalidates the old burst coroutine")
-	g._restart(10)
+	g._restart(Waves.COUNT)
 	start_tower(g)
 	g.model.hp = 1
 	g.model.volley_clock = 0.01

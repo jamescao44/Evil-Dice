@@ -97,6 +97,6 @@ static func lines(source: String, font: Font, size: int, width: float) -> Packed
 
 static func remaining(amount: int, unit: String = "turn") -> String:
 	# Full plural templates let translators choose their own word order.
-	var singular := {"turn":"%d turn remaining.", "throw":"%d throw remaining.", "stack":"%d stack remaining."}
-	var plural := {"turn":"%d turns remaining.", "throw":"%d throws remaining.", "stack":"%d stacks remaining."}
+	var singular := {"attack":"%d attack remaining.", "turn":"%d turn remaining.", "throw":"%d throw remaining.", "stack":"%d stack remaining."}
+	var plural := {"attack":"%d attacks remaining.", "turn":"%d turns remaining.", "throw":"%d throws remaining.", "stack":"%d stacks remaining."}
 	return format(singular[unit] if amount == 1 else plural[unit], amount)
