@@ -76,7 +76,9 @@ func reveal(tier: int) -> void:
 func sync(muted: bool, paused: bool) -> void:
 	enabled = not muted
 	for voice in [rolling,payout]:
-		voice.stream_paused = paused
+		# Web Sample playback restarts its source on every unpause call.
+		# Sync runs each frame, so send pause/resume only on a state change.
+		if voice.stream_paused != paused: voice.stream_paused = paused
 		if AudioServer.get_bus_index("Combat") >= 0: voice.bus = "Combat"
 	rolling.volume_db = ROLL_DB if enabled else -80.0
 	payout.volume_db = PAYOUT_DB if enabled else -80.0
