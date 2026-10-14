@@ -17,7 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-TranslationLiveReload="*res://scripts/translation_live_reload.gd"
+TranslationLiveReload="*res://scripts/localization/translation_live_reload.gd"
 
 [display]
 
@@ -30,7 +30,6 @@ window/stretch/mode="canvas_items"
 [internationalization]
 
 locale/translations=PackedStringArray("res://assets/localization/ui.en.translation", "res://assets/localization/ui.zh_CN.translation")
-locale/fallback="en"
 
 [physics]
 

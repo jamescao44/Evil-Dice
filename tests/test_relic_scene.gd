@@ -1,7 +1,7 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var checks := 0
 var failures := 0
 var game
@@ -29,6 +29,23 @@ func capture(name: String) -> void:
 	DirAccess.make_dir_recursive_absolute("res://test-output")
 	root.get_texture().get_image().save_png("res://test-output/relic-%s-%s.png" % ["portrait" if game is Portrait else "landscape",name])
 
+func open_test_chest(ids: Array) -> void:
+	game.model._roll_chest(0)
+	# A deterministic award fixture, supplied before the view snapshots prizes.
+	game.model.open_rewards.clear()
+	game.model.chest_relics.clear()
+	game.model.chest_tarots.clear()
+	for i in range(ids.size()):
+		game.model.open_rewards.append(game.Rewards.Category.RELIC)
+		game.model.chest_relics[i] = ids[i]
+	game._show_chest(game.model.open_rewards.duplicate())
+	var deadline: int = Time.get_ticks_msec()+3000
+	while not game.chest.visible and Time.get_ticks_msec() < deadline: await process_frame
+	game.chest.open_chest()
+	game.chest.skip_animation()
+	game.chest.skip_animation()
+	while game.chest.active and Time.get_ticks_msec() < deadline+5000: await process_frame
+
 func pickup_destination_checks() -> void:
 	var pages: Array = []
 	pages.resize(9)
@@ -41,10 +58,8 @@ func pickup_destination_checks() -> void:
 	for case in cases:
 		game._restart()
 		for id in case.owned: game.model.acquire_relic(id)
-		game.model.enemies[0].hp = 0
-		game._check_over()
-		game.model.relic_choices = [case.pick]
-		game._handle_click(game.relic_ui.card_rect(0).get_center())
+		await open_test_chest([case.pick])
+		game._handle_click(game.chest.reel_rect(0).get_center())
 		check(game.relic_ui.pickup.active and game.relic_ui.pickup.slot == 1 and game.model.relics.items[1].id == case.result,"Pickup lands on the acquired stack or fused relic: "+case.result)
 		if case.result == "ancient_codex":
 			game.reduced = true
@@ -117,17 +132,13 @@ func run() -> void:
 	game = Portrait.new() if "--portrait" in OS.get_cmdline_user_args() else Battle.new()
 	root.add_child(game)
 	game.muted = true; game.speed = 20
-	game.model.enemies[0].hp = 0
-	game._check_over()
-	check(game.view_phase == "relic_reward" and game.model.relic_choices.size() == 2 and game.model.wave_tarots.size() == 3,"Cleared wave opens two relics and a tarot draw before advancing")
-	var offers: Array = game.model.relic_choices.duplicate()
-	await create_timer(0.15).timeout
-	check(game.model.stage == 0 and game.model.relic_choices == offers,"Reward screen waits without rerolling")
+	await open_test_chest(["armor"])
+	var offers: Array = ["armor"]
 	await capture("choices")
-	game._handle_click(game.relic_ui.card_rect(0).get_center())
+	game._handle_click(game.chest.reel_rect(0).get_center())
 	var ui = game.relic_ui
-	check(ui.pickup.active and game.model.relic_offer_resolved and game.model.stage == 0,"Choice commits once while the wave waits for its inventory landing")
-	game._handle_click(ui.card_rect(1).get_center())
+	check(ui.pickup.active and game.model.claimed_slots == [0] and game.model.stage == 0,"Choice commits once while the wave waits for its inventory landing")
+	game._handle_click(game.chest.reel_rect(0).get_center())
 	check(game.model.relics.items.size() == 1 and game.model.relics.has(offers[0]),"Tapping again during pickup cannot grant another relic")
 	game._notification(MainLoop.NOTIFICATION_APPLICATION_PAUSED)
 	check(ui.pickup.active,"Focus changes cancel held input without dropping an acquired relic's animation")
@@ -140,12 +151,12 @@ func run() -> void:
 	ui.queue_redraw()
 	await capture("pickup-flight")
 	ui.pickup.advance(ui.Pickup.LAND_TIME-ui.pickup.age+0.025)
-	check(ui.pickup.landed and game.view_phase == "relic_reward","The impact is shown before leaving the reward screen")
+	check(ui.pickup.landed and game.view_phase == "reward","The impact is shown before leaving the reward screen")
 	ui.queue_redraw()
 	await capture("pickup-impact")
 	ui.set_process(true)
 	await until_phase("ready")
-	check(game.model.stage == 1 and game.model.relics.has(offers[0]),"Selecting a card acquires one relic and advances")
+	check(game.model.stage == 0 and game.model.relics.has(offers[0]),"Selecting a relic returns to the prior battle")
 	await pickup_destination_checks()
 	await charged_item_checks()
 	game._restart()
@@ -174,12 +185,6 @@ func run() -> void:
 			game.model.relics.items = [{"id":id}]
 			var tooltip: Rect2 = game.relic_ui.tooltip_rect(0)
 			check(tooltip.position.y >= 20 and tooltip.end.y < game.relic_ui.inventory_rect().position.y,"Held description fits above inventory: "+language+" "+id)
-			var portrait: bool = game.relic_ui.portrait()
-			var card: Rect2 = game.relic_ui.card_rect(0)
-			var size: int = 28 if portrait else 22
-			var lines := GameText.lines(game.relic_ui.Catalog.ITEMS[id].text,game.description_font,size,card.size.x-48)
-			var bottom: float = (132 if portrait else 186)+(lines.size()-1)*(size+8)+game.description_font.get_descent(size)
-			check(bottom < card.size.y-12,"Offer description fits without clipping: "+language+" "+id)
 		game.model.relics.items = [{"id":"magic_sword","turns":5,"charges":1}]
 		game._handle_click(game.relic_ui.slot_rect(0).get_center())
 		await capture("description-"+language)
@@ -207,27 +212,25 @@ func run() -> void:
 	game.model.apply_enemy_status(0,game.Status.CORROSION,3)
 	game.model.apply_enemy_status(0,game.Status.PLAGUE,1)
 	await capture("inventory")
-	for enemy in game.model.enemies: enemy.hp = 0
-	game._check_over()
-	game.model.relic_choices = ["contract","bloodstone"]
-	game._handle_click(game.relic_ui.card_rect(0).get_center())
-	check(game.relic_ui.replacement_choice == 0 and game.model.relics.items.size() == 10,"Full inventory prompts for a replacement")
+	await open_test_chest(["contract"])
+	game._handle_click(game.chest.reel_rect(0).get_center())
+	check(game.relic_ui.chest_slot == 0 and game.model.relics.items.size() == 10,"Full inventory prompts for replacement")
 	await capture("replacement")
 	game._handle_click(game.relic_ui.slot_rect(2).get_center())
 	await until_phase("ready")
-	check(game.model.relics.items[2].id == "contract" and game.model.relics.items.size() == 10,"Replacement preserves selected position and slot limit")
-	for enemy in game.model.enemies: enemy.hp = 0
-	game._check_over()
+	check(game.model.relics.items[2].id == "contract" and game.model.relics.items.size() == 10,"Replacement preserves position and slot limit")
 	var rubies: int = game.model.rubies
-	game._handle_click(game.relic_ui.skip_rect().get_center())
+	await open_test_chest(["bloodstone"])
+	game._handle_click(game.chest.skip_rect().get_center())
 	await until_phase("ready")
-	check(game.model.rubies == rubies+10,"Skip awards ten rubies")
-	game.model.perfect_progress = 9
+	check(game.model.rubies == rubies+30,"Skipping gifts retains the normal chest crystal payout")
+	game.model.perfect_progress = 15
 	game.model.reward_weights = [0,1,0,0,0,0,0]
 	game._reward_sequence()
 	var deadline: int = Time.get_ticks_msec()+4000
 	while not game.chest.visible and Time.get_ticks_msec() < deadline: await process_frame
-	check(game.chest.visible and game.model.chest_relics.size() == 4 and game.model.chest_tarots.size() == 1,"Perfect chest locks four relics and one tarot draw")
+	check(game.chest.visible and game.model.chest_relics.size() == 5 and game.model.chest_tarots.is_empty(),"Forced relic category locks five real relics")
+	game.chest.open_chest()
 	game.chest.set_process(false)
 	game.chest.elapsed = 3.8
 	game.chest.queue_redraw()
@@ -265,17 +268,18 @@ func run() -> void:
 	game.model.apply_affliction(game.Status.BURNING,3)
 	game.model.phase = "enemy"; game.view_phase = "resolving"
 	await game._resolve_turn_end(game.run_id)
-	check(game.view_phase == "relic_reward" and game.model.hp == 85 and game.model.status_count(game.Status.BURNING) == 2,"Enemy burn victory waits for every player burn tick before relic choices")
+	while game.view_phase == "collecting": await process_frame
+	check(game.view_phase == "reward" and game.model.wave_chest_stage == game.model.stage and game.model.hp == 85 and game.model.status_count(game.Status.BURNING) == 2,"Enemy burn victory waits for every player burn tick before the wave chest")
 	check(game.model.relics.items[0].charges == 1,"A status-effect victory completes the sixth relic turn")
 	game._restart(Waves.COUNT)
-	game.model.city_hp = 0; game.model.perfect_progress = 9
+	game.model.city_hp = 0; game.model.perfect_progress = 15
+	game.model.wave_chest_stage = game.model.stage
+	game.model.wave_reward_resolved = true
 	game._check_over()
-	check(game.view_phase == "relic_reward","City victory also offers a relic")
-	game._handle_click(game.relic_ui.skip_rect().get_center())
 	await until_phase("over")
-	check(game.model.open_rewards.size() == 5 and game.auto_claim_tier == 3,"Relic choice preserves the victory chest and success flow")
+	check(game.model.open_rewards.size() == 5 and game.auto_claim_tier == 3,"Victory preserves banked Ultra chest")
 	game._restart()
-	check(game.model.relics.items.is_empty() and game.model.relic_choices.is_empty(),"Restart clears inventory and pending choices")
+	check(game.model.relics.items.is_empty() and game.model.open_rewards.is_empty(),"Restart clears inventory and pending choices")
 	game.queue_free(); await process_frame
 	print("Relic UI: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

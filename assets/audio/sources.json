@@ -166,5 +166,39 @@
   "ui/maximize_008.ogg": {
     "source": "interface-sounds/Audio/maximize_008.ogg",
     "sha256": "57c074e600e193a303ce781c04c0ccc191c6030f9f106594fd94a65e55435c17"
+  },
+  "item/crystal_collect.wav": {
+    "source": "https://opengameart.org/sites/default/files/gem-gather-stereo.wav",
+    "author": "Bobjt",
+    "license": "CC0-1.0",
+    "page": "https://opengameart.org/content/gem-collect-sfx",
+    "sha256": "03ff8ccdf94e0439cac45fb52a1037c7fc02048ef10fdb7cbcb285ad41a3ec08"
+  },
+  "enemy/crystal_drop.wav": {
+    "source": "https://opengameart.org/sites/default/files/gem-gather-stereo-reverb.wav",
+    "author": "Bobjt",
+    "license": "CC0-1.0",
+    "page": "https://opengameart.org/content/gem-collect-sfx",
+    "sha256": "2d44fbb79f0839b8450e570a076154822b53ab31987ed2e8590d42792eb0a4d3"
+  },
+  "item/arcade_slot_roll.wav": {
+    "source": "User-provided outs-FXs/arcade_slot_roll.wav",
+    "sha256": "3d841fac5ffe2b834cf1c6e0d121d4c6c83fb2d1dd419b800a3c24e304ce1e5a"
+  },
+  "item/reward_level1.wav": {
+    "source": "User-provided outs-FXs/reward_level1.wav",
+    "sha256": "ab81d5d73d9c874a27cf1f3e3c0c3c99333706ac13f86bff54c7b743f4c6a3b7"
+  },
+  "item/reward_level2.wav": {
+    "source": "User-provided outs-FXs/reward_level2.wav",
+    "sha256": "abc1eda26bbce4b67e5ee06baf92a05563fd9090c6353a7adf0e03334023275b"
+  },
+  "item/reward_level3.wav": {
+    "source": "User-provided outs-FXs/reward_level3.wav",
+    "sha256": "a0dff57532b7e199479e294e7c8bca979ddccc8d18bbd3b243b9535bd14e8eb4"
+  },
+  "item/arcade_slot_roll2.wav": {
+    "source": "User-provided outs-FXs/arcade_slot_roll2.wav",
+    "sha256": "985729614ceb51e2de47b19da7a17b7cce6a9c8edf6fed72bbe1f23c8535e664"
   }
 }

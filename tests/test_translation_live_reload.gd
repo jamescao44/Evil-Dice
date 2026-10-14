@@ -1,6 +1,6 @@
 extends SceneTree
-const Source = preload("res://scripts/translation_csv.gd")
-const Home = preload("res://scripts/home.gd")
+const Source = preload("res://scripts/localization/translation_csv.gd")
+const Home = preload("res://scripts/home/home.gd")
 var checks := 0
 var failures := 0
 var fixture: String
@@ -18,7 +18,7 @@ func write_rows(path: String, rows: Array) -> void:
 	for row in rows: file.store_csv_line(PackedStringArray(row))
 
 func rows(pair: String) -> Array:
-	return [["keys","en","zh_CN"],["DOUBLES","DOUBLES",pair],["Settings","Options","选项"],["regen 5 for %s turns","regen 5 for %s turns","回复5点，持续%s回合"]]
+	return [["keys","en","zh_CN"],["DOUBLES","DOUBLES",pair],["Settings","Options","选项"],["DMG +0.5 for %s attacks","DMG +0.5 for %s attacks","伤害+0.5，持续%s次攻击"]]
 
 func parser_checks() -> void:
 	write_rows(fixture,rows("初始对子"))
@@ -80,7 +80,7 @@ func integration_checks() -> void:
 	await wait_for_text("DOUBLES","替换保存")
 	home.start_battle()
 	var g = home.battle
-	g.model.set_test_roll([2,2,3])
+	g.model.set_test_roll([3,3,4])
 	g.view_phase = "skill"
 	g.skill_bubble.begin(g.model.pending)
 	g.skill_bubble.age = 5
@@ -89,11 +89,11 @@ func integration_checks() -> void:
 	var hp: int = g.model.hp
 	var roll: Array = g.model.pending.dice.duplicate()
 	var edited := rows("战斗对子")
-	edited[3][2] = "每回合恢复5点，持续%s回合"
+	edited[3][2] = "攻击增益+0.5，还可攻击%s次"
 	paused = true
 	write_rows(fixture,edited)
 	await wait_for_text("DOUBLES","战斗对子")
-	check(g.skill_bubble.description_text() == "每回合恢复5点，持续3回合","Already-created skill uses edited dynamic wording")
+	check(g.skill_bubble.description_text() == "攻击增益+0.5，还可攻击4次","Already-created skill uses edited dynamic wording")
 	check(g.model.rng.state == rng and g.model.hp == hp and g.model.pending.dice == roll and g.menu_open,"Reload preserves battle state, paused menu, and gameplay RNG")
 	paused = false
 	GameText.set_language("en",false)

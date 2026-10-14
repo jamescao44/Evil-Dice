@@ -1,5 +1,5 @@
 extends SceneTree
-const Battle = preload("res://scripts/battle.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
 var failures := 0
 
 func check(value: bool, label: String) -> void:

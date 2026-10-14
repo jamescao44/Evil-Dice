@@ -1,8 +1,8 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Battle = preload("res://scripts/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
 var game
 var failures := 0
 var checks := 0

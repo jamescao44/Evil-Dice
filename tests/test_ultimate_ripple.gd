@@ -1,7 +1,7 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var checks := 0
 var failures := 0
 var game

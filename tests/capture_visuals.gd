@@ -1,6 +1,6 @@
 extends SceneTree
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var game
 func _initialize() -> void:
 	call_deferred("run")

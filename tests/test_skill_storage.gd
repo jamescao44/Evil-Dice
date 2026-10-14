@@ -1,9 +1,9 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 var checks := 0
 var failures := 0
@@ -269,7 +269,7 @@ func layout_checks(g) -> void:
 	drag(g,g._saved_slot_center(),g._enemy_point(0))
 	var wave_deadline: int = Time.get_ticks_msec()+7000
 	while (g.model.stage == 0 or g.view_phase != "ready") and Time.get_ticks_msec()<wave_deadline:
-		if g.view_phase == "relic_reward": g.model.skip_relic()
+		preload("res://tests/scene_driver.gd").cast_pending(g)
 		await process_frame
 	check(g.model.stage == 1 and g.view_phase == "ready" and g.model.saved_skill.dice == [6,6,4],"Bonus wave victory automatically carries the unused summoned skill to the next wave")
 	check(g.saved_bubble.roll.dice == [6,6,4] and g.skill_bubble.roll.is_empty() and g.model.statuses[6].count == 0,"Auto-save updates the slot visual without activating the unused boon")

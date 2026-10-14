@@ -1,7 +1,7 @@
 extends SceneTree
 ## Regenerate the reel icon atlas from the same sourced sprites as inventory icons.
-const Paint = preload("res://scripts/relic_paint.gd")
-const Catalog = preload("res://scripts/relic_catalog.gd")
+const Paint = preload("res://scripts/relics/relic_paint.gd")
+const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 
 func _initialize() -> void: call_deferred("render")
 

@@ -1,10 +1,10 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Motion = preload("res://scripts/combat_motion.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Status = preload("res://scripts/status_effect.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Motion = preload("res://scripts/combat/combat_motion.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
 var checks := 0
 var failures := 0
 func _initialize() -> void: call_deferred("run")

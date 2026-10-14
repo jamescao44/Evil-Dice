@@ -1,8 +1,8 @@
 extends SceneTree
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Home = preload("res://scripts/home.gd")
-const Waves = preload("res://scripts/wave_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Home = preload("res://scripts/home/home.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
 var checks := 0
 var failures := 0
 func check(ok: bool, text: String) -> void:
@@ -58,7 +58,7 @@ func run() -> void:
 			g._advance_wave()
 			var deadline: int = Time.get_ticks_msec()+4000
 			while g.view_phase != "ready" and Time.get_ticks_msec() < deadline:
-				if g.view_phase == "relic_reward": g.model.skip_relic()
+				preload("res://tests/scene_driver.gd").cast_pending(g)
 				await process_frame
 			check(g.view_phase == "ready" and g.model.stage == wave-1,"Feeding reaches the next wave exactly once")
 			check(is_equal_approx(g.monster_side,Waves.player_size(wave-1)) and g._player_growth_scale() == Vector2.ONE,"Growth settles at the configured size after each transition")

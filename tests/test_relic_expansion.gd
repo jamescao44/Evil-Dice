@@ -1,9 +1,9 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Status = preload("res://scripts/status_effect.gd")
-const Catalog = preload("res://scripts/relic_catalog.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
+const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 var checks := 0
 var failures := 0
 
@@ -227,11 +227,13 @@ func curse_and_currency_checks() -> void:
 	check(m.gain_soul_crystals(100) == 160,"Four vessel activations add sixty percent")
 	m = fresh(["coin","soul_vessel"])
 	for e in m.enemies: e.hp = 0
-	m.open_relic_offer(); m.skip_relic()
-	check(m.rubies == 23,"Coin and wave-skip payouts both receive the bonus")
-	m.open_rewards = [0]
-	var reward: Dictionary = m.claim_reward(0)
-	check(m.rubies == 138 and reward.text_values == [115],"Chest payout and displayed gain include Soul Vessel")
+	m.begin_wave_reward()
+	check(m.rubies == 11,"Wave coin receives Soul Vessel bonus")
+	var base: int = m.Chests.CRYSTALS[m.wave_chest_tier]
+	var expected: int = m.soul_crystal_gain_preview(base)
+	m.open_wave_chest()
+	check(m.release_chest_crystals() == expected and m.rubies == 11+expected,"Separate chest payout includes Soul Vessel")
+	check(m.release_chest_crystals() == 0,"Chest currency bonus cannot repeat")
 	m.reset_run()
 	check(m.rubies == 0 and m.soul_crystal_remainder == 0,"New run clears currency fractions")
 

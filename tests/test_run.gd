@@ -1,7 +1,7 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
 var checks := 0
 var failures := 0
 

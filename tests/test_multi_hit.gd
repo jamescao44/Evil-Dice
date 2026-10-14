@@ -1,9 +1,9 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 var checks := 0
 var failures := 0
@@ -153,7 +153,7 @@ func corpse_checks() -> void:
 				else: check(hits.all(func(e): return not e.get("corpse_hit",false)),"Corpses are excluded whenever a living target remains")
 				if use < count-1:
 					check(m.phase == "executing" and m.outcome().is_empty(),"Victory waits for the complete locked hit budget")
-					if mode != "battle": check(m.open_relic_offer().is_empty(),"Rewards stay unavailable between remaining hits")
+					if mode != "battle": check(not m.begin_wave_reward(),"Rewards stay unavailable between remaining hits")
 				if mode == "city" and m.city_hp == 0:
 					check(m.tick_city(0.25).is_empty(),"A destroyed city cannot attack during follow-through")
 			check(corpses > 0 and m.pending.is_empty() and m.outcome() == ("wave_clear" if mode == "wave" else "victory"),"The last corpse hit ends the cast and releases victory")
@@ -229,15 +229,18 @@ func scene_checks(g) -> void:
 	check(g.view_phase == "skill" and g.skill_bubble.orb_count() == 12 and g.model.round_number == turn,"Saved modified chain restores the waiting preview without spending its turn")
 	prepare(g,[5,5,5])
 	for enemy in g.model.enemies: enemy.hp = 1; enemy.shield = 0
-	g.model.set_skill_use_multiplier("echo",2)
+	g.speed = 1
+	g.model.set_skill_use_multiplier("echo",5)
 	var cast: MultiHitSkill = g.model.pending
+	var impact_times: Array = []
 	Driver.cast_pending(g)
 	var max_used: int = g.skill_bubble.used
 	var continued: bool = false
 	var rewards_locked: bool = true
 	var captured: bool = false
-	deadline = Time.get_ticks_msec()+8000
+	deadline = Time.get_ticks_msec()+12000
 	while g.view_phase == "resolving" and Time.get_ticks_msec()<deadline:
+		if cast.uses_spent > impact_times.size(): impact_times.append(Time.get_ticks_msec())
 		max_used = maxi(max_used,g.skill_bubble.used)
 		if g.model.living().is_empty() and cast.uses_left() > 0:
 			continued = true
@@ -246,9 +249,16 @@ func scene_checks(g) -> void:
 				captured = true
 				capture_corpses(g)
 		await process_frame
-	check(Time.get_ticks_msec()<deadline and continued and max_used == 12 and cast.uses_spent == 12,"Scene consumes every orb after killing the last creature")
+	check(Time.get_ticks_msec()<deadline and continued and max_used == 30 and cast.uses_spent == 30,"Scene consumes all thirty accelerating hits after killing the last creature")
+	if impact_times.size() == 30:
+		var early: float = (impact_times[6]-impact_times[1])/5.0
+		var late: float = (impact_times[29]-impact_times[24])/5.0
+		check(late < early*0.7 and late > 35,"Long combos speed up gradually while retaining separate readable impacts")
+		print("30-hit timing: %.0f ms early, %.0f ms late; %.2f s from first to last hit" % [early,late,(impact_times[29]-impact_times[0])/1000.0])
+	else: check(false,"Every accelerated impact remains observable")
 	check(rewards_locked,"Scene keeps rewards locked while hitting bodies")
-	check(g.view_phase == "relic_reward","Wave reward appears only after the complete chain")
+	while g.view_phase == "collecting" and Time.get_ticks_msec()<deadline: await process_frame
+	check(g.view_phase == "reward" and g.chest.roll_phase == "closed" and g.model.wave_chest_stage == g.model.stage,"Closed wave chest appears only after the complete chain")
 	g.fallen[0] = 1.0
 	check(g._enemy_impact_point(0).is_equal_approx(g._enemy_feet(0)-Vector2(0,g._enemy_side()*0.08)),"Follow-through aims at the body on the floor")
 	g.queue_free()

@@ -1,13 +1,13 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var checks := 0
 var failures := 0
 
 class SoundBattle:
-	extends "res://scripts/battle.gd"
+	extends "res://scripts/combat/battle.gd"
 	var played: Array = []
 	var levels: Dictionary = {}
 	func _sound(clip: String, _pitch: float = 1.0, _volume: float = -15.0) -> void:
@@ -77,6 +77,14 @@ func scene_checks(portrait: bool) -> void:
 	g._handle_click(g.DEBUG_RECT.get_center())
 	check(g.debug_open and g.debug_wave_input.visible and g.debug_wave_input.text == str(Waves.COUNT),"Debug shows a wave number field")
 	check(g.DEBUG_WAVE_INPUT.encloses(g.debug_wave_input.get_rect()),"Native number field fits the debug layout")
+	g.model.perfect_progress = 2
+	var combo_before: int = g.model.perfect_total
+	g._handle_click(g.DEBUG_TREASURE.get_center())
+	check(g.model.perfect_progress == Run.CHEST_THRESHOLDS[-1] and g.model.chest_tier() == 3,"Debug fully charges the treasure bank to Ultra")
+	g._handle_click(g.DEBUG_TREASURE.get_center())
+	check(g.model.perfect_progress == Run.CHEST_THRESHOLDS[-1] and g.model.perfect_total == combo_before and g.debug_open,"Repeated charging stays capped without faking Perfect throws")
+	for other in [g.DEBUG_CHEST,g.DEBUG_TAROTS,g.DEBUG_TAROT_DRAW,g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD,g._debug_option_rect(12)]:
+		check(not g.DEBUG_TREASURE.intersects(other),"Charge treasure button fits the debug layout")
 	await snapshot(g,"debug",portrait)
 	g.model.tarots.add("tower")
 	g.model.tarot_effects.banned = Run.Tarot.ITEMS.keys()
@@ -120,6 +128,49 @@ func scene_checks(portrait: bool) -> void:
 	ceremony.advance(1.0)
 	check(g.model.tarots.items.size() == 1 and not ceremony.active() and g.view_phase == "ready","Debug ceremony collects one card and returns to the current battle")
 	check(g.model.claimed_slots.is_empty() and g.model.reward_history.is_empty() and g.model.tarot_source.is_empty(),"Debug collection does not claim a chest slot or leave a pending transaction")
+	# Spawn through the real debug control, including its complete upgrade chain.
+	g.model.perfect_progress = 8
+	g.model.set_test_roll([1,1,4])
+	g.view_phase = "skill"
+	var held_faces: Array = g.model.pending.dice.duplicate()
+	var before_hp: int = g.model.hp
+	var before_stage: int = g.model.stage
+	var rng := RandomNumberGenerator.new()
+	for seed_value in range(10000):
+		rng.seed = seed_value
+		if Run.Chests.roll_wave_tier(rng) == 3:
+			g.model.reward_rng.seed = seed_value
+			break
+	g._open_debug()
+	for rect in [g.DEBUG_TAROTS,g.DEBUG_TAROT_DRAW,g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD,g._debug_option_rect(12)]:
+		check(not g.DEBUG_CHEST.intersects(rect),"Spawn chest debug button does not overlap other controls")
+	g._handle_click(g.DEBUG_CHEST.get_center())
+	check(not g.debug_open and not g.debug_wave_input.visible and g.chest.roll_phase == "closed" and g.chest.tier == 0 and g.chest.upgrade_mode,"Debug spawns a closed Normal Chest with upgrades enabled")
+	check(g.model.opened_chest_tier == 3 and g.model.perfect_progress == 8 and g.model.wave_chest_stage == -1,"Debug uses real upgrade chances without spending Perfect progress or clearing the wave")
+	var locked_rng: int = g.model.reward_rng.state
+	var funds: int = g.model.rubies
+	g.chest.set_process(false)
+	g.chest.audio_clock_enabled = false
+	g.chest._process(10)
+	g._handle_click(Vector2(10,10))
+	check(g.model.rubies == funds and g.chest.roll_phase == "closed","Closed debug chest does not pay, roll, or open from a background tap")
+	await snapshot(g,"closed-chest",portrait)
+	g._handle_click(g.chest.closed_rect().get_center())
+	check(g.chest.roll_phase == "spinning" and g.chest.tier == 0,"Opening tap starts rolling without attempting an upgrade")
+	for tier in range(1,4):
+		g._handle_click(Vector2(10,10))
+		g.chest._process(g.chest.UPGRADE_BEAT+0.01)
+		check(g.chest.tier == tier,"Debug chest follows the same upgrade chain")
+	g._handle_click(Vector2(10,10))
+	g.chest._process(5.5)
+	check(not g.chest.active and g.model.reward_rng.state == locked_rng,"Debug reveal retains committed rewards")
+	g._handle_click(g.chest.skip_rect().get_center())
+	var chest_deadline: int = Time.get_ticks_msec()+6000
+	while g.view_phase == "reward" and Time.get_ticks_msec() < chest_deadline: await process_frame
+	check(g.view_phase == "skill" and g.model.pending.dice == held_faces and g.model.hp == before_hp and g.model.stage == before_stage,"Finishing debug chest restores the held skill and current battle")
+	check(g.model.rubies == funds+100 and g.model.open_rewards.is_empty() and g.model.perfect_progress == 8,"Debug chest pays once and preserves the treasure bank")
+	g.chest.set_process(true)
+	g.chest.audio_clock_enabled = true
 	for wave in range(1,Waves.COUNT):
 		g._restart(wave)
 		check(g._enemy_side() > g.HUMAN_SIZES[-1] and g._enemy_side() <= g.HUMAN_SIZES[0],"Squad display sizes remain between initial and city scales")
@@ -149,9 +200,10 @@ func scene_checks(portrait: bool) -> void:
 	check(g.model.stage == 6 and g.model.pending.is_empty() and g.view_phase == "ready","Wave load invalidates the old roll coroutine")
 	g.model.stage = Waves.CITY_STAGE
 	g.model.city_hp = 0
-	g.model.perfect_progress = 9
+	g.model.perfect_progress = 15
+	g.model.wave_chest_stage = g.model.stage
+	g.model.wave_reward_resolved = true
 	g._check_over()
-	g.model.skip_relic()
 	await process_frame
 	await process_frame
 	check(g.auto_claim_tier == 3 and not g.model.open_rewards.is_empty(),"Victory reserves the largest chest")
@@ -170,9 +222,10 @@ func scene_checks(portrait: bool) -> void:
 	if "--capture" in OS.get_cmdline_user_args():
 		g._restart(Waves.COUNT)
 		g.model.city_hp = 0
-		g.model.perfect_progress = 9
+		g.model.perfect_progress = 15
+		g.model.wave_chest_stage = g.model.stage
+		g.model.wave_reward_resolved = true
 		g._check_over()
-		g.model.skip_relic()
 		await process_frame
 		await process_frame
 		g._process(0.3)
@@ -181,12 +234,14 @@ func scene_checks(portrait: bool) -> void:
 		var deadline: int = Time.get_ticks_msec()+4000
 		while not g.chest.visible and Time.get_ticks_msec() < deadline: await process_frame
 		check(g.chest.visible,"Victory automatically reveals its chest")
+		g.chest.open_chest()
+		g.chest.request_stop()
 		g.chest.set_process(false)
-		g.chest.elapsed = 3
+		g.chest.audio_clock_enabled = false
+		g.chest._process(1)
 		g.chest.queue_redraw()
 		await snapshot(g,"victory-reels",portrait)
-		g.chest.elapsed = 11
-		g.chest.active = false
+		g.chest._process(5.5)
 		g.chest.queue_redraw()
 		await snapshot(g,"victory-pickups",portrait)
 		for slot in range(g.chest.rewards.size()):

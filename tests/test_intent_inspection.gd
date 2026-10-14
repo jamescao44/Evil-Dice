@@ -1,9 +1,9 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Run = preload("res://scripts/run_rules.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
 var checks := 0
 var failures := 0
 
@@ -79,7 +79,7 @@ func layout_checks(g) -> void:
 	g.model.hit_enemy(0,5)
 	var broken: Dictionary = g._enemy_intent_data(0)
 	check(broken.icon == "skip" and broken.name == "Immobilized","Shield break replaces the next-move icon with immobilization")
-	var inspection = g.get_children().filter(func(node): return node.get_script() == preload("res://scripts/enemy_inspection.gd"))[0]
+	var inspection = g.get_children().filter(func(node): return node.get_script() == preload("res://scripts/enemies/enemy_inspection.gd"))[0]
 	var rows: Array = inspection.status_rows(0)
 	check(rows.any(func(item): return item.id is String and item.id == "enemy_empower") and rows.any(func(item): return item.id is int and item.id == StatusEffect.IMMOBILIZED),"Enemy buffs and shield-break status appear together in hold inspection")
 	g.model.enemies[0].statuses.clear()

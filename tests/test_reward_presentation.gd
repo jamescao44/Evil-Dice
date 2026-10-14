@@ -1,8 +1,8 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var checks := 0
 var failures := 0
 
@@ -80,20 +80,21 @@ func test_layout(game) -> void:
 	var chest = game.chest
 	chest.set_process(false)
 	chest.start([0,1,2],game.fx.canvas_size,game.pixel_font)
+	chest.open_chest()
 	var signals: Array = []
 	chest.opened.connect(func(): signals.append("open"))
 	chest.landed.connect(func(i): signals.append(i))
 	chest.completed.connect(func(): signals.append("complete"))
-	check(chest.stop_time(0) > 6 and chest.stop_time(2) > chest.stop_time(0), "Long reels stop in succession")
-	check(chest.prize_origin(0).distance_to(chest.chest_point()) < 50 and chest.emergence(0) == 0, "Prizes start inside the chest")
+	check(chest.stop_time(1) < chest.stop_time(0) and chest.stop_time(0) < chest.stop_time(2), "Reels stop in succession")
+	check(chest.prize_origin(0) == chest.reel_rect(0).get_center() and chest.emergence(0) == 0, "Reels wait invisibly in their final positions")
 	chest._process(1)
-	check(signals == ["open"] and chest.emergence(0) > 0 and chest.emergence(0) < 1, "Box opens before prizes rise into reels")
+	check(signals == ["open"] and chest.emergence(0) == 1, "Reels appear in place at full size after the box opens")
 	chest._process(1)
 	check(chest.prize_origin(2).is_equal_approx(chest.reel_rect(2).get_center()), "Every prize reaches its own reel")
-	for i in range(3):
+	for i in chest.stop_order():
 		check(Rect2(Vector2.ZERO,game.fx.canvas_size).encloses(chest.reel_rect(i)), "Three reels fit each layout")
 		chest._process(chest.stop_time(i)-chest.elapsed+0.001)
-		check(chest.announced == i+1 and signals.back() == i and is_equal_approx(chest.travel(i),chest.REEL_STEPS), "Each locked result lands once")
+		check(chest.announced == chest.stop_order().find(i)+1 and signals.back() == i and is_equal_approx(chest.travel(i),chest.reel_steps), "Each locked result lands once")
 	check(chest.celebrations.is_empty(), "Category effects wait for pickup")
 	for i in range(3): chest.celebrate(i)
 	check(chest.celebrations.map(func(event): return event.id) == ["ruby","relic","curse"], "Picked prizes get category celebrations")
@@ -113,5 +114,6 @@ func test_layout(game) -> void:
 func run() -> void:
 	await test_layout(Battle.new())
 	await test_layout(Portrait.new())
+	await create_timer(0.15).timeout
 	print("Reward presentation: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

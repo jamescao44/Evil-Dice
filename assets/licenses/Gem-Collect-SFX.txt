@@ -1,0 +1,7 @@
+Gem collect SFX — Bobjt
+Source: https://opengameart.org/content/gem-collect-sfx
+License: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+Retrieved: 2026-10-14
+Unmodified stereo recordings: gem-gather-stereo.wav and gem-gather-stereo-reverb.wav.
+Project paths: audio/item/crystal_collect.wav and audio/enemy/crystal_drop.wav.

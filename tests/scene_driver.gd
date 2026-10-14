@@ -1,8 +1,13 @@
 extends RefCounted
 ## Test player: aims single-target skills; drags other skills onto the field.
 static func cast_pending(game) -> void:
-	if game.view_phase == "relic_reward":
-		game.model.skip_relic()
+	if game.view_phase == "wave_reward":
+		game.wave_chest.click(game.wave_chest.action_rect().get_center())
+		return
+	if game.view_phase == "reward":
+		if game.chest.roll_phase == "closed": game.chest.click(game.chest.closed_rect().get_center())
+		elif game.chest.active: game.chest.request_stop()
+		elif game.chest.can_skip(): game._handle_click(game.chest.skip_rect().get_center())
 		return
 	if game.view_phase != "skill": return
 	game._handle_click(game._skill_center())

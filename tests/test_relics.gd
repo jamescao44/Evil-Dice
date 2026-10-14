@@ -1,8 +1,8 @@
 extends SceneTree
-const Run = preload("res://scripts/run_rules.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Status = preload("res://scripts/status_effect.gd")
-const Catalog = preload("res://scripts/relic_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
+const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 var checks := 0
 var failures := 0
 
@@ -163,11 +163,15 @@ func _initialize() -> void:
 		check(6 not in roll.dice,"Cursed die excludes six on misses")
 	m = fresh(); m.acquire_relic("coin"); m.acquire_relic("cursed_bow")
 	m.enemies[0].hp = 0
-	var first: Array = m.open_relic_offer()
+	m.begin_wave_reward()
+	var first: Array = m.open_rewards.duplicate()
 	check(m.rubies == 10 and m.relics.items[1].waves == 1,"Wave relics trigger before new relic is chosen")
-	check(m.open_relic_offer() == first and m.rubies == 10,"Offers and wave rewards cannot reroll or duplicate")
+	check(m.begin_wave_reward() and m.open_rewards == first and m.rubies == 10,"Offers and wave rewards cannot reroll or duplicate")
 	check(not m.advance_wave(),"Wave waits for relic decision")
-	check(m.skip_relic() and m.rubies == 20 and not m.skip_relic(),"Skip pays ten exactly once")
+	m.open_wave_chest()
+	var payout: int = m.Chests.CRYSTALS[m.wave_chest_tier]
+	m.discard_unclaimed_rewards(); m.close_chest()
+	check(m.finish_wave_reward() and m.rubies == 10+payout and not m.finish_wave_reward(),"Chest pays crystals once even when all items are skipped")
 	check(m.advance_wave() and m.power == 1 and m.max_hp == 130,"Wave grows health without free damage multiplier")
 	for wave in range(1,Run.Waves.COUNT+1):
 		m.load_debug_wave(wave)

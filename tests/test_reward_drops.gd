@@ -1,10 +1,10 @@
 extends SceneTree
-const Drops = preload("res://scripts/relic_drop_table.gd")
-const Relics = preload("res://scripts/relic_catalog.gd")
-const Rewards = preload("res://scripts/reward_catalog.gd")
-const Inventory = preload("res://scripts/relic_inventory.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Chest = preload("res://scripts/reward_chest.gd")
+const Drops = preload("res://scripts/relics/relic_drop_table.gd")
+const Relics = preload("res://scripts/relics/relic_catalog.gd")
+const Rewards = preload("res://scripts/rewards/reward_catalog.gd")
+const Inventory = preload("res://scripts/relics/relic_inventory.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Chest = preload("res://scripts/rewards/reward_chest.gd")
 const SAMPLES := 20000
 var checks := 0
 var failures := 0
@@ -59,20 +59,16 @@ func wave_curve_checks() -> void:
 	check(absf(late[0]-25.133236)<0.00001 and absf(late[3]-17.433382)<0.00001,"Wave twenty approaches rather than reaches equal odds")
 	var model = Run.new(240)
 	model.load_debug_wave(20)
-	check(model.relic_drop_weights() == late,"Run exposes its current wave rates")
+	check(model.relic_drop_weights() == Relics.RARITY_WEIGHTS,"Run uses fixed rates; progression curve is reserved for shops")
 	var counts := [0,0,0,0,0]
 	model.reward_weights = [0,1,0,0,0,0,0]
 	for n in range(10000):
-		model.perfect_progress = 6
-		model.open_chest()
-		counts[Relics.ITEMS[model.reward_item(1).relic_id].rarity] += 1
+		model._roll_chest(0)
+		counts[Relics.ITEMS[model.reward_item(0).relic_id].rarity] += 1
 		model.discard_unclaimed_rewards(); model.close_chest()
-	for rarity in range(5): frequency(counts[rarity],10000,late[rarity]/100,"Late-wave chests use the shifted rates")
+	for rarity in range(5): frequency(counts[rarity],10000,Relics.RARITY_WEIGHTS[rarity]/100,"Late-wave chests retain fixed rates")
 	var mirror := RandomNumberGenerator.new()
 	mirror.state = model.reward_rng.state
-	var expected: Array = model.relics.offers(mirror,2,late)
-	model.city_hp = 0
-	check(model.open_relic_offer() == expected,"Wave completion uses the same curve")
 	for wave in [1,10,20]:
 		model.load_debug_wave(wave); model.begin_round()
 		var card: Dictionary = model.tarots.add("emperor")
@@ -87,31 +83,29 @@ func chest_distribution_checks() -> void:
 	var categories := [0,0,0,0,0,0,0,0]
 	var rarities := [0,0,0,0,0]
 	for n in range(SAMPLES):
-		model.perfect_progress = 3
-		model.open_chest()
+		model._roll_chest(0)
 		var gift: Dictionary = model.reward_item(0)
-		if gift.id == "tarot": categories[Rewards.Category.RELIC] += 1
+		if gift.id == "tarot": categories[Rewards.Category.TAROT] += 1
 		elif gift.has("relic_id"):
 			categories[Rewards.Category.RELIC] += 1
 			rarities[Relics.ITEMS[gift.relic_id].rarity] += 1
 		else: categories[model.open_rewards[0]] += 1
 		model.claim_reward(0,-1,true)
 		model.close_chest()
-	for category in [0,1,3,4,5,6]:
-		frequency(categories[category],SAMPLES,Rewards.DEFAULT_WEIGHTS[category]/4,"Chest category probability stays independent of catalog size")
+	for category in [0,1,3,4,5,6,7]:
+		frequency(categories[category],SAMPLES,Rewards.DEFAULT_WEIGHTS[category]/100,"Chest category probability stays independent of catalog size")
 	for retired in Rewards.RETIRED_CATEGORIES:
 		check(categories[retired] == 0,"Removed category never drops")
 		var forced: Array = [0,0,0,0,0,0,0]
 		forced[retired] = 1
 		for i in range(100): check(Rewards.draw_category(model.reward_rng,forced) not in Rewards.RETIRED_CATEGORIES,"Custom weights cannot restore removed rewards")
-	check(rarities == [0,0,0,0,0],"A common chest substitutes its only relic slot with a tarot draw")
+	check(rarities.reduce(func(a,b): return a+b,0) == categories[Rewards.Category.RELIC],"Relic category gives a real relic")
 	for weights in [[0,1,0,0,0,0,0],[0,0,1,0,0,0,0]]:
 		model.reward_weights = weights
 		var counts := [0,0,0,0,0]
 		for n in range(SAMPLES):
-			model.perfect_progress = 6
-			model.open_chest()
-			counts[Relics.ITEMS[model.reward_item(1).relic_id].rarity] += 1
+			model._roll_chest(0)
+			counts[Relics.ITEMS[model.reward_item(0).relic_id].rarity] += 1
 			model.discard_unclaimed_rewards()
 			model.close_chest()
 		for tier in range(5): frequency(counts[tier],SAMPLES,Relics.RARITY_WEIGHTS[tier]/100,"Legacy cursed category cannot bypass the shared rarity roll")
@@ -120,25 +114,29 @@ func presentation_checks() -> void:
 	var chest = Chest.new()
 	root.add_child(chest)
 	chest.set_process(false)
+	chest.audio_clock_enabled = false
 	chest.cosmetic.seed = 331
-	chest.start([Rewards.Category.RUBY,Rewards.Category.SHARD,Rewards.Category.TAROT],Vector2(1280,800),null)
+	chest.start([Rewards.Category.SHARD,Rewards.Category.SHARD,Rewards.Category.TAROT],Vector2(1280,800),null)
+	await process_frame
 	for sequence in chest.sequences:
 		var rolling: Array = sequence.slice(0,chest.reel_steps)
-		for category in [Rewards.Category.RUBY,Rewards.Category.SHARD,Rewards.Category.TAROT]:
-			check(category in rolling,"Every reel shows currency and tarot regardless of the winning category")
+		for category in [Rewards.Category.SHARD,Rewards.Category.TAROT]:
+			check(category in rolling,"Every reel shows shards and tarot regardless of the winning category")
 		for id in Relics.ITEMS:
 			check((chest.relic_symbols[id] in rolling) == not Relics.ITEMS[id].get("fusion",false),"Every directly obtainable relic appears; fusion-only relics stay out")
 		for index in sequence:
 			check(chest.symbols[index].id not in ["damage","multiplier","potion"] and index not in [Rewards.Category.RELIC,Rewards.Category.CURSE],"Reels show real rewards without retired items or generic relic placeholders")
 	chest.cosmetic.seed = 207
-	chest.start([Rewards.Category.RUBY],Vector2(1280,800),null)
+	chest.start([Rewards.Category.SHARD],Vector2(1280,800),null)
+	await process_frame
 	var ruby_sequence: Array = chest.sequences[0].duplicate()
 	chest.cosmetic.seed = 207
 	chest.start([Rewards.Category.TAROT],Vector2(1280,800),null)
+	await process_frame
 	for i in range(ruby_sequence.size()):
 		if i != chest.reel_steps: check(ruby_sequence[i] == chest.sequences[0][i],"Changing the reward changes only the final landing symbol, never the filler")
 	var model = Run.new(889)
-	model.perfect_progress = 9
+	model.perfect_progress = 15
 	model.reward_weights = [0,1,0,0,0,0,0]
 	var outcomes: Array = model.open_chest()
 	var prizes: Array = []
@@ -149,10 +147,13 @@ func presentation_checks() -> void:
 	var first_sequence: Array = []
 	for reduced in [false,true]:
 		chest.start(outcomes,Vector2(1280,800),null,reduced,prizes)
+		chest.open_chest()
+		await process_frame
 		if first_sequence.is_empty(): first_sequence = chest.sequences.duplicate(true)
 		else: check(first_sequence != chest.sequences,"Cosmetic replay can change its filler without rerolling results")
 		chest.playback_speed = 0.5 if reduced else 10
 		for i in range(12): chest._process(2)
+		await process_frame
 		check(not chest.active and model.claimed_slots.is_empty(),"Animation ends without granting any prize")
 		for slot in range(outcomes.size()):
 			var symbol: Dictionary = chest.symbols[chest.sequences[slot][chest.reel_steps]]
@@ -167,12 +168,14 @@ func presentation_checks() -> void:
 			check(model.claim_reward(slot).relic_id == locked[slot].relic_id,"Reverse pickup order grants the preselected relic")
 	check(model.reward_rng.state == reward_state and model.rng.state == combat_state,"Collecting rewards never rolls them again")
 	check(model.close_chest(),"All locked rewards are collectible")
+	chest.cancel()
 	chest.free()
 
 func run() -> void:
 	distribution_checks()
 	wave_curve_checks()
 	chest_distribution_checks()
-	presentation_checks()
+	await presentation_checks()
+	await create_timer(0.15).timeout
 	print("Reward rarity and locked presentation: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

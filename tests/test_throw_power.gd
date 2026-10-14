@@ -1,10 +1,10 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
 const Driver = preload("res://tests/scene_driver.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Meter = preload("res://scripts/throw_meter.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Meter = preload("res://scripts/dice/throw_meter.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var failures := 0
 var checks := 0
 var game
@@ -102,7 +102,7 @@ func rate_checks() -> void:
 	check(modified.triple_weights[5] == 0.7 and modified.category_weights == [1.0,1.0,1.0], "New runs reset weight modifiers")
 	for fever in [false, true]:
 		for strength in [0.0, 0.25, 0.5, 0.75, 0.9999, 1.0]:
-			var rules := preload("res://scripts/run_rules.gd").new(97531)
+			var rules := preload("res://scripts/progression/run_rules.gd").new(97531)
 			rules.stage = Waves.CITY_STAGE if fever else 0
 			var counts := [0, 0, 0]
 			for i in range(12000):
@@ -111,7 +111,7 @@ func rate_checks() -> void:
 			var rates: Dictionary = Rules.throw_rates(strength, false, fever)
 			for i in range(3): check(absf(counts[i] / 12000.0 - rates[["normal", "pair", "triple"][i]]) < 0.018, "Observed odds match power %.4f fever %s category %d" % [strength, fever, i])
 			print("Power %.4f fever %s: normal / pair / triple %s" % [strength, fever, counts])
-		var perfect_rules := preload("res://scripts/run_rules.gd").new(7913)
+		var perfect_rules := preload("res://scripts/progression/run_rules.gd").new(7913)
 		perfect_rules.stage = Waves.CITY_STAGE if fever else 0
 		var perfect_counts := [0, 0, 0]
 		var faces := [0, 0, 0, 0, 0, 0]

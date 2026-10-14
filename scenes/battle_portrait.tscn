@@ -1,6 +1,7 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/battle_portrait.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/combat/battle_portrait.gd" id="1"]
 
 [node name="EvilDicePortrait" type="Node2D"]
 script = ExtResource("1")
+chest_pity_path = "user://chest_pity.cfg"

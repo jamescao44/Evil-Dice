@@ -1,7 +1,7 @@
 extends SceneTree
-const Life = preload("res://scripts/city_life.gd")
-const City = preload("res://scripts/city_paint.gd")
-const Run = preload("res://scripts/run_rules.gd")
+const Life = preload("res://scripts/city/city_life.gd")
+const City = preload("res://scripts/city/city_paint.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
 var failures := 0
 var checks := 0
 

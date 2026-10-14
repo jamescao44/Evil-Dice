@@ -1,8 +1,8 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
 const Driver = preload("res://tests/scene_driver.gd")
 var checks := 0
 var failures := 0
@@ -110,7 +110,7 @@ func test_layout(game) -> void:
 		prepare(game,[5,5,2] if face_count == 2 else [5,5,5])
 		for enemy in game.model.enemies: enemy.hp = 500
 		game.model.statuses[3].count = 2
-		game.model.perfect_progress = 9
+		game.model.perfect_progress = 15
 		var count: int = 3 if face_count == 2 else 6
 		var damage: int = 36 if face_count == 2 else 30
 		var round_number: int = game.model.round_number
@@ -125,7 +125,7 @@ func test_layout(game) -> void:
 		check(game.damage_feedback.building and game._world_time_scale() == 1,"Damage buildup leaves the battle running before the impact beat")
 		var rng: int = game.model.rng.state
 		for repeat in range(4): tap(game,game._skill_center())
-		tap(game,game._diamond_center(8))
+		tap(game,game._diamond_center(14))
 		check(game.skill_bubble.used == 1 and game.model.rng.state == rng and game.model.open_rewards.is_empty(),"Spam cannot trigger a second chain or claim loot")
 		var deadline: int = Time.get_ticks_msec()+5000
 		var most_used: int = 1
@@ -148,8 +148,8 @@ func test_layout(game) -> void:
 	prepare(game,[5,5,5])
 	for enemy in game.model.enemies: enemy.hp = 1
 	Driver.cast_pending(game)
-	while game.view_phase == "resolving": await process_frame
-	check(game.view_phase == "relic_reward" and game.model.living().is_empty() and game.skill_bubble.roll.is_empty(),"Wave clear stops unused hits before offering a relic")
+	while game.view_phase in ["resolving","collecting"]: await process_frame
+	check(game.view_phase == "wave_reward" and game.model.living().is_empty() and game.skill_bubble.roll.is_empty(),"Wave reward waits for all hits and crystal receipts")
 	prepare(game,[2,2,4])
 	tap(game,game._skill_center())
 	check(game.view_phase == "skill" and game.model.statuses[2].count == 0,"Support tap does not activate the skill")
@@ -177,23 +177,23 @@ func test_layout(game) -> void:
 				check(not health.intersects(game._enemy_health_rect(j).grow(3)),"Health bar borders never overlap in any squad formation")
 			for item in game._active_statuses():
 				check(not rect.intersects(game._status_rect(item.id)),"Enemy target never overlaps Horror status input")
-	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[9] == 288,"City Horror is slightly smaller while squad growth stays intact")
+	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[Waves.CITY_STAGE] == 288,"City Horror reaches the configured 288 destination size")
 	game._restart()
-	game.model.perfect_progress = 9
+	game.model.perfect_progress = 15
 	tap(game,game._diamond_center(2))
-	tap(game,game._diamond_center(5))
-	check(game.view_phase == "ready" and game.model.perfect_progress == 9,"Lower chest tiers cannot spend a full bank")
-	tap(game,game._diamond_center(8))
+	tap(game,game._diamond_center(7))
+	check(game.view_phase == "ready" and game.model.perfect_progress == 15,"Lower chest tiers cannot spend a full bank")
+	tap(game,game._diamond_center(14))
 	check(game.view_phase == "reward" and game.model.open_rewards.size() == 5 and game.model.perfect_progress == 0,"Full bank claims only the epic chest")
 	game._restart()
 	game.model.perfect_progress = 5
-	tap(game,game._diamond_center(5))
+	tap(game,game._diamond_center(7))
 	check(game.view_phase == "ready" and game.model.perfect_progress == 5,"Unfilled milestone cannot spend treasure")
 	game.model.perfect_progress = 8
 	tap(game,game._diamond_center(2))
 	check(game.view_phase == "ready" and game.model.perfect_progress == 8,"Common chest is unavailable once rare is earned")
-	tap(game,game._diamond_center(5))
-	check(game.model.open_rewards.size() == 3 and game.model.perfect_progress == 0,"Sixth diamond chooses rare chest and clears remainder")
+	tap(game,game._diamond_center(7))
+	check(game.model.open_rewards.size() == 3 and game.model.perfect_progress == 0,"Eighth diamond chooses Greed Chest and clears remainder")
 	game._restart()
 	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
@@ -228,7 +228,7 @@ func test_layout(game) -> void:
 	game.skill_bubble.begin(game.result)
 	game.skill_bubble.age = 5
 	game.view_phase = "skill"
-	game.model.perfect_progress = 9
+	game.model.perfect_progress = 15
 	game.model.troops = 3
 	game.model.spawn_clock = 999
 	game.model.volley_clock = 999

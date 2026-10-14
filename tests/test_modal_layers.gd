@@ -1,8 +1,8 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
 ## Render regression: changing dice/held sprites cannot change modal-page pixels.
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var failures := 0
 var checks := 0
 

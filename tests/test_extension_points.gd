@@ -1,8 +1,8 @@
 extends SceneTree
-const Run = preload("res://scripts/run_rules.gd")
-const Odds = preload("res://scripts/dice_odds.gd")
-const Effects = preload("res://scripts/relic_effects.gd")
-const Catalog = preload("res://scripts/relic_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Odds = preload("res://scripts/dice/dice_odds.gd")
+const Effects = preload("res://scripts/relics/relic_effects.gd")
+const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 var checks := 0
 var failures := 0
 
@@ -54,7 +54,7 @@ func _initialize() -> void:
 	for values in [[1,2,6],[1,1,2],[4,4,6],[5,5,1],[4,4,4],[5,5,5]]:
 		var skill = model.classify(values)
 		var before: Array = model.enemies.duplicate(true)
-		for i in range(10):
+		for i in range(model.enemies.size()):
 			check(not model.damage_caption(skill,i).is_empty(),"Targeted preview remains available")
 			var hits: Array = model.preview(skill,i)
 			check(hits[0].damage == model.attack_damage(skill,hits[0].target),"Preview and combat share the numeric damage path")

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Run before/after model changes. Timings are diagnostic, never pass/fail limits.
-const Run = preload("res://scripts/run_rules.gd")
-const Status = preload("res://scripts/status_effect.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
 const ITERATIONS := 5000
 
 func _initialize() -> void:

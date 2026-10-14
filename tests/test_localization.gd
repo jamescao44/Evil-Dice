@@ -1,11 +1,11 @@
 extends SceneTree
-const Home = preload("res://scripts/home.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Rules = preload("res://scripts/battle_rules.gd")
-const Relics = preload("res://scripts/relic_catalog.gd")
-const Statuses = preload("res://scripts/status_catalog.gd")
-const Rewards = preload("res://scripts/reward_catalog.gd")
+const Home = preload("res://scripts/home/home.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Relics = preload("res://scripts/relics/relic_catalog.gd")
+const Statuses = preload("res://scripts/status/status_catalog.gd")
+const Rewards = preload("res://scripts/rewards/reward_catalog.gd")
 var checks := 0
 var failures := 0
 
@@ -118,9 +118,10 @@ func scene_checks(portrait: bool) -> void:
 		g._handle_click(g.MENU_RECT.get_center())
 	g.menu_open = false
 	GameText.set_language("zh_CN",false)
-	g.model.relic_choices = ["magic_sword","prismatic_stone","cursed_watch"]
-	g.view_phase = "relic_reward"
+	g.view_phase = "wave_reward"
+	g.wave_chest.after_chest(3)
 	await capture(layout+"-zh_CN-relics")
+	g.wave_chest.cancel()
 	g.view_phase = "ready"
 	g.model.begin_round()
 	g.model.enemies[0].intent = {"type":"attack","amount":10,"attribute":Rules.Status.Attribute.ICE}

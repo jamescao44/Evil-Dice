@@ -79,9 +79,11 @@ Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_re
 
 ## User-provided charge-loop audio
 
-`audio/dice/magic_leak_loop.wav` derives from the user-provided `magic_leak.wav`. It is not part of the Kenney CC0 packs. The source excerpt, crossfade and normalization details are recorded in [magic_leak_loop.txt](audio/dice/magic_leak_loop.txt). `scripts/charge_audio.gd` controls its runtime volume.
+`audio/dice/magic_leak_loop.wav` derives from the user-provided `magic_leak.wav`. It is not part of the Kenney CC0 packs. The source excerpt, crossfade and normalization details are recorded in [magic_leak_loop.txt](audio/dice/magic_leak_loop.txt). `scripts/dice/charge_audio.gd` controls its runtime volume.
 
 ## User-provided finished sound effects
+
+`audio/item/arcade_slot_roll.wav`, `arcade_slot_roll2.wav`, and `audio/item/reward_level1.wav` through `reward_level3.wav` are copied unchanged from the user's `outs-FXs` folder. These are user-provided project audio, separate from the CC0 packs. Chest presentation uses the original 160 BPM timing; all five import as uncompressed 48 kHz stereo PCM.
 
 `audio/item/card_draw.wav`, `audio/item/deck_flip.wav`, and `audio/item/deck_flip2.wav` are copied unchanged from the same user-owned `outs-FXs` folder. Card draw plays on a successful fan pick; one of the two single-card flips is selected with equal probability at each card's visual departure during shuffling, with a quieter mix for the faster reduced-effects animation. All three import as uncompressed PCM and are separate from the Kenney packs.
 
@@ -96,3 +98,7 @@ Art by Jose Angel Canabal. All 22 Major Arcana and the card back are from
 Original monochrome PNGs, used unchanged. Free commercial and noncommercial
 digital-game use with attribution; asset resale and print use are not permitted.
 See `art/tarot/LICENSE.txt` for the source and license summary.
+
+## Soul crystal drops and pickup audio
+
+**Bobjt**, [Gem collect SFX](https://opengameart.org/content/gem-collect-sfx), **CC0 1.0**. Unmodified stereo WAVs: the reverb version accompanies enemy crystal drops; the short version plays at collection with light pitch variation. See [provenance](licenses/Gem-Collect-SFX.txt).

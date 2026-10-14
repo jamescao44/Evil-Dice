@@ -1,9 +1,9 @@
 extends SceneTree
-const Rules = preload("res://scripts/battle_rules.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Enemy = preload("res://scripts/enemy_catalog.gd")
-const Actions = preload("res://scripts/enemy_actions.gd")
-const Status = preload("res://scripts/status_effect.gd")
+const Rules = preload("res://scripts/combat/battle_rules.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Enemy = preload("res://scripts/enemies/enemy_catalog.gd")
+const Actions = preload("res://scripts/enemies/enemy_actions.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
 var checks := 0
 var failures := 0
 func check(ok: bool, label: String) -> void:

@@ -1,10 +1,10 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Status = preload("res://scripts/status_effect.gd")
-const Skill = preload("res://scripts/multi_hit_skill.gd")
-const Catalog = preload("res://scripts/tarot_catalog.gd")
-const Swipe = preload("res://scripts/card_swipe.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
+const Skill = preload("res://scripts/combat/multi_hit_skill.gd")
+const Catalog = preload("res://scripts/tarot/tarot_catalog.gd")
+const Swipe = preload("res://scripts/tarot/card_swipe.gd")
 var checks: int = 0
 var failures: int = 0
 func check(value: bool, label: String) -> void:

@@ -1,5 +1,5 @@
 extends SceneTree
-const Home = preload("res://scripts/home.gd")
+const Home = preload("res://scripts/home/home.gd")
 var home
 
 func _initialize() -> void:

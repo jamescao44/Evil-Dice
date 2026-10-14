@@ -1,5 +1,5 @@
 extends SceneTree
-const Home = preload("res://scripts/home.gd")
+const Home = preload("res://scripts/home/home.gd")
 var home
 var checks: int = 0
 var failures: int = 0

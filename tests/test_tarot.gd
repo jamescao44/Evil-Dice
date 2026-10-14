@@ -1,9 +1,9 @@
 extends SceneTree
-const Waves = preload("res://scripts/wave_catalog.gd")
-const Run = preload("res://scripts/run_rules.gd")
-const Catalog = preload("res://scripts/tarot_catalog.gd")
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Waves = preload("res://scripts/progression/wave_catalog.gd")
+const Run = preload("res://scripts/progression/run_rules.gd")
+const Catalog = preload("res://scripts/tarot/tarot_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var checks := 0
 var failures := 0
 
@@ -28,55 +28,42 @@ func model_checks() -> void:
 		check(ResourceLoader.exists(Catalog.ITEMS[id].art),"Every card has licensed artwork")
 		check(Catalog.ITEMS[id].implemented,"Card effects are active")
 	for e in m.enemies: e.hp = 0
-	check(m.open_relic_offer().size() == 2 and m.wave_tarots.size() == 3,"Wave offers two relics and a locked three-card tarot draw")
+	check(m.begin_wave_reward() and m.wave_tarots.size() == 3,"Wave locks an optional tarot draw")
 	var choices: Array = m.wave_tarots.duplicate()
 	var rng_state: int = m.reward_rng.state
-	m.open_relic_offer()
-	check(m.wave_tarots == choices and m.reward_rng.state == rng_state,"Reopening offers cannot reroll cards")
-	check(m.begin_tarot_reward("wave") == choices,"Tarot reward uses the preselected candidates")
-	check(not m.skip_relic() and not m.choose_relic(0) and not m.advance_wave(),"A pending draw blocks competing rewards and progression")
-	check(m.begin_tarot_reward("wave").is_empty() and m.choose_tarot(-1).is_empty(),"Draw transactions reject duplicate starts and invalid picks")
-	check(m.choose_tarot(1).id == choices[1] and m.tarots.items.size() == 1,"Exactly one chosen tarot enters its own inventory")
-	check(m.choose_tarot(1).is_empty() and m.relics.items.is_empty() and m.rubies == 0,"Tarot grants neither another reward nor skip rubies")
-	check(m.reward_rng.state == rng_state and m.advance_wave() and m.tarots.items.size() == 1,"Selection consumes no RNG and cards carry across waves")
+	check(m.begin_wave_reward() and m.wave_tarots == choices and m.reward_rng.state == rng_state,"Reopening cannot reroll cards")
+	m.open_wave_chest(); m.discard_unclaimed_rewards(); m.close_chest()
+	m.rubies = 30
+	check(m.begin_tarot_reward("wave") == choices and m.rubies == 0,"Paid draw uses locked candidates")
+	check(not m.finish_wave_reward() and not m.advance_wave(),"Pending draw blocks progression")
+	check(m.begin_tarot_reward("wave").is_empty() and m.choose_tarot(-1).is_empty(),"Transactions reject duplicate starts and invalid picks")
+	check(m.choose_tarot(1).id == choices[1] and m.tarots.items.size() == 1,"Exactly one chosen tarot enters inventory")
+	check(m.choose_tarot(1).is_empty() and m.relics.items.is_empty() and m.rubies == 0,"Tarot grants no extra reward or refund")
+	check(m.reward_rng.state == rng_state and m.finish_wave_reward() and m.advance_wave(),"Selection consumes no RNG")
 	for i in range(40): m.tarots.add(choices[1])
-	check(m.tarots.items.size() == 41 and m.tarots.items[0].instance_id != m.tarots.items[1].instance_id,"Duplicates have separate identities with no inventory cap")
-	m.reset_run()
-	check(m.tarots.items.is_empty() and m.tarot_source.is_empty(),"New runs reset all tarot state")
-	for e in m.enemies: e.hp = 0
-	m.open_relic_offer()
-	check(m.skip_relic() and m.rubies == 10 and not m.skip_relic() and m.tarots.items.is_empty(),"Skipping grants ten rubies once and no cards")
-	m.reset_run()
-	for e in m.enemies: e.hp = 0
-	m.open_relic_offer()
-	check(m.choose_relic(0) and m.begin_tarot_reward("wave").is_empty(),"Choosing a relic consumes the whole wave reward")
-	for tier in range(1,4):
+	check(m.tarots.items.size() == 41 and m.tarots.items[0].instance_id != m.tarots.items[1].instance_id,"Duplicates have separate identities and no cap")
+	for tier in [0,2,3]:
 		m.reset_run()
-		m.reward_weights = [0,1,0,0,0,0,0]
-		m.perfect_progress = tier*3
-		m.open_chest()
-		check(m.open_rewards.count(Run.Rewards.Category.TAROT) == 1 and m.chest_relics.size() == Run.CHEST_COUNTS[tier]-1,"One relic slot per chest is replaced, preserving all other slots")
-		choices = m.chest_tarots[0].duplicate()
+		m.reward_weights = [0,0,0,0,0,0,0,1]
+		m._roll_chest(tier)
+		check(m.chest_tarots.size() == m.CHEST_COUNTS[tier]-(1 if tier > 0 else 0),"Tarot category occupies every non-guaranteed slot")
+		var slot: int = m.chest_tarots.keys()[0]
+		choices = m.chest_tarots[slot].duplicate()
 		rng_state = m.reward_rng.state
-		check(m.claim_reward(0).is_empty(),"Tarot cannot be granted before the card choice")
-		m.begin_tarot_reward("chest",0)
-		check(m.discard_unclaimed_rewards() == 0 and not m.close_chest(),"The parent treasure waits during the ceremony")
-		check(m.choose_tarot(2).id == choices[2] and m.claimed_slots == [0],"Chest tarot resolves its original slot exactly once")
+		check(m.claim_reward(slot).is_empty(),"Tarot waits for card choice")
+		m.begin_tarot_reward("chest",slot)
+		check(m.discard_unclaimed_rewards() == 0 and not m.close_chest(),"Parent chest waits during ceremony")
+		check(m.choose_tarot(2).id == choices[2] and m.claimed_slots == [slot],"Chest draw resolves its slot exactly once")
 		m.discard_unclaimed_rewards()
-		check(m.reward_history == [Run.Rewards.Category.TAROT] and m.tarots.items.size() == 1,"Partial claiming keeps the card and discards remaining gifts")
-		check(m.reward_rng.state == rng_state and m.close_chest() and m.chest_tarots.is_empty(),"Collection and skipping preserve RNG and clear locked chest state")
-	m.reset_run()
-	m.reward_weights = [1,0,0,0,0,0,0]
-	m.perfect_progress = 9
-	check(m.open_chest() == [0,0,0,0,0] and m.chest_tarots.is_empty(),"Tarot never replaces currency or adds a reward slot")
+		check(m.reward_history == [Run.Rewards.Category.TAROT] and m.tarots.items.size() == 1,"Partial claim keeps chosen tarot")
+		check(m.reward_rng.state == rng_state and m.close_chest(),"Collection preserves locked RNG")
 	m.reset_run()
 	for e in m.enemies: e.hp = 0
-	m.open_relic_offer()
+	m.begin_wave_reward()
 	var wave_choices: Array = m.wave_tarots.duplicate()
-	var relic_choices: Array = m.relic_choices.duplicate(true)
-	check(m.begin_tarot_reward("debug").size() == 3,"Debug can open a standalone tarot reward")
-	check(not m.choose_tarot(0).is_empty() and m.tarots.items.size() == 1,"Standalone debug reward grants the chosen card")
-	check(not m.relic_offer_resolved and m.wave_tarots == wave_choices and m.relic_choices == relic_choices,"Debug reward preserves the real wave offer")
+	check(m.begin_tarot_reward("debug").size() == 3,"Debug opens independent draw")
+	check(not m.choose_tarot(0).is_empty() and m.tarots.items.size() == 1,"Debug grants chosen card")
+	check(not m.wave_reward_resolved and m.wave_tarots == wave_choices,"Debug preserves pending wave reward")
 
 func capture(game, label: String) -> void:
 	if "--visual" not in OS.get_cmdline_user_args(): return
@@ -112,12 +99,15 @@ func scene_checks(game) -> void:
 	ui._process(0.4)
 	check(not ui.blocks_battle() and game.dice_group.transform.is_equal_approx(Transform2D.IDENTITY),"Die icon restores the dice area")
 	for e in game.model.enemies: e.hp = 0
-	game.model.open_relic_offer()
-	game.view_phase = "relic_reward"
+	game.model.begin_wave_reward()
+	game.model.open_wave_chest(); game.model.discard_unclaimed_rewards(); game.model.close_chest()
+	game.model.rubies = 50
+	game.view_phase = "wave_reward"
+	game.wave_chest.after_chest(game.model.wave_chest_tier)
 	await capture(game,"offer")
 	var combat_rng: int = game.model.rng.state
 	var reward_rng: int = game.model.reward_rng.state
-	tap(game,game.relic_ui.card_rect(2).get_center())
+	tap(game,game.wave_chest.tarot_rect().get_center())
 	check(draw.active() and game._menus_open(),"Wave tarot card starts a blocking ceremony")
 	await capture(game,"shuffle")
 	ui._process(draw.shuffle_duration()+0.01)
@@ -159,8 +149,10 @@ func scene_checks(game) -> void:
 	ui._process(0.4)
 	await capture(game,"collect")
 	ui._process(0.5)
-	check(not draw.active() and game.model.relic_offer_resolved,"Collection finishes and releases progression")
+	check(not draw.active() and game.model.wave_tarot_bought,"Collection finishes before continuing")
 	check(game.model.rng.state == combat_rng and game.model.reward_rng.state == reward_rng,"Fan motion, reveal, and selection never change reward or combat RNG")
+	game.model.finish_wave_reward()
+	game.wave_chest.cancel()
 	game.model.advance_wave()
 	game.model.begin_round()
 	game.view_phase = "ready"
@@ -198,6 +190,25 @@ func scene_checks(game) -> void:
 		check(ui.inspected == other,"The newly selected card opens its own description")
 	tap(game,Vector2(10,10))
 	check(ui.inspected == -1 and game.view_phase == "ready","Closing inspection cannot send a battle action")
+	game.model.acquire_relic("heart")
+	game.model.acquire_relic("codex_page")
+	var relic_bar = game.relic_ui
+	var source: int = game.model.relics.index_of("heart")
+	var destination: int = game.model.relics.index_of("codex_page")
+	tap(game,ui.carousel_pose(ui.front_index()).at)
+	game._handle_click(relic_bar.slot_rect(source).get_center())
+	check(relic_bar.pressed == source and ui.inspected == -1 and not ui.held,"Holding a relic in tarot view opens its inspection and dismisses the card description")
+	relic_bar._process(0)
+	check(relic_bar.z_index > ui.z_index,"Held relic and description render above the tarot carousel")
+	await capture(game,"relic-inspect")
+	var tarot_count: int = game.model.tarots.items.size()
+	var carousel_scroll: float = ui.scroll
+	var destination_at: Vector2 = relic_bar.slot_rect(destination).get_center()-Vector2(0,90)
+	game._handle_motion(destination_at)
+	check(relic_bar.dragging and is_equal_approx(relic_bar.held_position().y,relic_bar.inventory_rect().get_center().y),"Relic drag stays on its horizontal rail inside tarot view")
+	game._handle_release(destination_at)
+	check(game.model.relics.items[destination].id == "heart" and relic_bar.pressed == -1,"Captured relic drag reorders and releases without tarot swallowing it")
+	check(ui.opened and ui.scroll == carousel_scroll and game.model.tarots.items.size() == tarot_count,"Relic dragging neither scrolls nor casts tarot cards")
 	game.model.load_debug_wave(Waves.COUNT)
 	game.model.begin_round()
 	var volley: float = game.model.volley_clock
@@ -206,17 +217,21 @@ func scene_checks(game) -> void:
 	game._restart()
 	check(not ui.blocks_battle() and game.model.tarots.items.is_empty(),"Restart clears draw, carousel, and cards")
 	# Exercise the real chest adapter and guard against skip-click leakage.
-	game.model.perfect_progress = 6
-	game.model.reward_weights = [0,1,0,0,0,0,0]
-	var outcomes: Array = game.model.open_chest()
+	game.model.reward_weights = [0,0,0,0,0,0,0,1]
+	var outcomes: Array = game.model._roll_chest(0)
 	var prizes: Array = []
 	for slot in range(outcomes.size()): prizes.append(game.model.reward_item(slot))
 	game.view_phase = "reward"
 	game.chest.start(outcomes,game.fx.canvas_size,game.pixel_font,false,prizes)
-	game.chest.active = false
-	game.chest.elapsed = 10
+	game.chest.open_chest()
+	await process_frame
+	game.chest.request_stop()
+	game.chest.request_stop()
 	tap(game,game.chest.reel_rect(0).get_center())
 	check(draw.active() and game.model.claimed_slots.is_empty(),"A treasure tarot opens the same ceremony before claiming")
+	game._process(0)
+	game.chest._process(0)
+	check(game.chest.paused and game.chest.audio.payout.playing and not game.chest.audio.payout.stream_paused,"Picking a treasure tarot keeps payout music playing behind the ceremony")
 	tap(game,game.chest.skip_rect().get_center())
 	check(game.model.claimed_slots.is_empty() and not game.chest.skip_requested,"Ceremony input cannot skip underlying treasure")
 	game._restart()
@@ -244,22 +259,30 @@ func integration_checks() -> void:
 	game.speed = 30
 	game.tarot_ui.set_process(false)
 	for e in game.model.enemies: e.hp = 0
+	game.model.rubies = 50
 	game._check_over()
-	tap(game,game.relic_ui.card_rect(2).get_center())
+	var wave_deadline: int = Time.get_ticks_msec()+12000
+	while game.wave_chest.phase != "after" and Time.get_ticks_msec() < wave_deadline:
+		preload("res://tests/scene_driver.gd").cast_pending(game)
+		await process_frame
+	tap(game,game.wave_chest.tarot_rect().get_center())
 	resolve_ceremony(game)
 	await process_frame
 	check(game.model.stage == 0 and game.tarot_ui.ceremony.state == "collect","Wave progression waits for the tarot to finish flying into inventory")
 	game.tarot_ui._process(1)
+	tap(game,game.wave_chest.action_rect().get_center())
 	var deadline: int = Time.get_ticks_msec()+6000
 	while game.view_phase != "ready" and Time.get_ticks_msec() < deadline: await process_frame
 	check(game.model.stage == 1 and game.view_phase == "ready" and game.model.tarots.items.size() == 1,"The real wave coroutine resumes with the collected card")
 	game.reduced = true
-	game.model.perfect_progress = 3
-	game.model.reward_weights = [0,1,0,0,0,0,0]
+	game.model.tarot_effects.bonus_chests.append(0)
+	game.model.reward_weights = [0,0,0,0,0,0,0,1]
 	game.chest.playback_speed = 100
-	game._reward_sequence()
+	game._reward_sequence(0,false,true)
 	deadline = Time.get_ticks_msec()+5000
-	while (not game.chest.visible or game.chest.active) and Time.get_ticks_msec() < deadline: await process_frame
+	while (not game.chest.visible or game.chest.active) and Time.get_ticks_msec() < deadline:
+		if game.chest.roll_phase == "closed": game.chest.click(game.chest.closed_rect().get_center())
+		await process_frame
 	check(game.chest.visible and not game.chest.active,"The real treasure sequence reaches its locked tarot reward")
 	tap(game,game.chest.reel_rect(0).get_center())
 	resolve_ceremony(game)
@@ -339,5 +362,6 @@ func run() -> void:
 	await skip_checks(Battle.new())
 	await skip_checks(Portrait.new())
 	await integration_checks()
+	await create_timer(0.15).timeout
 	print("Tarot: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

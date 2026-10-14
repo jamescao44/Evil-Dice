@@ -1,6 +1,6 @@
 extends SceneTree
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var game
 var prefix: String
 
@@ -51,12 +51,15 @@ func run() -> void:
 	game.debug_open = false
 	game.view_phase = "reward"
 	game.chest.start([3],game.fx.canvas_size,game.pixel_font)
+	game.chest.open_chest()
+	game.chest.audio_clock_enabled = false
 	game.chest.playback_speed = 0
 	game.chest.elapsed = 1.0
 	await capture("emerging")
 	game.chest.elapsed = 3.0
 	await capture("single-spin")
 	game.chest.start([0,6,4,1,2],game.fx.canvas_size,game.pixel_font)
+	game.chest.open_chest()
 	game.chest.elapsed = 3.0
 	await capture("triple-spin")
 	game.chest.elapsed = 10.0
@@ -68,6 +71,7 @@ func run() -> void:
 	await capture("reward-name")
 	for reward in [0,1,2,3,4]:
 		game.chest.start([reward],game.fx.canvas_size,game.pixel_font)
+		game.chest.open_chest()
 		game.chest.active = false
 		game.chest.elapsed = 9.0
 		game.chest.collected.append(0)
@@ -76,6 +80,7 @@ func run() -> void:
 		var item: Dictionary = game.Rewards.ITEMS[reward]
 		game.fx.reveal_skill(item.name,item.text,item.color)
 		await capture("effect-"+item.id)
+	game.chest.cancel()
 	game.queue_free()
 	await process_frame
 	quit()

@@ -1,7 +1,7 @@
 extends SceneTree
-const Battle = preload("res://scripts/battle.gd")
-const Portrait = preload("res://scripts/battle_portrait.gd")
-const Tarot = preload("res://scripts/tarot_catalog.gd")
+const Battle = preload("res://scripts/combat/battle.gd")
+const Portrait = preload("res://scripts/combat/battle_portrait.gd")
+const Tarot = preload("res://scripts/tarot/tarot_catalog.gd")
 var checks := 0
 var failures := 0
 func check(ok: bool, label: String) -> void:

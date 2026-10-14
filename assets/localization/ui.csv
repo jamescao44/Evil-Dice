@@ -353,7 +353,7 @@ Pages: %d / 10.,Pages: %d / 10.,残页：%d / 10。
 Turns: %d / 6. Stored charges: %d.,Turns: %d / 6. Stored charges: %d.,回合：%d / 6。储存次数：%d。
 Kills: %d.,Kills: %d.,击杀数：%d。
 Extra hits: %d.,Extra hits: %d.,额外攻击次数：%d。
-SKIP REMAINING,SKIP REMAINING,跳过剩余奖励
+SKIP REMAINING,SKIP REMAINING,放弃剩余奖励
 +%s BASE,+%s BASE,基础伤害 +%s
 CHOOSE ONE REWARD,CHOOSE ONE REWARD,选择一项奖励
 Draw Tarot,Draw Tarot,抽取塔罗牌
@@ -605,3 +605,29 @@ TWIN SENTINELS,TWIN SENTINELS,双重守卫
 CATHEDRAL GUARD,CATHEDRAL GUARD,教堂守军
 THE INNER SANCTUM,THE INNER SANCTUM,至圣所
 Single-target damage: x%.3f.,Single-target damage: x%.3f.,单体伤害：×%.3f。
+Normal Chest,Normal Chest,普通宝箱
+Perfect Chest,Perfect Chest,完美宝箱
+Greed Chest,Greed Chest,贪婪宝箱
+Ultra Chest,Ultra Chest,究极宝箱
+Normal,Normal,普通
+Perfect,Perfect,完美
+Greed,Greed,贪婪
+Ultra,Ultra,究极
+UPGRADED!,UPGRADED!,升级成功！
+25% CHANCE TO UPGRADE,25% CHANCE TO UPGRADE,25%概率升级
+YOUR CHEST IS READY,YOUR CHEST IS READY,宝箱已就绪
+%d rewards + %d soul crystals,%d rewards + %d soul crystals,%d份奖励＋%d灵魂水晶
+TAROT DRAW PURCHASED,TAROT DRAW PURCHASED,已购买塔罗抽取
+CONTINUE,CONTINUE,继续
+STOP,STOP,停止
+OPEN CHEST,OPEN CHEST,开启宝箱
+ROLL UPGRADE,ROLL UPGRADE,开始升级
+TAP TO REVEAL,TAP TO REVEAL,点击揭晓奖励
+TAP ANYWHERE TO STOP,TAP ANYWHERE TO STOP,点击任意位置停止
+TAP TO SKIP,TAP TO SKIP,点击跳过
+ULTRA REVEAL,ULTRA REVEAL,究极奖励揭晓
+TAP THE CHEST TO OPEN,TAP THE CHEST TO OPEN,点击宝箱开启
+SPAWN NORMAL CHEST,SPAWN NORMAL CHEST,生成普通宝箱
+WAVE CLEARED,WAVE CLEARED,本波通关
+GUARANTEED UPGRADE,GUARANTEED UPGRADE,必定升级
+25%% UPGRADE · ATTEMPT %d/4,25%% UPGRADE · ATTEMPT %d/4,25%% 升级概率 · 第 %d/4 次
