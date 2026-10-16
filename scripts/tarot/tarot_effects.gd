@@ -51,6 +51,7 @@ func begin_skill(skill: MultiHitSkill) -> void:
 	strength = 0
 
 func modify_dice(model, natural: Array) -> Array:
+	if not Catalog.ROLL_EFFECTS_ENABLED: return natural.duplicate()
 	# A newer direct setting replaces an older setting. Conditional transformations
 	# react afterwards; their order is the order the player actually used them.
 	var values: Array = natural.duplicate()
@@ -89,11 +90,12 @@ func usable(model) -> bool:
 func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) -> String:
 	if not model.outcome().is_empty() or (not repeating and not usable(model)): return "Use tarot between actions, before or after rolling."
 	if not Catalog.ITEMS.has(id): return "Unknown tarot card."
+	if id in Catalog.DISABLED: return "Temporarily disabled for six-dice turns."
 	if id in ["death","judgement"] and model.is_city(): return "This card cannot affect the city."
 	if id == "death" and choice.get("target",-1) not in model.attack_targets(): return "Drag Death onto an eligible enemy. Paladins protect their allies."
 	if id == "judgement" and (model.living().is_empty() or model.living().size()%6 != 0): return "Judgement needs a multiple of six living enemies."
 	if id == "fool" and model.relics.items.is_empty(): return "No relics to reroll."
-	if id == "hanged_man" and banned.size() >= Catalog.ITEMS.size()-1: return "At least one tarot must remain in the deck."
+	if id == "hanged_man" and Catalog.eligible(banned).size() <= 1: return "At least one tarot must remain in the deck."
 	return ""
 
 func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
@@ -131,7 +133,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"lovers":
 			if choice.get("parity",-1) not in [0,1]: return {"error":"Choose odd or even."}
 		"hanged_man":
-			if not Catalog.ITEMS.has(choice.get("ban","")) or choice.ban in banned: return {"error":"Choose a tarot still in the deck."}
+			if choice.get("ban", "") not in Catalog.eligible(banned): return {"error":"Choose a tarot still in the deck."}
 		"replace":
 			if choice.get("replace",-1) < 0 or choice.replace >= model.relics.items.size(): return {"error":"Choose a relic to replace."}
 	var repeats: Array = pending_repeat.get("sources",[]).duplicate() if repeating else model.RelicEffects.repeat_sources(model.relics.items,"ancient_prophecy")

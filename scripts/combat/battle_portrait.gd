@@ -9,6 +9,7 @@ var guide_page: int = 0
 var selected_status: int = -1
 var status_until: float = 0
 
+## Lay out phone controls and safe areas without resizing the browser canvas.
 func _configure_layout() -> void:
 	var window := get_window()
 	window.content_scale_size = PORTRAIT_SIZE
@@ -24,9 +25,8 @@ func _configure_layout() -> void:
 	window.title = "Evil Dice | Portrait"
 	# All controls sit below the island and above the home-indicator safe zones.
 	ARENA = Rect2(24, 228, 756, 722)
-	DICE_CENTER = Vector2(402, 1448)
+	DICE_CENTER = Vector2(402, 1410)
 	DICE_RADIUS = 232
-	DICE_POSITIONS = [Vector2(402, 1338), Vector2(296, 1508), Vector2(508, 1508)]
 	MENU_RECT = Rect2(672, 124, 88, 88)
 	MENU_CLOSE = Rect2(660, 132, 104, 88)
 	MENU_RESUME = Rect2(88, 1164, 628, 112)
@@ -48,7 +48,7 @@ func _configure_layout() -> void:
 	DEBUG_WAVE_INPUT = Rect2(220, 1578, 150, 88)
 	DEBUG_WAVE_LOAD = Rect2(414, 1578, 350, 88)
 	REPLAY_RECT = Rect2(162, 1360, 480, 104)
-	REWARD_CENTER = Vector2(402,1090)
+	REWARD_CENTER = Vector2(402,1064)
 	CITY_POINT = CITY_TRANSFORM * Vector2(925, 282)
 
 func _configure_effects() -> void:
@@ -59,7 +59,7 @@ func _configure_effects() -> void:
 	fx.ultimate_center = Vector2(448, 602)
 	fx.ultimate_scale = 0.85
 	for die in dice:
-		die.base_scale = 1.25
+		die.base_scale = 0.94
 		die.scale = Vector2.ONE * die.base_scale
 
 func _handle_click(point: Vector2) -> void:
@@ -124,8 +124,8 @@ func _troop_point(index: int) -> Vector2:
 	var progress: float = fposmod(city_life.clock * 0.1 + index * 0.17, 1.0)
 	return _city_gate_point().lerp(Vector2(340, 890), progress) + Vector2((index % 2) * 7, 0)
 
+## Draw portrait battle actors and controls over the retained scenery layer.
 func _draw() -> void:
-	_stone(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), Color("303129"))
 	_draw_header()
 	_draw_arena()
 	_draw_statuses()
@@ -143,7 +143,7 @@ func _button(rect: Rect2, value: String, enabled: bool = true, canvas: CanvasIte
 	_center(rect.get_center() + Vector2(0, 10), value, 28, GOLD if enabled else MUTED, canvas)
 
 func _draw_header() -> void:
-	_text(Vector2(48, 163), "%d / %d" % [model.stage + 1, Run.WAVE_NAMES.size()], 32, GOLD)
+	_text(Vector2(48, 163), "%d / %d" % [model.stage + 1, Run.PLAYABLE_WAVES], 32, GOLD)
 	_draw_currencies(_currency_point(),1.1)
 	_button(SPEED_RECT, "%.1fx" % _roll_speed() if model.is_city() else "2x" if speed == 2 else "1x")
 	_button(AUDIO_RECT, "")
@@ -151,30 +151,8 @@ func _draw_header() -> void:
 	_glyph(AUDIO_RECT.get_center(), "mute" if muted else "sound", MUTED if muted else GOLD, 2)
 	_draw_menu_icon()
 
+## Render portrait actors, dynamic shade and borders above the cached terrain.
 func _draw_arena() -> void:
-	draw_rect(ARENA, Color("a5a182"))
-	var tile: int = roundi(_stage_size(PAVING_SIZES))
-	var shift: int = int(background_offset) % tile
-	var progress: float = visual_stage / float(Run.WAVE_NAMES.size()-1)
-	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), progress)
-	var field: float = clampf((progress * 4 - 1) / 2.0, 0, 1)
-	for y in range(int(ARENA.position.y), int(ARENA.end.y), tile):
-		for x in range(24 - shift, 780, tile):
-			var variant: int = posmod(int((x + background_offset) / tile) + int(y / tile), 4)
-			if field < 1: _arena_art("floor%d" % variant, Rect2(x, y, tile, tile), tint)
-			if field > 0: _arena_art("grass", Rect2(x, y, tile, tile), Color(0.76, 0.83, 0.66, field))
-	var prop: float = _stage_size(SCENERY_SIZES)
-	var spacing: float = prop * 2.25
-	var drift: float = fposmod(background_offset * 0.65, spacing)
-	for i in range(-1, ceili(ARENA.size.x / spacing) + 1):
-		var x: float = 24 + i * spacing - drift
-		_arena_art("mangrove" if model.is_city() else "arch", Rect2(x, ARENA.position.y + 60 - prop * 0.3, prop, prop), Color("939e79"))
-	if visual_stage >= 1 and not model.is_city():
-		var height: float = _stage_size([96.0, 64.0, 40.0, 24.0, 18.0])
-		for i in range(9):
-			var x: float = 42 + i * 113 - fposmod(background_offset * 0.2, 113)
-			_draw_building(Rect2(x, ARENA.position.y + 104 - height, height * 0.7, height), Color("a1a184"), false)
-	draw_rect(ARENA, Color(0.84, 0.85, 0.67, 0.13))
 	_draw_backdrop_shade()
 	if model.is_city(): _draw_city()
 	_draw_player()
@@ -185,6 +163,7 @@ func _draw_arena() -> void:
 	if view_phase in ["feeding", "transition"]:
 		_center(Vector2(402, 720), "THE FEAST" if view_phase == "feeding" else "ADVANCING", 42, GOLD)
 
+## Render city scenery and troops through the portrait coordinate transform.
 func _draw_city() -> void:
 	City.paint(self, art, model.city_hp / float(Run.CITY_MAX_HP), city_life.clock, city_life.people, city_life.houses, reduced, CITY_TRANSFORM)
 	for corpse in city_corpses:
@@ -241,7 +220,7 @@ func _meter(rect: Rect2, ratio: float, color: Color) -> void:
 func _draw_console() -> void:
 	_draw_reward_progress(REWARD_CENTER, 1.5)
 	if _power_meter_visible():
-		_draw_power_meter(Rect2(186, 1164, 432, 24), 28)
+		_draw_power_meter(Rect2(186, 1126, 432, 24), 28)
 
 func _draw_tooltips() -> void:
 	var index: int = selected_status if clock_time < status_until else -1
@@ -264,8 +243,8 @@ func _draw_ending() -> void:
 	var color: Color = GOLD if won else RED
 	_rune(Vector2(402, 662), 5, color, 8)
 	_center(Vector2(402, 790), "VICTORY" if won else "DEFEAT", 72, color)
-	_center(Vector2(402, 858), "THE CITY REQUESTS A REFUND" if won else "BACK TO THE ABYSS", 26, CREAM)
-	_center(Vector2(402, 916), GameText.format("STAGE %d / %d   -   %d HP", [model.stage + 1, Run.WAVE_NAMES.size(), model.hp]), 26, MUTED)
+	_center(Vector2(402, 858), "THE INNER SANCTUM FALLS" if won else "BACK TO THE ABYSS", 26, CREAM)
+	_center(Vector2(402, 916), GameText.format("STAGE %d / %d   -   %d HP", [model.stage + 1, Run.PLAYABLE_WAVES, model.hp]), 26, MUTED)
 	_button(REPLAY_RECT, "RESTART")
 	if home_enabled: _button(_home_rect(), "HOME")
 
@@ -278,13 +257,13 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	_text(Vector2(40, 188), "GRIMOIRE", 42, GOLD, canvas)
 	_button(GUIDE_CLOSE, "X", true, canvas)
 	if home_enabled: _button(_home_rect(), "HOME", true, canvas)
-	var intro: String = "Tap twice to throw. Drag skills to the field, or tap targeted skills to choose a foe. SAVE banks a bonus cast."
-	var rule: String = "Perfect: pair or triple. Normal: sum. 666 clears the squad."
+	var intro: String = "Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn."
+	var rule: String = "Return a skill to the red center to unlock its dice. Use all six dice to end the turn."
 	if model.is_city():
 		intro = "Tap twice to throw. City skills cast automatically after the reveal. Drag saved skills out for a bonus cast."
 		rule = "Perfect: triple. 666: 2000 x DMG; clear troops; +12 HP."
 	_wrapped(Vector2(40, 258), intro, 718, CREAM, 26, canvas)
-	_wrapped(Vector2(40, 390), rule, 718, MUTED, 24, canvas)
+	_wrapped(Vector2(40, 350), rule, 718, MUTED, 24, canvas)
 	_button(GUIDE_PAIRS, "PAIRS", true, canvas)
 	_button(GUIDE_TRIPLES, "TRIPLES", true, canvas)
 	_button(GUIDE_STATUSES, "STATUSES", true, canvas)
@@ -302,7 +281,8 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage, 3)]
 	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.", caps), 718, MUTED, 24, canvas)
 	_wrapped(Vector2(40, 1554), "Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.", 718, MUTED, 24, canvas)
-	_wrapped(Vector2(40, 1620), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22, canvas)
+	_wrapped(Vector2(40, 1620), "Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.", 718, MUTED, 22, canvas)
+	_wrapped(Vector2(40, 1692), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22, canvas)
 
 func _debug_option_rect(choice: int) -> Rect2:
 	if choice == -1: return Rect2(40, 262, 724, 88)
@@ -329,10 +309,10 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	_button(DEBUG_TAROTS,"获得全部22张塔罗牌", true, canvas)
 	_button(DEBUG_TAROT_DRAW,"抽取塔罗牌", true, canvas)
 	_button(DEBUG_CHEST,"生成普通宝箱",_can_debug_chest(),canvas)
-	_button(DEBUG_TREASURE,"充满完美宝箱进度",true,canvas)
+	_button(DEBUG_TREASURE,"充满重投宝箱进度",true,canvas)
 	_button(DEBUG_REPEAT, "重复：" + ("开" if debug_repeat else "关"), true, canvas)
 	_button(DEBUG_PERFECT, "完美投掷：" + ("开" if debug_perfect else "关"), true, canvas)
 	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
 	_text(Vector2(40,1634),"关卡",28,GOLD, canvas)
 	_button(DEBUG_WAVE_LOAD,"载入", true, canvas)
-	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "从第1–20关重新开始，第20关为城市。",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)
+	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "从第1–19关重新开始；城市狂热暂时跳过。",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)

@@ -42,6 +42,7 @@ const CRITICAL_FACTOR := 3.0
 const PERFECT_STRIKE_BASE := 100.0
 const TAROT_GENERATORS := {"fortune_cookie":3,"crystal_ball":1}
 
+## Run a relic’s immediate acquisition effect after inventory insertion.
 static func acquired(model, id: String, batch: bool = false) -> void:
 	var acquired_slot: int = model.relics.index_of(id)
 	for entry in Sequence.entries(model.relics.items):
@@ -66,7 +67,7 @@ static func currency_bonus(model, amount: int) -> float:
 
 static func has_flag(items: Array, flag: String) -> bool:
 	for item in items:
-		if STATS.get(item.id,EMPTY).get(flag,false): return true
+		if item.id not in Catalog.DISABLED and STATS.get(item.id,EMPTY).get(flag,false): return true
 	return false
 
 static func max_health(items: Array, base: int) -> float:
@@ -85,6 +86,7 @@ static func damage_multiplier(items: Array, value: float, skill: MultiHitSkill) 
 		value = apply_damage_modifier(item,value,skill)
 	return value
 
+## Apply one relic’s damage rule in inventory order.
 static func apply_damage_modifier(item: Dictionary, value: float, skill: MultiHitSkill) -> float:
 	var stats: Dictionary = STATS.get(item.id,EMPTY)
 	value += stats.get("damage_add",0.0)*item.count
@@ -96,6 +98,7 @@ static func apply_damage_modifier(item: Dictionary, value: float, skill: MultiHi
 			value *= pow(stats.get("single_target_factor_per_wave",1.0),item.get("waves",0))
 	return value
 
+## Describe ordered relic damage activations without consuming their effects.
 static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Array:
 	var steps: Array = []
 	var critical: float = 1.0
@@ -120,6 +123,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Ar
 		steps.append({"source":"critical","id":"","slot":-1,"before":value,"after":value*CRITICAL_FACTOR,"note":""})
 	return steps
 
+## Combine relic extra-hit rules with the skill’s existing use modifiers.
 static func use_modifiers(items: Array, skill: MultiHitSkill, modifiers: Dictionary) -> Dictionary:
 	var result: Dictionary = modifiers.duplicate()
 	if not skill.random_target_per_use(): return result
@@ -134,6 +138,7 @@ static func use_modifiers(items: Array, skill: MultiHitSkill, modifiers: Diction
 static func has_critical(items: Array) -> bool:
 	return items.any(func(item): return item.id == "magic_sword" and item.charges > 0)
 
+## Consume stored critical charges for one whole attack cast.
 static func begin_attack(items: Array) -> bool:
 	for item in items:
 		if item.id == "magic_sword" and item.charges > 0:
@@ -161,6 +166,7 @@ static func perfect_combo_gain(items: Array) -> int:
 		else: amount += STONES.get(item.id,EMPTY).get("combo_gain",0)
 	return amount
 
+## Resolve ordered on-hit relic effects using actual damage dealt.
 static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> Array:
 	var events: Array = []
 	var extra_stacks: int = 0
@@ -196,6 +202,7 @@ static func _apply_stone(model, target: int, effect: Dictionary, extra: int, bur
 	if effect.chance < 1.0 and model.rng.randf() >= effect.chance: return []
 	return model.apply_enemy_status(target,effect.status,effect.stacks+extra+(burning if effect.status == Status.BURNING else 0),false)
 
+## Calculate relic protection and consumed charges for one incoming hit.
 static func incoming(items: Array, amount: float, corroded: bool, burning: bool) -> Dictionary:
 	var activated: Array = []
 	if not corroded:
@@ -210,6 +217,7 @@ static func incoming(items: Array, amount: float, corroded: bool, burning: bool)
 				return {"amount":0.0,"blocked":true,"activated":activated}
 	return {"amount":amount,"blocked":false,"activated":activated}
 
+## Consume a qualifying survival relic when the player would die.
 static func prevent_death(model) -> Array:
 	var index: int = model.relics.index_of("contract")
 	if index < 0: return []
@@ -218,6 +226,7 @@ static func prevent_death(model) -> Array:
 	model.hp = maxi(1,roundi(model.max_hp*0.6))
 	return [model.event(-1,model.hp,"relic","CONTRACT: REVIVED")]
 
+## Advance periodic relic counters and repeat their eligible payouts.
 static func turn_finished(model) -> Array:
 	var due: Array = []
 	for item in model.relics.items:
@@ -249,6 +258,7 @@ static func enemy_killed(model) -> void:
 			if entry.origin == entry.slot: item.kills += 1
 			Sequence.activate(model,entry)
 
+## Apply wave-based relic growth and currency rewards.
 static func wave_cleared(model) -> int:
 	var rubies: int = 0
 	for entry in Sequence.entries(model.relics.items):
@@ -259,6 +269,7 @@ static func wave_cleared(model) -> int:
 		if stats.has("wave_rubies") or stats.has("combo_uses_per_wave"): Sequence.activate(model,entry)
 	return rubies
 
+## Apply ordered relic face changes while respecting Perfect and roll categories.
 static func modify_dice(model, values: Array, perfect: bool, rates: Dictionary) -> Array:
 	var six_chance: float = model._six_probability(rates)
 	for entry in Sequence.entries(model.relics.items):
@@ -360,9 +371,9 @@ static func roll_actions(model, perfect: bool) -> Array:
 		match item.id:
 			"worn_bow": amount = 5; fixed = true
 			"tissue_pack":
-				if model.pending.kind == Skill.Kind.NORMAL: amount = 10
+				if not model.dice_turn.active and model.pending.kind == Skill.Kind.NORMAL: amount = 10
 			"magic_slingshot":
-				if model.pending.kind == Skill.Kind.PAIR: amount = model.pending.spare
+				if not model.dice_turn.active and model.pending.kind == Skill.Kind.PAIR: amount = model.pending.spare
 			"pet_ghost": amount = 50; fixed = true; area = true
 			"pet_dragon": amount = 50; count = 2
 			"spiked_helmet":
@@ -371,4 +382,14 @@ static func roll_actions(model, perfect: bool) -> Array:
 				if perfect: amount = PERFECT_STRIKE_BASE
 		if amount > 0:
 			for i in range(count): actions.append({"id":item.id,"activation":entry,"amount":amount,"fixed":fixed,"area":area})
+	return actions
+
+## Resolve trio-dependent relics once when the player locks a skill.
+static func formation_actions(model, skill: MultiHitSkill) -> Array:
+	var actions: Array = []
+	for entry in Sequence.entries(model.relics.items):
+		var amount: int = 0
+		if entry.item.id == "tissue_pack" and skill.kind == Skill.Kind.NORMAL: amount = 10
+		if entry.item.id == "magic_slingshot" and skill.kind == Skill.Kind.PAIR: amount = skill.spare
+		if amount > 0: actions.append({"id":entry.item.id,"activation":entry,"amount":amount,"fixed":false,"area":false})
 	return actions

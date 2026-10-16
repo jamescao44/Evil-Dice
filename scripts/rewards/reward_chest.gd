@@ -61,6 +61,7 @@ var celebrations: Array = []
 var landing_bursts: Array = []
 var cosmetic := RandomNumberGenerator.new()
 
+## Load reward artwork and build the cosmetic symbol pool without rolling outcomes.
 func _ready() -> void:
 	z_index = 80
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -72,11 +73,12 @@ func _ready() -> void:
 		var item: Dictionary = Relics.ITEMS[id]
 		symbols.append({"id":"curse" if item.rarity == Relics.Rarity.CURSED else "relic", "name":item.name,"text":item.text,"color":Relics.rarity_color(id),"relic_id":id})
 		relic_symbols[id] = symbols.size()-1
-		if not item.get("fusion",false): scroll_symbols.append(symbols.size()-1)
+		if id not in Relics.DISABLED and not item.get("fusion",false): scroll_symbols.append(symbols.size()-1)
 	for key in ["chest_closed", "chest_open", "ruby", "contract", "relic", "curse", "damage", "multiplier", "potion"]:
 		art[key] = load("res://assets/art/rewards/" + key + ".png")
 	hide()
 
+## Present locked prizes in a closed chest and reset all reel and audio state.
 func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false, prizes: Array = [], chest_tier: int = -1, wave_roll: bool = false, pity_misses: Array = [0,0,0]) -> void:
 	tier = clampi(chest_tier,0,3) if chest_tier >= 0 else 3 if values.size() == 5 else 2 if values.size() == 3 else 0
 	upgrade_mode = wave_roll
@@ -128,6 +130,7 @@ func click(point: Vector2) -> void:
 		if closed_rect().grow(18).has_point(point): open_chest()
 	else: request_stop()
 
+## Open the clicked chest and start its reveal timeline.
 func open_chest() -> bool:
 	if not active or paused or roll_phase != "closed": return false
 	roll_phase = "spinning"
@@ -144,6 +147,7 @@ func _start_rolling_audio() -> void:
 	audio.start_rolling(tier)
 	_sync_audio()
 
+## Build cosmetic reels from every obtainable item independently of prize odds.
 func _scroll_sequence() -> Array:
 	# Every obtainable reward gets screen time, independent of the locked winner
 	# and its drop odds. Each cosmetic bag is exhausted before any item repeats.
@@ -229,6 +233,7 @@ func _symbol_at(reel: int, row: int) -> int:
 		return sequences[reel][posmod(row,reel_steps)]
 	return sequences[reel][clampi(row,0,reel_steps+3)]
 
+## Reveal an upgrade or begin stopping on the already committed prizes.
 func request_stop() -> void:
 	if not active or paused or roll_phase == "closed": return
 	# One tap reveals one upgrade. Extra taps during its impact cannot skip tiers.
@@ -253,6 +258,7 @@ func request_stop() -> void:
 		_begin_settle(elapsed)
 	queue_redraw()
 
+## Start the tier-specific slowdown or Ultra musical landing sequence.
 func _begin_settle(at: float) -> void:
 	# Rebase the continuous cosmetic strip, then attach the committed winners.
 	# This remains bounded even if the player leaves the reels spinning.
@@ -270,6 +276,7 @@ func _begin_settle(at: float) -> void:
 	if tier == 3: audio.begin_ultra(maxf(0,elapsed-at))
 	_sync_audio()
 
+## Emit each prize landing once when its scheduled stop is reached.
 func _land_reels() -> void:
 	var order: Array = stop_order()
 	while announced < rewards.size() and elapsed >= stop_time(order[announced]):
@@ -284,6 +291,7 @@ func _land_reels() -> void:
 		if tier == 3: audio.reveal(tier)
 		revealed.emit(tier)
 
+## Complete the chest reveal after all visible prize reels land.
 func _finish_reels() -> void:
 	elapsed = stop_time(rewards.size()-1)
 	_land_reels()
@@ -292,6 +300,7 @@ func _finish_reels() -> void:
 	completed.emit()
 	queue_redraw()
 
+## Find an uncollected stopped prize beneath the pointer.
 func pickup_at(point: Vector2) -> int:
 	if active or not visible: return -1
 	for i in range(rewards.size()):
@@ -301,6 +310,7 @@ func pickup_at(point: Vector2) -> int:
 func skip_rect() -> Rect2:
 	return Rect2(152,130,500,88) if size.y > size.x else Rect2(944,64,304,56)
 
+## Check whether the player may leave the remaining chest rewards.
 func can_skip() -> bool:
 	return visible and not active and not skip_requested and collected.size() < rewards.size()
 
@@ -308,6 +318,7 @@ func skip_animation() -> void:
 	# All input paths honor the Ultra notes and the brief non-Ultra stop delay.
 	request_stop()
 
+## Mark the unclaimed rewards to skip so the battle flow can close the chest.
 func skip_remaining() -> void:
 	active = false
 	skip_requested = true
@@ -340,6 +351,7 @@ func celebrate(index: int) -> void:
 	for i in range(72): specks.append(Vector4(cosmetic.randf(),cosmetic.randf(),cosmetic.randf(),cosmetic.randf()))
 	celebrations.append({"id":item.id,"at":reel_rect(index).get_center(),"color":item.color,"born":elapsed,"specks":specks})
 
+## Advance chest reels, upgrades and reveal particles without changing outcomes.
 func _process(delta: float) -> void:
 	_sync_audio()
 	if paused or not visible or rewards.is_empty(): return
@@ -372,6 +384,7 @@ func _process(delta: float) -> void:
 			completed.emit()
 	queue_redraw()
 
+## Pause pre-reveal audio with the chest while allowing payouts during tarot draws.
 func _sync_audio() -> void:
 	if not is_instance_valid(audio): return
 	var muted: bool = not is_instance_valid(battle) or battle.muted
@@ -398,6 +411,7 @@ func upgrade_hint() -> String:
 	if tier >= 3: return ""
 	return GameText.text("25% CHANCE TO UPGRADE")
 
+## Paint the current chest, horizontal reels and claim controls.
 func _draw() -> void:
 	if rewards.is_empty() or font == null: return
 	var portrait: bool = size.y > size.x
@@ -477,6 +491,7 @@ func _draw_closed(color: Color, portrait: bool) -> void:
 	_text(Vector2(size.x/2,516 if portrait else 138),"TAP THE CHEST TO OPEN",26 if portrait else 22,Color("eee0b9"))
 	if upgrade_mode: _text(rect.get_center()+Vector2(0,rect.size.y*0.75),upgrade_hint(),24 if portrait else 18,color)
 
+## Draw neighboring symbols around the square prize-selection indicator.
 func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 	var scroll: float = travel(reel)
 	# Follow the visible reel symbol, never the hidden locked prize during a spin.

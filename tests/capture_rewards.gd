@@ -33,10 +33,10 @@ func run() -> void:
 	game.model.stage = 8
 	game.model._load_wave()
 	game.visual_stage = 8
-	game.model.perfect_progress = 2
+	game.model.reroll_progress = 2
 	game.model.rubies = 300
 	game.model.summon_shards = 4
-	game.model.perfect_progress = 7
+	game.model.reroll_progress = 7
 	game.monster_side = 320
 	game._start_round()
 	await capture("wave-nine")

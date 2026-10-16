@@ -187,11 +187,12 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if is_instance_valid(battle) and is_instance_valid(battle.tarot_ui) and battle.tarot_ui.inventory_visible(): return
 	if not is_instance_valid(battle) or battle._menus_open(): return
+	if not stored and is_instance_valid(battle.dice_selection) and battle.dice_selection.dragging: return
 	var source: String = "saved" if stored else "current"
 	var selected: bool = battle.skill_source == source
 	var casting: bool = is_casting()
 	var aiming: bool = battle.view_phase == "targeting" and selected
-	var held: bool = not roll.is_empty() and (stored or battle.view_phase in ["forming", "skill", "targeting", "resolving"])
+	var held: bool = not roll.is_empty() and (stored or battle.view_phase in ["forming", "skill", "targeting", "resolving", "charging", "rolling"])
 	if battle.view_phase in ["over", "reward"]: return
 	if not held: return
 	var at: Vector2 = display_center()
@@ -208,7 +209,8 @@ func _draw() -> void:
 	if progress < 1:
 		var travel: float = 1.0 - pow(1.0 - progress, 3)
 		for i in range(3):
-			var start: Vector2 = battle.DICE_POSITIONS[i]
+			var indices: Array = battle.model.skill_dice_indices
+			var start: Vector2 = battle.DICE_POSITIONS[indices[i] if indices.size() == 3 else i]
 			var p: Vector2 = start.lerp(battle.DICE_CENTER, travel)
 			Pixel.line(self, start.lerp(p, 0.65), p, Color(color, (1.0-progress)*0.7), 3)
 			_mini_die(p, int(roll.dice[i]), lerpf(38 if portrait else 24, 8, travel), 1.0-progress)
@@ -289,10 +291,15 @@ func _draw_value(at: Vector2, radius: float, portrait: bool) -> void:
 	var size: int = 30 if portrait else 20
 	var width: float = battle.pixel_font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 	var baseline := Vector2(clampf(at.x,width/2+16,battle.fx.canvas_size.x-width/2-16),maxf(size+16,at.y-radius-(32 if portrait else 24)))
+	# Keep the larger resting skill's value below the treasure meter, inside its rim.
+	if not stored and not is_dragging() and not is_casting(): baseline.y = at.y-radius+(28 if portrait else 22)
 	_center(baseline,value,size,value_color(),true)
 
 func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, color: Color) -> void:
 	_draw_value(at, radius, portrait)
+	if not aiming and not is_casting():
+		_center(at+Vector2(0,radius+30),GameText.text(caption.name),26 if portrait else 18,color)
+		return
 	var description: String = GameText.text(description_text())
 	var title: String = GameText.text(caption.name)
 	var title_size: int = 32 if portrait else 24
@@ -318,7 +325,7 @@ func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, col
 		for line in bonus_lines:
 			_center(baseline+Vector2(0,next),line,bonus_size,battle.GOLD,true,battle.description_font)
 			next += bonus_size+6
-	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended(): return
+	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended() or battle._current_skill_selected(): return
 	var hint: String = "CHOOSE A FOE" if aiming and battle._skill_needs_target(roll) else "TAP / DRAG TO AIM" if battle._skill_needs_target(roll) else "DRAG TO FIELD"
 	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font)
 
@@ -341,12 +348,7 @@ func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
 			Pixel.line(self,at+d*side*0.57,at+d*side*0.76,Color("eee0b9",tint.a),3)
 
 func _mini_die(at: Vector2, face: int, half: float, alpha: float) -> void:
-	draw_rect(Rect2(at-Vector2.ONE*(half+2),Vector2.ONE*(half+2)*2),Color("201c29",alpha))
-	draw_rect(Rect2(at-Vector2.ONE*half,Vector2.ONE*half*2),Color("eee0b9",alpha))
-	var pips: Array = [[],[Vector2(0,0)],[Vector2(-1,-1),Vector2(1,1)],[Vector2(-1,-1),Vector2(0,0),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(-1,1),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(0,0),Vector2(-1,1),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(-1,0),Vector2(1,0),Vector2(-1,1),Vector2(1,1)]]
-	for pip in pips[face]:
-		var width: float = maxf(2,half*0.25)
-		draw_rect(Rect2(at+pip*half*0.55-Vector2.ONE*width/2,Vector2.ONE*width),Color("271c35",alpha))
+	Pixel.mini_die(self,at,face,half,alpha)
 
 func _center(at: Vector2, value: String, size: int, color: Color, outline: bool = false, font: Font = null) -> void:
 	value = GameText.text(value)

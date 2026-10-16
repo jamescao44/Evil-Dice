@@ -1,6 +1,15 @@
 extends RefCounted
 ## Shared stepped geometry: UI and spell effects use the same pixel grid.
 
+## Draw a compact bone die for selection previews and skill animations.
+static func mini_die(canvas: CanvasItem, at: Vector2, face: int, half: float, alpha: float = 1.0) -> void:
+	canvas.draw_rect(Rect2(at-Vector2.ONE*(half+2),Vector2.ONE*(half+2)*2),Color("201c29",alpha))
+	canvas.draw_rect(Rect2(at-Vector2.ONE*half,Vector2.ONE*half*2),Color("eee0b9",alpha))
+	var pips: Array = [[],[Vector2(0,0)],[Vector2(-1,-1),Vector2(1,1)],[Vector2(-1,-1),Vector2(0,0),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(-1,1),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(0,0),Vector2(-1,1),Vector2(1,1)],[Vector2(-1,-1),Vector2(1,-1),Vector2(-1,0),Vector2(1,0),Vector2(-1,1),Vector2(1,1)]]
+	for pip in pips[face]:
+		var width: float = maxf(2,half*0.25)
+		canvas.draw_rect(Rect2(at+pip*half*0.55-Vector2.ONE*width/2,Vector2.ONE*width),Color("271c35",alpha))
+
 static func line(canvas: CanvasItem, a: Vector2, b: Vector2, color: Color, pixel: int = 3) -> void:
 	var from := Vector2i((a / pixel).round())
 	var to := Vector2i((b / pixel).round())

@@ -29,18 +29,23 @@ var count: int = 0:
 		count = clampi(value, 0, MAX_BURNING_STACKS) if id == BURNING else maxi(0, value)
 		if count == 0: potency = 1.0
 
+## Bind this status instance to its boon or affliction ID.
 func _init(effect_id: int) -> void:
 	id = effect_id
 
+## Add stacking effects or refresh duration, then set the new potency.
 func apply(amount: int, effect_potency: float = 1.0) -> void:
 	count = count+maxi(0,amount) if is_stacking() else maxi(0,amount)
 	if count > 0: potency = maxf(1.0,effect_potency)
 
+## Spend status counts unless this effect is permanent.
 func consume(amount: int = 1) -> void:
 	if not permanent: count -= amount
 
+## Classify this status as an affliction rather than a boon.
 func is_harmful() -> bool:
 	return id in HARMFUL
 
+## Identify statuses whose incoming counts add instead of replacing.
 func is_stacking() -> bool:
 	return id in [BURNING, DARKNESS, CORROSION, PLAGUE]

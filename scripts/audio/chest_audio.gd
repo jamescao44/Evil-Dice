@@ -22,6 +22,7 @@ var ultra_clock: float = 0.0
 var clock_stall: float = 0.0
 var clock_failed: bool = false
 
+## Create persistent rolling and payout voices and prepare the two timed reel loops.
 func _ready() -> void:
 	rolling = _voice()
 	payout = _voice()
@@ -29,17 +30,20 @@ func _ready() -> void:
 	if greed_roll_loop == null: greed_roll_loop = TimedLoop.build(GREED_ROLL,ROLL_PERIOD)
 	rolling.stream = roll_loop
 
+## Create a chest audio player routed through the combat sound bus.
 func _voice() -> AudioStreamPlayer:
 	var voice := AudioStreamPlayer.new()
 	voice.bus = "Combat" if AudioServer.get_bus_index("Combat") >= 0 else "Master"
 	add_child(voice)
 	return voice
 
+## Start the rolling texture for the currently visible chest tier.
 func start_rolling(tier: int = 0) -> void:
 	# An automatic Ultra intro may already be playing before reels appear.
 	set_roll_tier(tier)
 	rolling.play()
 
+## Switch rolling textures on upgrades while preserving whether audio is playing.
 func set_roll_tier(tier: int) -> void:
 	var stream: AudioStreamWAV = greed_roll_loop if tier == 2 else roll_loop
 	if rolling.stream == stream: return
@@ -47,6 +51,7 @@ func set_roll_tier(tier: int) -> void:
 	rolling.stream = stream
 	if was_playing: rolling.play()
 
+## Start the Ultra buildup and reset its musical reveal clock.
 func begin_ultra(offset: float = 0.0) -> void:
 	ultra_started = true
 	ultra_clock = offset
@@ -56,6 +61,7 @@ func begin_ultra(offset: float = 0.0) -> void:
 	payout.stream = PAYOUTS[2]
 	if offset < payout.stream.get_length(): payout.play(offset)
 
+## Read a monotonic audio clock for synchronizing the five Ultra prize reveals.
 func ultra_position(delta: float = 0.0) -> float:
 	# Compensate the mix buffer and speaker latency; ignore clock jitter backwards.
 	# https://docs.godotengine.org/en/stable/tutorials/audio/sync_with_audio.html
@@ -65,6 +71,7 @@ func ultra_position(delta: float = 0.0) -> float:
 	ultra_clock = maxf(ultra_clock,at)
 	return ultra_clock
 
+## Stop rolling and play the first payout once, preserving an existing Ultra intro.
 func reveal(tier: int) -> void:
 	if reveal_count > 0: return
 	reveal_count += 1
@@ -73,6 +80,7 @@ func reveal(tier: int) -> void:
 	payout.stream = PAYOUTS[clampi(tier-1,0,2)]
 	payout.play()
 
+## Apply mute and pause changes without restarting browser audio each frame.
 func sync(muted: bool, paused: bool) -> void:
 	enabled = not muted
 	for voice in [rolling,payout]:
@@ -84,6 +92,7 @@ func sync(muted: bool, paused: bool) -> void:
 	payout.volume_db = PAYOUT_DB if enabled else -80.0
 	# Never pitch-shift the 160 BPM buildup or payout recordings.
 
+## Stop both chest voices and clear paused playback for the next opening.
 func stop() -> void:
 	ultra_started = false
 	rolling.stop()
@@ -91,5 +100,6 @@ func stop() -> void:
 	rolling.stream_paused = false
 	payout.stream_paused = false
 
+## Silence chest audio when its scene is removed.
 func _exit_tree() -> void:
 	stop()

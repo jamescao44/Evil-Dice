@@ -234,7 +234,7 @@ func _draw() -> void:
 		var rect := Rect2(66,1000,672,360) if portrait() else Rect2(264,484,752,172)
 		Paint.panel(self,rect,Color("211a38"),Color("534265"))
 		Paint.text(self,font,rect.position+Vector2(24,42 if portrait() else 30),"Effect",24 if portrait() else 18,Paint.GOLD,false)
-		Paint.wrap(self,font,Rect2(rect.position+Vector2(24,60 if portrait() else 42),rect.size-Vector2(48,110 if portrait() else 86)),Catalog.ITEMS[choices[selected]].design,30 if portrait() else 20)
+		Paint.wrap(self,font,Rect2(rect.position+Vector2(24,60 if portrait() else 42),rect.size-Vector2(48,110 if portrait() else 86)),Catalog.description(choices[selected]),30 if portrait() else 20)
 		Paint.text(self,font,Vector2(mid,rect.end.y-24),"Single use",22 if portrait() else 17,Paint.LILAC)
 		Paint.panel(self,keep_rect(),Color("3c3056"),Paint.GOLD)
 		Paint.text(self,font,keep_rect().get_center()+Vector2(0,10),"KEEP THIS CARD",28 if portrait() else 22)

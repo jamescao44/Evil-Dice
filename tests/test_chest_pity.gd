@@ -59,7 +59,7 @@ func run() -> void:
 	model.discard_unclaimed_rewards()
 	model.close_chest()
 	model.chest_pity.misses = [2,1,2]
-	model.perfect_progress = 3
+	model.reroll_progress = 3
 	model.open_chest()
 	check(model.chest_pity.misses == [2,1,2],"Fixed-tier Perfect treasure does not consume upgrade pity")
 	model.discard_unclaimed_rewards()

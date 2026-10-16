@@ -1,5 +1,5 @@
 extends RefCounted
-## Shared chest economy. Tier 0 is a wave chest, not an earned Perfect tier.
+## Shared chest economy. Reroll Treasure unlocks tiers 1–3 with unused throws.
 const NAMES := ["Normal Chest", "Perfect Chest", "Greed Chest", "Ultra Chest"]
 const COLORS := [Color("eee0b9"), Color("ffd773"), Color("ce82ff"), Color("ff6977")]
 const COUNTS := [1, 1, 3, 5]

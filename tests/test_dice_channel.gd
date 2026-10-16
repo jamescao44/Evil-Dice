@@ -110,7 +110,7 @@ func test_layout(game) -> void:
 		prepare(game,[5,5,2] if face_count == 2 else [5,5,5])
 		for enemy in game.model.enemies: enemy.hp = 500
 		game.model.statuses[3].count = 2
-		game.model.perfect_progress = 15
+		game.model.reroll_progress = 15
 		var count: int = 3 if face_count == 2 else 6
 		var damage: int = 36 if face_count == 2 else 30
 		var round_number: int = game.model.round_number
@@ -179,21 +179,21 @@ func test_layout(game) -> void:
 				check(not rect.intersects(game._status_rect(item.id)),"Enemy target never overlaps Horror status input")
 	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[Waves.CITY_STAGE] == 288,"City Horror reaches the configured 288 destination size")
 	game._restart()
-	game.model.perfect_progress = 15
+	game.model.reroll_progress = 15
 	tap(game,game._diamond_center(2))
 	tap(game,game._diamond_center(7))
-	check(game.view_phase == "ready" and game.model.perfect_progress == 15,"Lower chest tiers cannot spend a full bank")
+	check(game.view_phase == "ready" and game.model.reroll_progress == 15,"Lower chest tiers cannot spend a full bank")
 	tap(game,game._diamond_center(14))
-	check(game.view_phase == "reward" and game.model.open_rewards.size() == 5 and game.model.perfect_progress == 0,"Full bank claims only the epic chest")
+	check(game.view_phase == "reward" and game.model.open_rewards.size() == 5 and game.model.reroll_progress == 0,"Full bank claims only the epic chest")
 	game._restart()
-	game.model.perfect_progress = 5
+	game.model.reroll_progress = 5
 	tap(game,game._diamond_center(7))
-	check(game.view_phase == "ready" and game.model.perfect_progress == 5,"Unfilled milestone cannot spend treasure")
-	game.model.perfect_progress = 8
+	check(game.view_phase == "ready" and game.model.reroll_progress == 5,"Unfilled milestone cannot spend treasure")
+	game.model.reroll_progress = 8
 	tap(game,game._diamond_center(2))
-	check(game.view_phase == "ready" and game.model.perfect_progress == 8,"Common chest is unavailable once rare is earned")
+	check(game.view_phase == "ready" and game.model.reroll_progress == 8,"Common chest is unavailable once rare is earned")
 	tap(game,game._diamond_center(7))
-	check(game.model.open_rewards.size() == 3 and game.model.perfect_progress == 0,"Eighth diamond chooses Greed Chest and clears remainder")
+	check(game.model.open_rewards.size() == 3 and game.model.reroll_progress == 0,"Eighth diamond chooses Greed Chest and clears remainder")
 	game._restart()
 	game.model.stage = Waves.CITY_STAGE
 	game.model._load_wave()
@@ -228,7 +228,7 @@ func test_layout(game) -> void:
 	game.skill_bubble.begin(game.result)
 	game.skill_bubble.age = 5
 	game.view_phase = "skill"
-	game.model.perfect_progress = 15
+	game.model.reroll_progress = 15
 	game.model.troops = 3
 	game.model.spawn_clock = 999
 	game.model.volley_clock = 999

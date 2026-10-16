@@ -33,13 +33,14 @@ func streak_checks() -> void:
 		m.phase = "roll"
 		m.roll(1,true)
 		check(m.perfect_combo == n and is_equal_approx(m.combo_multiplier(),1+n*0.1),"Accepted Perfects add one combo each")
-	check(m.perfect_total == 3 and m.perfect_progress == 3,"Accepted rolls count treasure once")
+	check(m.perfect_total == 3 and m.reroll_progress == 0,"Accepted Perfects count once without granting treasure")
 	check(m.roll(1,true).is_empty() and m.perfect_combo == 3,"Rejected roll cannot increment combo")
 	m.phase = "roll"
 	check(m.set_test_roll([0,1,2],false).is_empty() and m.perfect_combo == 3,"Invalid forced roll cannot reset combo")
+	m.reroll_progress = 3
 	m.open_chest()
-	check(m.perfect_combo == 3 and m.perfect_progress == 0,"Claiming treasure preserves the streak")
-	for slot in range(m.open_rewards.size()): m.claim_reward(slot)
+	check(m.perfect_combo == 3 and m.reroll_progress == 0,"Claiming treasure preserves the streak")
+	m.discard_unclaimed_rewards()
 	m.close_chest()
 	m.enemies[0].hp = 0
 	check(m.advance_wave() and m.perfect_combo == 3,"Wave transition preserves the streak")

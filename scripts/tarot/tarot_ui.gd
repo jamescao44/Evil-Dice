@@ -33,6 +33,7 @@ var reward_slot: int = -1
 var swallow_release: bool = false
 var audio_rng := RandomNumberGenerator.new()
 
+## Connect tarot grants, draw selection and card sounds to the battle adapter.
 func _ready() -> void:
 	audio_rng.randomize()
 	z_index = 120
@@ -45,30 +46,38 @@ func _ready() -> void:
 	ceremony.card_drawn.connect(func(): battle._sound("item/card_draw",1.0,-5))
 	ceremony.card_shuffled.connect(func(): battle._sound("item/deck_flip" if audio_rng.randi_range(0,1) == 0 else "item/deck_flip2",1.0,-13 if ceremony.reduced else -7))
 
+## Choose the phone layout from the battle canvas dimensions.
 func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
 
+## Report whether a menu, help page or debug page covers the tarot UI.
 func settings_open() -> bool:
 	return battle.menu_open or battle.guide or battle.debug_open
 
+## Keep tarot mode active until its closing animation finishes.
 func inventory_visible() -> bool:
 	return opened or expansion > 0.001
 
+## Reserve dice-area input for an open inventory or tarot reward ceremony.
 func blocks_battle() -> bool:
 	return opened or expansion > 0.001 or ceremony.active()
 
+## Return the shared card/dice toggle hit area for this screen layout.
 func icon_rect() -> Rect2:
-	return Rect2(48,1598,104,104) if portrait() else Rect2(402,704,66,66)
+	return Rect2(48,battle.DICE_CENTER.y+108,104,104) if portrait() else Rect2(402,battle.DICE_CENTER.y+64,66,66)
 
+## Check whether a tarot action is allowed in the current battle phase.
 func available() -> bool:
 	return battle.view_phase in ["ready","skill"] and battle.inspecting_enemy < 0 and not settings_open() and not battle.relic_ui.pickup.active
 
+## Shrink the dice toward the card icon as the tarot inventory expands.
 func dice_transform() -> Transform2D:
 	var t: float = smoothstep(0,1,expansion)
 	var scale_factor: float = lerpf(1.0,0.12,t)
 	var center: Vector2 = battle.DICE_CENTER.lerp(icon_rect().get_center(),t)
 	return Transform2D(0,Vector2.ONE*scale_factor,0,center-battle.DICE_CENTER*scale_factor)
 
+## Open a three-card ceremony using the model’s already committed tarot candidates.
 func begin_reward(source: String, slot: int = -1) -> bool:
 	if ceremony.active(): return false
 	var choices: Array = battle.model.begin_tarot_reward(source,slot)
@@ -83,6 +92,7 @@ func begin_reward(source: String, slot: int = -1) -> bool:
 	ceremony.start(choices,battle.fx.canvas_size,battle.description_font,icon_rect().get_center(),battle.reduced)
 	return true
 
+## Keep the chosen tarot and acknowledge its chest reward slot when applicable.
 func _collect(index: int) -> void:
 	var item: Dictionary = battle.model.choose_tarot(index)
 	if item.is_empty(): return
@@ -96,6 +106,7 @@ func _collect(index: int) -> void:
 	reward_source = ""
 	reward_slot = -1
 
+## Clear tarot gestures and presentation when starting a new run.
 func reset() -> void:
 	swipe.reset()
 	float_levels.clear()
@@ -113,6 +124,7 @@ func reset() -> void:
 	if is_instance_valid(battle.dice_group): battle.dice_group.transform = Transform2D.IDENTITY
 	queue_redraw()
 
+## Release held cards and swipe inertia without consuming a tarot.
 func cancel_gesture() -> void:
 	drag_feedback.reset()
 	swipe.dragging = false
@@ -124,12 +136,15 @@ func cancel_gesture() -> void:
 	swallow_release = false
 	ceremony.cancel_gesture()
 
+## Space owned cards evenly around the circular inventory.
 func card_angle() -> float:
 	return TAU/maxi(1,battle.model.tarots.items.size())
 
+## Return the horizontal radius of the tarot inventory ring.
 func carousel_radius() -> float:
 	return 248.0 if portrait() else 204.0
 
+## Calculate one card’s position, size, depth, inspection lift and idle bob.
 func carousel_pose(index: int) -> Dictionary:
 	var angle: float = (index-scroll)*card_angle()
 	var depth: float = (cos(angle)+1)/2
@@ -145,18 +160,25 @@ func carousel_pose(index: int) -> Dictionary:
 	extent *= lerpf(0.12,1,t)
 	return {"at":at,"size":extent,"depth":depth}
 
+## Sort cards from back to front using depth alone, preserving overlap order.
 func carousel_order() -> Array:
 	var order: Array = range(battle.model.tarots.items.size())
+	# Sorting needs depth only; avoid rebuilding full card poses for each comparison.
+	var depths := PackedFloat64Array()
+	var angle_step: float = card_angle()
+	for i in order: depths.append((cos((i-scroll)*angle_step)+1)/2)
 	order.sort_custom(func(a,b):
-		var da: float = carousel_pose(a).depth
-		var db: float = carousel_pose(b).depth
+		var da: float = depths[a]
+		var db: float = depths[b]
 		return da < db if not is_equal_approx(da,db) else a < b)
 	return order
 
+## Identify the card nearest the player at the current scroll position.
 func front_index() -> int:
 	var count: int = battle.model.tarots.items.size()
 	return posmod(roundi(scroll),count) if count > 0 else -1
 
+## Hit-test overlapping cards from front to back.
 func card_at(point: Vector2) -> int:
 	var order: Array = carousel_order()
 	order.reverse()
@@ -165,6 +187,7 @@ func card_at(point: Vector2) -> int:
 		if Rect2(pose.at-pose.size/2,pose.size).has_point(point): return i
 	return -1
 
+## Route a tarot press to drawing, inspection, swiping or a neighboring relic.
 func click(point: Vector2) -> bool:
 	if ceremony.active(): return ceremony.click(point)
 	if settings_open(): return false
@@ -198,6 +221,7 @@ func click(point: Vector2) -> bool:
 	swipe.begin()
 	return true
 
+## Update swipe inertia or move a held card toward the battlefield.
 func motion(point: Vector2) -> bool:
 	if ceremony.active(): return ceremony.motion(point)
 	if not blocks_battle(): return false
@@ -217,6 +241,7 @@ func motion(point: Vector2) -> bool:
 		last_at = point
 	return true
 
+## Commit an eligible tarot drop or finish the current inspection/swipe gesture.
 func release(point: Vector2) -> bool:
 	if ceremony.active(): return ceremony.release(point)
 	if swallow_release: swallow_release = false; return true
@@ -243,6 +268,7 @@ func release(point: Vector2) -> bool:
 	drag_feedback.reset()
 	return true
 
+## Collapse the tarot carousel and restore the dice-area controls.
 func close_inventory() -> void:
 	opened = false
 	expansion = 0
@@ -250,6 +276,7 @@ func close_inventory() -> void:
 	cancel_gesture()
 	battle.dice_group.transform = Transform2D.IDENTITY
 
+## Start the consumed-card effect and adjust scrolling to the remaining inventory.
 func play_cast(id: String, at: Vector2) -> void:
 	cast_visual = {"id":id,"at":at,"age":0.0}
 	inspected = -1
@@ -258,6 +285,7 @@ func play_cast(id: String, at: Vector2) -> void:
 	scroll_target = roundf(scroll)
 	swipe.reset(scroll*card_angle())
 
+## Advance tarot expansion, swipe inertia, inspection lift and reward animation.
 func _process(delta: float) -> void:
 	z_index = battle.HELD_ITEM_Z if gesture == "card" else 120
 	if not settings_open():
@@ -272,9 +300,13 @@ func _process(delta: float) -> void:
 			else:
 				scroll = lerpf(scroll,scroll_target,1-exp(-delta*14))
 				swipe.position = scroll*card_angle()
-		for i in range(battle.model.tarots.items.size()):
-			var instance_id: int = battle.model.tarots.items[i].instance_id
-			float_levels[instance_id] = move_toward(float_levels.get(instance_id,0.0),1.0 if inspected == i else 0.0,delta*5)
+		# Only inspected cards need lift state; closed inventories do no per-card work.
+		var lifted_id: int = battle.model.tarots.items[inspected].instance_id if inspected >= 0 and inspected < battle.model.tarots.items.size() else -1
+		if lifted_id >= 0 and not float_levels.has(lifted_id): float_levels[lifted_id] = 0.0
+		for instance_id in float_levels.keys():
+			var level: float = move_toward(float_levels[instance_id],1.0 if instance_id == lifted_id else 0.0,delta*5)
+			if level <= 0: float_levels.erase(instance_id)
+			else: float_levels[instance_id] = level
 		if not cast_visual.is_empty():
 			cast_visual.age += delta
 			if cast_visual.age >= 0.4: cast_visual.clear()
@@ -283,6 +315,7 @@ func _process(delta: float) -> void:
 	battle.dice_group.transform = dice_transform()
 	queue_redraw()
 
+## Render the tarot carousel, toggle, description and frontmost held card.
 func _draw() -> void:
 	if settings_open() or ceremony.active(): return
 	if expansion > 0:
@@ -319,6 +352,7 @@ func _draw() -> void:
 		var t: float = cast_visual.age/0.4
 		Paint.card(self,cast_visual.id,cast_visual.at,Vector2(120,186)*(1+t*0.4),sin(t*PI)*0.12,1,2*(1-t),1-t)
 
+## Dim controls around the battlefield while leaving enemies clear for aiming.
 func _draw_drag_backdrop() -> void:
 	var arena: Rect2 = battle.ARENA
 	var screen: Vector2 = battle.fx.canvas_size
@@ -328,6 +362,7 @@ func _draw_drag_backdrop() -> void:
 		draw_rect(rect,shade)
 	draw_rect(arena,Color(shade,shade.a*(1-drag_feedback.strength())))
 
+## Draw the card/dice toggle, card count and unavailable-state dimming.
 func _draw_icon() -> void:
 	var rect: Rect2 = icon_rect()
 	Paint.panel(self,rect,Color("252431"),Color("8c799d"),14)
@@ -344,6 +379,7 @@ func _draw_icon() -> void:
 	if not available() and not opened:
 		Paint.panel(self,rect,Color(0.06,0.06,0.07,0.58),Color.TRANSPARENT,14)
 
+## Show the selected floating card and its effect over a dimmed battlefield.
 func _draw_inspection() -> void:
 	var item: Dictionary = battle.model.tarots.items[inspected]
 	var lift: float = float_levels.get(item.instance_id,0.0)
@@ -353,4 +389,4 @@ func _draw_inspection() -> void:
 	var rect := Rect2(62,1040,680,236) if portrait() else Rect2(372,320,536,180)
 	Paint.panel(self,rect,Color("211a38",0.94),Color("75628d"))
 	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,12),Vector2(rect.size.x-44,76)),Catalog.ITEMS[item.id].name,30 if portrait() else 23,Paint.GOLD)
-	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),Catalog.ITEMS[item.id].design,26 if portrait() else 19)
+	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),Catalog.description(item.id),26 if portrait() else 19)

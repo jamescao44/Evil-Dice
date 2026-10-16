@@ -7,6 +7,7 @@ const RARITY_NAMES := ["COMMON", "RARE", "EPIC", "LEGENDARY", "CURSED"]
 const COLORS := [Color.WHITE, Color("72bbfe"), Color("c060ff"), Color("f9cb9c"), Color("dd7e6b")]
 const STONES := ["orange_stone", "blue_stone", "purple_stone", "yellow_stone", "green_stone", "black_stone"]
 const CURSED_DICE := {"cursed_die":6,"cursed_die_5":5,"cursed_die_4":4,"cursed_die_3":3,"cursed_die_2":2,"cursed_die_1":1}
+const DISABLED := ["lucky_die", "four_leaf_clover", "five_leaf_clover", "cursed_watch", "cursed_die", "cursed_die_5", "cursed_die_4", "cursed_die_3", "cursed_die_2", "cursed_die_1"]
 const ITEMS := {
 	"codex_page": {"counter":"count", "name":"Codex Page", "rarity":0, "icon":"page", "text":"DMG +0.2 per page. Pages share one slot; 10 fuse into an Ancient Codex."},
 	"heart": {"name":"Beating Heart", "rarity":0, "icon":"heart", "text":"Maximum health +10%."},
@@ -36,14 +37,14 @@ const ITEMS := {
 	"cursed_die": {"name":"Cursed Die - 6", "rarity":4, "icon":"die", "text":"Perfect rolls always contain 6. Other rolls never contain 6."},
 	"reaper_scythe": {"counter":"kills", "name":"Reaper's Scythe", "rarity":4, "icon":"scythe", "text":"Each enemy killed multiplies damage by 1.1. Halve max HP. City troops do not count."},
 	"cursed_bow": {"counter":"waves", "name":"Cursed Bow", "rarity":4, "icon":"bow", "text":"Each wave cleared while owned adds 1 combo hit and multiplies single-target damage by 0.95. Compounds each wave."},
-	"cursed_watch": {"name":"Cursed Stopwatch", "rarity":4, "icon":"watch", "text":"Always Perfect. Never roll 666. Perfects cannot advance the treasure bank."},
+	"cursed_watch": {"name":"Cursed Stopwatch", "rarity":4, "icon":"watch", "text":"Always Perfect. Never roll 666. Cannot gain Reroll Treasure progress."},
 	"worn_dagger": {"name": "Worn Dagger", "rarity": 0, "icon": "worn_dagger", "text": "Combo skills gain 1 extra hit."},
 	"worn_bow": {"name": "Worn Longbow", "rarity": 0, "icon": "worn_bow", "text": "After each throw, deal 5 fixed damage to a random enemy."},
 	"four_leaf_clover": {"name": "Four-leaf Clover", "rarity": 0, "icon": "four_leaf_clover", "text": "Two-alike chance +10 percentage points."},
 	"fries": {"name": "Fries", "rarity": 0, "icon": "fries", "text": "Damage multiplier +0.5."},
-	"tissue_pack": {"name": "Tissue Pack", "rarity": 0, "icon": "tissue_pack", "text": "After an all-different throw, deal 10 base damage to a random enemy."},
+	"tissue_pack": {"name": "Tissue Pack", "rarity": 0, "icon": "tissue_pack", "text": "After forming an all-different skill, deal 10 base damage to a random enemy."},
 	"pet_bat": {"name": "Pet Bat", "rarity": 0, "icon": "pet_bat", "text": "Heal 5 HP per attack. Combo hits heal separately."},
-	"magic_slingshot": {"name": "Magic Slingshot", "rarity": 1, "icon": "magic_slingshot", "text": "After two alike, the spare die deals its face value as base damage to a random enemy. Not a skill cast."},
+	"magic_slingshot": {"name": "Magic Slingshot", "rarity": 1, "icon": "magic_slingshot", "text": "After forming a two-alike skill, the spare die deals its face value as base damage to a random enemy. Not a skill cast."},
 	"hamburger": {"name": "Hamburger", "rarity": 1, "icon": "hamburger", "text": "Damage multiplier +1."},
 	"soul_vessel": {"name": "Soul Vessel", "rarity": 1, "icon": "soul_vessel", "text": "Soul crystal gains +15%. Fractional bonuses carry over."},
 	"pet_lizard": {"name": "Pet Lizard", "rarity": 1, "icon": "pet_lizard", "text": "Apply 1 extra burning stack to enemies."},
@@ -80,6 +81,7 @@ static func charged(item: Dictionary) -> bool:
 static func description(item: Dictionary, translate: Callable = Callable()) -> String:
 	var localize: Callable = translate if translate.is_valid() else func(value: String) -> String: return value
 	var text: String = localize.call(ITEMS[item.id].text)
+	if item.id in DISABLED: text = localize.call("Temporarily disabled for six-dice turns.") + "\n" + text
 	if CURSED_DICE.has(item.id): text += "\n" + localize.call("Only one Cursed Die can be held.")
 	if item.id == "codex_page": text += "\n" + localize.call("Pages: %d / 10.") % item.get("count", 1)
 	if item.id in ["magic_shield", "magic_sword"]: text += "\n" + localize.call("Turns: %d / 6. Stored charges: %d.") % [item.get("turns", 0),item.get("charges", 0)]

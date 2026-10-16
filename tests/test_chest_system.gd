@@ -26,17 +26,16 @@ func resolve(model) -> void:
 
 func model_checks() -> void:
 	var model = Run.new(201)
+	model.reroll_progress = 2
 	for n in range(2): model.record_perfect(true)
 	model.record_perfect(false)
-	check(model.perfect_progress == 0,"Early miss loses incomplete first streak")
+	check(model.reroll_progress == 2,"Perfect and missed throws leave the treasure bank unchanged")
 	for tier in range(1,4):
-		while model.perfect_progress < Chests.THRESHOLDS[tier]: model.record_perfect(true)
+		model.reroll_progress = Chests.THRESHOLDS[tier]
 		check(model.chest_tier() == tier,"Checkpoint grants tier %d" % tier)
-		if tier < 3:
-			for n in range(2): model.record_perfect(true)
 		model.record_perfect(false)
-		check(model.perfect_progress == Chests.THRESHOLDS[tier],"Miss preserves highest earned tier")
-	check(model.open_chest().size() == 5 and model.perfect_progress == 0,"Claim empties whole bank")
+		check(model.reroll_progress == Chests.THRESHOLDS[tier],"Miss preserves every banked point")
+	check(model.open_chest().size() == 5 and model.reroll_progress == 0,"Claim empties whole bank")
 	resolve(model)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 14312
@@ -141,7 +140,7 @@ func scene_checks(script, portrait: bool) -> void:
 	game.speed = 3
 	await process_frame
 	var label: String = "portrait" if portrait else "landscape"
-	game.model.perfect_progress = 15
+	game.model.reroll_progress = 15
 	game.chest.playback_speed = 1
 	game._reward_sequence(3)
 	if not await frame_until(func(): return game.chest.visible): game.free(); return

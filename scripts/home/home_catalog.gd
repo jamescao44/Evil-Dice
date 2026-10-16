@@ -9,6 +9,6 @@ const ANCIENTS := [{
 }]
 const DICES := [{
 	"id": "bone", "name": "Bone Dice", "rarity": "BASIC", "face": 5,
-	"description": "Three six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.",
-	"effect": "The original dice. No extra modifiers. Time your throw to shape the odds; matching faces awaken your Ancient's skills.",
+	"description": "Six six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.",
+	"effect": "Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.",
 }]

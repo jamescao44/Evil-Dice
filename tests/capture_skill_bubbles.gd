@@ -28,7 +28,7 @@ func run() -> void:
 	game.monster_side = game.HORROR_SIZES[6]
 	game._start_round()
 	game.model.set_status_counts({2:4,3:3,33:2,6:1})
-	game.model.perfect_progress = 9
+	game.model.reroll_progress = 9
 	game.result = game.model.set_test_roll([5,5,3])
 	game.status_color = game.TEAL
 	game.skill_bubble.begin(game.result)
@@ -134,7 +134,7 @@ func run() -> void:
 		game.model.stage = Waves.CITY_STAGE
 		game.model._load_wave()
 		game.model.city_hp = 0
-		game.model.perfect_progress = tier*3
+		game.model.reroll_progress = tier*3
 		game.visual_stage = Waves.CITY_STAGE
 		game.monster_side = game.HORROR_SIZES[9]
 		game._check_over()

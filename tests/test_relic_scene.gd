@@ -224,7 +224,7 @@ func run() -> void:
 	game._handle_click(game.chest.skip_rect().get_center())
 	await until_phase("ready")
 	check(game.model.rubies == rubies+30,"Skipping gifts retains the normal chest crystal payout")
-	game.model.perfect_progress = 15
+	game.model.reroll_progress = 15
 	game.model.reward_weights = [0,1,0,0,0,0,0]
 	game._reward_sequence()
 	var deadline: int = Time.get_ticks_msec()+4000
@@ -272,7 +272,7 @@ func run() -> void:
 	check(game.view_phase == "reward" and game.model.wave_chest_stage == game.model.stage and game.model.hp == 85 and game.model.status_count(game.Status.BURNING) == 2,"Enemy burn victory waits for every player burn tick before the wave chest")
 	check(game.model.relics.items[0].charges == 1,"A status-effect victory completes the sixth relic turn")
 	game._restart(Waves.COUNT)
-	game.model.city_hp = 0; game.model.perfect_progress = 15
+	game.model.city_hp = 0; game.model.reroll_progress = 15
 	game.model.wave_chest_stage = game.model.stage
 	game.model.wave_reward_resolved = true
 	game._check_over()

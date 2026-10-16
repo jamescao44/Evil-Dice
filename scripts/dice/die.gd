@@ -6,7 +6,7 @@ var final_face: int = 1
 var rolling: bool = false
 var elapsed: float = 0.0
 var duration: float = 1.0
-var delay: float = 0.0
+var reveal_order: int = 0
 var glow: float = 0.0
 var marked: bool = false
 var tint: Color = Color("aed085")
@@ -19,6 +19,9 @@ var charge_power: float = 0
 var charge_age: float = 0
 var throw_power: float = 0
 var reduced: bool = false
+var selection_emphasis: float = 0
+var connection_glow: bool = false
+var connection_color := Color.WHITE
 
 func _ready() -> void:
 	cosmetic.randomize()
@@ -38,13 +41,14 @@ func charge(power: float) -> void:
 	glow = charge_power * 0.8
 	tint = Color("dfb866")
 
-func roll_to(value: int, index: int, speed: float, power: float = 0.0) -> void:
+## Start together, then land in a quick stagger set by the dice-ring order.
+func roll_to(value: int, order: int, speed: float, power: float = 0.0) -> void:
 	stop_charge()
 	throw_power = clampf(power, 0, 1)
 	final_face = value
-	duration = (0.9 + index * 0.24) / speed
+	reveal_order = order
+	duration = (0.55 + order * 0.08) / speed
 	elapsed = 0
-	delay = index * 0.05 / speed
 	rolling = true
 	glow = 0
 	marked = false
@@ -68,28 +72,31 @@ func _process(delta: float) -> void:
 		scale = Vector2.ONE * base_scale * (1.0 + intensity * 0.07)
 	elif rolling:
 		elapsed += delta * playback_rate
-		if elapsed > delay:
-			var progress := clampf((elapsed - delay) / duration, 0.0, 1.0)
-			var strength: float = 0.0 if reduced else throw_power
-			var lift: float = (sin(progress * PI) * 22 + absf(sin(progress * PI * 5)) * 11 * (1 - progress)) * (1.0 + strength * 1.8)
-			position = resting + Vector2(sin(progress * TAU * 3) * 10 * (1 - progress) * (1 + strength * 2.5), -lift)
-			rotation = sin(progress * TAU * 2.5) * 0.38 * (1 - progress) * (1 + strength * 2.5)
-			if int(elapsed * 26) != int((elapsed - delta) * 26):
-				face = cosmetic.randi_range(1, 6)
-			if progress >= 1:
-				rolling = false
-				face = final_face
-				position = resting
-				rotation = 0
-				var tween := create_tween()
-				scale = Vector2(1.12 + strength * 0.18, 0.88 - strength * 0.15) * base_scale
-				tween.tween_property(self, "scale", Vector2.ONE * base_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-				landed.emit()
+		var progress := clampf(elapsed / duration, 0.0, 1.0)
+		var strength: float = 0.0 if reduced else throw_power
+		var lift: float = (sin(progress * PI) * 22 + absf(sin(progress * PI * 5)) * 11 * (1 - progress)) * (1.0 + strength * 1.8)
+		position = resting + Vector2(sin(progress * TAU * 3) * 10 * (1 - progress) * (1 + strength * 2.5), -lift)
+		rotation = sin(progress * TAU * 2.5) * 0.38 * (1 - progress) * (1 + strength * 2.5)
+		if int(elapsed * 26) != int((elapsed - delta * playback_rate) * 26):
+			face = cosmetic.randi_range(1, 6)
+		if progress >= 1:
+			rolling = false
+			face = final_face
+			position = resting
+			rotation = 0
+			var tween := create_tween()
+			scale = Vector2(1.12 + strength * 0.18, 0.88 - strength * 0.15) * base_scale
+			tween.tween_property(self, "scale", Vector2.ONE * base_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			landed.emit()
 	else:
 		glow = maxf(0.28 if marked else 0.0, glow - delta * 0.32)
 	queue_redraw()
 
 func _draw() -> void:
+	draw_set_transform(Vector2.ZERO,0,Vector2.ONE*(1+selection_emphasis*0.12))
+	if connection_glow:
+		for spread in range(4,0,-1):
+			draw_rect(Rect2(-55-spread*5,-57-spread*5,110+spread*10,114+spread*10),Color(connection_color,0.045))
 	if glow > 0:
 		for i in range(4, 0, -1):
 			var extent: float = 54 + i * 5
@@ -102,6 +109,9 @@ func _draw() -> void:
 	draw_rect(Rect2(-45, -48, 90, 88), Color("e5d5ac"))
 	draw_rect(Rect2(-42, -48, 84, 5), Color("fff1c5"))
 	draw_rect(Rect2(-42, 38, 84, 4), Color("b99d68"))
+	if connection_glow:
+		draw_rect(Rect2(-53,-55,106,109),Color(connection_color,0.18))
+		draw_rect(Rect2(-53,-55,106,109),connection_color,false,3)
 	# Small chips and ivory grain make the dice read as carved bone.
 	for p in [Vector2(-32,-40),Vector2(28,-36),Vector2(-35,25),Vector2(32,32),Vector2(-10,34)]:
 		draw_rect(Rect2(p, Vector2(4, 4)), Color("cdb98a"))

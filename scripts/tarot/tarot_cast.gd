@@ -72,7 +72,7 @@ func cell_rect(index: int, columns: int, rows: int) -> Rect2:
 	return Rect2(area.position+Vector2(index%columns,index/columns)*cell+Vector2(4,4),cell-Vector2(8,8))
 
 func options() -> Array:
-	return Catalog.ITEMS.keys().filter(func(id): return id not in battle.model.tarot_effects.banned)
+	return Catalog.eligible(battle.model.tarot_effects.banned)
 
 func click(point: Vector2) -> bool:
 	if busy: return true

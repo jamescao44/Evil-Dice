@@ -10,6 +10,9 @@ const RelicEffects = preload("res://scripts/relics/relic_effects.gd")
 const AreaAttack = preload("res://scripts/combat/area_attack.gd")
 const TarotEffects = preload("res://scripts/tarot/tarot_effects.gd")
 var tarot_effects = TarotEffects.new()
+const DiceTurn = preload("res://scripts/dice/dice_turn.gd")
+var dice_turn = DiceTurn.new()
+var skill_dice_indices: Array = []
 const DiceOdds = preload("res://scripts/dice/dice_odds.gd")
 const EnemyCatalog = preload("res://scripts/enemies/enemy_catalog.gd")
 const EnemyActions = preload("res://scripts/enemies/enemy_actions.gd")
@@ -80,6 +83,8 @@ func _init(seed_value: int = -1) -> void:
 
 func reset() -> void:
 	tarot_effects = TarotEffects.new()
+	dice_turn = DiceTurn.new()
+	skill_dice_indices.clear()
 	relics.clear()
 	perfect_relic_ready = false
 	roll_relic_actions.clear()
@@ -143,6 +148,7 @@ func is_frozen() -> bool:
 func is_stunned() -> bool:
 	return status_count(Status.STUNNED) > 0
 
+## Apply an eligible player status with relic immunities and stack limits.
 func apply_affliction(id: int, amount: int) -> Array:
 	if hp <= 0 or (status_count(Status.IMMUNITY) > 0 and status_count(Status.CORROSION) == 0): return []
 	if id not in Status.PLAYER_HARMFUL: return []
@@ -159,6 +165,7 @@ func apply_affliction(id: int, amount: int) -> Array:
 	applied.status = id
 	return [applied]
 
+## Convert three dice faces into a reusable skill object.
 static func classify(dice: Array) -> MultiHitSkill:
 	if dice.size() != 3: return Skill.new()
 	var counts: Dictionary = {}
@@ -193,6 +200,7 @@ static func throw_rates(throw_power: float, perfect: bool = false, fever: bool =
 	pair = minf(pair, NON_PERFECT_PAIR_CAP)
 	return {"normal": maxf(0, 1.0 - pair - triple), "pair": pair, "triple": triple}
 
+## Combine throw power and relic modifiers into the current dice-category odds.
 func roll_rates(throw_power: float, perfect: bool = false, fever: bool = false) -> Dictionary:
 	var base: Dictionary = throw_rates(throw_power, perfect, fever)
 	var values: Array = [base.normal, base.pair, base.triple]
@@ -224,8 +232,53 @@ func _match_values(triple: bool) -> Array:
 		values[rng.randi_range(0, 2)] = other + 1
 	return values
 
+## Roll unused dice only after the previous summoned skill has been resolved.
+func roll_pool(perfect: bool = false, forced: Array = []) -> Array:
+	if phase != "roll" or not pending.is_empty() or not outcome().is_empty(): return []
+	var changed: Array = dice_turn.roll(rng, perfect, forced)
+	if changed.is_empty(): return []
+	record_perfect(perfect)
+	statuses[Status.STUNNED].consume()
+	return changed
+
+## Lock one trio and suspend the remaining dice while its skill is pending.
+func form_selected_skill() -> MultiHitSkill:
+	if phase != "roll" or not pending.is_empty() or not outcome().is_empty(): return Skill.new()
+	var indices: Array = dice_turn.selected.duplicate()
+	var skill: MultiHitSkill = classify(dice_turn.form())
+	if skill.is_empty(): return skill
+	skill.perfect = dice_turn.last_perfect
+	pending = skill
+	skill_dice_indices = indices
+	phase = "player"
+	return skill.duplicate(true)
+
+## Return a pending skill's dice without refunding throws or touching spent groups.
+func cancel_formed_skill() -> bool:
+	if phase != "player" or pending.is_empty() or not bonus_resume.is_empty() or not outcome().is_empty(): return false
+	if not dice_turn.release_group(skill_dice_indices): return false
+	pending = Skill.new()
+	skill_dice_indices = []
+	phase = "roll"
+	return true
+
+## Defer trio-dependent relic bonuses until the group can no longer be cancelled.
+func _commit_formed_skill() -> void:
+	if not bonus_resume.is_empty() or not dice_turn.commit_group(skill_dice_indices): return
+	roll_relic_actions.append_array(RelicEffects.formation_actions(self, pending))
+	perfect_relic_ready = not roll_relic_actions.is_empty()
+
+## End early only after rolling and resolving all formed skills.
+func end_dice_turn() -> bool:
+	if phase != "roll" or not dice_turn.active or dice_turn.rolls_left == DiceTurn.ROLLS or not pending.is_empty() or not outcome().is_empty(): return false
+	dice_turn.active = false
+	_finish_player_action(Skill.new(Kind.NORMAL))
+	return true
+
+## Roll dice, apply outcome modifiers and store the pending player skill.
 func roll(throw_power: float = 0.0, perfect: bool = false, fever: bool = false) -> MultiHitSkill:
 	if phase != "roll": return Skill.new()
+	dice_turn.active = false # Legacy three-die simulation helper; gameplay uses roll_pool.
 	perfect = perfect or forces_perfect()
 	var rates: Dictionary = roll_rates(throw_power, perfect, fever)
 	var category: int = Weighted.pick(rng, [rates.normal, rates.pair, rates.triple])
@@ -252,6 +305,7 @@ func set_test_roll(dice: Array, perfect: bool = false) -> MultiHitSkill:
 	# Only called by tests or the visual debug picker; overrides power odds.
 	if phase != "roll" or classify(dice).is_empty():
 		return Skill.new()
+	dice_turn.active = false # Direct skill fixture for combat tests.
 	perfect = perfect or forces_perfect()
 	var result := classify(tarot_effects.modify_dice(self,RelicEffects.modify_dice(self,dice.duplicate(),perfect,throw_rates(0,perfect))))
 	if result.is_empty():
@@ -263,6 +317,7 @@ func set_test_roll(dice: Array, perfect: bool = false) -> MultiHitSkill:
 	phase = "player"
 	return pending.duplicate(true)
 
+## Update the Perfect combo once for an accepted throw.
 func record_perfect(perfect: bool) -> void:
 	# Only accepted throws change the streak; skips and bonus casts preserve it.
 	perfect_combo = perfect_combo + RelicEffects.perfect_combo_gain(relics.items) if perfect else 0
@@ -270,11 +325,11 @@ func record_perfect(perfect: bool) -> void:
 	perfect_relic_ready = not roll_relic_actions.is_empty()
 	if perfect:
 		for item in relics.items:
-			if RelicEffects.STATS.get(item.id,{}).get("always_perfect",false) or RelicEffects.STONES.get(item.id,{}).get("combo_gain",0) > 0:
+			if item.id not in RelicEffects.Catalog.DISABLED and RelicEffects.STONES.get(item.id,{}).get("combo_gain",0) > 0:
 				relic_activated.emit(item.id)
 
 func forces_perfect() -> bool:
-	return tarot_effects.star_throws > 0 or RelicEffects.has_flag(relics.items,"always_perfect")
+	return false # Roll-changing item effects are suspended for the six-dice rules.
 
 func combo_multiplier() -> float:
 	return 1.0 + perfect_combo * 0.1
@@ -301,6 +356,7 @@ func taunting_enemies() -> Array:
 	var targets: Array = living()
 	return targets.filter(func(i): return EnemyCatalog.taunts(enemies[i])) if targets.size() > 1 else []
 
+## Return living targets allowed by Paladin taunt.
 func attack_targets() -> Array:
 	var guards: Array = taunting_enemies()
 	return guards if not guards.is_empty() else living()
@@ -308,6 +364,7 @@ func attack_targets() -> Array:
 func area_damage_factor(target: int, guards: Array) -> float:
 	return 0.5 if not guards.is_empty() and target not in guards else 1.0
 
+## Use living targets first, then corpses when a multi-hit cast must finish.
 func player_attack_targets() -> Array:
 	var targets: Array = attack_targets()
 	# Only an already-started cast can follow through on the defeated squad.
@@ -341,7 +398,11 @@ func begin_round() -> Array:
 	return events
 
 func _prepare_player_turn() -> void:
-	if is_frozen(): tarot_effects.extra_rolls = 0
+	dice_turn.reset()
+	skill_dice_indices.clear()
+	if is_frozen():
+		tarot_effects.extra_rolls = 0
+		dice_turn.active = false
 	phase = "frozen" if is_frozen() else "roll"
 	ice_hits_remaining = 3 if is_frozen() else 0
 
@@ -379,8 +440,10 @@ func skill_modifiers_for(skill: MultiHitSkill) -> Dictionary:
 	if skill.is_attack() and not is_instant_kill(skill) and tarot_effects.extra_uses > 0: modifiers["high_priestess"] = {"add":tarot_effects.extra_uses}
 	return modifiers
 
+## Freeze the skill use budget and consume next-skill modifiers at cast start.
 func begin_player_cast() -> bool:
 	if phase != "player" or pending.is_empty() or not outcome().is_empty(): return false
+	_commit_formed_skill()
 	pending.begin_cast(skill_modifiers_for(pending))
 	if pending.is_attack() and not is_instant_kill(pending): tarot_effects.extra_uses = 0
 	tarot_effects.begin_skill(pending)
@@ -398,6 +461,7 @@ func attack_multiplier() -> float:
 func boon_turns(face: int) -> int:
 	return (statuses[33].count if statuses[33].count > 0 else statuses[3].count) if face == 3 else int(status_count(face))
 
+## Get the skill’s base damage with current flat relic bonuses.
 func attack_base(result: MultiHitSkill) -> float:
 	return attack_base_with_bonus(result,relic_base_damage())*tarot_effects.skill_factor(result)
 
@@ -424,6 +488,7 @@ func relic_base_damage() -> float:
 func damage_baseline() -> float:
 	return DAMAGE_MULTIPLIER * power
 
+## Apply additive boons and combo, ordered relics, then darkness.
 func damage_multiplier(result: MultiHitSkill = null) -> float:
 	# One multiplier: additive rewards, both active boons, and the Perfect streak.
 	var value: float = damage_baseline() + reward_damage_multiplier + (attack_multiplier() - 1.0) + perfect_combo * 0.1
@@ -432,6 +497,7 @@ func damage_multiplier(result: MultiHitSkill = null) -> float:
 	if status_count(Status.DARKNESS) > 0: value *= 0.5
 	return value
 
+## Build the read-only base and multiplier trace for cast feedback.
 func attack_damage_steps(result: MultiHitSkill) -> Array:
 	# Read-only trace of the same formula used by hits. Never consumes charges/RNG.
 	if not is_attack(result) or is_instant_kill(result): return []
@@ -477,6 +543,7 @@ func cast_damage_multiplier(result: MultiHitSkill) -> float:
 func is_instant_kill(result: MultiHitSkill) -> bool:
 	return result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
 
+## Combine base damage, multiplier and critical before target defenses.
 func unmitigated_damage(result: MultiHitSkill) -> int:
 	var critical: bool = result.critical or (phase != "executing" and RelicEffects.has_critical(relics.items))
 	return floori(attack_base(result)*damage_multiplier(result)*(RelicEffects.CRITICAL_FACTOR if critical else 1.0)+0.000001)
@@ -486,9 +553,11 @@ func _target_damage(result: MultiHitSkill, damage: int, target: int) -> int:
 	if enemy_status_count(target,Status.CORROSION) > 0: damage = floori(damage*1.5)
 	return damage
 
+## Apply target caps and modifiers to the shared calculated hit.
 func attack_damage(result: MultiHitSkill, target: int = -1) -> int:
 	return _target_damage(result,unmitigated_damage(result),target)
 
+## Format the held skill’s per-hit damage preview without changing combat state.
 func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 	if not is_attack(result) or is_instant_kill(result): return ""
 	var base: int = floori(attack_base(result))
@@ -529,6 +598,7 @@ func preview(result: MultiHitSkill, primary: int) -> Array:
 		hits.append({"target": i, "damage": damage, "ignore": execute, "hp_loss": hp_loss, "corpse_hit": not is_enemy_alive(i)})
 	return hits
 
+## Resolve healing, freeze or boon application and any refresh bonus.
 func _apply_support(result: MultiHitSkill) -> Array:
 	var events: Array = []
 	if result.is_freeze():
@@ -571,6 +641,12 @@ func _finish_player_action(_result: MultiHitSkill) -> void:
 		pending = resume.pending if outcome().is_empty() else Skill.new()
 		phase = resume.phase if outcome().is_empty() else "finished"
 		return
+	if dice_turn.active and outcome().is_empty():
+		pending = Skill.new()
+		if dice_turn.locked.size() < DiceTurn.COUNT:
+			phase = "roll"
+			return
+		dice_turn.active = false
 	if tarot_effects.extra_rolls > 0 and outcome().is_empty():
 		tarot_effects.extra_rolls -= 1
 		pending = Skill.new()
@@ -586,14 +662,17 @@ func _end_buff_turn() -> void:
 	for face in buff_ticks: statuses[face].consume()
 	buff_ticks.clear()
 
+## Bank the rolled skill without casting its effect.
 func save_pending_skill() -> bool:
 	if phase != "player" or pending.is_empty() or not saved_skill.is_empty() or not bonus_resume.is_empty() or not outcome().is_empty(): return false
+	_commit_formed_skill()
 	saved_skill = pending.duplicate(true)
 	saved_skill.target = -1
 	# Banking passes the turn; it does not apply or refresh the stored boon.
 	_finish_player_action(Skill.new(Kind.NORMAL))
 	return true
 
+## Temporarily replace the pending roll with the saved bonus skill.
 func begin_saved_cast() -> bool:
 	if saved_skill.is_empty() or not bonus_resume.is_empty() or phase not in ["roll", "player", "round_end"] or not outcome().is_empty(): return false
 	bonus_resume = {"phase": phase, "pending": pending.duplicate(true)}
@@ -602,6 +681,7 @@ func begin_saved_cast() -> bool:
 	phase = "player"
 	return true
 
+## Resolve one use of the current skill and emit its combat events.
 func apply_player_step(primary: int = -1) -> Array:
 	if phase not in ["player", "executing"] or pending.is_empty() or not outcome().is_empty(): return []
 	if is_attack(pending):
@@ -609,9 +689,14 @@ func apply_player_step(primary: int = -1) -> Array:
 		if primary not in player_attack_targets(): return []
 		pending.target = primary
 	if phase == "player": begin_player_cast()
+	var formation_events: Array = resolve_perfect_relic() if perfect_relic_ready else []
+	if not outcome().is_empty(): return formation_events
+	if is_attack(pending) and primary not in player_attack_targets():
+		primary = player_target()
+		pending.target = primary
 	var result: MultiHitSkill = pending.duplicate()
-	var events: Array = []
-	if not is_attack(result): events = _apply_support(result)
+	var events: Array = formation_events
+	if not is_attack(result): events.append_array(_apply_support(result))
 	else:
 		lifesteal_used = 0
 		for hit in preview(result, primary):
@@ -653,10 +738,11 @@ func apply_player(primary: int = -1) -> Array:
 		var step: Array = apply_player_step(primary)
 		if step.is_empty(): break
 		events.append_array(step)
-		if bonus and bonus_resume.is_empty(): break
+		if (bonus and bonus_resume.is_empty()) or phase == "player": break
 		primary = -1
 	return events
 
+## Apply one hit to enemy defenses and health, returning actual damage dealt.
 func hit_enemy(index: int, damage: int, ignore: bool = false) -> int:
 	var e: Dictionary = enemies[index]
 	if not ignore and e.shield > 0 and enemy_status_count(index, Status.CORROSION) == 0:
@@ -675,6 +761,7 @@ func heal(amount: int) -> int:
 	hp += actual
 	return actual
 
+## Resolve the next impact of an enemy’s committed action.
 func enemy_act_step(index: int) -> Array:
 	if phase != "enemy" or not outcome().is_empty() or not is_enemy_alive(index) or enemies[index].acted: return []
 	var events: Array = EnemyActions.step(self,index)
@@ -703,6 +790,7 @@ func _finish_turn_end() -> void:
 	_end_buff_turn()
 	phase = "round_end" if outcome().is_empty() else "finished"
 
+## Resolve turn-end effects incrementally after all enemies have acted.
 func end_round_step() -> Array:
 	# Presentation calls once per burn tick; headless simulation uses end_round().
 	if phase == "enemy":
@@ -749,6 +837,7 @@ func refresh_relic_health(old_max: int) -> void:
 		if relic_immune(status): statuses[status].count = 0
 	hp = clampi(hp + maxi(0, max_hp - old_max), 0, max_hp)
 
+## Resolve incoming damage through player statuses, defenses and survival relics.
 func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> Array:
 	if not burning and status_count(Status.HIDDEN) > 0: return [event(-1,0,"relic","UNTARGETABLE")]
 	var corroded: bool = status_count(Status.CORROSION) > 0
@@ -789,6 +878,7 @@ func enemy_status_count(index: int, id: int) -> int:
 	var effects: Dictionary = enemies[index].get("statuses", {})
 	return effects[id].count if effects.has(id) else 0
 
+## Apply eligible enemy afflictions and interrupt blocked charging actions.
 func apply_enemy_status(index: int, id: int, amount: int, modify_stacks: bool = true) -> Array:
 	if not is_enemy_alive(index) or id not in Status.ENEMY_HARMFUL: return []
 	if modify_stacks: amount += RelicEffects.status_bonus(self,id)
@@ -811,6 +901,7 @@ func apply_enemy_status(index: int, id: int, amount: int, modify_stacks: bool = 
 func _attack_relic_effects(target: int, damage: int, skill: MultiHitSkill) -> Array:
 	return RelicEffects.after_hit(self,target,damage,skill)
 
+## Resolve enemy burning, plague spread and decaying status stacks.
 func _tick_enemy_statuses() -> Array:
 	var events: Array = []
 	# Snapshot infections so a newly infected ally cannot spread again this turn.
@@ -876,6 +967,7 @@ func end_round() -> Array:
 static func event(target: int, amount: int, type: String, text: String) -> Dictionary:
 	return {"target": target, "amount": amount, "type": type, "text": text}
 
+## Keep actual HP loss separate from the full damage displayed on impact.
 static func damage_event(target: int, actual_loss: int, hit_damage: int, type: String = "damage", instant_kill: bool = false) -> Dictionary:
 	# Gameplay consumers retain actual HP/shield loss; presentation shows the hit
 	# before remaining-health clamping. An execution has impact FX but no number.

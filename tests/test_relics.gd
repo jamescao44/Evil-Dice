@@ -156,7 +156,7 @@ func _initialize() -> void:
 		m.phase = "roll"
 		roll = m.roll(0,false)
 		check(roll.perfect and 6 in roll.dice and roll.kind != Rules.Kind.ULTIMATE,"Stopwatch + cursed die always Perfect, includes six, never 666")
-	check(m.perfect_progress == 0 and m.perfect_combo == 300,"Stopwatch preserves combo but blocks treasure progress")
+	check(m.reroll_progress == 0 and m.perfect_combo == 300,"Stopwatch preserves combo but blocks treasure progress")
 	m = fresh(); m.acquire_relic("cursed_die")
 	for i in range(300):
 		m.phase = "roll"; roll = m.roll(0.8,false)
@@ -189,7 +189,7 @@ func chest_checks() -> void:
 	for legacy_curse_weight in [false,true]:
 		var m = fresh()
 		m.acquire_relic("heart")
-		m.perfect_progress = 9
+		m.reroll_progress = 9
 		m.reward_weights = [0,0 if legacy_curse_weight else 1,1 if legacy_curse_weight else 0,0,0,0,0]
 		var rewards: Array = m.open_chest()
 		var locked: Dictionary = m.chest_relics.duplicate()

@@ -191,7 +191,7 @@ func _initialize() -> void:
 		check(m.phase == "roll" and m.round_number == round_number,"First next-turn skill grants another throw before enemies or status ticks")
 		m.set_test_roll([1,2,3]); m.apply_player(0); finish(m)
 		check(m.phase == "round_end","Second throw completes the full turn")
-	m = fresh(); m.perfect_progress = 6
+	m = fresh(); m.reroll_progress = 6
 	var wins: int = 0
 	var rares: int = 0
 	for i in range(4000):
@@ -203,7 +203,7 @@ func _initialize() -> void:
 			m.tarot_effects.bonus_chests.clear()
 	check(wins > 850 and wins < 1150 and rares > 65 and rares < 140,"Wheel uses 25% win rate and conditional 10% rare rate")
 	m.tarot_effects.bonus_chests.append(2)
-	check(m.open_bonus_chest().size() == 3 and m.perfect_progress == 6,"Wheel chest uses the existing reward system without spending Perfect progress")
+	check(m.open_bonus_chest().size() == 3 and m.reroll_progress == 6,"Wheel chest uses the existing reward system without spending Perfect progress")
 	m = fresh(); var duplicate: Dictionary = m.tarots.add("strength")
 	m.tarot_effects.cast(m,duplicate.instance_id)
 	check(m.tarot_effects.cast(m,duplicate.instance_id).has("error") and m.tarot_effects.strength == 1,"Duplicate release cannot consume or apply twice")

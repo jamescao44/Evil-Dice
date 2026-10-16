@@ -14,7 +14,7 @@ static func draw(rng: RandomNumberGenerator, eligible: Array, rarity_weights: Ar
 	var pools: Array = [[],[],[],[],[]]
 	for id in eligible:
 		var item: Dictionary = Catalog.ITEMS[id]
-		if not item.get("fusion",false): pools[item.rarity].append(id)
+		if id not in Catalog.DISABLED and not item.get("fusion",false): pools[item.rarity].append(id)
 	var weights: Array = rarity_weights.duplicate()
 	# A guarantee promotes low rolls to its floor, without inflating top rarities.
 	for rarity in range(minimum_rarity):

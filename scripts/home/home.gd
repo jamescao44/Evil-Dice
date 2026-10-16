@@ -213,7 +213,7 @@ func _activate(point: Vector2) -> void:
 				if skill_tab_rect(i).has_point(point):
 					skill_page = i
 					_click()
-			if city_rect().has_point(point):
+			if Run.CITY_FEVER_ENABLED and city_rect().has_point(point):
 				city_skills = not city_skills
 				_click()
 		elif modal == "settings":
@@ -388,7 +388,7 @@ func _draw_play() -> void:
 	var y: float = 1128 if portrait else 348
 	var start: float = 78 if portrait else 702
 	var step: float = 72 if portrait else 52
-	for i in range(Run.Waves.COUNT):
+	for i in range(Run.PLAYABLE_WAVES):
 		var p := Vector2(start+(i%10)*step,y+floori(i/10.0)*(84 if portrait else 74))
 		if i%10 < 9: Pixel.line(self,p,p+Vector2(step,0),EDGE.darkened(0.4),3)
 		var special: bool = i == Run.Waves.CITY_STAGE or not Run.Waves.SQUADS[i].special.is_empty() or Run.Waves.SQUADS[i].general[1] > 0
@@ -478,7 +478,7 @@ func _draw_dice_detail() -> void:
 	_seal(at + Vector2(0, 84), 236 if portrait else 192, 0.46, GOLD.darkened(0.2))
 	var info := Vector2(72, 962) if portrait else Vector2(670, 202)
 	_text(info, dices[detail_dice].name, 40 if portrait else 32, CREAM)
-	_text(info + Vector2(0, 48), "BASIC  /  D6  /  THREE DICE", 22 if portrait else 16, GOLD)
+	_text(info + Vector2(0, 48), "BASIC  /  D6  /  SIX DICE", 22 if portrait else 16, GOLD)
 	var y := _wrapped(info + Vector2(0, 100), dices[detail_dice].description, 660 if portrait else 412, 24 if portrait else 18, CREAM)
 	_wrapped(Vector2(info.x, y + (54 if portrait else 32)), dices[detail_dice].effect, 660 if portrait else 412, 22 if portrait else 18, MUTED)
 	_button(equip_rect(), "EQUIPPED" if detail_dice == dice_index else "EQUIP", true, GREEN)
@@ -487,7 +487,7 @@ func _draw_skills() -> void:
 	var area := modal_rect()
 	_text(area.position + Vector2(24, 68 if portrait else 50), "DICE SKILLS", 34 if portrait else 28, GOLD)
 	for i in range(3): _button(skill_tab_rect(i), ["NORMAL", "DOUBLES", "TRIPLES"][i], true, GREEN if skill_page == i else EDGE)
-	_button(city_rect(), "CITY" if city_skills else "SQUAD", true, PURPLE if city_skills else GOLD)
+	if Run.CITY_FEVER_ENABLED: _button(city_rect(), "CITY" if city_skills else "SQUAD", true, PURPLE if city_skills else GOLD)
 	if skill_page == 0:
 		var at := Vector2(402, 650) if portrait else Vector2(640, 292)
 		for i in range(3): _mini_die(at + Vector2((i - 1) * 112, 0), i + 1, 80 if portrait else 60)
@@ -496,7 +496,7 @@ func _draw_skills() -> void:
 		var info: String = "Three different faces combine into one sum. Choose a foe and cast the skill for the total, multiplied by attack power and growth."
 		if city_skills: info = "Three different faces combine into one sum. Strike the city with the total, attack power, growth and the siege multiplier."
 		var y := _wrapped(point, info, 640 if portrait else 784, 28 if portrait else 22, CREAM)
-		_wrapped(Vector2(point.x, y + 70), "Aim near the center of the power bar for more doubles and triples.", 640 if portrait else 784, 24 if portrait else 20, MUTED)
+		_wrapped(Vector2(point.x, y + 70), "Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.", 640 if portrait else 784, 24 if portrait else 20, MUTED)
 		return
 	for i in range(6):
 		var rect := Rect2(48, 490 + i * 146, 708, 138) if portrait else Rect2(168 + (i % 2) * 480, 218 + floori(i / 2.0) * 140, 464, 132)

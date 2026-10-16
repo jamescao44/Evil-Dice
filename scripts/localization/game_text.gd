@@ -12,7 +12,10 @@ static var _csv: CsvSource
 static var _live_translations: Array[Translation] = []
 static var _reported_error: String = ""
 static var _description_font: FontFile
+const LINE_CACHE_LIMIT := 256
+static var _line_cache: Dictionary = {}
 
+## Load the saved interface language and initialize editor translations once.
 static func initialize() -> void:
 	if OS.has_feature("editor") and _csv == null: reload_translations(true)
 	if not language.is_empty(): return
@@ -21,6 +24,7 @@ static func initialize() -> void:
 	var saved: String = str(settings.get_value("interface", "language", DEFAULT_LANGUAGE))
 	set_language(saved if saved in LANGUAGES else DEFAULT_LANGUAGE, false)
 
+## Publish a valid CSV snapshot while preserving the last good translations on errors.
 static func reload_translations(immediate: bool = false) -> bool:
 	# Exported games use the bundled, imported translations and never watch files.
 	if not OS.has_feature("editor"): return false
@@ -40,12 +44,15 @@ static func reload_translations(immediate: bool = false) -> bool:
 	for previous in _live_translations: TranslationServer.remove_translation(previous)
 	_live_translations = _csv.translations
 	for translation in _live_translations: TranslationServer.add_translation(translation)
+	clear_line_cache()
 	return true
 
+## Switch interface language and optionally persist the player preference.
 static func set_language(value: String, persist: bool = true) -> void:
 	if value not in LANGUAGES: return
 	language = value
 	TranslationServer.set_locale(value)
+	clear_line_cache()
 	if persist:
 		var settings := ConfigFile.new()
 		settings.load(settings_path)
@@ -53,13 +60,16 @@ static func set_language(value: String, persist: bool = true) -> void:
 		var error := settings.save(settings_path)
 		if error != OK: push_warning("Could not save language setting: %s" % error_string(error))
 
+## Translate an English source key using the current interface language.
 static func text(source: String) -> String:
 	initialize()
 	return TranslationServer.translate(source)
 
+## Translate a template before inserting its numbers or labels.
 static func format(source: String, values: Variant) -> String:
 	return text(source) % values
 
+## Attach the bundled Chinese fallback with optional scalable glyph rendering.
 static func prepare_font(font: FontFile, scalable: bool = false) -> void:
 	initialize()
 	# Bundle CJK glyphs so web/mobile never depend on installed system fonts.
@@ -73,6 +83,7 @@ static func prepare_font(font: FontFile, scalable: bool = false) -> void:
 	chinese.variation_opentype = {weight_tag: 600.0}
 	font.fallbacks = [chinese]
 
+## Reuse the high-resolution pixel font for readable item and skill descriptions.
 static func description_font() -> FontFile:
 	if _description_font == null:
 		# Keep pixel letterforms; a finer distance-field atlas preserves clean edges at phone scale.
@@ -83,8 +94,13 @@ static func description_font() -> FontFile:
 		prepare_font(_description_font,true)
 	return _description_font
 
+## Wrap localized text once per font, size and width, with a bounded reusable cache.
 static func lines(source: String, font: Font, size: int, width: float) -> PackedStringArray:
 	var translated := text(source)
+	# Include translated content so external catalogs and live CSV edits stay current.
+	var key: Array = [translated,font.get_instance_id(),size,width,language]
+	if _line_cache.has(key): return _line_cache[key].duplicate()
+	if not font.changed.is_connected(clear_line_cache): font.changed.connect(clear_line_cache)
 	var paragraph := TextParagraph.new()
 	paragraph.width = width
 	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
@@ -93,8 +109,15 @@ static func lines(source: String, font: Font, size: int, width: float) -> Packed
 	for i in range(paragraph.get_line_count()):
 		var span := paragraph.get_line_range(i)
 		result.append(translated.substr(span.x, span.y - span.x).strip_edges())
+	if _line_cache.size() >= LINE_CACHE_LIMIT: _line_cache.clear()
+	_line_cache[key] = result.duplicate()
 	return result
 
+## Discard wrapped text after language, CSV or font metrics change.
+static func clear_line_cache() -> void:
+	_line_cache.clear()
+
+## Format remaining attacks, turns, throws or stacks with the correct plural template.
 static func remaining(amount: int, unit: String = "turn") -> String:
 	# Full plural templates let translators choose their own word order.
 	var singular := {"attack":"%d attack remaining.", "turn":"%d turn remaining.", "throw":"%d throw remaining.", "stack":"%d stack remaining."}

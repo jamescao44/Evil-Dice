@@ -3,6 +3,8 @@ extends RefCounted
 enum EffectType { ROLL_SETTING, ROLL_TRIGGER, IMMEDIATE, NEXT_SKILL }
 # Timing and repeat behavior are independent. Star affects Perfect detection,
 # so it shares a category with face settings without replacing their faces.
+const ROLL_EFFECTS_ENABLED := false
+const DISABLED := ["magician", "hierophant", "lovers", "justice", "devil", "star", "temperance"]
 const ROLL_FACE_SETTINGS := ["magician","lovers","justice"]
 const ROLL_TRIGGERS := ["hierophant","devil"]
 const NEXT_SKILL_MODIFIERS := ["strength","high_priestess"]
@@ -44,11 +46,11 @@ static func pick_index(rng: RandomNumberGenerator, pool: Array) -> int:
 	return Weighted.pick(rng,pool.map(func(id): return ITEMS[id].get("weight",1.0)))
 
 static func draw_one(rng: RandomNumberGenerator, banned: Array = []) -> String:
-	var pool: Array = ITEMS.keys().filter(func(id): return id not in banned)
+	var pool: Array = eligible(banned)
 	return "" if pool.is_empty() else pool[pick_index(rng,pool)]
 
 static func draw_choices(rng: RandomNumberGenerator, banned: Array = []) -> Array:
-	var eligible: Array = ITEMS.keys().filter(func(id): return id not in banned)
+	var eligible: Array = eligible(banned)
 	var pool: Array = eligible.duplicate()
 	var choices: Array = []
 	if pool.is_empty(): return []
@@ -56,3 +58,11 @@ static func draw_choices(rng: RandomNumberGenerator, banned: Array = []) -> Arra
 		if pool.is_empty(): pool = eligible.duplicate()
 		choices.append(pool.pop_at(pick_index(rng,pool)))
 	return choices
+
+## Include the temporary rules notice wherever a card's effect is inspected.
+static func description(id: String) -> String:
+	return "Temporarily disabled for six-dice turns." if id in DISABLED else ITEMS[id].design
+
+## Share the active reward deck with draws and ban choices.
+static func eligible(banned: Array = []) -> Array:
+	return ITEMS.keys().filter(func(id): return id not in banned and id not in DISABLED)

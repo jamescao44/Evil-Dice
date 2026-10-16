@@ -22,7 +22,7 @@ func _initialize() -> void: call_deferred("run")
 func distribution_checks() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 608
-	var all: Array = Relics.ITEMS.keys().filter(func(id): return not Relics.ITEMS[id].get("fusion",false))
+	var all: Array = Relics.ITEMS.keys().filter(func(id): return id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false))
 	var one_per_tier: Array = []
 	for tier in range(5): one_per_tier.append(all.filter(func(id): return Relics.ITEMS[id].rarity == tier)[0])
 	for eligible in [all,one_per_tier]:
@@ -123,7 +123,7 @@ func presentation_checks() -> void:
 		for category in [Rewards.Category.SHARD,Rewards.Category.TAROT]:
 			check(category in rolling,"Every reel shows shards and tarot regardless of the winning category")
 		for id in Relics.ITEMS:
-			check((chest.relic_symbols[id] in rolling) == not Relics.ITEMS[id].get("fusion",false),"Every directly obtainable relic appears; fusion-only relics stay out")
+			check((chest.relic_symbols[id] in rolling) == (id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false)),"Every obtainable relic appears; suspended and fusion-only relics stay out")
 		for index in sequence:
 			check(chest.symbols[index].id not in ["damage","multiplier","potion"] and index not in [Rewards.Category.RELIC,Rewards.Category.CURSE],"Reels show real rewards without retired items or generic relic placeholders")
 	chest.cosmetic.seed = 207
@@ -136,7 +136,7 @@ func presentation_checks() -> void:
 	for i in range(ruby_sequence.size()):
 		if i != chest.reel_steps: check(ruby_sequence[i] == chest.sequences[0][i],"Changing the reward changes only the final landing symbol, never the filler")
 	var model = Run.new(889)
-	model.perfect_progress = 15
+	model.reroll_progress = 15
 	model.reward_weights = [0,1,0,0,0,0,0]
 	var outcomes: Array = model.open_chest()
 	var prizes: Array = []

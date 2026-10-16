@@ -348,7 +348,7 @@ Each enemy killed multiplies damage by 1.1. Halve max HP. City troops do not cou
 Cursed Bow,Cursed Bow,诅咒弓
 Each wave cleared while owned adds 1 combo hit and multiplies single-target damage by 0.95. Compounds each wave.,Each wave cleared while owned adds 1 combo hit and multiplies single-target damage by 0.95. Compounds each wave.,持有期间每通关一波，连击技能增加1次攻击，单体伤害再乘以0.95；逐波累乘。
 Cursed Stopwatch,Cursed Stopwatch,诅咒秒表
-Always Perfect. Never roll 666. Perfects cannot advance the treasure bank.,Always Perfect. Never roll 666. Perfects cannot advance the treasure bank.,始终完美投掷，无法投出666，完美投掷不再增加宝箱进度。
+Always Perfect. Never roll 666. Cannot gain Reroll Treasure progress.,Always Perfect. Never roll 666. Cannot gain Reroll Treasure progress.,始终完美投掷，无法投出666，无法获得重投宝箱进度。
 Pages: %d / 10.,Pages: %d / 10.,残页：%d / 10。
 Turns: %d / 6. Stored charges: %d.,Turns: %d / 6. Stored charges: %d.,回合：%d / 6。储存次数：%d。
 Kills: %d.,Kills: %d.,击杀数：%d。
@@ -631,3 +631,17 @@ SPAWN NORMAL CHEST,SPAWN NORMAL CHEST,生成普通宝箱
 WAVE CLEARED,WAVE CLEARED,本波通关
 GUARANTEED UPGRADE,GUARANTEED UPGRADE,必定升级
 25%% UPGRADE · ATTEMPT %d/4,25%% UPGRADE · ATTEMPT %d/4,25%% 升级概率 · 第 %d/4 次
+Temporarily disabled for six-dice turns.,Temporarily disabled for six-dice turns.,六骰机制调整期间暂时停用。
+LOCKED %d,LOCKED %d,锁定 %d
+SWITCH SKILL,SWITCH SKILL,切换技能
+SELECT THREE DICE,SELECT THREE DICE,选择三枚骰子
+THE INNER SANCTUM FALLS,THE INNER SANCTUM FALLS,内殿已被攻破
+"After forming an all-different skill, deal 10 base damage to a random enemy.","After forming an all-different skill, deal 10 base damage to a random enemy.",组成三个点数各异的技能后，对随机敌人造成10基础伤害。
+"After forming a two-alike skill, the spare die deals its face value as base damage to a random enemy. Not a skill cast.","After forming a two-alike skill, the spare die deals its face value as base damage to a random enemy. Not a skill cast.",组成两个一样的技能后，余骰点数作为基础伤害攻击随机敌人；不算技能施放。
+"Six six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.","Six six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.",六枚骨制六面骰。骨头的主人，最好别问。熟悉的分量，陌生的低语。
+BASIC  /  D6  /  SIX DICE,BASIC  /  D6  /  SIX DICE,基础 / 六面 / 六枚骰子
+ROLL,ROLL,投掷
+CANCEL SKILL,CANCEL SKILL,取消技能
+Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.,Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.,点击中央投掷，拖过三枚骰子后松手召唤技能。每回合可投三次。
+Return a skill to the red center to unlock its dice. Use all six dice to end the turn.,Return a skill to the red center to unlock its dice. Use all six dice to end the turn.,将技能拖回红色中央可解锁骰子；用完六枚骰子结束回合。
+"Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.","Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.",重投宝箱：投掷过骰子的回合结束时，每次未用投掷增加1格进度；3／8／15格解锁宝箱。

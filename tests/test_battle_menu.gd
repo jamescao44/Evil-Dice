@@ -34,13 +34,13 @@ func model_checks() -> void:
 	for wave in range(1,Waves.COUNT+1):
 		m.hp = 0
 		m.perfect_combo = 8
-		m.perfect_progress = 6
+		m.reroll_progress = 6
 		m.saved_skill = m.classify([5,5,5])
 		m.statuses[6].count = 5
 		check(m.load_debug_wave(wave),"Each supported wave loads")
 		check(m.stage == wave-1 and m.hp == 100+(wave-1)*30 and m.hp == m.max_hp,"Wave gets matching full player health")
 		check(m.power == 1.0,"Every wave keeps base damage multiplier at one")
-		check(m.phase == "new" and m.round_number == 0 and m.pending.is_empty() and m.saved_skill.is_empty() and m.perfect_combo == 0 and m.perfect_progress == 0 and m.status_count(6) == 0,"Wave starts with fresh turn, treasure, skills and statuses")
+		check(m.phase == "new" and m.round_number == 0 and m.pending.is_empty() and m.saved_skill.is_empty() and m.perfect_combo == 0 and m.reroll_progress == 0 and m.status_count(6) == 0,"Wave starts with fresh turn, treasure, skills and statuses")
 		check(m.city_hp == Run.CITY_MAX_HP and m.troops == 0,"Fresh city has its configured HP and fresh siege clocks")
 		if wave < Waves.COUNT:
 			check(m.enemies.size() == Run.WAVE_COUNTS[wave-1][0]+Run.WAVE_COUNTS[wave-1][1],"Wave gets its enemy formation")
@@ -77,12 +77,12 @@ func scene_checks(portrait: bool) -> void:
 	g._handle_click(g.DEBUG_RECT.get_center())
 	check(g.debug_open and g.debug_wave_input.visible and g.debug_wave_input.text == str(Waves.COUNT),"Debug shows a wave number field")
 	check(g.DEBUG_WAVE_INPUT.encloses(g.debug_wave_input.get_rect()),"Native number field fits the debug layout")
-	g.model.perfect_progress = 2
+	g.model.reroll_progress = 2
 	var combo_before: int = g.model.perfect_total
 	g._handle_click(g.DEBUG_TREASURE.get_center())
-	check(g.model.perfect_progress == Run.CHEST_THRESHOLDS[-1] and g.model.chest_tier() == 3,"Debug fully charges the treasure bank to Ultra")
+	check(g.model.reroll_progress == Run.CHEST_THRESHOLDS[-1] and g.model.chest_tier() == 3,"Debug fully charges the treasure bank to Ultra")
 	g._handle_click(g.DEBUG_TREASURE.get_center())
-	check(g.model.perfect_progress == Run.CHEST_THRESHOLDS[-1] and g.model.perfect_total == combo_before and g.debug_open,"Repeated charging stays capped without faking Perfect throws")
+	check(g.model.reroll_progress == Run.CHEST_THRESHOLDS[-1] and g.model.perfect_total == combo_before and g.debug_open,"Repeated charging stays capped without faking Perfect throws")
 	for other in [g.DEBUG_CHEST,g.DEBUG_TAROTS,g.DEBUG_TAROT_DRAW,g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD,g._debug_option_rect(12)]:
 		check(not g.DEBUG_TREASURE.intersects(other),"Charge treasure button fits the debug layout")
 	await snapshot(g,"debug",portrait)
@@ -129,7 +129,7 @@ func scene_checks(portrait: bool) -> void:
 	check(g.model.tarots.items.size() == 1 and not ceremony.active() and g.view_phase == "ready","Debug ceremony collects one card and returns to the current battle")
 	check(g.model.claimed_slots.is_empty() and g.model.reward_history.is_empty() and g.model.tarot_source.is_empty(),"Debug collection does not claim a chest slot or leave a pending transaction")
 	# Spawn through the real debug control, including its complete upgrade chain.
-	g.model.perfect_progress = 8
+	g.model.reroll_progress = 8
 	g.model.set_test_roll([1,1,4])
 	g.view_phase = "skill"
 	var held_faces: Array = g.model.pending.dice.duplicate()
@@ -146,7 +146,7 @@ func scene_checks(portrait: bool) -> void:
 		check(not g.DEBUG_CHEST.intersects(rect),"Spawn chest debug button does not overlap other controls")
 	g._handle_click(g.DEBUG_CHEST.get_center())
 	check(not g.debug_open and not g.debug_wave_input.visible and g.chest.roll_phase == "closed" and g.chest.tier == 0 and g.chest.upgrade_mode,"Debug spawns a closed Normal Chest with upgrades enabled")
-	check(g.model.opened_chest_tier == 3 and g.model.perfect_progress == 8 and g.model.wave_chest_stage == -1,"Debug uses real upgrade chances without spending Perfect progress or clearing the wave")
+	check(g.model.opened_chest_tier == 3 and g.model.reroll_progress == 8 and g.model.wave_chest_stage == -1,"Debug uses real upgrade chances without spending Perfect progress or clearing the wave")
 	var locked_rng: int = g.model.reward_rng.state
 	var funds: int = g.model.rubies
 	g.chest.set_process(false)
@@ -168,7 +168,7 @@ func scene_checks(portrait: bool) -> void:
 	var chest_deadline: int = Time.get_ticks_msec()+6000
 	while g.view_phase == "reward" and Time.get_ticks_msec() < chest_deadline: await process_frame
 	check(g.view_phase == "skill" and g.model.pending.dice == held_faces and g.model.hp == before_hp and g.model.stage == before_stage,"Finishing debug chest restores the held skill and current battle")
-	check(g.model.rubies == funds+100 and g.model.open_rewards.is_empty() and g.model.perfect_progress == 8,"Debug chest pays once and preserves the treasure bank")
+	check(g.model.rubies == funds+100 and g.model.open_rewards.is_empty() and g.model.reroll_progress == 8,"Debug chest pays once and preserves the treasure bank")
 	g.chest.set_process(true)
 	g.chest.audio_clock_enabled = true
 	for wave in range(1,Waves.COUNT):
@@ -200,7 +200,7 @@ func scene_checks(portrait: bool) -> void:
 	check(g.model.stage == 6 and g.model.pending.is_empty() and g.view_phase == "ready","Wave load invalidates the old roll coroutine")
 	g.model.stage = Waves.CITY_STAGE
 	g.model.city_hp = 0
-	g.model.perfect_progress = 15
+	g.model.reroll_progress = 15
 	g.model.wave_chest_stage = g.model.stage
 	g.model.wave_reward_resolved = true
 	g._check_over()
@@ -222,7 +222,7 @@ func scene_checks(portrait: bool) -> void:
 	if "--capture" in OS.get_cmdline_user_args():
 		g._restart(Waves.COUNT)
 		g.model.city_hp = 0
-		g.model.perfect_progress = 15
+		g.model.reroll_progress = 15
 		g.model.wave_chest_stage = g.model.stage
 		g.model.wave_reward_resolved = true
 		g._check_over()
@@ -277,8 +277,13 @@ func sound_checks() -> void:
 	g._restart()
 	g.played.clear()
 	g._roll(1,true)
-	check(g.played.count("dice/soft_sweep") == 1 and g.played.count("dice/perfect") == 1 and "dice/confirmation_002" in g.played,"Perfect sound layers once with the existing confirmation")
+	check(g.played.count("dice/soft_sweep") == 1 and g.played.count("dice/perfect") == 1 and "dice/confirmation_002" not in g.played,"Perfect sound layers once; skill confirmation waits for a selected trio")
 	check(g.levels["dice/soft_sweep"] == -8,"Soft sweep is six dB louder on a Perfect throw")
+	var deadline: int = Time.get_ticks_msec()+3000
+	while g.view_phase != "ready" and Time.get_ticks_msec() < deadline: await process_frame
+	for index in [0,1,2]: g.model.dice_turn.select(index)
+	g._form_selected_skill()
+	check(g.played.count("dice/confirmation_002") == 1,"Summoning the chosen trio plays one confirmation")
 	g._restart()
 	g.queue_free()
 	await process_frame
