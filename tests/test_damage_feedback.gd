@@ -203,6 +203,7 @@ func scene_checks(portrait: bool) -> void:
 	g.relic_ui.set_process(false)
 	check(not g.damage_feedback.active and g._damage_multiplier_label().is_empty(),"Idle multiplier is hidden")
 	for id in ["bracelet","codex_page","cursed_skull","cursed_bow"]: g.model.acquire_relic(id)
+	g.model.relics.items[g.model.relics.index_of("cursed_bow")].waves = 1
 	g.model.set_test_roll([1,1,6])
 	g.model.begin_player_cast()
 	g.view_phase = "resolving"
@@ -272,6 +273,8 @@ func scene_checks(portrait: bool) -> void:
 	g.reduced = true
 	check(panel.result_glyph_motion(0,3) == Vector2.ZERO and panel.result_glyph_scale(0,3) == 1.2,"Reduced effects keep the enlarged result without bobbing")
 	check(g.model.rng.state == rng and g.model.reward_rng.state == reward_rng and g.model.enemies[0].hp == hp,"Presentation never executes the attack or consumes RNG")
+	panel.sync_hit(7.5,8)
+	check(panel.base_value == 7.5 and panel.label() == "DMG 8","A leftover die displays its own base and damage including fractional carry")
 	panel.finish(); panel._process(0.21)
 	check(not panel.active and g._damage_multiplier_label().is_empty(),"Multiplier fades away after the attack")
 	await motion_checks(g)

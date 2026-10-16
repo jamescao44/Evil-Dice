@@ -485,32 +485,23 @@ func _draw_dice_detail() -> void:
 
 func _draw_skills() -> void:
 	var area := modal_rect()
-	_text(area.position + Vector2(24, 68 if portrait else 50), "DICE SKILLS", 34 if portrait else 28, GOLD)
-	for i in range(3): _button(skill_tab_rect(i), ["NORMAL", "DOUBLES", "TRIPLES"][i], true, GREEN if skill_page == i else EDGE)
-	if Run.CITY_FEVER_ENABLED: _button(city_rect(), "CITY" if city_skills else "SQUAD", true, PURPLE if city_skills else GOLD)
+	_text(area.position+Vector2(24,68 if portrait else 50),"DICE SKILLS",34 if portrait else 28,GOLD)
+	for i in range(3): _button(skill_tab_rect(i),["TURN","MATCHES","SHIELDS"][i],true,GREEN if skill_page == i else EDGE)
 	if skill_page == 0:
-		var at := Vector2(402, 650) if portrait else Vector2(640, 292)
-		for i in range(3): _mini_die(at + Vector2((i - 1) * 112, 0), i + 1, 80 if portrait else 60)
-		_center(at + Vector2(0, 144 if portrait else 86), Rules.NORMAL_NAME, 36 if portrait else 28, CREAM)
-		var point := Vector2(80, 934) if portrait else Vector2(248, 438)
-		var info: String = "Three different faces combine into one sum. Choose a foe and cast the skill for the total, multiplied by attack power and growth."
-		if city_skills: info = "Three different faces combine into one sum. Strike the city with the total, attack power, growth and the siege multiplier."
-		var y := _wrapped(point, info, 640 if portrait else 784, 28 if portrait else 22, CREAM)
-		_wrapped(Vector2(point.x, y + 70), "Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.", 640 if portrait else 784, 24 if portrait else 20, MUTED)
+		var point := Vector2(80,560) if portrait else Vector2(248,268)
+		var width: float = 640 if portrait else 784
+		var y: float = _wrapped(point,"Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",width,28 if portrait else 22,CREAM)
+		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.",width,28 if portrait else 22,CREAM)
+		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.",width,28 if portrait else 22,CREAM)
+		_wrapped(Vector2(point.x,y+(90 if portrait else 60)),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",width,24 if portrait else 20,MUTED)
 		return
-	for i in range(6):
-		var rect := Rect2(48, 490 + i * 146, 708, 138) if portrait else Rect2(168 + (i % 2) * 480, 218 + floori(i / 2.0) * 140, 464, 132)
-		var color: Color = GREEN if skill_page == 1 else GOLD if i == 5 else PURPLE
-		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y - 4), Vector2(rect.size.x, 2)), Color(EDGE, 0.55))
-		var count: int = 2 if skill_page == 1 else 3
-		var mini_side: float = 36 if portrait else 24
-		for n in range(count): _mini_die(rect.position + Vector2(22 + n * (mini_side + 8), 34 if portrait else 20), i + 1, mini_side)
-		var name_at := rect.position + (Vector2(158, 38) if portrait else Vector2(106, 27))
-		var label: String = Rules.PAIR_NAMES[i] if skill_page == 1 else Rules.SPECIAL_NAMES[i]
-		var description: String = Rules.PAIR_TEXT[i] if skill_page == 1 else (Rules.CITY_SPECIAL_TEXT[i] if city_skills else Rules.SPECIAL_TEXT[i])
-		if city_skills and skill_page == 1 and i == 1: description = "City is immune to freeze."
-		_text(name_at, label, 24 if portrait else 18, color)
-		_wrapped(rect.position + (Vector2(12, 76) if portrait else Vector2(10, 62)), description, 684 if portrait else 440, 28 if portrait else 22, CREAM)
+	var entries: Array = Rules.Patterns.help_entries(skill_page == 2)
+	for i in range(entries.size()):
+		var rect := Rect2(48,490+i*164,708,158) if portrait else Rect2(168+(i%2)*480,218+floori(i/2.0)*148,464,140)
+		var color: Color = GREEN if skill_page == 1 else PURPLE
+		draw_rect(Rect2(rect.position+Vector2(0,rect.size.y-4),Vector2(rect.size.x,2)),Color(EDGE,0.55))
+		_text(rect.position+Vector2(12,30),entries[i].name,26 if portrait else 20,color)
+		_wrapped(rect.position+Vector2(12,72),entries[i].text,684 if portrait else 440,28 if portrait else 22,CREAM)
 
 func _text(at: Vector2, value: String, size: int, color: Color = CREAM) -> void:
 	value = GameText.text(value)

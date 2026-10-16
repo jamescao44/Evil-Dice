@@ -276,14 +276,15 @@ func sound_checks() -> void:
 	check(g.levels["dice/soft_sweep"] == -21,"Soft sweep is six dB louder on a low-power throw")
 	g._restart()
 	g.played.clear()
+	g.debug_choice = 0 # A straight is a valid selection in the new dice rules.
 	g._roll(1,true)
-	check(g.played.count("dice/soft_sweep") == 1 and g.played.count("dice/perfect") == 1 and "dice/confirmation_002" not in g.played,"Perfect sound layers once; skill confirmation waits for a selected trio")
+	check(g.played.count("dice/soft_sweep") == 1 and g.played.count("dice/perfect") == 1 and "dice/confirmation_002" not in g.played,"Perfect sound layers once; skill confirmation waits for a selected combination")
 	check(g.levels["dice/soft_sweep"] == -8,"Soft sweep is six dB louder on a Perfect throw")
 	var deadline: int = Time.get_ticks_msec()+3000
 	while g.view_phase != "ready" and Time.get_ticks_msec() < deadline: await process_frame
 	for index in [0,1,2]: g.model.dice_turn.select(index)
 	g._form_selected_skill()
-	check(g.played.count("dice/confirmation_002") == 1,"Summoning the chosen trio plays one confirmation")
+	check(g.played.count("dice/confirmation_002") == 1,"Summoning the chosen straight plays one confirmation")
 	g._restart()
 	g.queue_free()
 	await process_frame

@@ -326,6 +326,7 @@ func damage_cap(kind: int, target: int) -> int:
 	return maxi(1, floori(enemies[target].max_hp * numerator * WAVE_BOOSTS[stage] / 3.0))
 
 func _load_wave() -> void:
+	shield = 0 # Straight shields last within this wave only.
 	city_immunity_clock = 0.0
 	enemies = Waves.create(stage,rng)
 	pending = Skill.new()
@@ -446,7 +447,7 @@ func is_instant_kill(result: MultiHitSkill) -> bool:
 	return not is_city() and super.is_instant_kill(result)
 
 func attack_base_with_bonus(result: MultiHitSkill, bonus: float) -> float:
-	if not is_city(): return super.attack_base_with_bonus(result,bonus)
+	if not is_city() or not result.pattern.is_empty(): return super.attack_base_with_bonus(result,bonus)
 	if result.kind == Kind.ULTIMATE: return CITY_ULTIMATE_DAMAGE + bonus
 	# A city is not a humanoid: triple 1 deals five regular attacks instead.
 	return (regular_base_damage() + bonus) * 5 if result.kind == Kind.SPECIAL and result.face == 1 else super.attack_base_with_bonus(result,bonus)

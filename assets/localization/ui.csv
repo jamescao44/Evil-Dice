@@ -645,3 +645,44 @@ CANCEL SKILL,CANCEL SKILL,取消技能
 Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.,Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.,点击中央投掷，拖过三枚骰子后松手召唤技能。每回合可投三次。
 Return a skill to the red center to unlock its dice. Use all six dice to end the turn.,Return a skill to the red center to unlock its dice. Use all six dice to end the turn.,将技能拖回红色中央可解锁骰子；用完六枚骰子结束回合。
 "Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.","Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.",重投宝箱：投掷过骰子的回合结束时，每次未用投掷增加1格进度；3／8／15格解锁宝箱。
+Two Alike,Two Alike,两个一样
+Three Alike,Three Alike,三个一样
+Four Alike,Four Alike,四个一样
+Five Alike,Five Alike,五个一样
+Straight Shield,Straight Shield,顺子护盾
+Leftover Volley,Leftover Volley,余骰连射
+END TURN,END TURN,结束回合
+Deselect,Deselect,取消选择
+OK,OK,确认
+TURN,TURN,回合
+MATCHES,MATCHES,同点攻击
+SHIELDS,SHIELDS,顺子护盾
+MATCH ATTACKS,MATCH ATTACKS,同点攻击
+STRAIGHT SHIELDS,STRAIGHT SHIELDS,顺子护盾
++%d SHIELD,+%d SHIELD,+%d 护盾
+%d DMG,%d DMG,%d 伤害
+TREASURE +%d,TREASURE +%d,宝箱 +%d
+Six alike: destroy all enemies. Heal 12 HP.,Six alike: destroy all enemies. Heal 12 HP.,六个一样：消灭全体敌人，恢复12生命。
+%d pips x%d = %d shield.,%d pips x%d = %d shield.,点数和%d ×%d = %d护盾。
+%d pips fire %d orbs.,%d pips fire %d orbs.,剩余%d点，直接射出%d枚光球。
+%d dice x%d base x%.1f; %d hits.,%d dice x%d base x%.1f; %d hits.,%d骰 ×%d基础 ×%.1f；攻击%d次。
+3-Dice Straight,3-Dice Straight,三骰顺子
+4-Dice Straight,4-Dice Straight,四骰顺子
+5-Dice Straight,5-Dice Straight,五骰顺子
+6-Dice Straight,6-Dice Straight,六骰顺子
+Wave Shields,Wave Shields,护盾规则
+Three consecutive faces: shield = pip sum x1. Example: 123 gives 6.,Shield = pip sum x1. Example: 123 gives 6.,三个连续点数：护盾=点数和×1。例如123获得6护盾。
+Four consecutive faces: shield = pip sum x2. Example: 1234 gives 20.,Shield = pip sum x2. Example: 1234 gives 20.,四个连续点数：护盾=点数和×2。例如1234获得20护盾。
+Five consecutive faces: shield = pip sum x3. Example: 12345 gives 45.,Shield = pip sum x3. Example: 12345 gives 45.,五个连续点数：护盾=点数和×3。例如12345获得45护盾。
+123456: shield = 21 x4 = 84.,123456: shield = 21 x4 = 84.,123456：护盾=21×4=84。
+"Shields absorb damage, have no cap, and clear on the next wave. Shield skills are not attacks.",No cap. Clears next wave. Absorbs damage; not an attack.,护盾抵挡伤害，无上限，换波清空。护盾技能不算攻击。
+2 dice x5 base x1.5 = 15 per hit. The matching face sets the number of hits.,15 per hit (2 x5 x1.5). Hits = matching face.,2骰×5基础×1.5=每击15伤害。相同点数决定攻击次数。
+3 dice x5 base x2 = 30 per hit. The matching face sets the number of hits.,30 per hit (3 x5 x2). Hits = matching face.,3骰×5基础×2=每击30伤害。相同点数决定攻击次数。
+4 dice x5 base x2.5 = 50 per hit. The matching face sets the number of hits.,50 per hit (4 x5 x2.5). Hits = matching face.,4骰×5基础×2.5=每击50伤害。相同点数决定攻击次数。
+5 dice x5 base x3 = 75 per hit. The matching face sets the number of hits.,75 per hit (5 x5 x3). Hits = matching face.,5骰×5基础×3=每击75伤害。相同点数决定攻击次数。
+"Six alike of any face: destroy all enemies, ignoring shields. Heal 12 HP.","Six alike: kill all, ignore shields; heal 12 HP.",任意点数六个一样：无视护盾消灭全体敌人，恢复12生命。
+"Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.","Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",每回合三次投掷。拖连同点骰子或顺子，松手召唤；也可逐个点选，再点确认。
+Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.,Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.,技能拖回红色中央可取消并解锁骰子。结束回合会自动使用余骰。
+End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.,End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.,结束回合：每个余骰点直接射出一枚光球，造成25%基础伤害；不召唤技能。
+Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.,Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.,未用投掷次数计入重投宝箱。每次连续Perfect仍增加0.1伤害倍率。
+SELECT DICE,SELECT DICE,选择骰子

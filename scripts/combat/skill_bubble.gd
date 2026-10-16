@@ -185,6 +185,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if stored and not Rules.SAVED_SKILLS_ENABLED: return
 	if is_instance_valid(battle) and is_instance_valid(battle.tarot_ui) and battle.tarot_ui.inventory_visible(): return
 	if not is_instance_valid(battle) or battle._menus_open(): return
 	if not stored and is_instance_valid(battle.dice_selection) and battle.dice_selection.dragging: return
@@ -208,9 +209,9 @@ func _draw() -> void:
 		draw_rect(battle.ARENA.grow(-8), Color(color,0.85 if battle._field_drop_valid(battle.skill_pointer) else 0.35),false,3)
 	if progress < 1:
 		var travel: float = 1.0 - pow(1.0 - progress, 3)
-		for i in range(3):
+		for i in range(roll.dice.size()):
 			var indices: Array = battle.model.skill_dice_indices
-			var start: Vector2 = battle.DICE_POSITIONS[indices[i] if indices.size() == 3 else i]
+			var start: Vector2 = battle.DICE_POSITIONS[indices[i] if indices.size() == roll.dice.size() else i]
 			var p: Vector2 = start.lerp(battle.DICE_CENTER, travel)
 			Pixel.line(self, start.lerp(p, 0.65), p, Color(color, (1.0-progress)*0.7), 3)
 			_mini_die(p, int(roll.dice[i]), lerpf(38 if portrait else 24, 8, travel), 1.0-progress)
@@ -277,6 +278,7 @@ func value_text() -> String:
 	var held: bool = battle.view_phase == "skill" and not stored
 	if not selected and not (held and not battle._skill_needs_target(roll)): return ""
 	if Rules.is_attack(roll): return battle.model.damage_caption(roll, battle.hover_target if selected else -1)
+	if roll.pattern == "straight": return GameText.format("+%d SHIELD",roundi(Rules.Patterns.shield_points(roll)*battle.model.tarot_effects.skill_factor(roll)))
 	if roll.face == 2 and roll.kind == Rules.Kind.SPECIAL:
 		if battle.model.status_count(battle.Status.DARKNESS) > 0: return "+0 HP"
 		return "+%d HP" % maxi(0, battle.model.max_hp-battle.model.hp)
@@ -339,7 +341,9 @@ func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
 	var kind: int = roll.kind
 	var face: int = roll.face
 	var key: String = "attack"
-	if kind != Rules.Kind.NORMAL:
+	if not roll.pattern.is_empty():
+		key = "shield" if roll.pattern == "straight" else "crown" if roll.pattern == "annihilation" else "attack"
+	elif kind != Rules.Kind.NORMAL:
 		key = "heal" if face == 2 else "book" if face == 3 else "shield" if face == 6 and kind == Rules.Kind.PAIR else "feast" if face == 1 and kind == Rules.Kind.SPECIAL else "crown" if kind == Rules.Kind.ULTIMATE else "attack"
 	if battle.art.has(key): draw_texture_rect(battle.art[key], Rect2(at-Vector2.ONE*side/2, Vector2.ONE*side),false,tint)
 	if Rules.hits_all(roll):

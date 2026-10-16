@@ -1,5 +1,6 @@
 extends RefCounted
 ## Six physical dice and their roll budget, independent of skills and presentation.
+const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 const COUNT := 6
 const ROLLS := 3
 var active: bool = false
@@ -28,7 +29,7 @@ func unused() -> Array:
 func can_roll() -> bool:
 	return active and not has_pending_group() and rolls_left > 0 and locked.size() < COUNT
 
-## A summoned group suspends the rest of the pool until used, saved or cancelled.
+## A summoned group suspends the rest of the pool until used or cancelled.
 func has_pending_group() -> bool:
 	return locked.any(func(index): return index not in committed)
 
@@ -44,37 +45,42 @@ func roll(rng: RandomNumberGenerator, perfect: bool, forced: Array = []) -> Arra
 	selected.clear()
 	return indices
 
-## Toggle up to three available dice after the first throw.
+## Toggle an available die only when the selection can still form a useful pattern.
 func select(index: int) -> bool:
 	if not active or has_pending_group() or rolls_left == ROLLS or index < 0 or index >= COUNT or index in locked: return false
 	if index in selected: selected.erase(index)
-	elif selected.size() < 3: selected.append(index)
+	elif can_select(index): selected.append(index)
 	else: return false
 	return true
+
+## Check a potential selection against patterns still possible in this pool.
+func can_select(index: int) -> bool:
+	if index in locked or index < 0 or index >= COUNT: return false
+	return Patterns.can_extend(selection_values()+[values[index]],unused().map(func(i): return values[i]))
 
 func selection_values() -> Array:
 	return selected.map(func(index): return values[index])
 
-## Reserve a selected trio until its skill is used, saved or cancelled.
+## Reserve a valid variable-length combination until it is used or cancelled.
 func form() -> Array:
-	if has_pending_group() or selected.size() != 3: return []
+	if not active or rolls_left == ROLLS or has_pending_group() or Patterns.classify(selection_values()).is_empty(): return []
 	var faces: Array = selection_values()
 	groups.append(selected.duplicate())
 	locked.append_array(selected)
 	selected.clear()
 	return faces
 
-## Unlock only a still-pending group; used or saved dice stay spent.
+## Unlock only a still-pending group; used dice stay spent.
 func release_group(indices: Array) -> bool:
-	if not active or indices.size() != 3 or indices.any(func(index): return index in committed): return false
+	if not active or indices.is_empty() or indices.any(func(index): return index in committed): return false
 	if not groups.has(indices): return false
 	groups.erase(indices)
 	for index in indices: locked.erase(index)
 	selected.clear()
 	return true
 
-## Commit formation bonuses once when the player actually uses or saves a skill.
+## Commit formation bonuses once when the player actually uses a skill.
 func commit_group(indices: Array) -> bool:
-	if not active or indices.size() != 3 or not groups.has(indices) or indices.any(func(index): return index in committed): return false
+	if not active or indices.is_empty() or not groups.has(indices) or indices.any(func(index): return index in committed): return false
 	committed.append_array(indices)
 	return true

@@ -228,7 +228,7 @@ func resolve_next_step(model) -> Dictionary:
 
 func _finish_effect(model, events: Array) -> void:
 	if not model.outcome().is_empty():
-		if model.saved_skill.is_empty(): model.saved_skill = model.pending.duplicate()
+		if model.SAVED_SKILLS_ENABLED and model.saved_skill.is_empty(): model.saved_skill = model.pending.duplicate()
 		model.pending = Skill.new()
 		model.phase = "finished"
 		model._end_buff_turn()

@@ -100,7 +100,7 @@ func model_checks() -> void:
 	m.set_skill_use_multiplier("echo",2)
 	m.set_test_roll([1,1,1])
 	m.apply_player(1)
-	check(m.living().size() == 1 and m.enemies[1].hp == 0,"Repeated execution selects a new living foe after the chosen target dies")
+	check(m.living().size() == 2 and m.enemies[1].hp == 0,"Repeated execution stays on its selected foe after death")
 	m = fresh()
 	m.set_skill_use_multiplier("echo",2)
 	m.set_test_roll([5,5,5])
@@ -111,13 +111,8 @@ func model_checks() -> void:
 	m = fresh(true)
 	m.set_test_roll([5,5,5])
 	m.pending.set_use_multiplier("skill_relic",2)
-	check(m.save_pending_skill(),"A modified skill can be saved")
-	m.begin_round()
-	m.set_test_roll([2,2,4])
 	var waiting: MultiHitSkill = m.pending.duplicate()
-	m.begin_saved_cast()
-	var events: Array = m.apply_player()
-	check(events.filter(func(e):return e.type == "damage").size() == 12 and m.pending.same_as(waiting) and m.phase == "player","Saved twelve-hit casts restore the waiting skill exactly once")
+	check(not m.save_pending_skill() and not m.begin_saved_cast() and m.pending.same_as(waiting),"Saving is suspended and cannot consume a modified skill")
 	m.reset_run()
 	check(m.skill_use_modifiers.is_empty() and m.pending.is_empty() and m.saved_skill.is_empty(),"Restart clears all skill instances and run modifiers")
 
@@ -136,7 +131,7 @@ func corpse_checks() -> void:
 			var count: int = m.skill_use_count(cast)
 			var corpses: int = 0
 			for use in range(count):
-				var defeated: bool = m.city_hp == 0 if mode == "city" else m.living().is_empty()
+				var defeated: bool = m.city_hp == 0 if mode == "city" else (not m.is_enemy_alive(cast.target) if cast.keeps_selected_target() and cast.target >= 0 else m.living().is_empty())
 				var before_hp: int = m.hp
 				var kills: int = m.relics.items[m.relics.index_of("reaper_scythe")].kills
 				var target: int = m.player_target()
@@ -150,24 +145,22 @@ func corpse_checks() -> void:
 					check(hits.all(func(e): return e.get("corpse_hit",false) and e.amount == 0),"Corpse impacts never remove additional HP")
 					check(m.relics.items[m.relics.index_of("reaper_scythe")].kills == kills,"Corpse hits never award duplicate kills")
 					if values != [6,6,6]: check(m.hp == before_hp,"Corpse hits do not grant lifesteal")
-				else: check(hits.all(func(e): return not e.get("corpse_hit",false)),"Corpses are excluded whenever a living target remains")
+				else: check(hits.all(func(e): return not e.get("corpse_hit",false)),"Random and area attacks prefer living targets")
 				if use < count-1:
 					check(m.phase == "executing" and m.outcome().is_empty(),"Victory waits for the complete locked hit budget")
 					if mode != "battle": check(not m.begin_wave_reward(),"Rewards stay unavailable between remaining hits")
 				if mode == "city" and m.city_hp == 0:
 					check(m.tick_city(0.25).is_empty(),"A destroyed city cannot attack during follow-through")
-			check(corpses > 0 and m.pending.is_empty() and m.outcome() == ("wave_clear" if mode == "wave" else "victory"),"The last corpse hit ends the cast and releases victory")
-			check(m.relics.items[m.relics.index_of("magic_shield")].turns == 1,"The whole chain completes exactly one relic turn")
+			var expected_outcome: String = "" if mode != "city" and not m.living().is_empty() else "wave_clear" if mode == "wave" else "victory"
+			check(corpses > 0 and m.pending.is_empty() and m.outcome() == expected_outcome,"The last corpse hit ends the cast; victory requires every enemy defeated")
+			check(m.relics.items[m.relics.index_of("magic_shield")].turns == (0 if expected_outcome.is_empty() else 1),"Relic turn advances once on victory, otherwise waits for the enemy phase")
 			check(m.apply_player_step().is_empty(),"A finished battle cannot start another corpse hit")
 	var saved = Run.new(994)
 	saved.begin_round()
 	saved.enemies[0].hp = 1
 	saved.saved_skill = Rules.classify([5,5,5])
 	var waiting: MultiHitSkill = saved.set_test_roll([3,3,4]).duplicate()
-	saved.begin_saved_cast()
-	var hits: Array = saved.apply_player().filter(func(e): return e.type == "damage")
-	check(hits.size() == 6 and hits.slice(1).all(func(e): return e.corpse_hit),"Saved attacks also spend all remaining hits on corpses")
-	check(saved.saved_skill.same_as(waiting) and saved.pending.is_empty(),"A saved finishing chain preserves the unused current skill for the next wave")
+	check(not saved.begin_saved_cast() and saved.pending.same_as(waiting),"Legacy saved attacks remain unavailable during the dice redesign")
 	var defeated = fresh()
 	defeated.set_test_roll([5,5,5]); defeated.begin_player_cast()
 	for enemy in defeated.enemies: enemy.hp = 0
@@ -226,7 +219,7 @@ func scene_checks(g) -> void:
 	g._handle_release(g.ARENA.get_center())
 	var deadline: int = Time.get_ticks_msec()+8000
 	while g.view_phase == "resolving" and Time.get_ticks_msec()<deadline: await process_frame
-	check(g.view_phase == "skill" and g.skill_bubble.orb_count() == 12 and g.model.round_number == turn,"Saved modified chain restores the waiting preview without spending its turn")
+	check(g.view_phase == "skill" and g.skill_bubble.orb_count() == 12 and g.model.round_number == turn,"Hidden saved slot cannot spend or replace the waiting skill")
 	prepare(g,[5,5,5])
 	for enemy in g.model.enemies: enemy.hp = 1; enemy.shield = 0
 	g.speed = 1

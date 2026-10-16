@@ -10,5 +10,5 @@ const ANCIENTS := [{
 const DICES := [{
 	"id": "bone", "name": "Bone Dice", "rarity": "BASIC", "face": 5,
 	"description": "Six six-sided dice, carved from bones whose owner is best left unasked. A familiar weight. An unfamiliar whisper.",
-	"effect": "Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.",
+	"effect": "Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",
 }]

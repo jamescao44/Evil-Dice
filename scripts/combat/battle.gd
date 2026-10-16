@@ -64,6 +64,7 @@ var DICE_CENTER := Vector2(639, 610)
 var DICE_RADIUS := 144.0
 var DICE_POSITIONS: Array = []
 var dice_selection: Node2D
+var leftover_volley: Node2D
 var MENU_RECT := Rect2(1200, 24, 40, 34)
 var MENU_CLOSE := Rect2(836, 148, 44, 40)
 var MENU_RESUME := Rect2(400, 548, 480, 72)
@@ -211,6 +212,9 @@ func _ready() -> void:
 	dice_selection = preload("res://scripts/dice/dice_selection.gd").new()
 	dice_selection.battle = self
 	add_child(dice_selection)
+	leftover_volley = preload("res://scripts/dice/leftover_volley.gd").new()
+	leftover_volley.battle = self
+	add_child(leftover_volley)
 	skill_bubble = SkillBubble.new()
 	skill_bubble.battle = self
 	add_child(skill_bubble)
@@ -326,6 +330,7 @@ func _process(delta: float) -> void:
 		var die = dice[index]
 		die.visible = true
 		var brightness: float = 0.18 if modal else 0.35 if index in model.dice_turn.locked or model.dice_turn.has_pending_group() else 0.55 if view_phase not in ["ready", "charging", "rolling"] else 1.0
+		if not modal and index == leftover_volley.active_die: brightness = 0.95
 		die.self_modulate = Color(brightness,brightness,brightness,0.18 if modal or view_phase == "over" else 1.0)
 		die.set_process(not modal and not model.is_frozen())
 		die.reduced = reduced
@@ -367,7 +372,7 @@ func _process(delta: float) -> void:
 		interactive = interactive or REPLAY_RECT.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse))
 	if view_phase in ["skill", "targeting"]:
 		interactive = interactive or _in_skill_bubble(mouse) or (view_phase == "targeting" and _target_at(mouse) != -1)
-	interactive = interactive or (_can_use_saved() and _in_saved_slot(mouse))
+	interactive = interactive or (_can_end_turn() and _in_saved_slot(mouse))
 	interactive = interactive or _chest_tier_at(mouse) > 0
 	interactive = interactive or (_can_inspect_enemy() and _enemy_inspect_at(mouse) >= 0)
 	interactive = interactive or (view_phase == "frozen" and not modal and (_ice_rect().has_point(mouse) or _player_ice_rect().has_point(mouse)))
@@ -617,6 +622,9 @@ func _handle_click(mouse: Vector2) -> void:
 	if view_phase == "frozen":
 		if _ice_rect().has_point(mouse) or _player_ice_rect().has_point(mouse): _hit_ice(mouse)
 		return
+	if _in_saved_slot(mouse) and _can_end_turn():
+		_end_dice_turn()
+		return
 	if dice_selection.click(mouse): return
 	if _can_inspect_enemy() and not skill_pressed and (result.is_empty() or not _in_skill_bubble(mouse)) and not _in_saved_slot(mouse):
 		var enemy: int = _enemy_inspect_at(mouse)
@@ -662,6 +670,7 @@ func _in_saved_slot(point: Vector2) -> bool:
 
 ## Check whether the banked skill is ready for a bonus cast.
 func _can_use_saved() -> bool:
+	if not Rules.SAVED_SKILLS_ENABLED: return false
 	if is_instance_valid(tarot_ui) and tarot_ui.inventory_visible(): return false
 	return not model.saved_skill.is_empty() and view_phase in ["ready", "skill", "targeting"] and not _menus_open() and model.outcome().is_empty()
 
@@ -812,7 +821,7 @@ func _handle_release(point: Vector2) -> void:
 			_sound("ui/book",0.85,-20)
 			_show_pending_skill(false)
 		return
-	if skill_source == "current" and _in_saved_slot(point):
+	if Rules.SAVED_SKILLS_ENABLED and skill_source == "current" and _in_saved_slot(point):
 		if model.saved_skill.is_empty(): _save_skill()
 		else: _cancel_targeting()
 		return
@@ -907,6 +916,7 @@ func _cinematic_gloom() -> float:
 	return cinematic_dim * minf(1, cinematic_remaining/(0.4 if cinematic_pause == 0 else cinematic_recovery))
 
 func _clear_skill() -> void:
+	if is_instance_valid(leftover_volley): leftover_volley.clear()
 	if is_instance_valid(dice_selection): dice_selection.cancel_gesture()
 	if is_instance_valid(damage_feedback): damage_feedback.clear()
 	if is_instance_valid(screen_ripple): screen_ripple.clear()
@@ -1088,32 +1098,23 @@ func _hit_ice(point: Vector2) -> void:
 
 func _debug_values() -> Array:
 	if debug_choice < 0: return []
-	if debug_choice == 0:
-		var choices: Array = [1, 2, 3, 4, 5, 6]
+	var count: int = model.dice_turn.unused().size()
+	if debug_choice == 0: return range(1,count+1)
+	if debug_choice > 6:
 		var values: Array = []
-		for i in range(3):
-			var at: int = debug_rng.randi_range(0, choices.size() - 1)
-			values.append(choices.pop_at(at))
+		values.resize(count)
+		values.fill(debug_choice-6)
 		return values
-	if debug_choice <= 6:
-		var other: int = debug_rng.randi_range(1, 5)
-		if other >= debug_choice: other += 1
-		var values: Array = [debug_choice, debug_choice, other]
-		var slot: int = debug_rng.randi_range(0, 2)
-		values[2] = values[slot]
-		values[slot] = other
-		return values
-	var face: int = debug_choice - 6
-	return [face, face, face]
+	var values: Array = []
+	for i in range(count): values.append(debug_choice if i < 2 else 1+(debug_choice+i-2)%6)
+	return values
 
-## Throw all unused dice, then return to choosing or casting a formed skill.
 func _roll(strength: float = 0.0, perfect: bool = false) -> void:
 	if view_phase not in ["ready", "skill"] or _menus_open() or not model.outcome().is_empty(): return
 	var token: int = run_id
 	throw_power = clampf(strength, 0, 1)
 	throw_perfect = perfect or debug_perfect
 	var forced: Array = _debug_values()
-	if not forced.is_empty() and model.dice_turn.unused().size() == 6: forced.append_array(forced.duplicate())
 	var changed: Array = model.roll_pool(throw_perfect, forced)
 	if changed.is_empty(): return
 	view_phase = "rolling"
@@ -1150,7 +1151,7 @@ func _resolve_roll_triggers(token: int) -> bool:
 		if _check_over(): return false
 	return not _check_over()
 
-## Turn the selected trio into a locked skill without spending unused dice.
+## Summon the selected pattern without spending the remaining dice.
 func _form_selected_skill() -> void:
 	if view_phase not in ["ready", "skill"] or _menus_open(): return
 	var formed: MultiHitSkill = model.form_selected_skill()
@@ -1167,7 +1168,7 @@ func _show_pending_skill(animate: bool = true) -> void:
 	if result.is_empty():
 		skill_bubble.clear()
 		view_phase = "ready"
-		status_title = "SELECT THREE DICE"
+		status_title = "SELECT DICE"
 		return
 	skill_bubble.begin(result)
 	if animate:
@@ -1189,6 +1190,10 @@ func _combo_chime(ultimate: bool, token: int) -> bool:
 
 ## Build the skill name, description and value preview for its bubble.
 func _skill_caption(roll: MultiHitSkill) -> Dictionary:
+	if roll.pattern == "annihilation": return {"name":"Annihilation","description":"Six alike: destroy all enemies. Heal 12 HP."}
+	if roll.pattern == "straight": return {"name":"Straight Shield","description":GameText.format("%d pips x%d = %d shield.",[roll.sum,roll.dice.size()-2,roundi(Rules.Patterns.shield_points(roll)*model.tarot_effects.skill_factor(roll))])}
+	if roll.pattern == "cleanup": return {"name":"Leftover Volley","description":GameText.format("%d pips fire %d orbs.",[roll.sum,roll.sum])}
+	if roll.pattern == "match": return {"name":Rules.Patterns.MATCH_NAMES[roll.dice.size()-2],"description":GameText.format("%d dice x%d base x%.1f; %d hits.",[roll.dice.size(),int(Rules.Patterns.BASE_PER_DIE),Rules.Patterns.tier_multiplier(roll),model.skill_use_count(roll)])}
 	if roll.is_freeze():
 		var stacks: int = roundi(model.tarot_effects.skill_factor(roll))
 		var description: String = GameText.text("City is immune to freeze.") if model.is_city() else GameText.format("Freeze all: %d stack. No attack." if stacks == 1 else "Freeze all: %d stacks. No attack.",stacks)
@@ -1214,6 +1219,7 @@ func _skill_caption(roll: MultiHitSkill) -> Dictionary:
 
 ## Describe the bonus gained by refreshing an already active support effect.
 func _skill_reapply_bonus(roll: MultiHitSkill) -> String:
+	if not roll.pattern.is_empty(): return ""
 	var id: int = roll.face if roll.kind == Rules.Kind.PAIR else Status.ASCENSION if roll.kind == Rules.Kind.SPECIAL and roll.face == 3 else -1
 	if model.status_count(id) <= 0: return ""
 	match id:
@@ -1230,7 +1236,7 @@ func _die_landed(index: int) -> void:
 func _resolve_player(target: int, source: String = "current") -> void:
 	if model.phase != "player" or model.pending.is_empty() or view_phase == "resolving" or not model.outcome().is_empty(): return
 	var token: int = run_id
-	if not model.begin_player_cast(): return
+	if not model.begin_player_cast(target): return
 	var roll: MultiHitSkill = model.pending.duplicate()
 	var bubble: Node2D = _source_bubble(source)
 	bubble.roll = roll.duplicate()
@@ -1261,10 +1267,12 @@ func _resolve_player(target: int, source: String = "current") -> void:
 		_sound("player/crash", 0.55, -12)
 	var count: int = model.skill_use_count(roll)
 	for impact in range(count):
+		roll = model.pending.duplicate()
 		# Local to this cast: gradually compress both travel and recovery, while
 		# preserving every impact and the player's existing speed setting.
 		var hit_speed: float = minf(MULTI_HIT_SPEED_CAP,1.0+impact*MULTI_HIT_SPEED_GAIN) if attacking and count > 1 else 1.0
-		if attacking: damage_feedback.sync_value(model.cast_damage_multiplier(roll))
+		if attacking:
+			damage_feedback.sync_value(model.cast_damage_multiplier(roll))
 		if impact > 0: bubble.consume_use()
 		if not attacking:
 			if roll.is_freeze():
@@ -1279,12 +1287,12 @@ func _resolve_player(target: int, source: String = "current") -> void:
 			_show_events(model.apply_player_step())
 			_sync_corpses()
 		else:
-			if roll.random_target_per_use() or (not model.is_city() and target not in model.living()): target = model.player_target()
+			target = model.player_target()
 			attack_target = target
 			var targets: Array = [CITY_POINT] if model.is_city() else []
 			if not model.is_city():
 				for hit in model.preview(roll, target): targets.append(_enemy_impact_point(hit.target))
-			var face: int = roll.face if kind >= Rules.Kind.SPECIAL or kind == Rules.Kind.PAIR else 0
+			var face: int = (6 if roll.pattern == "annihilation" else 0) if not roll.pattern.is_empty() else roll.face if kind >= Rules.Kind.SPECIAL or kind == Rules.Kind.PAIR else 0
 			var duration: float = 0.18 if count > 1 else 1.6 if kind == Rules.Kind.ULTIMATE else 0.7 if kind >= Rules.Kind.SPECIAL else 0.38
 			duration /= hit_speed
 			fx.cast(face, _player_point(), targets, duration / _roll_speed())
@@ -1663,7 +1671,7 @@ func _show_events(events: Array) -> void:
 			else: fx.activate_circle(point, tint, monster_side*0.42, 0.45)
 			continue
 		var color: Color = RED if event.type == "damage" else PURPLE if event.type == "cancel" else TEAL
-		var label: String = event.text if event.type == "immune" else _damage_popup(event) if event.type == "damage" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "+ BOON"
+		var label: String = event.text if event.type == "immune" else _damage_popup(event) if event.type == "damage" else GameText.format("+%d SHIELD",event.amount) if event.type == "shield" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "+ BOON"
 		var offset: int = offsets.get(event.target, 0)
 		if not label.is_empty():
 			fx.floating(point - Vector2(0, 45 + offset), label, color,_event_font_size(event))
@@ -2267,29 +2275,55 @@ func _current_skill_selected() -> bool:
 
 ## Highlight an empty save slot as soon as the current skill is selected.
 func _save_slot_accepts() -> bool:
-	return _current_skill_selected() and model.saved_skill.is_empty()
+	return Rules.SAVED_SKILLS_ENABLED and _current_skill_selected() and model.saved_skill.is_empty()
 
-## Draw the saved-skill slot with its current interaction state.
-func _draw_saved_slot() -> void:
+## Draw End Turn and the projected leftover volley beside the dice.
+func _draw_end_turn() -> void:
 	if is_instance_valid(tarot_ui) and tarot_ui.inventory_visible(): return
-	if view_phase in ["over", "reward"]: return
+	if view_phase in ["over","reward"]: return
+	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
 	var at: Vector2 = _saved_slot_center()
 	var radius: float = _saved_slot_radius()
-	var accepts: bool = _save_slot_accepts()
-	var hovered: bool = accepts and _in_saved_slot(skill_pointer)
-	var color: Color = GOLD if hovered else TEAL if accepts else MUTED
+	var enabled: bool = _can_end_turn()
+	var color: Color = GOLD if enabled else MUTED
 	Pixel.disc(self,at,radius,Color(INK,0.75),2)
-	Pixel.circle(self,at,radius,Color(color,0.95 if accepts else 0.45),3)
-	Pixel.circle(self,at,radius-7,Color(color,0.3),2)
-	for i in range(4):
-		var p: Vector2 = at+Vector2.from_angle(PI/4+i*PI/2)*(radius+5)
-		_rune(p,i,color,1)
-	if model.saved_skill.is_empty() and casting_source != "saved":
-		Pixel.line(self,at-Vector2(12,0),at+Vector2(12,0),Color(color,0.7),3)
-		Pixel.line(self,at-Vector2(0,12),at+Vector2(0,12),Color(color,0.7),3)
-	_center(at+Vector2(0,radius+27 if fx.canvas_size.y > fx.canvas_size.x else radius+20),"SAVE" if model.saved_skill.is_empty() else "SAVED",20 if fx.canvas_size.y > fx.canvas_size.x else 12,color)
+	Pixel.circle(self,at,radius,Color(color,0.9 if enabled else 0.35),3)
+	_center(at+Vector2(0,5),"END TURN",22 if portrait else 14,color)
+	if enabled:
+		var total: int = model.leftover_total_damage()
+		_center(at+Vector2(0,radius+25 if portrait else radius+19),GameText.format("%d DMG",total),22 if portrait else 14,CREAM)
+		_center(at+Vector2(0,radius+50 if portrait else radius+38),GameText.format("TREASURE +%d",model.dice_turn.rolls_left),18 if portrait else 12,color)
 
-## Display the consecutive Perfect count opposite the saved skill.
+## End Turn replaces skill saving and is unavailable during every modal or cast.
+func _can_end_turn() -> bool:
+	return view_phase == "ready" and model.can_end_dice_turn() and not _menus_open() and not tarot_ui.inventory_visible() and not dice_selection.dragging
+
+## Fire leftover pips directly, then advance the turn without summoning a bubble.
+func _end_dice_turn() -> void:
+	if not _can_end_turn() or not model.end_dice_turn(): return
+	var token: int = run_id
+	_clear_skill()
+	_sound("ui/book",1.0,-18)
+	if model.pending.is_empty():
+		await _enemy_phase()
+		return
+	if not model.begin_player_cast(): return
+	result = MultiHitSkill.new()
+	view_phase = "resolving"
+	status_title = "ATTACKING"
+	status_color = GOLD
+	damage_feedback.start(model.attack_damage_steps(model.pending))
+	while damage_feedback.building:
+		await get_tree().process_frame
+		if not _valid_turn(token): return
+	if not await leftover_volley.play(token): return
+	damage_feedback.finish()
+	attack_target = -1
+	if model.phase == "turn_end" and not await _resolve_turn_end(token): return
+	if _check_over(): return
+	if model.phase in ["roll","player"]: _show_pending_skill()
+	else: await _enemy_phase()
+
 func _draw_perfect_combo() -> void:
 	if is_instance_valid(tarot_ui) and tarot_ui.inventory_visible(): return
 	if view_phase in ["over", "reward"]: return
@@ -2314,7 +2348,7 @@ func _draw_perfect_combo() -> void:
 	_center(at+Vector2(0,radius+27 if portrait else radius+20),"COMBO",20 if portrait else 12,color)
 
 func _draw_dice_circle() -> void:
-	_draw_saved_slot()
+	_draw_end_turn()
 	_draw_perfect_combo()
 	if is_instance_valid(tarot_ui): draw_set_transform_matrix(tarot_ui.dice_transform())
 	var layout_scale: float = DICE_RADIUS / 144.0
@@ -2426,30 +2460,26 @@ func _home_rect() -> Rect2:
 
 func _draw_guide(canvas: CanvasItem = null) -> void:
 	if canvas == null: canvas = self
-	canvas.draw_rect(Rect2(0, 0, 1280, 800), Color(0.06, 0.08, 0.05))
-	_frame(Rect2(86, 76, 1108, 681), Color("333b2e"), GOLD, canvas)
-	_text(Vector2(116, 126), "DICE GRIMOIRE", 32, GOLD, canvas)
+	canvas.draw_rect(Rect2(0,0,1280,800),Color(0.06,0.08,0.05))
+	_frame(Rect2(86,76,1108,681),Color("333b2e"),GOLD,canvas)
+	_text(Vector2(116,126),"DICE GRIMOIRE",32,GOLD,canvas)
 	_button(GUIDE_STATUSES,"SKILLS" if guide_status_page else "STATUS EFFECTS",true,canvas)
-	_button(GUIDE_CLOSE, "X", true, canvas)
-	if home_enabled: _button(_home_rect(), "HOME", true, canvas)
-	_text(Vector2(116, 165), "City rolls cast automatically after the reveal. Drag saved skills out for a bonus cast." if model.is_city() else "Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.", 16, CREAM, canvas)
-	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage,3)]
-	_text(Vector2(116, 194), "CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP. Skills ignore caps; 666 clears the wave.", caps), 16, MUTED, canvas)
-	_text(Vector2(116, 213), "Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.", 16, MUTED, canvas)
+	_button(GUIDE_CLOSE,"X",true,canvas)
+	if home_enabled: _button(_home_rect(),"HOME",true,canvas)
+	_wrapped(Vector2(116,165),"Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",1040,CREAM,18,canvas)
 	if guide_status_page:
 		_draw_status_help(canvas)
 		return
-	_text(Vector2(116, 238), "PAIRS / SKILLS", 16, TEAL, canvas)
-	_text(Vector2(656, 238), "TRIPLES / SPELLS", 16, PURPLE, canvas)
-	canvas.draw_rect(Rect2(632, 220, 2, 478), EDGE.darkened(0.25))
-	for i in range(6):
-		var y: float = 280 + i * 67
-		_text(Vector2(116, y), "%d%d  %s" % [i+1,i+1,GameText.text(Rules.PAIR_NAMES[i])], 16, TEAL, canvas)
-		_wrapped(Vector2(116, y + 25), _pair_description(i), 496, MUTED, 16, canvas)
-		_text(Vector2(656, y), "%d%d%d  %s" % [i+1,i+1,i+1,GameText.text(Rules.SPECIAL_NAMES[i])], 16, GOLD if i==5 else PURPLE, canvas)
-		_wrapped(Vector2(656, y + 25), _special_description(i), 504, MUTED, 16, canvas)
-	_text(Vector2(116, 713), "Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.", 16, MUTED, canvas)
-	_text(Vector2(116, 739), "Art: Dungeon Crawl Stone Soup / CC0    Sound: Kenney", 16, MUTED, canvas)
+	for column in range(2):
+		var x: float = 116+column*540
+		_text(Vector2(x,232),"MATCH ATTACKS" if column == 0 else "STRAIGHT SHIELDS",22,TEAL if column == 0 else PURPLE,canvas)
+		var entries: Array = Rules.Patterns.help_entries(column == 1)
+		for i in range(entries.size()):
+			var y: float = 270+i*78
+			_text(Vector2(x,y),entries[i].name,19,GOLD,canvas)
+			_wrapped(Vector2(x,y+24),entries[i].text,504,CREAM,18,canvas)
+	_wrapped(Vector2(116,670),"End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.",1040,MUTED,18,canvas)
+	_text(Vector2(116,723),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",18,MUTED,canvas)
 
 func _draw_status_help(canvas: CanvasItem) -> void:
 	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
@@ -2494,12 +2524,12 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	_text(Vector2(136, 148), "调试", 32, GOLD, canvas)
 	_button(DEBUG_CLOSE, "X", true, canvas)
 	_button(_debug_option_rect(-1), "自然随机", true, canvas)
-	_button(_debug_option_rect(0), "随机单骰", true, canvas)
+	_button(_debug_option_rect(0), "顺子 1—6", true, canvas)
 	_button(DEBUG_REPEAT, "重复：" + ("开" if debug_repeat else "关"), true, canvas)
 	_button(DEBUG_PERFECT, "完美投掷：" + ("开" if debug_perfect else "关"), true, canvas)
 	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 2)
 	_text(Vector2(136, 259), "两个一样 / 技能", 16, TEAL, canvas)
-	_text(Vector2(136, 426), "三个一样 / 法术", 16, PURPLE, canvas)
+	_text(Vector2(136, 426), "六个一样 / 湮灭", 16, PURPLE, canvas)
 	for choice in range(1, 13):
 		var rect: Rect2 = _debug_option_rect(choice)
 		var face: int = choice if choice <= 6 else choice - 6
@@ -2507,7 +2537,7 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 		_frame(rect, Color("53613d") if choice == debug_choice else PANEL, color if rect.has_point(get_global_mouse_position()) or choice == debug_choice else EDGE, canvas)
 		for i in range(3):
 			_mini_die(rect.position + Vector2(30 + i * 44, 38), 0 if choice <= 6 and i == 2 else face, CREAM.darkened(0.3) if choice <= 6 and i == 2 else CREAM, canvas)
-		_center(rect.get_center() + Vector2(0, 32), "%d%d" % [face, face] if choice <= 6 else "%d%d%d" % [face, face, face], 16, color, canvas)
+		_center(rect.get_center() + Vector2(0, 32), "%d%d" % [face, face] if choice <= 6 else str(face).repeat(6), 16, color, canvas)
 	_button(DEBUG_CHEST,"生成普通宝箱",_can_debug_chest(),canvas)
 	_button(DEBUG_TREASURE,"充满重投宝箱进度",true,canvas)
 	_button(DEBUG_TAROTS,"获得全部22张塔罗牌", true, canvas)

@@ -2,8 +2,12 @@ extends Node2D
 ## Drag-to-connect presentation; the dice model owns locks, rolls and skill budgets.
 const Beam = preload("res://scripts/dice/dice_connection_beam.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
+const IdleFeedback = preload("res://scripts/dice/dice_idle_feedback.gd")
+var idle_feedback := IdleFeedback.new()
 var battle
 var dragging: bool = false
+var moved: bool = false
+var press_origin := Vector2.ZERO
 var contact_die: int = -1
 var pointer := Vector2.ZERO
 var preview: MultiHitSkill = MultiHitSkill.new()
@@ -27,6 +31,11 @@ func available() -> bool:
 func center_hit(point: Vector2) -> bool:
 	return point.distance_to(battle.DICE_CENTER) <= (78 if portrait() else 48)
 
+## A small text-only control clears tap selections without spending dice or rolls.
+func cancel_rect() -> Rect2:
+	var size := Vector2(152,38) if portrait() else Vector2(112,28)
+	return Rect2(battle.DICE_CENTER+Vector2(0,90 if portrait() else 62)-size/2,size)
+
 func die_rect(index: int) -> Rect2:
 	var side: float = 114 if portrait() else 82
 	return Rect2(battle.DICE_POSITIONS[index]-Vector2.ONE*side/2, Vector2.ONE*side)
@@ -38,21 +47,30 @@ func click(point: Vector2) -> bool:
 		battle._release_charge()
 		return true
 	if not available(): return false
+	if not battle.model.dice_turn.selected.is_empty() and cancel_rect().has_point(point):
+		cancel_gesture()
+		return true
 	if center_hit(point):
-		if battle.model.dice_turn.can_roll(): battle._start_charge()
+		if not battle.model.dice_turn.selected.is_empty():
+			if not preview.is_empty():
+				battle._form_selected_skill()
+				_clear_preview()
+		elif battle.model.dice_turn.can_roll(): battle._start_charge()
 		return true
 	for index in range(battle.model.DiceTurn.COUNT):
 		if die_rect(index).has_point(point):
-			cancel_gesture()
 			if battle.model.dice_turn.select(index):
 				dragging = true
+				moved = false
+				press_origin = point
 				pointer = point
 				contact_die = index
 				_selection_changed()
+			else: battle.dice[index].reject_selection()
 			return true
 	return false
 
-## Allow a complete trio to stretch before its final connection breaks.
+## A full six-die chain can stretch before the final connection breaks.
 func break_distance() -> float:
 	return minf(die_rect(0).size.x*1.35,battle.DICE_POSITIONS[0].distance_to(battle.DICE_POSITIONS[1])*0.85)
 
@@ -62,6 +80,7 @@ func motion(point: Vector2) -> bool:
 	if not available():
 		cancel_gesture()
 		return true
+	if point.distance_to(press_origin) > (14 if portrait() else 8): moved = true
 	var start: Vector2 = pointer
 	var steps: int = clampi(ceili(start.distance_to(point)/(16 if portrait() else 10)),1,256)
 	for step in range(1,steps+1): _visit_pointer(start.lerp(point,float(step)/steps))
@@ -80,27 +99,29 @@ func _visit_pointer(point: Vector2) -> void:
 			if previous >= 0 and pool.selected.size() > 1:
 				pool.selected.resize(previous if previous == pool.selected.size()-1 else previous+1)
 				_selection_changed()
-			elif previous < 0 and pool.select(index): _selection_changed()
+			elif previous < 0:
+				if pool.select(index): _selection_changed()
+				else: battle.dice[index].reject_selection()
 			break
-	if pool.selected.size() == 3 and point.distance_to(battle.DICE_POSITIONS[pool.selected[-1]]) > break_distance():
+	if pool.selected.size() == pool.COUNT and point.distance_to(battle.DICE_POSITIONS[pool.selected[-1]]) > break_distance():
 		pool.selected.pop_back()
 		_selection_changed()
 		# A new die may already be under the finger when the stretched link snaps.
 		if contact_die >= 0 and contact_die not in pool.selected and die_rect(contact_die).has_point(point):
 			if pool.select(contact_die): _selection_changed()
 
-## Release commits exactly three connected dice; incomplete gestures spend nothing.
+## Drag release summons a complete pattern; taps leave the selection for OK.
 func release(point: Vector2) -> bool:
 	if not dragging: return false
 	motion(point)
-	var complete: bool = dragging and available() and battle.model.dice_turn.selected.size() == 3
+	var complete: bool = moved and dragging and available() and not preview.is_empty()
 	dragging = false
-	if complete: battle._form_selected_skill()
-	else: battle.model.dice_turn.selected.clear()
-	_clear_preview()
+	contact_die = -1
+	if complete:
+		battle._form_selected_skill()
+		_clear_preview()
 	return true
 
-## Drop transient selection on focus loss, menus, rewards or a fresh turn.
 func cancel_gesture() -> void:
 	dragging = false
 	contact_die = -1
@@ -117,9 +138,9 @@ func _clear_preview() -> void:
 		die.connection_glow = false
 	queue_redraw()
 
-## Cache the formed skill caption only when the selected trio changes.
+## Cache the formed skill caption only when the selected pattern changes.
 func _selection_changed() -> void:
-	preview = battle.model.classify(battle.model.dice_turn.selection_values())
+	preview = battle.model.Patterns.classify(battle.model.dice_turn.selection_values())
 	caption = {} if preview.is_empty() else battle._skill_caption(preview)
 	if preview.is_empty(): particles.clear()
 	battle._sound("ui/book",1.5,-24)
@@ -128,22 +149,24 @@ func _selection_changed() -> void:
 func skill_color() -> Color:
 	return battle.GOLD if preview.is_empty() else [battle.CREAM,battle.TEAL,battle.PURPLE,battle.GOLD][preview.kind]
 
-## Animate a bounded stream of sparks while the complete trio is held.
+## Animate a bounded stream of sparks while the valid pattern is selected.
 func _process(delta: float) -> void:
 	visible = not battle._menus_open() and not battle.tarot_ui.inventory_visible() and battle.view_phase in ["ready", "skill", "charging", "rolling", "forming", "targeting", "resolving", "frozen"]
 	if dragging and not available(): cancel_gesture()
 	clock_time += delta
 	var pool = battle.model.dice_turn
+	idle_feedback.advance(delta,pool,available(),battle.reduced)
 	for index in range(battle.dice.size()):
 		var die = battle.dice[index]
-		die.selection_emphasis = move_toward(die.selection_emphasis,1.0 if dragging and index in pool.selected else 0.0,delta*12)
-		die.connection_glow = dragging and not preview.is_empty() and index in pool.selected
+		die.idle_hint = idle_feedback.hint_pose(index)
+		die.selection_emphasis = move_toward(die.selection_emphasis,1.0 if index in pool.selected else 0.0,delta*12)
+		die.connection_glow = not preview.is_empty() and index in pool.selected
 		die.connection_color = skill_color()
 	for spark in particles:
 		spark.life -= delta
 		spark.p += spark.v*delta
 	particles = particles.filter(func(spark): return spark.life > 0)
-	if dragging and not preview.is_empty():
+	if not preview.is_empty():
 		emission_clock -= delta
 		if emission_clock <= 0:
 			emission_clock = 0.14 if battle.reduced else 0.06
@@ -157,9 +180,9 @@ func _draw() -> void:
 	var pool = battle.model.dice_turn
 	var color: Color = skill_color()
 	_draw_interactable_dice()
-	if dragging:
+	if not pool.selected.is_empty():
 		var points: Array = pool.selected.map(func(index): return battle.DICE_POSITIONS[index])
-		points.append(pointer)
+		if dragging and moved: points.append(pointer)
 		for index in range(1,points.size()):
 			var direction: Vector2 = (points[index]-points[index-1]).normalized()
 			var edge: float = 48 if portrait() else 36
@@ -184,18 +207,20 @@ func _draw() -> void:
 		draw_rect(Rect2(spark.p-Vector2.ONE*spark.size/2,Vector2.ONE*spark.size),Color(color.lightened(0.4),alpha))
 	_draw_center()
 
-## Bounce pixel rings around selectable dice; reduced effects keep them still.
+## Send a fading pixel wave outward every two seconds; reduced effects stay still.
 func _draw_interactable_dice() -> void:
 	var pool = battle.model.dice_turn
 	if not available() or not pool.active or pool.rolls_left == pool.ROLLS or pool.has_pending_group(): return
 	for index in pool.unused():
-		var bounce: float = 0 if battle.reduced else sin(clock_time*TAU/1.5)*0.055
-		var radius: float = (78 if portrait() else 62)*(1+bounce+battle.dice[index].selection_emphasis*0.12)
-		Pixel.circle(self,battle.DICE_POSITIONS[index],radius,Color(battle.CREAM,0.26),4 if portrait() else 3)
+		var progress: float = 0 if battle.reduced else idle_feedback.wave_age/IdleFeedback.WAVE_PERIOD
+		var radius: float = (65 if portrait() else 49)+(40 if portrait() else 30)*progress
+		radius *= 1+battle.dice[index].selection_emphasis*0.12
+		var alpha: float = 0.26 if battle.reduced else 0.34*sin(minf(progress/0.14,1.0)*PI/2)*pow(1-progress,1.2)
+		Pixel.circle(self,battle.DICE_POSITIONS[index],radius,Color(battle.CREAM,alpha),4 if portrait() else 3)
 
 ## The center contains only glowing text, or a faint red skill-cancellation target.
 func _draw_center() -> void:
-	if dragging: return
+	if dragging and moved: return
 	var at: Vector2 = battle.DICE_CENTER
 	var size: int = 46 if portrait() else 32
 	var cancelling: bool = battle._current_skill_selected()
@@ -206,8 +231,9 @@ func _draw_center() -> void:
 		battle._center(at+Vector2(0,60 if portrait() else 38),"CANCEL SKILL",24 if portrait() else 14,Color("db7474",0.9 if over else 0.65),self)
 		return
 	var charging: bool = battle.view_phase == "charging"
-	var enabled: bool = charging or (available() and battle.model.dice_turn.can_roll())
-	var label: String = GameText.text("STOP!" if charging else "ROLL")
+	var selected: bool = not battle.model.dice_turn.selected.is_empty()
+	var enabled: bool = charging or (available() and (not preview.is_empty() if selected else battle.model.dice_turn.can_roll()))
+	var label: String = GameText.text("STOP!" if charging else "OK" if selected else "ROLL")
 	var color: Color = battle.GOLD if enabled else Color("505156")
 	var base: Vector2 = at+Vector2(0,1)
 	if enabled:
@@ -216,3 +242,4 @@ func _draw_center() -> void:
 		for outline in [8,4]: draw_string_outline(battle.pixel_font,base-Vector2(width/2,0),label,HORIZONTAL_ALIGNMENT_LEFT,-1,size,outline,Color(color,0.08*pulse))
 	battle._center(base,label,size,color,self)
 	battle._center(at+Vector2(0,35 if portrait() else 27),str(battle.model.dice_turn.rolls_left),26 if portrait() else 20,color,self)
+	if selected and available(): battle._center(cancel_rect().get_center()+Vector2(0,8 if portrait() else 6),"Deselect",24 if portrait() else 16,Color("df9696"),self)

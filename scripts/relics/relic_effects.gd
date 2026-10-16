@@ -114,7 +114,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Ar
 		if stats.get("base_damage",0) != 0:
 			extra = "+%d BASE"
 			extra_values = [stats.base_damage]
-		if skill.random_target_per_use() and (stats.has("combo_uses_factor") or stats.has("combo_uses_add") or stats.get("combo_uses_per_wave",0)*item.waves > 0):
+		if skill.is_combo_attack() and (stats.has("combo_uses_factor") or stats.has("combo_uses_add") or stats.get("combo_uses_per_wave",0)*item.waves > 0):
 			extra = "EXTRA HITS"
 			extra_values.clear()
 		if not is_equal_approx(before,value*critical) or not extra.is_empty():
@@ -126,7 +126,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Ar
 ## Combine relic extra-hit rules with the skill’s existing use modifiers.
 static func use_modifiers(items: Array, skill: MultiHitSkill, modifiers: Dictionary) -> Dictionary:
 	var result: Dictionary = modifiers.duplicate()
-	if not skill.random_target_per_use(): return result
+	if not skill.is_combo_attack(): return result
 	for entry in Sequence.entries(items):
 		var item: Dictionary = entry.item
 		var stats: Dictionary = STATS.get(item.id,EMPTY)
@@ -177,7 +177,7 @@ static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> 
 		if item.id == "runestone": extra_stacks += 1; runestones.append(entry)
 		if item.id == "pet_lizard": extra_burning += 1; runestones.append(entry)
 		if item.id == "bloodstone":
-			var cap: int = floori(model.max_hp*(0.05 if skill.random_target_per_use() else 0.1))
+			var cap: int = floori(model.max_hp*(0.05 if skill.is_combo_attack() or skill.pattern == "cleanup" else 0.1))
 			var budget: String = str(entry.activators)
 			var restored: int = model.heal(mini(maxi(0,cap-model.lifesteal_budgets.get(budget,0)),floori(damage*0.2)))
 			model.lifesteal_budgets[budget] = model.lifesteal_budgets.get(budget,0)+restored
@@ -389,7 +389,7 @@ static func formation_actions(model, skill: MultiHitSkill) -> Array:
 	var actions: Array = []
 	for entry in Sequence.entries(model.relics.items):
 		var amount: int = 0
-		if entry.item.id == "tissue_pack" and skill.kind == Skill.Kind.NORMAL: amount = 10
+		if entry.item.id == "tissue_pack" and (skill.pattern == "straight" or (skill.pattern.is_empty() and skill.kind == Skill.Kind.NORMAL)): amount = 10
 		if entry.item.id == "magic_slingshot" and skill.kind == Skill.Kind.PAIR: amount = skill.spare
 		if amount > 0: actions.append({"id":entry.item.id,"activation":entry,"amount":amount,"fixed":false,"area":false})
 	return actions

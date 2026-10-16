@@ -253,36 +253,28 @@ func _home_rect() -> Rect2:
 
 func _draw_guide(canvas: CanvasItem = null) -> void:
 	if canvas == null: canvas = self
-	canvas.draw_rect(Rect2(Vector2.ZERO, Vector2(PORTRAIT_SIZE)), INK)
-	_text(Vector2(40, 188), "GRIMOIRE", 42, GOLD, canvas)
-	_button(GUIDE_CLOSE, "X", true, canvas)
-	if home_enabled: _button(_home_rect(), "HOME", true, canvas)
-	var intro: String = "Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn."
-	var rule: String = "Return a skill to the red center to unlock its dice. Use all six dice to end the turn."
-	if model.is_city():
-		intro = "Tap twice to throw. City skills cast automatically after the reveal. Drag saved skills out for a bonus cast."
-		rule = "Perfect: triple. 666: 2000 x DMG; clear troops; +12 HP."
-	_wrapped(Vector2(40, 258), intro, 718, CREAM, 26, canvas)
-	_wrapped(Vector2(40, 350), rule, 718, MUTED, 24, canvas)
-	_button(GUIDE_PAIRS, "PAIRS", true, canvas)
-	_button(GUIDE_TRIPLES, "TRIPLES", true, canvas)
-	_button(GUIDE_STATUSES, "STATUSES", true, canvas)
-	canvas.draw_rect((GUIDE_STATUSES if guide_status_page else GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3), GOLD if guide_status_page else TEAL if guide_page == 0 else PURPLE, false, 3)
+	canvas.draw_rect(Rect2(Vector2.ZERO,Vector2(PORTRAIT_SIZE)),INK)
+	_text(Vector2(40,188),"GRIMOIRE",42,GOLD,canvas)
+	_button(GUIDE_CLOSE,"X",true,canvas)
+	if home_enabled: _button(_home_rect(),"HOME",true,canvas)
+	_wrapped(Vector2(40,258),"Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",718,CREAM,26,canvas)
+	_wrapped(Vector2(40,350),"Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.",718,MUTED,24,canvas)
+	_button(GUIDE_PAIRS,"MATCHES",true,canvas)
+	_button(GUIDE_TRIPLES,"SHIELDS",true,canvas)
+	_button(GUIDE_STATUSES,"STATUSES",true,canvas)
+	canvas.draw_rect((GUIDE_STATUSES if guide_status_page else GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3),GOLD,false,3)
 	if guide_status_page:
 		_draw_status_help(canvas)
 		return
-	for i in range(6):
-		var y: float = 584 + i * 145
-		var code: String = str(i + 1).repeat(2 if guide_page == 0 else 3)
-		var label: String = Rules.PAIR_NAMES[i] if guide_page == 0 else Rules.SPECIAL_NAMES[i]
-		_text(Vector2(40, y), code + "  " + GameText.text(label), 28, TEAL if guide_page == 0 else GOLD if i == 5 else PURPLE, canvas)
-		_wrapped(Vector2(40, y + 42), _pair_description(i) if guide_page == 0 else _special_description(i), 718, CREAM, 28, canvas)
-		canvas.draw_rect(Rect2(40, y + 108, 724, 2), EDGE.darkened(0.35))
-	var caps: String = ["1/3", "1/3", "1/2", "3/4"][mini(model.stage, 3)]
-	_wrapped(Vector2(40, 1490), "City damage has no squad caps." if model.is_city() else GameText.format("Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.", caps), 718, MUTED, 24, canvas)
-	_wrapped(Vector2(40, 1554), "Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.", 718, MUTED, 24, canvas)
-	_wrapped(Vector2(40, 1620), "Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.", 718, MUTED, 22, canvas)
-	_wrapped(Vector2(40, 1692), "Art: DCSS / CC0. Audio: Kenney.", 718, MUTED, 22, canvas)
+	var entries: Array = Rules.Patterns.help_entries(guide_page == 1)
+	for i in range(entries.size()):
+		var y: float = 584+i*156
+		_text(Vector2(40,y),entries[i].name,28,TEAL if guide_page == 0 else PURPLE,canvas)
+		_wrapped(Vector2(40,y+42),entries[i].text,718,CREAM,28,canvas)
+		canvas.draw_rect(Rect2(40,y+120,724,2),EDGE.darkened(0.35))
+	_wrapped(Vector2(40,1400),"End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.",718,CREAM,26,canvas)
+	_wrapped(Vector2(40,1550),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",718,MUTED,24,canvas)
+	_wrapped(Vector2(40,1680),"Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.",718,MUTED,22,canvas)
 
 func _debug_option_rect(choice: int) -> Rect2:
 	if choice == -1: return Rect2(40, 262, 724, 88)
@@ -296,16 +288,16 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	_text(Vector2(40, 188), "调试", 42, GOLD, canvas)
 	_button(DEBUG_CLOSE, "X", true, canvas)
 	_button(_debug_option_rect(-1), "自然随机", true, canvas)
-	_button(_debug_option_rect(0), "随机单骰", true, canvas)
+	_button(_debug_option_rect(0), "顺子 1—6", true, canvas)
 	_text(Vector2(40, 516), "两个一样 / 技能", 28, TEAL, canvas)
-	_text(Vector2(40, 896), "三个一样 / 法术", 28, PURPLE, canvas)
+	_text(Vector2(40, 896), "六个一样 / 湮灭", 28, PURPLE, canvas)
 	for choice in range(1, 13):
 		var rect := _debug_option_rect(choice)
 		var face: int = choice if choice <= 6 else choice - 6
 		var color: Color = TEAL if choice <= 6 else GOLD if choice == 12 else PURPLE
 		_frame(rect, Color("53613d") if debug_choice == choice else PANEL, color if debug_choice == choice or rect.has_point(_pointer_position()) else EDGE, canvas)
 		for i in range(3): _mini_die(rect.position + Vector2(54 + i * 60, 48), 0 if choice <= 6 and i == 2 else face, CREAM, canvas)
-		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 3), 30, color, canvas)
+		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 6), 30, color, canvas)
 	_button(DEBUG_TAROTS,"获得全部22张塔罗牌", true, canvas)
 	_button(DEBUG_TAROT_DRAW,"抽取塔罗牌", true, canvas)
 	_button(DEBUG_CHEST,"生成普通宝箱",_can_debug_chest(),canvas)

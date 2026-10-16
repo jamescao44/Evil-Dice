@@ -22,6 +22,12 @@ var reduced: bool = false
 var selection_emphasis: float = 0
 var connection_glow: bool = false
 var connection_color := Color.WHITE
+var rejection_age: float = 0.0
+var idle_hint := Vector2.ZERO # Extra scale and tilt supplied by idle dice feedback.
+
+## Give invalid taps a short sideways shake without moving the dice hitbox.
+func reject_selection() -> void:
+	rejection_age = 0.28
 
 func _ready() -> void:
 	cosmetic.randomize()
@@ -63,6 +69,7 @@ func celebrate(color: Color, strong: bool) -> void:
 	tween.tween_property(self, "scale", Vector2.ONE * base_scale, 0.26).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _process(delta: float) -> void:
+	rejection_age = maxf(0,rejection_age-delta)
 	if charging:
 		charge_age += delta
 		var intensity: float = charge_power * charge_power
@@ -93,7 +100,8 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	draw_set_transform(Vector2.ZERO,0,Vector2.ONE*(1+selection_emphasis*0.12))
+	var rejection: float = sin(rejection_age*90)*10*(rejection_age/0.28)
+	draw_set_transform(Vector2(rejection,0),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x))
 	if connection_glow:
 		for spread in range(4,0,-1):
 			draw_rect(Rect2(-55-spread*5,-57-spread*5,110+spread*10,114+spread*10),Color(connection_color,0.045))
@@ -120,14 +128,17 @@ func _draw() -> void:
 		draw_rect(Rect2(x - 2, 34, 4, 4), Color("9e8050"))
 	if glow > 0.1:
 		draw_rect(Rect2(-53, -55, 106, 109), Color(tint, glow * 0.7), false, 3)
-	var pips: Array = []
-	match face:
-		1: pips = [Vector2(0, 0)]
-		2: pips = [Vector2(-24, -24), Vector2(24, 24)]
-		3: pips = [Vector2(-24, -24), Vector2.ZERO, Vector2(24, 24)]
-		4: pips = [Vector2(-24, -24), Vector2(24, -24), Vector2(-24, 24), Vector2(24, 24)]
-		5: pips = [Vector2(-24, -24), Vector2(24, -24), Vector2.ZERO, Vector2(-24, 24), Vector2(24, 24)]
-		6: pips = [Vector2(-24, -24), Vector2(24, -24), Vector2(-24, 0), Vector2(24, 0), Vector2(-24, 24), Vector2(24, 24)]
-	for pip in pips:
+	for pip in pip_offsets(face):
 		draw_rect(Rect2(pip + Vector2(-7, -9), Vector2(14, 14)), Color("51442e"))
 		draw_rect(Rect2(pip + Vector2(-4, -6), Vector2(8, 5)), Color("30271e"))
+
+## Share printed pip coordinates with direct leftover-orb launch positions.
+static func pip_offsets(value: int) -> Array:
+	match value:
+		1: return [Vector2.ZERO]
+		2: return [Vector2(-24,-24),Vector2(24,24)]
+		3: return [Vector2(-24,-24),Vector2.ZERO,Vector2(24,24)]
+		4: return [Vector2(-24,-24),Vector2(24,-24),Vector2(-24,24),Vector2(24,24)]
+		5: return [Vector2(-24,-24),Vector2(24,-24),Vector2.ZERO,Vector2(-24,24),Vector2(24,24)]
+		6: return [Vector2(-24,-24),Vector2(24,-24),Vector2(-24,0),Vector2(24,0),Vector2(-24,24),Vector2(24,24)]
+	return []

@@ -4,6 +4,7 @@ extends RefCounted
 ## Modifiers affect previews immediately; the budget freezes when casting begins.
 enum Kind { NORMAL, PAIR, SPECIAL, ULTIMATE }
 
+var pattern: String = "" # Empty retains scripted legacy effects; dice use named patterns.
 var kind: int = -1
 var face: int = 0
 var sum: int = 0
@@ -32,12 +33,14 @@ func is_empty() -> bool:
 
 func is_attack() -> bool:
 	if is_empty(): return false
+	if not pattern.is_empty(): return pattern != "straight"
 	return face in [1,4,5] if kind in [Kind.PAIR,Kind.SPECIAL] else true
 
 func is_freeze() -> bool:
-	return kind == Kind.PAIR and face == 2
+	return pattern.is_empty() and kind == Kind.PAIR and face == 2
 
 func hits_all() -> bool:
+	if not pattern.is_empty(): return pattern == "annihilation"
 	return kind == Kind.ULTIMATE or (kind in [Kind.PAIR,Kind.SPECIAL] and face == 4)
 
 func set_use_multiplier(source: String, multiplier: int) -> void:
@@ -70,11 +73,21 @@ func consume_use() -> bool:
 func has_use_orbs(additional_modifiers: Dictionary = {}) -> bool:
 	return use_count(additional_modifiers) > 1
 
+## Combo relics apply to matching attacks, independently of targeting style.
+func is_combo_attack() -> bool:
+	return pattern == "match" or (pattern.is_empty() and random_target_per_use())
+
 func random_target_per_use() -> bool:
+	if not pattern.is_empty(): return pattern == "cleanup"
 	return face == 5 and kind in [Kind.PAIR, Kind.SPECIAL]
+
+## Selected-target casts keep their target through death; future overflow can override this policy.
+func keeps_selected_target() -> bool:
+	return is_attack() and not hits_all() and not random_target_per_use()
 
 func duplicate(_deep: bool = true) -> MultiHitSkill:
 	var copy := MultiHitSkill.new(kind, face, dice, base_uses)
+	copy.pattern = pattern
 	copy.use_modifiers = use_modifiers.duplicate()
 	copy.target = target
 	copy.uses_spent = uses_spent
@@ -86,4 +99,4 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 	return copy
 
 func same_as(other: MultiHitSkill) -> bool:
-	return other != null and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked
+	return other != null and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked

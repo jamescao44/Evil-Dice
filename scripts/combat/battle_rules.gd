@@ -10,6 +10,8 @@ const RelicEffects = preload("res://scripts/relics/relic_effects.gd")
 const AreaAttack = preload("res://scripts/combat/area_attack.gd")
 const TarotEffects = preload("res://scripts/tarot/tarot_effects.gd")
 var tarot_effects = TarotEffects.new()
+const Patterns = preload("res://scripts/dice/dice_patterns.gd")
+const SAVED_SKILLS_ENABLED := false
 const DiceTurn = preload("res://scripts/dice/dice_turn.gd")
 var dice_turn = DiceTurn.new()
 var skill_dice_indices: Array = []
@@ -241,11 +243,11 @@ func roll_pool(perfect: bool = false, forced: Array = []) -> Array:
 	statuses[Status.STUNNED].consume()
 	return changed
 
-## Lock one trio and suspend the remaining dice while its skill is pending.
+## Lock a valid combination and suspend the remaining dice until it resolves.
 func form_selected_skill() -> MultiHitSkill:
 	if phase != "roll" or not pending.is_empty() or not outcome().is_empty(): return Skill.new()
 	var indices: Array = dice_turn.selected.duplicate()
-	var skill: MultiHitSkill = classify(dice_turn.form())
+	var skill: MultiHitSkill = Patterns.classify(dice_turn.form())
 	if skill.is_empty(): return skill
 	skill.perfect = dice_turn.last_perfect
 	pending = skill
@@ -262,17 +264,38 @@ func cancel_formed_skill() -> bool:
 	phase = "roll"
 	return true
 
-## Defer trio-dependent relic bonuses until the group can no longer be cancelled.
+## Defer formation relic bonuses until the combination can no longer be cancelled.
 func _commit_formed_skill() -> void:
 	if not bonus_resume.is_empty() or not dice_turn.commit_group(skill_dice_indices): return
 	roll_relic_actions.append_array(RelicEffects.formation_actions(self, pending))
 	perfect_relic_ready = not roll_relic_actions.is_empty()
 
-## End early only after rolling and resolving all formed skills.
+## End Turn is available only after throwing and resolving the summoned skill.
+func can_end_dice_turn() -> bool:
+	return phase == "roll" and dice_turn.active and dice_turn.rolls_left < DiceTurn.ROLLS and pending.is_empty() and outcome().is_empty()
+
+## Build a read-only leftover attack for the End Turn preview.
+func leftover_skill() -> MultiHitSkill:
+	return Patterns.cleanup(dice_turn.unused().map(func(index): return dice_turn.values[index]))
+
+## Preview the volley total before target defenses, including a ready critical.
+func leftover_total_damage() -> int:
+	var volley: MultiHitSkill = leftover_skill()
+	if volley.is_empty(): return 0
+	var critical: float = RelicEffects.CRITICAL_FACTOR if RelicEffects.has_critical(relics.items) else 1.0
+	return floori(attack_base(volley)*damage_multiplier(volley)*critical*skill_use_count(volley)+0.000001)
+
+## Commit every leftover as one cast; enemy actions follow the complete volley.
 func end_dice_turn() -> bool:
-	if phase != "roll" or not dice_turn.active or dice_turn.rolls_left == DiceTurn.ROLLS or not pending.is_empty() or not outcome().is_empty(): return false
+	if not can_end_dice_turn(): return false
+	pending = leftover_skill()
+	skill_dice_indices = dice_turn.unused()
+	dice_turn.selected.clear()
+	dice_turn.locked.append_array(skill_dice_indices)
+	dice_turn.committed.append_array(skill_dice_indices)
 	dice_turn.active = false
-	_finish_player_action(Skill.new(Kind.NORMAL))
+	if pending.is_empty(): _finish_player_action(Skill.new(Kind.NORMAL))
+	else: phase = "player"
 	return true
 
 ## Roll dice, apply outcome modifiers and store the pending player skill.
@@ -364,8 +387,9 @@ func attack_targets() -> Array:
 func area_damage_factor(target: int, guards: Array) -> float:
 	return 0.5 if not guards.is_empty() and target not in guards else 1.0
 
-## Use living targets first, then corpses when a multi-hit cast must finish.
+## Lock selected-target casts to their corpse; random attacks prefer living foes.
 func player_attack_targets() -> Array:
+	if has_pending_attack_hits() and pending.keeps_selected_target() and pending.target >= 0 and pending.target < enemies.size(): return [pending.target]
 	var targets: Array = attack_targets()
 	# Only an already-started cast can follow through on the defeated squad.
 	if targets.is_empty() and has_pending_attack_hits(): return range(enemies.size())
@@ -441,8 +465,12 @@ func skill_modifiers_for(skill: MultiHitSkill) -> Dictionary:
 	return modifiers
 
 ## Freeze the skill use budget and consume next-skill modifiers at cast start.
-func begin_player_cast() -> bool:
+func begin_player_cast(primary: int = -1) -> bool:
 	if phase != "player" or pending.is_empty() or not outcome().is_empty(): return false
+	if pending.is_attack():
+		if primary < 0: primary = player_target()
+		if not is_city() and primary not in attack_targets(): return false
+		pending.target = primary
 	_commit_formed_skill()
 	pending.begin_cast(skill_modifiers_for(pending))
 	if pending.is_attack() and not is_instant_kill(pending): tarot_effects.extra_uses = 0
@@ -469,6 +497,8 @@ func regular_base_damage() -> float:
 	return REGULAR_ATTACK_POWER + reward_base_damage * DAMAGE_PER_PIP
 
 func attack_base_with_bonus(result: MultiHitSkill, bonus: float) -> float:
+	if result.pattern == "cleanup": return Patterns.base_damage(result)+bonus*Patterns.LEFTOVER_FACTOR
+	if result.pattern == "match": return Patterns.base_damage(result)+bonus
 	if result.kind == Kind.NORMAL: return (result.sum + reward_base_damage) * DAMAGE_PER_PIP + bonus
 	var amount: float = regular_base_damage() + bonus
 	if result.kind == Kind.PAIR:
@@ -502,7 +532,7 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 	# Read-only trace of the same formula used by hits. Never consumes charges/RNG.
 	if not is_attack(result) or is_instant_kill(result): return []
 	var base: float = attack_base_with_bonus(result,0)
-	var steps: Array = [{"source":"skill","id":"","slot":-1,"before":1.0,"after":1.0,"base_before":regular_base_damage(),"base_after":base,"note":""}]
+	var steps: Array = [{"source":"skill","id":"","slot":-1,"before":1.0,"after":1.0,"base_before":Patterns.BASE_PER_DIE if not result.pattern.is_empty() else regular_base_damage(),"base_after":base,"note":""}]
 	var value: float = 1.0
 	var bonuses: Array = [
 		{"source":"baseline","amount":damage_baseline()-1.0},
@@ -541,15 +571,18 @@ func cast_damage_multiplier(result: MultiHitSkill) -> float:
 	return damage_multiplier(result)*(RelicEffects.CRITICAL_FACTOR if result.critical else 1.0)
 
 func is_instant_kill(result: MultiHitSkill) -> bool:
-	return result.kind == Kind.ULTIMATE or (result.kind == Kind.SPECIAL and result.face == 1)
+	return result.kind == Kind.ULTIMATE or (result.pattern.is_empty() and result.kind == Kind.SPECIAL and result.face == 1)
 
 ## Combine base damage, multiplier and critical before target defenses.
 func unmitigated_damage(result: MultiHitSkill) -> int:
 	var critical: bool = result.critical or (phase != "executing" and RelicEffects.has_critical(relics.items))
-	return floori(attack_base(result)*damage_multiplier(result)*(RelicEffects.CRITICAL_FACTOR if critical else 1.0)+0.000001)
+	var raw: float = attack_base(result)*damage_multiplier(result)*(RelicEffects.CRITICAL_FACTOR if critical else 1.0)
+	if result.pattern == "cleanup":
+		return floori(raw*(result.uses_spent+1)+0.000001)-floori(raw*result.uses_spent+0.000001)
+	return floori(raw+0.000001)
 
 func _target_damage(result: MultiHitSkill, damage: int, target: int) -> int:
-	if result.kind == Kind.NORMAL and is_enemy_alive(target): damage = mini(damage,damage_cap(result.kind,target))
+	if result.pattern.is_empty() and result.kind == Kind.NORMAL and is_enemy_alive(target): damage = mini(damage,damage_cap(result.kind,target))
 	if enemy_status_count(target,Status.CORROSION) > 0: damage = floori(damage*1.5)
 	return damage
 
@@ -601,6 +634,10 @@ func preview(result: MultiHitSkill, primary: int) -> Array:
 ## Resolve healing, freeze or boon application and any refresh bonus.
 func _apply_support(result: MultiHitSkill) -> Array:
 	var events: Array = []
+	if result.pattern == "straight":
+		var amount: int = roundi(Patterns.shield_points(result)*tarot_effects.skill_factor(result))
+		shield += amount
+		return [event(-1,amount,"shield","SHIELD")]
 	if result.is_freeze():
 		if is_city(): return [event(-2,0,"immune","IMMUNE")]
 		var stacks: int = roundi(tarot_effects.skill_factor(result))
@@ -664,6 +701,7 @@ func _end_buff_turn() -> void:
 
 ## Bank the rolled skill without casting its effect.
 func save_pending_skill() -> bool:
+	if not SAVED_SKILLS_ENABLED: return false
 	if phase != "player" or pending.is_empty() or not saved_skill.is_empty() or not bonus_resume.is_empty() or not outcome().is_empty(): return false
 	_commit_formed_skill()
 	saved_skill = pending.duplicate(true)
@@ -674,6 +712,7 @@ func save_pending_skill() -> bool:
 
 ## Temporarily replace the pending roll with the saved bonus skill.
 func begin_saved_cast() -> bool:
+	if not SAVED_SKILLS_ENABLED: return false
 	if saved_skill.is_empty() or not bonus_resume.is_empty() or phase not in ["roll", "player", "round_end"] or not outcome().is_empty(): return false
 	bonus_resume = {"phase": phase, "pending": pending.duplicate(true)}
 	pending = saved_skill.duplicate(true)
@@ -685,10 +724,10 @@ func begin_saved_cast() -> bool:
 func apply_player_step(primary: int = -1) -> Array:
 	if phase not in ["player", "executing"] or pending.is_empty() or not outcome().is_empty(): return []
 	if is_attack(pending):
-		if primary < 0: primary = player_target()
+		if primary < 0 or (phase == "executing" and pending.keeps_selected_target()): primary = player_target()
 		if primary not in player_attack_targets(): return []
 		pending.target = primary
-	if phase == "player": begin_player_cast()
+	if phase == "player" and not begin_player_cast(primary): return []
 	var formation_events: Array = resolve_perfect_relic() if perfect_relic_ready else []
 	if not outcome().is_empty(): return formation_events
 	if is_attack(pending) and primary not in player_attack_targets():

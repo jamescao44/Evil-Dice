@@ -33,6 +33,7 @@ var impact_color := Color.WHITE
 var fade_age: float = -1
 var flight_from := Vector2.ZERO
 var landed: bool = false
+var hit_damage: int = -1
 
 func _ready() -> void:
 	z_index = 115
@@ -51,6 +52,7 @@ func start(values: Array) -> void:
 	visible = true
 
 func clear() -> void:
+	hit_damage = -1
 	active = false
 	building = false
 	value = 1.0
@@ -84,7 +86,7 @@ func formula_label() -> String:
 	return "DMG %s x %s" % [number(base_value),number(value,true)]
 
 func combined_damage() -> int:
-	return floori(base_value * value + 0.000001)
+	return hit_damage if hit_damage >= 0 else floori(base_value * value + 0.000001)
 
 func label() -> String:
 	return "DMG %d" % combined_damage() if phase == "result" else formula_label()
@@ -133,6 +135,14 @@ func sync_value(next: float) -> void:
 	if active and not building and not is_equal_approx(value,next):
 		_impact(base_value,next,Color("dfb866"))
 		result_age = 0
+
+## Show the current leftover die's base and rounded hit without replaying relics.
+func sync_hit(next_base: float, actual: int) -> void:
+	if not active: return
+	if not is_equal_approx(base_value,next_base):
+		_impact(next_base,value,Color("dfb866"))
+		result_age = 0
+	hit_damage = actual
 
 func _relic_activated(id: String) -> void:
 	var skill: MultiHitSkill = battle.model.pending
