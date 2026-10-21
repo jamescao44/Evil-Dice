@@ -116,7 +116,7 @@ func scene_checks(game) -> void:
 	check(cast_ui.choice_type == "replace","Full inventory opens a replacement picker")
 	var offered: String = cast_ui.prepared.relic
 	await capture(game,"replacement")
-	tap(game,cast_ui.cell_rect(4,2,5).get_center())
+	tap(game,game.inventory_page.slot_rect(4).get_center()); tap(game,game.inventory_page.replace_rect().get_center())
 	await settle(game)
 	check(game.model.relics.items[4].id == offered,"Replacement selection puts the new relic into that exact slot")
 	game._restart(2)
@@ -147,11 +147,11 @@ func scene_checks(game) -> void:
 	check(game.model.tarot_effects.pending_repeat.is_empty() and game.model.tarot_effects.parity == 1 and game.view_phase == "ready","Skipping a repeat preserves the first effect and restores input")
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone"]: game.model.acquire_relic(id)
 	give_front(game,"emperor"); drag(game,game.ARENA.get_center())
-	tap(game,cast_ui.cell_rect(1,2,5).get_center()); await settle(game)
+	tap(game,game.inventory_page.slot_rect(1).get_center()); tap(game,game.inventory_page.replace_rect().get_center()); await settle(game)
 	check(cast_ui.choice_type == "replace" and cast_ui.instance_id < 0,"Repeated Emperor opens its own full-inventory picker after the first pickup lands")
 	await capture(game,"prophecy-replacement")
 	var second_prize: String = cast_ui.prepared.relic
-	tap(game,cast_ui.cell_rect(2,2,5).get_center()); await settle(game)
+	tap(game,game.inventory_page.slot_rect(2).get_center()); tap(game,game.inventory_page.replace_rect().get_center()); await settle(game)
 	check(game.model.relics.items[2].id == second_prize and game.view_phase == "ready","Second Emperor reward lands and resumes battle")
 	game._restart(Waves.COUNT)
 	give_front(game,"magician"); drag(game,game.ARENA.get_center())

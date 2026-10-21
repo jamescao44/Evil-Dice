@@ -33,12 +33,12 @@ func model_checks() -> void:
 	var rng_state: int = m.reward_rng.state
 	check(m.begin_wave_reward() and m.wave_tarots == choices and m.reward_rng.state == rng_state,"Reopening cannot reroll cards")
 	m.open_wave_chest(); m.discard_unclaimed_rewards(); m.close_chest()
-	m.rubies = 30
-	check(m.begin_tarot_reward("wave") == choices and m.rubies == 0,"Paid draw uses locked candidates")
+	m.blood_gems = 30
+	check(m.begin_tarot_reward("wave") == choices and m.blood_gems == 0,"Paid draw uses locked candidates")
 	check(not m.finish_wave_reward() and not m.advance_wave(),"Pending draw blocks progression")
 	check(m.begin_tarot_reward("wave").is_empty() and m.choose_tarot(-1).is_empty(),"Transactions reject duplicate starts and invalid picks")
 	check(m.choose_tarot(1).id == choices[1] and m.tarots.items.size() == 1,"Exactly one chosen tarot enters inventory")
-	check(m.choose_tarot(1).is_empty() and m.relics.items.is_empty() and m.rubies == 0,"Tarot grants no extra reward or refund")
+	check(m.choose_tarot(1).is_empty() and m.relics.items.is_empty() and m.blood_gems == 0,"Tarot grants no extra reward or refund")
 	check(m.reward_rng.state == rng_state and m.finish_wave_reward() and m.advance_wave(),"Selection consumes no RNG")
 	for i in range(40): m.tarots.add(choices[1])
 	check(m.tarots.items.size() == 41 and m.tarots.items[0].instance_id != m.tarots.items[1].instance_id,"Duplicates have separate identities and no cap")
@@ -101,7 +101,7 @@ func scene_checks(game) -> void:
 	for e in game.model.enemies: e.hp = 0
 	game.model.begin_wave_reward()
 	game.model.open_wave_chest(); game.model.discard_unclaimed_rewards(); game.model.close_chest()
-	game.model.rubies = 50
+	game.model.blood_gems = 50
 	game.view_phase = "wave_reward"
 	game.wave_chest.after_chest(game.model.wave_chest_tier)
 	await capture(game,"offer")
@@ -259,7 +259,7 @@ func integration_checks() -> void:
 	game.speed = 30
 	game.tarot_ui.set_process(false)
 	for e in game.model.enemies: e.hp = 0
-	game.model.rubies = 50
+	game.model.blood_gems = 50
 	game._check_over()
 	var wave_deadline: int = Time.get_ticks_msec()+12000
 	while game.wave_chest.phase != "after" and Time.get_ticks_msec() < wave_deadline:

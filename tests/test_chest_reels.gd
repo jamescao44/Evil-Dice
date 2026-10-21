@@ -113,7 +113,7 @@ func layout_checks(portrait: bool) -> void:
 	game.model.open_wave_chest()
 	game.model.discard_unclaimed_rewards()
 	game.model.close_chest()
-	game.model.rubies = 30
+	game.model.blood_gems = 30
 	game.wave_chest.after_chest(0)
 	check(game.model.can_buy_wave_tarot(),"A Normal chest's 30 crystals afford the tarot deck")
 	check(not game.wave_chest.tarot_rect().intersects(game.wave_chest.action_rect()),"Large deck hit area leaves Continue separate")
@@ -124,7 +124,7 @@ func layout_checks(portrait: bool) -> void:
 		GameText.set_language(language,false)
 		await capture(game,layout+"-deck-"+language)
 	game.wave_chest.click(game.wave_chest.tarot_rect().get_center())
-	check(game.model.rubies == 0 and game.tarot_ui.ceremony.active(),"Tapping the deck spends exactly 30 and opens the draw")
+	check(game.model.blood_gems == 0 and game.tarot_ui.ceremony.active(),"Tapping the deck spends exactly 30 and opens the draw")
 	game.free()
 	await process_frame
 

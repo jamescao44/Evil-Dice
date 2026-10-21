@@ -19,10 +19,13 @@ func act(m, index: int, skill: String) -> Array:
 	m.enemies[index].intent = Actions.intent(m,index,skill)
 	return m.enemy_act(index)
 func pool_checks() -> void:
+	var expected_hp := [[75,150],[50,100],[35,75],[500,700],[100,200]]
+	var expected_damage := [[7,10],[10,15],[15,20],[20,35],[30,50]]
 	for role in range(5):
 		for elite in [false,true]:
 			var m = fresh(role,elite)
 			var enemy: Dictionary = m.enemies[0]
+			check(enemy.max_hp == expected_hp[role][int(elite)] and enemy.damage == expected_damage[role][int(elite)],"Enemy base stats match the updated design table")
 			check(enemy.max_hp == Enemy.ITEMS[role].hp[int(elite)] and enemy.damage == Enemy.ITEMS[role].damage[int(elite)],"Roster stats: %d/%s" % [role,elite])
 			enemy.hp -= 1
 			var expected: Array = Enemy.ITEMS[role].skills.duplicate()
@@ -67,6 +70,7 @@ func action_checks() -> void:
 	for role in [3,4]:
 		m = fresh(role,true)
 		var total: int = Enemy.ITEMS[role].charge_turns
+		check(total == 2,"Both special enemies now charge twice before releasing")
 		act(m,0,"charge")
 		for i in range(1,total):
 			check(m.choose_intent(0).skill == "charge","Charging cannot randomly change move")
@@ -77,7 +81,7 @@ func action_checks() -> void:
 		m.enemies[0].attack_boost = true
 		m.phase = "enemy"; m.enemies[0].acted = false; m.enemies[0].action_hit = 0
 		m.enemies[0].intent = m.choose_intent(0)
-		var hits: int = 2 if role == 3 else 6
+		var hits: int = 2
 		for i in range(hits):
 			m.enemy_act_step(0)
 			check(m.hp == 10000-roundi(m.enemies[0].damage*1.5)*(i+1),"Charged attacks apply one impact at a time with the stored blessing")
@@ -118,11 +122,11 @@ func taunt_checks() -> void:
 	card = r.tarots.add("chariot"); r.tarot_effects.cast(r,card.instance_id)
 	check(r.enemies[0].hp == 450 and r.enemies[1].hp == 50,"Fixed Chariot area damage is also halved on protected allies")
 func wave_checks() -> void:
-	var expected := [[1,0,0,0],[2,0,0,0],[0,1,0,0],[4,0,0,0],[2,1,0,0],[6,0,0,0],[3,2,0,0],[0,3,0,0],[3,3,0,0],[0,0,1,0],[2,0,1,0],[0,5,0,0],[0,2,0,1],[0,0,1,1],[0,2,1,0],[2,2,0,1],[0,0,2,1],[0,5,1,1],[0,0,1,2]]
+	var expected := [[1,0,0,0],[2,0,0,0],[0,1,0,0],[4,0,0,0],[2,1,0,0],[5,0,0,0],[3,2,0,0],[0,3,0,0],[2,3,0,0],[0,0,1,0],[2,0,1,0],[0,5,0,0],[0,2,0,1],[0,0,1,1],[0,2,1,0],[0,3,0,1],[0,0,2,1],[0,3,1,1],[0,0,1,2]]
 	var m = Run.new(19)
 	for wave in range(1,21):
 		check(m.load_debug_wave(wave),"Debug loads wave %d" % wave)
-		check(m.max_hp == 100+30*(wave-1),"Health growth continues across twenty waves")
+		check(m.max_hp == 100,"Debug wave loading retains level-one health without wave growth")
 		check(m.power == 1.0,"No natural attack multiplier growth")
 		if wave == 20:
 			check(m.is_city() and m.city_hp == 20000 and m.enemies.is_empty(),"Wave twenty is the twenty-thousand-HP city")
@@ -130,7 +134,8 @@ func wave_checks() -> void:
 		var counts: Array = [0,0,0,0]
 		for e in m.enemies:
 			counts[int(e.elite) if e.role < 3 else e.role-1] += 1
-			check(e.hp == Enemy.ITEMS[e.role].hp[int(e.elite)] and e.damage == Enemy.ITEMS[e.role].damage[int(e.elite)],"Wave enemies retain one-times stats")
+			var scale: float = pow(1.1,floori((wave-1)/2.0))
+			check(e.hp == roundi(Enemy.ITEMS[e.role].hp[int(e.elite)]*scale) and e.damage == roundi(Enemy.ITEMS[e.role].damage[int(e.elite)]*scale),"Wave health and attack scale once every two waves")
 		check(counts == expected[wave-1],"Wave table composition %d" % wave)
 		if wave in [10,15,19]: check(m.enemies.filter(func(e): return e.role == 3).all(func(e): return e.elite),"Specified Paladins are elite")
 		if wave == 19: check(m.enemies.all(func(e): return e.elite),"Final squad contains only elite special enemies")
@@ -142,7 +147,31 @@ func wave_checks() -> void:
 		check(Run.Waves.player_size(stage) > Run.Waves.player_size(stage-1) and Run.Waves.player_size(stage) <= 288,"Player grows without overshooting or shrinking at city entry")
 		check(Run.Waves.enemy_size(stage) < Run.Waves.enemy_size(stage-1),"Enemies shrink each wave without early-wave size bumps")
 		check(Run.Waves.paving_size(stage) <= Run.Waves.paving_size(stage-1) and Run.Waves.scenery_size(stage) < Run.Waves.scenery_size(stage-1),"Map scale decreases throughout the route")
+## Shield breaks interrupt normal enemies, but preserve elite actions and charges.
+func shield_break_checks() -> void:
+	for role in range(5):
+		for elite in [false,true]:
+			var m = fresh(role,elite)
+			m.enemies[0].shield = 5
+			m.enemies[0].intent = Actions.intent(m,0,"attack")
+			var hp: int = m.hp
+			m.hit_enemy(0,5)
+			check(m.enemies[0].shield == 0 and m.enemy_cannot_act(0) == not elite,"Only normal enemies lose their action on shield break")
+			m.phase = "enemy"
+			m.enemy_act(0)
+			check(m.hp == hp-(m.enemies[0].damage if elite else 0),"Elite queued attack still lands after shield breaks")
+	for role in [3,4]:
+		var m = fresh(role,true)
+		act(m,0,"charge")
+		m.enemies[0].shield = 5
+		m.hit_enemy(0,5)
+		act(m,0,"charge")
+		check(m.enemies[0].charge == 2,"Elite shield break keeps charge progress")
+		m.apply_enemy_status(0,Status.FROZEN,1)
+		act(m,0,"charge")
+		check(m.enemies[0].charge == 0,"Freeze still interrupts elite charging")
+
 func _initialize() -> void:
-	pool_checks(); action_checks(); taunt_checks(); wave_checks()
+	pool_checks(); action_checks(); taunt_checks(); wave_checks(); shield_break_checks()
 	print("Enemy roster and waves: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

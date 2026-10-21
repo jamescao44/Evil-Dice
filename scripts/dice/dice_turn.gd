@@ -11,9 +11,11 @@ var groups: Array = []
 var committed: Array = []
 var rolls_left: int = ROLLS
 var last_perfect: bool = false
+var turn_id: int = 0
 
 ## Start a turn with six unused dice and three available throws.
 func reset() -> void:
+	turn_id += 1
 	active = true
 	locked.clear()
 	selected.clear()

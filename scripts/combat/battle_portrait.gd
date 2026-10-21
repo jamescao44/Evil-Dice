@@ -12,9 +12,6 @@ var status_until: float = 0
 ## Lay out phone controls and safe areas without resizing the browser canvas.
 func _configure_layout() -> void:
 	var window := get_window()
-	window.content_scale_size = PORTRAIT_SIZE
-	window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	if OS.get_name() in ["iOS", "Android"]:
 		DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	# The browser owns the canvas size, including its device-pixel ratio.
@@ -22,6 +19,7 @@ func _configure_layout() -> void:
 	if not OS.has_feature("web") and DisplayServer.get_name() != "headless" and OS.get_name() not in ["iOS", "Android"]:
 		window.size = Vector2i(402, 874)
 		window.move_to_center()
+	preload("res://scripts/shared/display_quality.gd").configure(window, PORTRAIT_SIZE)
 	window.title = "Evil Dice | Portrait"
 	# All controls sit below the island and above the home-indicator safe zones.
 	ARENA = Rect2(24, 228, 756, 722)
@@ -63,13 +61,16 @@ func _configure_effects() -> void:
 		die.scale = Vector2.ONE * die.base_scale
 
 func _handle_click(point: Vector2) -> void:
+	if is_instance_valid(inventory_page) and (inventory_page.opened or (inventory_page.available() and inventory_page.button_rect().has_point(point))):
+		super._handle_click(point)
+		return
 	if guide:
 		if GUIDE_PAIRS.has_point(point): guide_page = 0; guide_status_page = false
 		elif GUIDE_TRIPLES.has_point(point): guide_page = 1; guide_status_page = false
 		elif GUIDE_STATUSES.has_point(point): guide_status_page = true; return
 		super._handle_click(point)
 		return
-	if view_phase in ["reward", "wave_reward", "skill", "targeting"]:
+	if view_phase in ["reward", "wave_reward", "skill", "targeting", "shop"]:
 		super._handle_click(point)
 		return
 	if not _menus_open() and view_phase != "over":
@@ -85,31 +86,12 @@ func _restart(wave_number: int = 1) -> void:
 	selected_status = -1
 	super._restart(wave_number)
 
-func _player_feet() -> Vector2:
+func _player_world_feet() -> Vector2:
 	return Vector2(222, 890)
 
-func _player_point() -> Vector2:
-	return _player_feet() - Vector2(0, monster_side * 0.48)
-
-func _enemy_feet(index: int) -> Vector2:
-	var count: int = model.enemies.size()
-	if count == 1: return Vector2(530, 662 if model.stage == 0 else 610)
-	if count <= 3:
-		var bottom: float = minf(550, _player_feet().y-monster_side-132)
-		return Vector2(486+(index-(count-1)/2.0)*maxf(144,_enemy_side()+12),bottom+[-12,0,-8][index])
-	# Stagger compact groups through the upper center and open right flank.
-	# The lower left stays clear for the Horror and its two rows of statuses.
-	var rows: Array = [2,2] if count == 4 else [3,2] if count == 5 else [3,3] if count == 6 and _enemy_side() > 110 else [4,count-4] if count <= 7 else [4,3,count-7]
-	var row: int = 0
-	var column: int = index
-	while column >= rows[row]:
-		column -= rows[row]
-		row += 1
-	var center: float = (436 if count == 4 else 444) if count <= 5 and row == 0 else 556 if row > 0 else 402
-	var bottom: float = (470+row*166) if count <= 5 else (438+row*182) if count <= 7 else (408+row*158)
-	var spacing: float = maxf(112 if count <= 5 else 108,_enemy_side()+12)
-	center = minf(center,ARENA.end.x-10-_enemy_side()/2-(rows[row]-1)*spacing/2)
-	return Vector2(center+(column-(rows[row]-1)/2.0)*spacing,bottom+[0,-8,-4,0][column])
+## Keep front-row enemies beside the player with enough overhead for intent icons.
+func _enemy_layout_feet(index: int) -> Vector2:
+	return preload("res://scripts/enemies/enemy_formation.gd").feet(ARENA,index,model.enemies.size(),_enemy_side(),true)
 
 func _city_gate_point() -> Vector2:
 	return CITY_TRANSFORM * City.gate_point()
@@ -153,11 +135,10 @@ func _draw_header() -> void:
 
 ## Render portrait actors, dynamic shade and borders above the cached terrain.
 func _draw_arena() -> void:
-	_draw_backdrop_shade()
 	if model.is_city(): _draw_city()
 	_draw_player()
 	if not model.is_city():
-		for i in range(model.enemies.size()): _draw_human(i)
+		for i in range(model.enemies.size()): _draw_enemy_overlay(i)
 	draw_rect(ARENA, EDGE, false, 4)
 	draw_rect(ARENA.grow(-5), Color("d2c29a"), false, 2)
 	if view_phase in ["feeding", "transition"]:
@@ -185,14 +166,7 @@ func _draw_city() -> void:
 	if model.volley_warned: _center(Vector2(616, ARENA.position.y + 125), "VOLLEY", 26, RED)
 
 func _draw_player() -> void:
-	var hurt: float = hit_times[0]
-	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
-	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
-	var feet := _player_feet()
-	_shadow(feet, monster_side * _player_growth_scale().x * 0.48, 0.27)
-	if model.shield > 0 or model.statuses[6].count > 0: Pixel.circle(self, _player_point(), monster_side * 0.47, Color(TEAL, 0.45), 4)
-	_art("eldritch", _player_sprite_rect(dx,bob), Color(Color.WHITE.lerp(RED, hurt * 0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
-	_draw_player_afflictions()
+	if model.is_city(): _draw_player_actor(self)
 	_meter(Rect2(48, 910, 708, 34), model.hp / float(model.max_hp), TEAL)
 	_center(Vector2(402, 935), "%d / %d" % [model.hp, model.max_hp], 28)
 	if model.shield > 0:
@@ -257,10 +231,10 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	_text(Vector2(40,188),"GRIMOIRE",42,GOLD,canvas)
 	_button(GUIDE_CLOSE,"X",true,canvas)
 	if home_enabled: _button(_home_rect(),"HOME",true,canvas)
-	_wrapped(Vector2(40,258),"Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",718,CREAM,26,canvas)
-	_wrapped(Vector2(40,350),"Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.",718,MUTED,24,canvas)
-	_button(GUIDE_PAIRS,"MATCHES",true,canvas)
-	_button(GUIDE_TRIPLES,"SHIELDS",true,canvas)
+	_wrapped(Vector2(40,258),"Matching dice attack automatically. Connect 3-6 consecutive unique faces to summon a fire skill, or tap dice then OK. Three rolls per turn.",718,CREAM,26,canvas)
+	_wrapped(Vector2(40,350),Rules.Patterns.BONUS_TURN_HELP,718,MUTED,24,canvas)
+	_button(GUIDE_PAIRS,"AUTO ATTACKS",true,canvas)
+	_button(GUIDE_TRIPLES,"STRAIGHTS",true,canvas)
 	_button(GUIDE_STATUSES,"STATUSES",true,canvas)
 	canvas.draw_rect((GUIDE_STATUSES if guide_status_page else GUIDE_PAIRS if guide_page == 0 else GUIDE_TRIPLES).grow(-3),GOLD,false,3)
 	if guide_status_page:
@@ -272,7 +246,7 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 		_text(Vector2(40,y),entries[i].name,28,TEAL if guide_page == 0 else PURPLE,canvas)
 		_wrapped(Vector2(40,y+42),entries[i].text,718,CREAM,28,canvas)
 		canvas.draw_rect(Rect2(40,y+120,724,2),EDGE.darkened(0.35))
-	_wrapped(Vector2(40,1400),"End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.",718,CREAM,26,canvas)
+	_wrapped(Vector2(40,1400),"End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.",718,CREAM,26,canvas)
 	_wrapped(Vector2(40,1550),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",718,MUTED,24,canvas)
 	_wrapped(Vector2(40,1680),"Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.",718,MUTED,22,canvas)
 

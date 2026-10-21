@@ -99,6 +99,6 @@ func _draw() -> void:
 	var side: float = 240 if portrait() else 124
 	for layer in range(8): draw_circle(center,side*(0.5+layer*0.09),Color(color,0.025))
 	draw_texture_rect(battle.chest.art.chest_open,Rect2(center-Vector2.ONE*side/2,Vector2.ONE*side),false,color)
-	_text(center+Vector2(0,side*0.66),GameText.format("%d rewards + %d soul crystals",[Chests.COUNTS[tier],Chests.CRYSTALS[tier]]),24 if portrait() else 18,color)
+	_text(center+Vector2(0,side*0.66),GameText.format("%d rewards + %d blood gems",[Chests.COUNTS[tier],Chests.CRYSTALS[tier]]),24 if portrait() else 18,color)
 	_draw_tarot_deck()
 	_button(action_rect(),"CONTINUE")

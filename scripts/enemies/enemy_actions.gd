@@ -66,8 +66,8 @@ static func intent(model, index: int, skill: String) -> Dictionary:
 				var statuses: Array = Status.PLAYER_HARMFUL.filter(func(id): return id != Status.FROZEN or not model.is_frozen())
 				move.status = statuses[model.rng.randi_range(0,statuses.size()-1)]
 			move.attribute = ATTRIBUTES[move.status]
-			if skill == "stun_combo": move.hits = 2
-		"forbidden_rite": move.name = "Forbidden Rite"; move.hits = 6
+			if skill == "stun_combo": move.hits = data.release_hits
+		"forbidden_rite": move.name = "Forbidden Rite"; move.hits = data.release_hits
 		"charge":
 			move.type = "charge"; move.target = index; move.amount = 1
 			move.name = "Chant" if enemy.role == Catalog.Role.HIGH_PRIEST else "Charge"

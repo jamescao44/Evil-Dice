@@ -73,7 +73,7 @@ func run() -> void:
 			var before: int = g.model.hp
 			var round_before: int = g.model.round_number
 			await g._enemy_phase()
-			check(g.model.hp == before-g.model.enemies[0].damage*(2 if role == 3 else 6),"Scene resolves each charged strike exactly once")
+			check(g.model.hp == before-g.model.enemies[0].damage*2,"Scene resolves each charged strike exactly once")
 			check(g.view_phase == "ready" and g.model.round_number == round_before+1,"Charged burst advances exactly one round")
 		g.queue_free(); await process_frame
 	print("Enemy presentation: %d checks, %d failures" % [checks,failures])

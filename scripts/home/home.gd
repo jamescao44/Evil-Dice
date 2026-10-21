@@ -51,6 +51,8 @@ func _ready() -> void:
 	pixel_font.oversampling = 1
 	for key in ["eldritch", "stone", "arch", "column", "floor0", "book", "crown", "fx", "attack", "vanguard", "archer", "mage"]:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
+	# Match the opening portrait and collection thumbnails to the run's level-one form.
+	art.flameling = preload("res://assets/art/player/flamelings/level-2.png")
 	preview_die = Die.new()
 	preview_die.set_process(false)
 	add_child(preview_die)
@@ -63,13 +65,11 @@ func _ready() -> void:
 
 func _configure_layout() -> void:
 	var window := get_window()
-	window.content_scale_size = Vector2i(804, 1748) if portrait else Vector2i(1280, 800)
-	window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	# Web owns the backing resolution; never apply a native preview size to its canvas.
 	if not OS.has_feature("web") and DisplayServer.get_name() != "headless" and OS.get_name() not in ["iOS", "Android"]:
 		window.size = Vector2i(402, 874) if portrait else Vector2i(1280, 800)
 		window.move_to_center()
+	preload("res://scripts/shared/display_quality.gd").configure(window, Vector2i(804, 1748) if portrait else Vector2i(1280, 800))
 	window.title = "Evil Dice"
 	get_viewport().canvas_transform = Transform2D.IDENTITY
 
@@ -441,7 +441,7 @@ func _draw_tabs() -> void:
 		var color: Color = GOLD if selected else MUTED
 		match i:
 			0: _mini_die(center, 5, 42 if portrait else 28, color)
-			1: _art("eldritch", Rect2(center - Vector2.ONE * 28, Vector2.ONE * 56), color)
+			1: _art(ancients[ancient_index].art, Rect2(center - Vector2.ONE * 28, Vector2.ONE * 56), color)
 			2:
 				Pixel.circle(self, center, 27 if portrait else 19, color, 3)
 				var s: float = 16 if portrait else 11
@@ -486,22 +486,22 @@ func _draw_dice_detail() -> void:
 func _draw_skills() -> void:
 	var area := modal_rect()
 	_text(area.position+Vector2(24,68 if portrait else 50),"DICE SKILLS",34 if portrait else 28,GOLD)
-	for i in range(3): _button(skill_tab_rect(i),["TURN","MATCHES","SHIELDS"][i],true,GREEN if skill_page == i else EDGE)
+	for i in range(3): _button(skill_tab_rect(i),["TURN","AUTO ATTACKS","STRAIGHTS"][i],true,GREEN if skill_page == i else EDGE)
 	if skill_page == 0:
 		var point := Vector2(80,560) if portrait else Vector2(248,268)
 		var width: float = 640 if portrait else 784
-		var y: float = _wrapped(point,"Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",width,28 if portrait else 22,CREAM)
-		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.",width,28 if portrait else 22,CREAM)
-		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.",width,28 if portrait else 22,CREAM)
+		var y: float = _wrapped(point,"Matching dice attack automatically. Connect 3-6 consecutive unique faces to summon a fire skill, or tap dice then OK. Three rolls per turn.",width,28 if portrait else 22,CREAM)
+		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),Run.Patterns.BONUS_TURN_HELP,width,28 if portrait else 22,CREAM)
+		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.",width,28 if portrait else 22,CREAM)
 		_wrapped(Vector2(point.x,y+(90 if portrait else 60)),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",width,24 if portrait else 20,MUTED)
 		return
 	var entries: Array = Rules.Patterns.help_entries(skill_page == 2)
 	for i in range(entries.size()):
-		var rect := Rect2(48,490+i*164,708,158) if portrait else Rect2(168+(i%2)*480,218+floori(i/2.0)*148,464,140)
+		var rect := Rect2(48,490+i*216,708,210) if portrait else Rect2(168+(i%2)*480,218+floori(i/2.0)*205,464,198)
 		var color: Color = GREEN if skill_page == 1 else PURPLE
 		draw_rect(Rect2(rect.position+Vector2(0,rect.size.y-4),Vector2(rect.size.x,2)),Color(EDGE,0.55))
 		_text(rect.position+Vector2(12,30),entries[i].name,26 if portrait else 20,color)
-		_wrapped(rect.position+Vector2(12,72),entries[i].text,684 if portrait else 440,28 if portrait else 22,CREAM)
+		_wrapped(rect.position+Vector2(12,72),entries[i].text,684 if portrait else 440,26 if portrait else 20,CREAM)
 
 func _text(at: Vector2, value: String, size: int, color: Color = CREAM) -> void:
 	value = GameText.text(value)
@@ -545,12 +545,7 @@ func _button(rect: Rect2, label: String, enabled: bool = true, accent: Color = G
 	_center(rect.get_center() + Vector2(0, 10 if portrait else 7), label, 28 if portrait else 22, accent if enabled else MUTED.darkened(0.6))
 
 func _mini_die(at: Vector2, face: int, side: float, tint: Color = CREAM) -> void:
-	draw_rect(Rect2((at - Vector2.ONE * side / 2 + Vector2(0, 4)).round(), Vector2.ONE * side), Color("786343"))
-	draw_rect(Rect2((at - Vector2.ONE * side / 2).round(), Vector2.ONE * side), tint)
-	var layouts := [[4], [0,8], [0,4,8], [0,2,6,8], [0,2,4,6,8], [0,2,3,5,6,8]]
-	for pip in layouts[face - 1]:
-		var point := at + Vector2(pip % 3 - 1, floori(pip / 3.0) - 1) * side * 0.27 - Vector2.ONE * side * 0.065
-		draw_rect(Rect2(point.round(), Vector2.ONE * maxf(3, roundf(side * 0.13))), INK)
+	Die.Art.paint_face(self,at,face,side,Color.WHITE if tint == CREAM else tint)
 
 func _seal(at: Vector2, radius: float, squash: float, color: Color) -> void:
 	for ring in [1.0, 0.89, 0.64]:

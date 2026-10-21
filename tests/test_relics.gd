@@ -165,13 +165,13 @@ func _initialize() -> void:
 	m.enemies[0].hp = 0
 	m.begin_wave_reward()
 	var first: Array = m.open_rewards.duplicate()
-	check(m.rubies == 10 and m.relics.items[1].waves == 1,"Wave relics trigger before new relic is chosen")
-	check(m.begin_wave_reward() and m.open_rewards == first and m.rubies == 10,"Offers and wave rewards cannot reroll or duplicate")
+	check(m.blood_gems == 10 and m.relics.items[1].waves == 1,"Wave relics trigger before new relic is chosen")
+	check(m.begin_wave_reward() and m.open_rewards == first and m.blood_gems == 10,"Offers and wave rewards cannot reroll or duplicate")
 	check(not m.advance_wave(),"Wave waits for relic decision")
 	m.open_wave_chest()
 	var payout: int = m.Chests.CRYSTALS[m.wave_chest_tier]
 	m.discard_unclaimed_rewards(); m.close_chest()
-	check(m.finish_wave_reward() and m.rubies == 10+payout and not m.finish_wave_reward(),"Chest pays crystals once even when all items are skipped")
+	check(m.finish_wave_reward() and m.blood_gems == 10+payout and not m.finish_wave_reward(),"Chest pays crystals once even when all items are skipped")
 	check(m.advance_wave() and m.power == 1 and m.max_hp == 130,"Wave grows health without free damage multiplier")
 	for wave in range(1,Run.Waves.COUNT+1):
 		m.load_debug_wave(wave)
@@ -215,7 +215,7 @@ func chest_checks() -> void:
 	m.chest_relics = {0:"contract",1:"cursed_bow"}
 	check(m.claim_reward(0).is_empty() and m.claimed_slots.is_empty(),"Full inventory leaves a relic unclaimed until a replacement is selected")
 	check(not m.claim_reward(0,2).is_empty() and m.relics.items[2].id == "contract","Chest replacement preserves the chosen slot")
-	check(m.claim_reward(1,-1,true).id == "discard" and not m.relics.has("cursed_bow") and m.rubies == 0,"Leaving a chest relic resolves it without awarding skip rubies")
+	check(m.claim_reward(1,-1,true).id == "discard" and not m.relics.has("cursed_bow") and m.blood_gems == 0,"Leaving a chest relic resolves it without awarding skip rubies")
 	check(m.close_chest(),"Replacement and leaving a relic both allow the chest to close")
 	for n in range(8): m.acquire_relic("codex_page")
 	m.open_rewards = [1]; m.chest_relics = {0:"codex_page"}

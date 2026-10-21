@@ -5,11 +5,11 @@ enum Category { RUBY, RELIC, CURSE, DAMAGE, MULTIPLIER, POTION, SHARD, TAROT }
 # Preserve stable category IDs. Removed categories cannot drop, even with custom weights.
 # CURSE stays as a presentation ID only;
 # cursed relics are selected by the shared relic rarity roll.
-const RETIRED_CATEGORIES := [Category.RUBY, Category.DAMAGE, Category.MULTIPLIER, Category.POTION]
-const DEFAULT_WEIGHTS := [0.0,70.0,0.0,0.0,0.0,0.0,10.0,20.0]
+const RETIRED_CATEGORIES := [Category.RUBY, Category.DAMAGE, Category.MULTIPLIER, Category.POTION, Category.SHARD, Category.TAROT]
+const DEFAULT_WEIGHTS := [0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0]
 # Retired rows keep old numeric references readable; selection and claiming reject them.
 const ITEMS := [
-	{"id":"ruby", "name":"Soul Crystals", "text":"+100 soul crystals", "icon":"ruby", "color":Color("fa6086")},
+	{"id":"ruby", "name":"Blood Gems", "text":"+100 blood gems", "icon":"ruby", "color":Color("fa6086")},
 	{"id":"relic", "name":"Relic", "text":"A random relic", "icon":"relic", "color":Color("c5a4de")},
 	{"id":"curse", "name":"Cursed Relic", "text":"A random cursed relic", "icon":"curse", "color":Color("e99b81")},
 	{"id":"damage", "name":"Sharpened Hunger", "text":"+7.5 base damage", "icon":"damage", "color":Color("e99b81")},

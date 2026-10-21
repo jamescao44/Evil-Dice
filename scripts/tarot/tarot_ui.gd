@@ -64,6 +64,7 @@ func blocks_battle() -> bool:
 
 ## Return the shared card/dice toggle hit area for this screen layout.
 func icon_rect() -> Rect2:
+	if battle.view_phase == "shop": return Rect2(86,342,80,72) if portrait() else Rect2(70,130,66,56)
 	return Rect2(48,battle.DICE_CENTER.y+108,104,104) if portrait() else Rect2(402,battle.DICE_CENTER.y+64,66,66)
 
 ## Check whether a tarot action is allowed in the current battle phase.
@@ -276,6 +277,19 @@ func close_inventory() -> void:
 	cancel_gesture()
 	battle.dice_group.transform = Transform2D.IDENTITY
 
+## Return a cancelled, unconsumed card to the front instead of losing it in the fan.
+func focus_instance(instance_id: int) -> void:
+	var index: int = battle.model.tarots.find_instance(instance_id)
+	if index < 0: return
+	opened = true
+	inspected = -1
+	cancel_gesture()
+	scroll = index
+	scroll_target = index
+	swipe.reset(scroll*card_angle())
+	swallow_release = true
+	queue_redraw()
+
 ## Start the consumed-card effect and adjust scrolling to the remaining inventory.
 func play_cast(id: String, at: Vector2) -> void:
 	cast_visual = {"id":id,"at":at,"age":0.0}
@@ -346,8 +360,8 @@ func _draw() -> void:
 		drag_feedback.paint(self,at,size*0.56,Paint.GOLD,battle.reduced)
 		if Catalog.ITEMS[battle.model.tarots.items[pressed_card].id].target == "enemy" and not battle.model.is_city():
 			var target: int = battle._enemy_inspect_at(pointer)
-			for index in battle.model.living():
-				DragFeedback.paint_target(self,battle._target_rect(index),index == target,Paint.GOLD,portrait())
+			for index in battle.model.attack_targets():
+				battle._draw_target_indicator(self,index,index == target,Paint.GOLD)
 	if not cast_visual.is_empty():
 		var t: float = cast_visual.age/0.4
 		Paint.card(self,cast_visual.id,cast_visual.at,Vector2(120,186)*(1+t*0.4),sin(t*PI)*0.12,1,2*(1-t),1-t)
@@ -360,7 +374,7 @@ func _draw_drag_backdrop() -> void:
 	# Leave enemies clear while aiming; dim the controls surrounding the field.
 	for rect in [Rect2(0,0,screen.x,arena.position.y),Rect2(0,arena.end.y,screen.x,screen.y-arena.end.y),Rect2(0,arena.position.y,arena.position.x,arena.size.y),Rect2(arena.end.x,arena.position.y,screen.x-arena.end.x,arena.size.y)]:
 		draw_rect(rect,shade)
-	draw_rect(arena,Color(shade,shade.a*(1-drag_feedback.strength())))
+	# Battlefield shade is drawn below actors by the battle, independent of card position.
 
 ## Draw the card/dice toggle, card count and unavailable-state dimming.
 func _draw_icon() -> void:

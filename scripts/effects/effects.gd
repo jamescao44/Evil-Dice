@@ -1,5 +1,6 @@
 extends Node2D
 ## Small reusable pixel effects; this RNG is deliberately separate from combat.
+const FlameSpell = preload("res://scripts/effects/flame_spell.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 var particles: Array = []
 var rings: Array = []
@@ -18,6 +19,7 @@ var font: Font
 var cosmetic = RandomNumberGenerator.new()
 var reduced: bool = false
 var time_factor: float = 1.0
+var world_transform := Transform2D.IDENTITY
 var canvas_size := Vector2(1280, 800)
 var skill_anchor := Vector2(640, 280)
 var skill_max_width: float = 1200
@@ -31,17 +33,21 @@ var ultimate_scale: float = 1.0
 func _ready() -> void:
 	cosmetic.randomize()
 
-func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160) -> void:
+func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160, size_scale: float = 1.0) -> void:
 	for i in range(count):
 		var angle := cosmetic.randf_range(0, TAU)
 		var velocity := Vector2.from_angle(angle) * cosmetic.randf_range(strength * 0.25, strength)
-		particles.append({"p": at, "v": velocity, "color": color, "life": cosmetic.randf_range(0.4, 0.9), "max": 1.0, "size": cosmetic.randi_range(3, 7)})
+		particles.append({"p": at, "v": velocity, "color": color, "life": cosmetic.randf_range(0.4, 0.9), "max": 1.0, "size": cosmetic.randi_range(3, 7)*size_scale})
 
 func ring(at: Vector2, color: Color, radius: float = 90.0, clip: Rect2 = Rect2()) -> void:
 	rings.append({"p": at, "color": color, "life": 0.55, "radius": radius, "clip":clip})
 
+## Share logarithmic sizing between damage numbers, projectiles and impact effects.
+static func damage_scale(damage: int) -> float:
+	return maxf(1.0,log(maxi(1,damage))/log(10.0))
+
 static func damage_font_size(damage: int) -> int:
-	return roundi(FLOAT_FONT_SIZE*maxf(1.0,log(maxi(1,damage))/log(10.0)))
+	return roundi(FLOAT_FONT_SIZE*damage_scale(damage))
 
 func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE) -> void:
 	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size})
@@ -68,26 +74,40 @@ func flash(color: Color, amount: float = 0.12) -> void:
 	if not reduced:
 		flashes.append({"color": color, "life": 0.22, "amount": amount})
 
-func cast(face: int, from: Vector2, targets: Array, duration: float) -> void:
+func cast(face: int, from: Vector2, targets: Array, duration: float, track_targets: bool = false, track_origin: bool = false) -> void:
 	spell = {"face": face, "from": from, "targets": targets, "life": duration, "duration": duration}
+	if track_origin: spell.world_from = world_transform.affine_inverse()*from
+	if track_targets: spell.world_targets = targets.map(func(point): return world_transform.affine_inverse()*point)
 	if face > 0:
-		activate_circle(from + Vector2(0, 55), Color("efd394") if face == 6 else Color("c5a4de"), 106, duration)
+		activate_circle(from + Vector2(0, 55), Color("efd394") if face == 6 else Color("c5a4de"), 106, duration,track_origin)
 		for target in targets:
-			activate_circle(target + Vector2(0, 60), Color("efd394") if face == 6 else Color("c5a4de"), 70, duration)
+			activate_circle(target + Vector2(0, 60), Color("efd394") if face == 6 else Color("c5a4de"), 70, duration,track_targets)
 
-func slash(at: Vector2, heavy: bool = false) -> void:
-	slashes.append({"p": at, "life": 0.38, "heavy": heavy, "flip": cosmetic.randi_range(0, 1) * 2 - 1})
-	burst(at, Color("efc1ab"), 22 if heavy else 10, 180)
+## Fire attacks reuse world tracking so camera zoom cannot detach their endpoints.
+func flame_cast(tier: int, from: Vector2, targets: Array, duration: float, damages: Array = []) -> void:
+	spell = {"face":0,"flame_tier":clampi(tier,0,4),"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"scales":targets.map(func(_point): return 1.0)}
+	for i in range(mini(damages.size(),targets.size())): spell.scales[i] = damage_scale(damages[i])
 
-func activate_circle(at: Vector2, color: Color, radius: float = 90, duration: float = 0.8) -> void:
-	sigils.append({"p": at, "color": color, "radius": radius, "life": duration, "duration": duration})
+## Enlarge sparks and their spread without multiplying particle counts or changing timing.
+func attack_burst(at: Vector2, color: Color, damage: int, count: int, strength: float) -> void:
+	var size_scale: float = damage_scale(damage)
+	burst(at,color,count,strength*size_scale,size_scale)
+
+func slash(at: Vector2, heavy: bool = false, damage: int = 0) -> void:
+	slashes.append({"p": at, "life": 0.38, "heavy": heavy, "flip": cosmetic.randi_range(0, 1) * 2 - 1,"scale":damage_scale(damage)})
+	attack_burst(at, Color("efc1ab"),damage,22 if heavy else 10,180)
+
+func activate_circle(at: Vector2, color: Color, radius: float = 90, duration: float = 0.8, track_world: bool = false) -> void:
+	var circle: Dictionary = {"p": at, "color": color, "radius": radius, "life": duration, "duration": duration}
+	if track_world: circle.world_p = world_transform.affine_inverse()*at
+	sigils.append(circle)
 
 func feed(from: Vector2, to: Vector2, duration: float = 1.2) -> void:
 	for i in range(18):
 		feeds.append({"from": from + Vector2(cos(i * 2.4) * 30, sin(i) * 10), "to": to, "life": duration + i * 0.025, "duration": duration + i * 0.025, "bend": sin(i * 2.1) * 65})
 
 func enemy_cast(role: int, from: Vector2, target: Vector2, duration: float, attribute: int = 0) -> void:
-	enemy_spells.append({"face": -1, "role": role, "attribute":attribute, "from": from, "targets": [target], "life": duration, "duration": duration})
+	enemy_spells.append({"face": -1, "role": role, "attribute":attribute, "from": from, "targets": [target], "life": duration, "duration": duration,"world_from":world_transform.affine_inverse()*from,"world_targets":[world_transform.affine_inverse()*target]})
 
 func clear() -> void:
 	particles.clear()
@@ -147,6 +167,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	for s in sigils:
+		if s.has("world_p"): s.p = world_transform*s.world_p
 		var t: float = 1 - s.life / s.duration
 		var color: Color = Color(s.color, minf(1, s.life * 5) * 0.85)
 		var radius: float = s.radius * minf(1, t * 5 + 0.25)
@@ -171,13 +192,15 @@ func _draw() -> void:
 		_draw_spell(effect)
 	for s in slashes:
 		var t: float = 1 - s.life / 0.38
+		draw_set_transform(s.p,0,Vector2.ONE*s.scale)
 		for i in range(3 if s.heavy else 2):
-			var a: Vector2 = s.p + Vector2(-45 * s.flip + i * 14, 38 - i * 8)
-			var b: Vector2 = s.p + Vector2(45 * s.flip + i * 14, -48 - i * 8)
+			var a := Vector2(-45 * s.flip + i * 14, 38 - i * 8)
+			var b := Vector2(45 * s.flip + i * 14, -48 - i * 8)
 			var end: Vector2 = a.lerp(b, minf(1, t * 4))
 			var start: Vector2 = a.lerp(b, maxf(0, (t - 0.25) * 1.33))
 			Pixel.line(self, start + Vector2(4, 4), end + Vector2(4, 4), Color("9b5475"), 8)
 			Pixel.line(self, start, end, Color("fff1c5"), 4)
+		draw_set_transform(Vector2.ZERO)
 	for r in rings:
 		var progress: float = 1 - r.life / 0.55
 		Pixel.circle(self, r.p, 10 + progress * r.radius, Color(r.color, (1 - progress) * 0.8), 3, r.clip)
@@ -290,7 +313,18 @@ func _label(value: String, baseline: Vector2, size: int, color: Color, outline: 
 		draw_string(font,at+offset,value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Color(0.06,0.08,0.07,color.a))
 	draw_string(font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
 
+## Project travelling spell endpoints through the camera without moving UI effects.
+func projected_spell(cast_info: Dictionary) -> Dictionary:
+	var projected: Dictionary = cast_info.duplicate()
+	if cast_info.has("world_from"): projected.from = world_transform*cast_info.world_from
+	if cast_info.has("world_targets"): projected.targets = cast_info.world_targets.map(func(point): return world_transform*point)
+	return projected
+
 func _draw_spell(cast_info: Dictionary) -> void:
+	cast_info = projected_spell(cast_info)
+	if cast_info.has("flame_tier"):
+		FlameSpell.paint(self,cast_info,reduced)
+		return
 	var progress: float = 1 - cast_info.life / cast_info.duration
 	var strength: float = sin(progress * PI)
 	var color := Color("b395f0")

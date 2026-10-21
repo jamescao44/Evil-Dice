@@ -144,7 +144,7 @@ Perfect: triple. 666: 2000 x DMG; clear troops; +12 HP.,Perfect: triple. 666: 20
 PAIRS,PAIRS,两个一样
 City damage has no squad caps.,City damage has no squad caps.,城市伤害不受小队战上限限制。
 Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.,Damage x DMG; bonuses add. Normal cap %s HP; skills ignore caps.,伤害 × 伤害倍率，加成相加。普通攻击上限为目标生命的%s；技能无此限制。
-Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.,Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.,完美连击：每次连续完美投掷增加0.1伤害倍率，失误后重置。
+Perfect combo: +0.1 DMG per consecutive Perfect. A miss resets it.,"Perfect combo: x1.3 on the first Perfect, then +0.1 per combo. Multiplies other damage bonuses. A miss resets it.",完美连击：首次独立乘以1.3，之后每次连击再加0.1；失误后重置。
 Art: DCSS / CC0. Audio: Kenney.,Art: DCSS / CC0. Audio: Kenney.,美术：DCSS / CC0。音效：Kenney。
 NATURAL RANDOM,NATURAL RANDOM,自然随机
 RANDOM SINGLES,RANDOM SINGLES,随机不同点数
@@ -164,7 +164,7 @@ City rolls cast automatically after the reveal. Drag saved skills out for a bonu
 Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.,Drag skills to the field. Tap targeted skills to choose a foe. SAVE banks one bonus cast.,将技能拖至战场，或点击指向技能选择敌人。保存技能可额外施放一次。
 CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack.,CITY: 666 deals 2000 x DMG. Invincibility lasts 2 seconds per stack.,城市战：666造成2000 × 伤害倍率的伤害。每层无敌持续2秒。
 Damage x DMG; bonuses add. Normal cap %s HP. Skills ignore caps; 666 clears the wave.,Damage x DMG; bonuses add. Normal cap %s HP. Skills ignore caps; 666 clears the wave.,伤害 × 伤害倍率，加成相加。普通攻击上限为目标生命的%s。技能无此限制；666清场。
-Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.,Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.,完美连击：每次连续完美投掷增加0.1伤害倍率，失误后连击重置。
+Perfect combo: +0.1 DMG per consecutive Perfect. A missed Perfect resets the combo.,"Perfect combo: x1.3 on the first Perfect, then +0.1 per combo. Multiplies other damage bonuses. A miss resets it.",完美连击：首次独立乘以1.3，之后每次连击再加0.1；失误后重置。
 Art: Dungeon Crawl Stone Soup / CC0    Sound: Kenney,Art: Dungeon Crawl Stone Soup / CC0    Sound: Kenney,美术：Dungeon Crawl Stone Soup / CC0    音效：Kenney
 "Choose dice, or start fresh at a wave below. 10 = city.","Choose dice, or start fresh at a wave below. 10 = city.",选择骰子组合，或从指定波次重新开始。第10波为城市战。
 CLAIM,CLAIM,领取
@@ -234,7 +234,7 @@ WAVE %d CLEARED,WAVE %d CLEARED,第%d波已完成
 CHOOSE ONE RELIC,CHOOSE ONE RELIC,选择一件法具
 "CHOOSE A RELIC ABOVE, THEN REPLACE ONE BELOW","CHOOSE A RELIC ABOVE, THEN REPLACE ONE BELOW",先选择上方的法具，再替换下方的一件法具
 DRAG RELICS TO ORDER THEIR EFFECTS LEFT TO RIGHT,DRAG RELICS TO ORDER THEIR EFFECTS LEFT TO RIGHT,拖动法具调整顺序，效果从左到右触发
-SKIP  +%d SOUL CRYSTALS,SKIP  +%d SOUL CRYSTALS,跳过，获得%d灵魂水晶
+SKIP  +%d BLOOD GEMS,SKIP  +%d BLOOD GEMS,跳过，获得%d血宝石
 COMMON,COMMON,普通
 RARE,RARE,稀有
 EPIC,EPIC,史诗
@@ -251,8 +251,8 @@ FIVE GIFTS,FIVE GIFTS,五件奖励
 THREE GIFTS,THREE GIFTS,三件奖励
 A GIFT FROM THE ABYSS,A GIFT FROM THE ABYSS,来自深渊的馈赠
 CLAIMED,CLAIMED,已领取
-Soul Crystals,Soul Crystals,灵魂水晶
-+100 soul crystals,+100 soul crystals,+100灵魂水晶
+Blood Gems,Blood Gems,血宝石
++100 blood gems,+100 blood gems,+100血宝石
 Relic,Relic,法具
 A random relic,A random relic,随机法具
 Cursed Relic,Cursed Relic,诅咒法具
@@ -306,7 +306,7 @@ Base damage +10.,Base damage +10.,基础伤害增加10。
 Rusty Armor,Rusty Armor,生锈护甲
 Take 10% less damage.,Take 10% less damage.,受到的伤害减少10%。
 Game Coin,Game Coin,游戏币
-Gain 10 soul crystals after clearing a wave.,Gain 10 soul crystals after clearing a wave.,每通关一波，获得10灵魂水晶。
+Gain 10 blood gems after clearing a wave.,Gain 10 blood gems after clearing a wave.,每通关一波，获得10血宝石。
 Magic Shield,Magic Shield,魔盾
 "Every 6 completed turns, store a shield that blocks one whole hit.","Every 6 completed turns, store a shield that blocks one whole hit.",每完成6回合，储存一层可完全抵挡一次伤害的护盾。
 Magic Sword,Magic Sword,魔剑
@@ -496,7 +496,7 @@ Player only. The next throw's Perfect marker moves unpredictably.,Player only. T
 Attack damage x0.5; cannot heal. Lose 1 stack per turn.,Attack damage x0.5; cannot heal. Lose 1 stack per turn.,攻击伤害减半，无法恢复生命；每回合减少1层。
 "No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.","No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",护盾、无敌与护甲失效，受到伤害×1.5；每回合减少1层。
 Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random uninfected ally each turn.,Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random uninfected ally each turn.,仅敌人：每层降低10生命上限，最低为1；每回合增加1层，并向随机一名未感染的队友传播1层。
-"Enemy shield broken: skip the next action, then recover.","Enemy shield broken: skip the next action, then recover.",敌人护盾破碎：跳过下次行动，随后恢复。
+"Non-elite shield broken: skip the next action, then recover. Elites are unaffected.","Non-elite shield broken: skip the next action, then recover. Elites are unaffected.",普通敌人护盾破碎：跳过下次行动，随后恢复。精英不会因破盾无法行动。
 Fortune Cookie,Fortune Cookie,幸运饼干
 "Receive a random tarot immediately, then another every 3 completed turns.","Receive a random tarot immediately, then another every 3 completed turns.",立即获得一张随机塔罗牌，此后每完成3回合再获得一张。
 Crystal Ball,Crystal Ball,水晶球
@@ -534,7 +534,7 @@ Magic Slingshot,Magic Slingshot,魔法弹弓
 Hamburger,Hamburger,汉堡
 Damage multiplier +1.,Damage multiplier +1.,伤害乘数 +1。
 Soul Vessel,Soul Vessel,灵魂容器
-Soul crystal gains +15%. Fractional bonuses carry over.,Soul crystal gains +15%. Fractional bonuses carry over.,灵魂水晶获得量 +15%；不足 1 个的加成会累计保留。
+Blood gem gains +15%. Fractional bonuses carry over.,Blood gem gains +15%. Fractional bonuses carry over.,血宝石获得量 +15%；不足 1 个的加成会累计保留。
 Pet Lizard,Pet Lizard,宠物蜥蜴
 Apply 1 extra burning stack to enemies.,Apply 1 extra burning stack to enemies.,给敌人附加燃烧时，额外附加 1 层。
 Ice Rose,Ice Rose,冰玫瑰
@@ -565,7 +565,7 @@ Cursed Die - 2,Cursed Die - 2,诅咒骰子-2
 Perfect rolls always contain 2. Other rolls never contain 2.,Perfect rolls always contain 2. Other rolls never contain 2.,Perfect 必定含 2；非 Perfect 必定不含 2。
 Cursed Die - 1,Cursed Die - 1,诅咒骰子-1
 Perfect rolls always contain 1. Other rolls never contain 1.,Perfect rolls always contain 1. Other rolls never contain 1.,Perfect 必定含 1；非 Perfect 必定不含 1。
-+%d soul crystals,+%d soul crystals,+%d灵魂水晶
++%d blood gems,+%d blood gems,+%d血宝石
 Only one Cursed Die can be held.,Only one Cursed Die can be held.,最多携带一枚诅咒骰子。
 Paladin,Paladin,圣骑士
 High Priest,High Priest,大祭祀
@@ -576,7 +576,7 @@ Greater Shield,Greater Shield,举盾+
 Elven Healing,Elven Healing,精灵治疗
 Blessing,Blessing,祝福
 Group Blessing,Group Blessing,祝福+
-Fireball,Fireball,火球
+Fireball,Fireball,火球术
 Elemental Strike,Elemental Strike,元素攻击
 Stunning Flurry,Stunning Flurry,晕眩打击+
 Forbidden Rite,Forbidden Rite,禁忌术
@@ -616,7 +616,7 @@ Ultra,Ultra,究极
 UPGRADED!,UPGRADED!,升级成功！
 25% CHANCE TO UPGRADE,25% CHANCE TO UPGRADE,25%概率升级
 YOUR CHEST IS READY,YOUR CHEST IS READY,宝箱已就绪
-%d rewards + %d soul crystals,%d rewards + %d soul crystals,%d份奖励＋%d灵魂水晶
+%d rewards + %d blood gems,%d rewards + %d blood gems,%d份奖励＋%d血宝石
 TAROT DRAW PURCHASED,TAROT DRAW PURCHASED,已购买塔罗抽取
 CONTINUE,CONTINUE,继续
 STOP,STOP,停止
@@ -664,7 +664,7 @@ STRAIGHT SHIELDS,STRAIGHT SHIELDS,顺子护盾
 TREASURE +%d,TREASURE +%d,宝箱 +%d
 Six alike: destroy all enemies. Heal 12 HP.,Six alike: destroy all enemies. Heal 12 HP.,六个一样：消灭全体敌人，恢复12生命。
 %d pips x%d = %d shield.,%d pips x%d = %d shield.,点数和%d ×%d = %d护盾。
-%d pips fire %d orbs.,%d pips fire %d orbs.,剩余%d点，直接射出%d枚光球。
+%d dice fire %d orbs.,%d dice fire %d orbs.,剩余%d枚骰子，射出%d枚光球。
 %d dice x%d base x%.1f; %d hits.,%d dice x%d base x%.1f; %d hits.,%d骰 ×%d基础 ×%.1f；攻击%d次。
 3-Dice Straight,3-Dice Straight,三骰顺子
 4-Dice Straight,4-Dice Straight,四骰顺子
@@ -677,12 +677,80 @@ Five consecutive faces: shield = pip sum x3. Example: 12345 gives 45.,Shield = p
 123456: shield = 21 x4 = 84.,123456: shield = 21 x4 = 84.,123456：护盾=21×4=84。
 "Shields absorb damage, have no cap, and clear on the next wave. Shield skills are not attacks.",No cap. Clears next wave. Absorbs damage; not an attack.,护盾抵挡伤害，无上限，换波清空。护盾技能不算攻击。
 2 dice x5 base x1.5 = 15 per hit. The matching face sets the number of hits.,15 per hit (2 x5 x1.5). Hits = matching face.,2骰×5基础×1.5=每击15伤害。相同点数决定攻击次数。
-3 dice x5 base x2 = 30 per hit. The matching face sets the number of hits.,30 per hit (3 x5 x2). Hits = matching face.,3骰×5基础×2=每击30伤害。相同点数决定攻击次数。
-4 dice x5 base x2.5 = 50 per hit. The matching face sets the number of hits.,50 per hit (4 x5 x2.5). Hits = matching face.,4骰×5基础×2.5=每击50伤害。相同点数决定攻击次数。
-5 dice x5 base x3 = 75 per hit. The matching face sets the number of hits.,75 per hit (5 x5 x3). Hits = matching face.,5骰×5基础×3=每击75伤害。相同点数决定攻击次数。
+3 dice x5 base x4 = 60 per hit. The matching face sets the number of hits.,60 per hit (3 x5 x4). Hits = matching face.,3骰×5基础×4=每击60伤害。相同点数决定攻击次数。
+4 dice x5 base x10 = 200 per hit. The matching face sets the number of hits.,200 per hit (4 x5 x10). Hits = matching face.,4骰×5基础×10=每击200伤害。相同点数决定攻击次数。
+5 dice x5 base x25 = 625 per hit. The matching face sets the number of hits.,625 per hit (5 x5 x25). Hits = matching face.,5骰×5基础×25=每击625伤害。相同点数决定攻击次数。
 "Six alike of any face: destroy all enemies, ignoring shields. Heal 12 HP.","Six alike: kill all, ignore shields; heal 12 HP.",任意点数六个一样：无视护盾消灭全体敌人，恢复12生命。
 "Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.","Three rolls per turn. Connect matching dice or a straight; release to summon. Or tap dice, then OK.",每回合三次投掷。拖连同点骰子或顺子，松手召唤；也可逐个点选，再点确认。
 Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.,Return a skill to the red center to unlock its dice. End Turn uses the leftovers automatically.,技能拖回红色中央可取消并解锁骰子。结束回合会自动使用余骰。
-End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.,End Turn: every leftover pip fires an orb for 25% base damage. No skill is summoned.,结束回合：每个余骰点直接射出一枚光球，造成25%基础伤害；不召唤技能。
+End Turn: each leftover die fires one orb. Damage = pips x 25% base; no skill bubble.,End Turn: each leftover die fires one orb. Damage = pips x 25% base; no skill bubble.,结束回合：每枚余骰射出一枚光球，伤害为点数×25%基础伤害；不召唤技能。
 Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.,Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.,未用投掷次数计入重投宝箱。每次连续Perfect仍增加0.1伤害倍率。
 SELECT DICE,SELECT DICE,选择骰子
+BONUS TURN,BONUS TURN,额外回合
+Use all six dice in skills: bonus turn with three rolls. Leftover orbs do not count.,Use all six dice in skills: bonus turn +3 rolls. Leftovers do not count.,将六枚骰子全部用于技能，可获得额外回合与三次投掷；余骰光球不计入。
+Two of %s,Two of %s,两个%s点
+Three of %s,Three of %s,三个%s点
+Four of %s,Four of %s,四个%s点
+Five of %s,Five of %s,五个%s点
+One,One,一
+Two,Two,二
+Three,Three,三
+Four,Four,四
+Five,Five,五
+Six,Six,六
+REROLL,REROLL,重掷
+TAUNT,Taunt,嘲讽
+AFTER WAVE %d,AFTER WAVE %d,第%d波之后
+REFRESH ALL · %d,REFRESH ALL · %d,全部刷新 · %d
+LEAVE SHOP,LEAVE SHOP,离开商店
+BUY,BUY,购买
+SOLD,SOLD,售出
+SOLD OUT,SOLD OUT,暂无存货
+RELIC INVENTORY,RELIC INVENTORY,法具背包
+Tap an item to inspect it. Purchased tarot cards go straight into your collection.,Tap an item to inspect it. Purchased tarot cards go straight into your collection.,点击查看道具详情。购买的塔罗直接收入牌库，无需抽牌。
+CANCEL,CANCEL,取消
+ITEMS,ITEMS,背包
+DROP TO BUY,DROP TO BUY,松手购买
+%d / 10 ITEMS,%d / 10 ITEMS,%d / 10 件法具
+Choose an owned item to inspect before replacing it.,Choose an owned item to inspect before replacing it.,选择已有道具查看详情，再确认替换。
+Tap an item to view its details.,Tap an item to view its details.,点击道具查看详情。
+BACK TO INVENTORY,BACK TO INVENTORY,返回背包
+REPLACE THIS ITEM,REPLACE THIS ITEM,替换此道具
+CLOSE,CLOSE,关闭
+Souls,Souls,灵魂
+CHOOSE YOUR PATH,CHOOSE YOUR PATH,选择前进路线
+NEXT WAVE REWARD,NEXT WAVE REWARD,下一波奖励
+TAP TO OPEN,TAP TO OPEN,点击开启
++%d souls,+%d souls,+%d灵魂
+LV. %d,LV. %d,等级 %d
+LEVEL %d,LEVEL %d,进化 · 等级 %d
+BASE DMG x1.5  ·  HP +50%,BASE DMG x1.5  ·  HP +50%,基础伤害 ×1.5  ·  生命 +50%
+WAVE %d,WAVE %d,第 %d 波
+Soul Bottle,Soul Bottle,灵魂瓶
+Opened: +%d souls.,Opened: +%d souls.,已开启：获得%d灵魂。
+A sealed bottle of souls. Opens on purchase. Its contents are a mystery.,A sealed bottle of souls. Opens on purchase. Its contents are a mystery.,密封的灵魂瓶，购买后立即开启。瓶中灵魂数量未知。
+"Matching dice attack automatically. Connect 3-6 consecutive unique faces to summon a fire skill, or tap dice then OK. Three rolls per turn.","Matching dice attack automatically. Connect 3-6 consecutive unique faces to summon a fire skill, or tap dice then OK. Three rolls per turn.",相同点数在投掷后自动攻击。连接3～6个连续且不同的点数召唤火焰技能，也可点选后确认。每回合可投掷三次。
+End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.,End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.,结束回合：剩余骰子的点数总和×1%最大生命值，转为治疗。黑暗会阻止治疗。
+Fiery Slash,Fiery Slash,烈焰斩
+Fire Storm,Fire Storm,烈焰风暴
+Brimstone,Brimstone,地狱硫火
+Single target: (3 + 0.1 x pip sum) x base damage. Then apply 2 Burning.,Single target: (3 + 0.1 x pip sum) x base damage. Then apply 2 Burning.,单体攻击：(3＋0.1×点数总和)×基础伤害，命中后施加2层燃烧。
+All enemies: (2 + 0.1 x pip sum) x base damage. Double against Burning enemies.,All enemies: (2 + 0.1 x pip sum) x base damage. Double against Burning enemies.,全体攻击：(2＋0.1×点数总和)×基础伤害。对已燃烧的敌人造成双倍伤害。
+"All enemies: (5 + 0.1 x pip sum) x base damage. Double against Burning enemies, then apply 2 Burning.","All enemies: (5 + 0.1 x pip sum) x base damage. Double against Burning enemies, then apply 2 Burning.",全体攻击：(5＋0.1×点数总和)×基础伤害。对已燃烧的敌人造成双倍伤害，命中后施加2层燃烧。
+"Destroy all enemies, ignoring shields.","Destroy all enemies, ignoring shields.",无视护盾，消灭所有敌人。
+Matching Auto Attacks,Matching Auto Attacks,同点自动攻击
+Each newly rolled group of 2+ matching dice attacks random enemies. One hit per matching die; damage = base x (0.5 + 0.1 x pip).,Each newly rolled group of 2+ matching dice attacks random enemies. One hit per matching die; damage = base x (0.5 + 0.1 x pip).,每次投掷后，每组至少两个同点骰子自动攻击随机敌人。每个同点骰子攻击一次，伤害＝基础伤害×(0.5＋0.1×点数)。
+Dice Stay Available,Dice Stay Available,骰子仍可使用
+"Automatic attacks do not spend dice. Use them in straights or reroll all unused dice, up to three rolls per turn.","Automatic attacks do not spend dice. Use them in straights or reroll all unused dice, up to three rolls per turn.",自动攻击不消耗骰子。之后可连接顺子或重掷所有未使用骰子，每回合最多投掷三次。
+Healing Embers,Healing Embers,余烬回生
+HEALING EMBERS,HEALING EMBERS,余烬回生
+Use all six dice in skills: bonus turn with three rolls. Automatic attacks and leftover healing do not count.,Use all six dice in skills: bonus turn with three rolls. Automatic attacks and leftover healing do not count.,将六个骰子全部用于技能，可获得额外回合及三次投掷。自动攻击和余烬治疗不计入。
++%d HP,+%d HP,+%d 生命
+AUTO ATTACKS,AUTO ATTACKS,自动攻击
+FIRE SKILLS,FIRE SKILLS,火焰技能
+STRAIGHTS,STRAIGHTS,顺子技能
+Single target; +2 Burning.,Single target; +2 Burning.,单体 · 燃烧＋2层
+All enemies; 2x against Burning.,All enemies; 2x against Burning.,全体 · 对燃烧敌人双倍
+All; 2x vs Burning; +2 Burning.,All; 2x vs Burning; +2 Burning.,全体 · 燃烧翻倍／＋2层
+Destroy all enemies.,Destroy all enemies.,消灭所有敌人
+Incoming relic: %s,Incoming relic: %s,待领取法具：%s

@@ -33,14 +33,14 @@ func is_empty() -> bool:
 
 func is_attack() -> bool:
 	if is_empty(): return false
-	if not pattern.is_empty(): return pattern != "straight"
+	if not pattern.is_empty(): return pattern != "cleanup"
 	return face in [1,4,5] if kind in [Kind.PAIR,Kind.SPECIAL] else true
 
 func is_freeze() -> bool:
 	return pattern.is_empty() and kind == Kind.PAIR and face == 2
 
 func hits_all() -> bool:
-	if not pattern.is_empty(): return pattern == "annihilation"
+	if not pattern.is_empty(): return pattern == "annihilation" or (pattern == "straight" and dice.size() >= 4)
 	return kind == Kind.ULTIMATE or (kind in [Kind.PAIR,Kind.SPECIAL] and face == 4)
 
 func set_use_multiplier(source: String, multiplier: int) -> void:
@@ -75,10 +75,10 @@ func has_use_orbs(additional_modifiers: Dictionary = {}) -> bool:
 
 ## Combo relics apply to matching attacks, independently of targeting style.
 func is_combo_attack() -> bool:
-	return pattern == "match" or (pattern.is_empty() and random_target_per_use())
+	return pattern in ["match","match_auto"] or (pattern.is_empty() and random_target_per_use())
 
 func random_target_per_use() -> bool:
-	if not pattern.is_empty(): return pattern == "cleanup"
+	if not pattern.is_empty(): return pattern == "match_auto"
 	return face == 5 and kind in [Kind.PAIR, Kind.SPECIAL]
 
 ## Selected-target casts keep their target through death; future overflow can override this policy.

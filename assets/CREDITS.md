@@ -13,7 +13,7 @@ The treasure chest and seven reward category icons are copied unchanged from the
 | The Horror | `monster/abyss/worldbinder.png` |
 | Vanguard | `monster/vault/vault_guard_new.png` |
 | Elf Archer | `monster/deep_elf_master_archer.png` |
-| Mage | `monster/deep_elf_mage.png` |
+| Elite mage / legacy mage | `monster/deep_elf_mage.png` |
 | Paladin | `monster/holy/paladin.png` |
 | High Priest | `monster/deep_elf_high_priest.png` |
 | Fleeing civilians | `monster/human_new.png`, `monster/human_old.png` |
@@ -27,6 +27,14 @@ The treasure chest and seven reward category icons are copied unchanged from the
 | Boon and effect icons | `gui/skills/`: shields, fighting, transmutations, necromancy, invocations, spellcasting |
 
 The actors use 32×32 source images with nearest-neighbor sampling and stepped idle motion. Apparent scale changes with growth; death poses rotate and flatten the same sprite. City troops and inhabitants lean and hop while running; civilians and aristocrats emerge when houses become rubble. Scene and UI textures are tiled, cropped, and tinted at runtime. These are existing public pixel-art tiles; no custom image generation was used for this redesign.
+
+## User-provided basic dice
+
+The basic dice use the user's unchanged 48×48-cell `basic_dice.png` atlas and retain the original `.aseprite` source under `art/dice/`. Frames 1–6 are the resting faces and frames 7–13 are rolling poses. Battle dice, home previews and miniature skill dice share this artwork. See [dice asset notes](art/dice/SOURCE.md). This artwork is user-provided and is not covered by the public asset licenses listed elsewhere here.
+
+## User-provided normal mage
+
+The normal mage uses the user's nine-frame `mage.gif`, retained in `art/enemies/mage/source.gif`. Frame 1 is its living sprite; frames 2–9 are eight scattered death pieces. See [mage asset notes](art/enemies/mage/README.md). This custom artwork is user-provided and is not included in the DCSS CC0 attribution. Its small blood splatter is drawn in code.
 
 ## Relic inventory artwork
 
@@ -102,3 +110,11 @@ See `art/tarot/LICENSE.txt` for the source and license summary.
 ## Soul crystal drops and pickup audio
 
 **Bobjt**, [Gem collect SFX](https://opengameart.org/content/gem-collect-sfx), **CC0 1.0**. Unmodified stereo WAVs: the reverb version accompanies enemy crystal drops; the short version plays at collection with light pitch variation. See [provenance](licenses/Gem-Collect-SFX.txt).
+
+## Hooded shopkeeper
+
+**Shopkeeper** by **pablopirata**, [OpenGameArt source](https://opengameart.org/content/shopkeeper), licensed **CC0 1.0**. The original `keeper.png` is copied unchanged to `art/shop/`; see [provenance](art/shop/SOURCE.md). Shelves are drawn in code.
+
+### Player evolution forms
+
+All three active levels use [Flamelings by surt](https://opengameart.org/content/flamelings), CC0. Sprites extracted with transparent backgrounds and nearest-neighbor scaling. The former original AI-generated ember starter is retained as an unused source asset. See [source and generation record](licenses/Flamelings.txt).

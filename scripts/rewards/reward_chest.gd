@@ -33,7 +33,7 @@ const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
 var symbols: Array = Catalog.ITEMS.duplicate(true)
-var scroll_symbols: Array = [Catalog.Category.SHARD,Catalog.Category.TAROT]
+var scroll_symbols: Array = []
 var relic_symbols: Dictionary = {}
 var relic_atlas: Texture2D
 const OPEN_TIME := 0.65
@@ -398,7 +398,10 @@ func draw_currency(canvas: CanvasItem) -> void:
 	var side: float = 32 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 23
 	Icons.paint(canvas,art,"ruby",Rect2(point-Vector2.ONE*side/2,Vector2.ONE*side))
 	var pending: int = battle.crystal_pickup.pending_total
-	canvas.draw_string(battle.description_font,point+Vector2(side*0.75,8),str(maxi(0,battle.model.rubies-pending)),HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("ffd0de"))
+	canvas.draw_string(battle.description_font,point+Vector2(side*0.75,8),str(maxi(0,battle.model.blood_gems-pending)),HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("ffd0de"))
+	var soul_at: Vector2 = battle._soul_currency_point()
+	Icons.paint(canvas,art,"soul",Rect2(soul_at-Vector2.ONE*side/2,Vector2.ONE*side))
+	canvas.draw_string(battle.description_font,soul_at+Vector2(side*0.75,8),battle.soul_pickup.counter_text(),HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("a5e4ef"))
 
 func _text(at: Vector2, text: String, point_size: int, color: Color) -> void:
 	text = GameText.text(text)
@@ -452,7 +455,7 @@ func _draw() -> void:
 	draw_texture_rect(art.chest_open if opened_for >= 0 else art.chest_closed,Rect2(box_at-Vector2.ONE*(chest_side+pop)/2+Vector2(shake,0),Vector2.ONE*(chest_side+pop)),false)
 	if opened_for > 0 and opened_for < 0.65 and not reduced:
 		Pixel.circle(self,box_at-Vector2(0,35),opened_for*450,Color(gold,(1-opened_for/0.65)*0.65),6)
-	_text(box_at+Vector2(0,chest_side*0.62),GameText.format("+%d soul crystals",battle.model.chest_crystals if is_instance_valid(battle) and battle.model.chest_crystals > 0 else Chests.CRYSTALS[tier]),26 if portrait else 19,Color("ffadc4"))
+	_text(box_at+Vector2(0,chest_side*0.62),GameText.format("+%d blood gems",battle.model.chest_crystals if is_instance_valid(battle) and battle.model.chest_crystals > 0 else Chests.CRYSTALS[tier]),26 if portrait else 19,Color("ffadc4"))
 	if opened_for > 0 and opened_for < 0.7 and not reduced:
 		var burst: float = opened_for/0.7
 		for i in range(48):

@@ -3,6 +3,8 @@ extends Node2D
 const Beam = preload("res://scripts/dice/dice_connection_beam.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const IdleFeedback = preload("res://scripts/dice/dice_idle_feedback.gd")
+const Style = preload("res://scripts/dice/dice_pattern_style.gd")
+const PromptPulse = preload("res://scripts/shared/prompt_pulse.gd")
 var idle_feedback := IdleFeedback.new()
 var battle
 var dragging: bool = false
@@ -15,6 +17,9 @@ var caption: Dictionary = {}
 var particles: Array = []
 var emission_clock: float = 0
 var clock_time: float = 0
+var roll_prompt_age: float = 0
+var end_turn_prompt_age: float = 0
+var prompt_turn_id: int = -1
 var cosmetic := RandomNumberGenerator.new()
 
 func _ready() -> void:
@@ -98,6 +103,7 @@ func _visit_pointer(point: Vector2) -> void:
 			var previous: int = pool.selected.find(index)
 			if previous >= 0 and pool.selected.size() > 1:
 				pool.selected.resize(previous if previous == pool.selected.size()-1 else previous+1)
+				if pool.selected.size() == 1: pool.selected.clear()
 				_selection_changed()
 			elif previous < 0:
 				if pool.select(index): _selection_changed()
@@ -136,6 +142,7 @@ func _clear_preview() -> void:
 	for die in battle.dice:
 		die.selection_emphasis = 0
 		die.connection_glow = false
+		die.connection_fire = 0
 	queue_redraw()
 
 ## Cache the formed skill caption only when the selected pattern changes.
@@ -147,7 +154,12 @@ func _selection_changed() -> void:
 	queue_redraw()
 
 func skill_color() -> Color:
-	return battle.GOLD if preview.is_empty() else [battle.CREAM,battle.TEAL,battle.PURPLE,battle.GOLD][preview.kind]
+	return Style.color(preview)
+
+## Prompt the first throw, or a usable reroll when the remaining pool has no straight.
+func should_prompt_roll() -> bool:
+	var pool = battle.model.dice_turn
+	return available() and pool.selected.is_empty() and pool.can_roll() and (pool.rolls_left == pool.ROLLS or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i])))
 
 ## Animate a bounded stream of sparks while the valid pattern is selected.
 func _process(delta: float) -> void:
@@ -155,13 +167,21 @@ func _process(delta: float) -> void:
 	if dragging and not available(): cancel_gesture()
 	clock_time += delta
 	var pool = battle.model.dice_turn
+	if prompt_turn_id != pool.turn_id:
+		prompt_turn_id = pool.turn_id
+		roll_prompt_age = 0
+	if should_prompt_roll(): roll_prompt_age += delta
+	else: roll_prompt_age = 0
+	if battle._can_end_turn() and pool.rolls_left == 0 and not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i])): end_turn_prompt_age += delta
+	else: end_turn_prompt_age = 0
 	idle_feedback.advance(delta,pool,available(),battle.reduced)
 	for index in range(battle.dice.size()):
 		var die = battle.dice[index]
 		die.idle_hint = idle_feedback.hint_pose(index)
 		die.selection_emphasis = move_toward(die.selection_emphasis,1.0 if index in pool.selected else 0.0,delta*12)
-		die.connection_glow = not preview.is_empty() and index in pool.selected
+		die.connection_glow = index in pool.selected
 		die.connection_color = skill_color()
+		die.connection_fire = Style.fire_level(preview) if index in pool.selected else 0
 	for spark in particles:
 		spark.life -= delta
 		spark.p += spark.v*delta
@@ -169,10 +189,13 @@ func _process(delta: float) -> void:
 	if not preview.is_empty():
 		emission_clock -= delta
 		if emission_clock <= 0:
-			emission_clock = 0.14 if battle.reduced else 0.06
+			var level: int = Style.fire_level(preview)
+			emission_clock = 0.2 if battle.reduced else [0.14,0.10,0.09,0.07,0.065][level]
 			for index in pool.selected:
-				var direction := Vector2.from_angle(cosmetic.randf()*TAU)
-				particles.append({"p":battle.DICE_POSITIONS[index]+direction*(52 if portrait() else 40),"v":direction*cosmetic.randf_range(15,35)+Vector2(0,-24),"life":0.65,"size":cosmetic.randf_range(3,6)})
+				for burst in range(1 if battle.reduced else [1,1,2,2,3][level]):
+					if particles.size() >= 240: break
+					var direction := Vector2.from_angle(cosmetic.randf()*TAU)
+					particles.append({"p":battle.DICE_POSITIONS[index]+direction*(52 if portrait() else 40),"v":direction*cosmetic.randf_range(15,35)+Vector2(0,-24-level*18),"life":0.65,"size":cosmetic.randf_range(3,6)+level*0.4,"color":skill_color()})
 	queue_redraw()
 
 ## Draw straight connections above dice and a small centered face/skill preview.
@@ -197,21 +220,21 @@ func _draw() -> void:
 			battle._center(row+Vector2(0,44 if portrait() else 38),caption.name,30 if portrait() else 23,color,self)
 			var size: int = 24 if portrait() else 22
 			var y: float = row.y+(70 if portrait() else 67)
-			for line in GameText.lines(caption.description,battle.description_font,size,410 if portrait() else 340):
+			for line in GameText.lines(caption.get("preview",caption.description),battle.description_font,size,410 if portrait() else 340):
 				var width: float = battle.description_font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 				draw_string(battle.description_font,Vector2(row.x-width/2,y).round(),line,HORIZONTAL_ALIGNMENT_LEFT,-1,size,battle.CREAM)
 				y += size+4
 	for spark in particles:
 		var alpha: float = spark.life/0.65
-		draw_circle(spark.p,spark.size*2,Color(color,alpha*0.1))
-		draw_rect(Rect2(spark.p-Vector2.ONE*spark.size/2,Vector2.ONE*spark.size),Color(color.lightened(0.4),alpha))
+		draw_circle(spark.p,spark.size*2,Color(spark.color,alpha*0.1))
+		draw_rect(Rect2(spark.p-Vector2.ONE*spark.size/2,Vector2.ONE*spark.size),Color(spark.color.lightened(0.4),alpha))
 	_draw_center()
 
 ## Send a fading pixel wave outward every two seconds; reduced effects stay still.
 func _draw_interactable_dice() -> void:
 	var pool = battle.model.dice_turn
 	if not available() or not pool.active or pool.rolls_left == pool.ROLLS or pool.has_pending_group(): return
-	for index in pool.unused():
+	for index in idle_feedback.ring_indices:
 		var progress: float = 0 if battle.reduced else idle_feedback.wave_age/IdleFeedback.WAVE_PERIOD
 		var radius: float = (65 if portrait() else 49)+(40 if portrait() else 30)*progress
 		radius *= 1+battle.dice[index].selection_emphasis*0.12
@@ -220,7 +243,7 @@ func _draw_interactable_dice() -> void:
 
 ## The center contains only glowing text, or a faint red skill-cancellation target.
 func _draw_center() -> void:
-	if dragging and moved: return
+	if (dragging and moved) or battle.view_phase == "rolling": return
 	var at: Vector2 = battle.DICE_CENTER
 	var size: int = 46 if portrait() else 32
 	var cancelling: bool = battle._current_skill_selected()
@@ -232,14 +255,24 @@ func _draw_center() -> void:
 		return
 	var charging: bool = battle.view_phase == "charging"
 	var selected: bool = not battle.model.dice_turn.selected.is_empty()
+	var reroll: bool = battle.model.dice_turn.rolls_left < battle.model.DiceTurn.ROLLS
 	var enabled: bool = charging or (available() and (not preview.is_empty() if selected else battle.model.dice_turn.can_roll()))
-	var label: String = GameText.text("STOP!" if charging else "OK" if selected else "ROLL")
+	var label: String = GameText.text("STOP!" if charging else "OK" if selected else "REROLL" if reroll else "ROLL")
 	var color: Color = battle.GOLD if enabled else Color("505156")
 	var base: Vector2 = at+Vector2(0,1)
+	# Rectified sine touches normal size briefly and eases around each crest.
+	var pop: float = 1.0
+	if should_prompt_roll() and not battle.reduced:
+		pop = PromptPulse.scale_at(roll_prompt_age)
+	var pivot: Vector2 = base+Vector2(0,(battle.pixel_font.get_descent(size)-battle.pixel_font.get_ascent(size))*0.5)
+	draw_set_transform(pivot,0,Vector2.ONE*pop)
+	base -= pivot
 	if enabled:
 		var pulse: float = 0.7 if battle.reduced else 0.7+sin(clock_time*3.4)*0.3
 		var width: float = battle.pixel_font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 		for outline in [8,4]: draw_string_outline(battle.pixel_font,base-Vector2(width/2,0),label,HORIZONTAL_ALIGNMENT_LEFT,-1,size,outline,Color(color,0.08*pulse))
 	battle._center(base,label,size,color,self)
-	battle._center(at+Vector2(0,35 if portrait() else 27),str(battle.model.dice_turn.rolls_left),26 if portrait() else 20,color,self)
+	draw_set_transform(Vector2.ZERO)
+	if reroll and not charging and not selected:
+		battle._center(at+Vector2(0,35 if portrait() else 27),str(battle.model.dice_turn.rolls_left),26 if portrait() else 20,color,self)
 	if selected and available(): battle._center(cancel_rect().get_center()+Vector2(0,8 if portrait() else 6),"Deselect",24 if portrait() else 16,Color("df9696"),self)

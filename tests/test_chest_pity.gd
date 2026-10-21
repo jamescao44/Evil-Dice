@@ -66,6 +66,7 @@ func run() -> void:
 	model.close_chest()
 	model.reset_run()
 	model.chest_pity.misses = [3,3,3]
+	model.wave_kind = model.WaveRewards.RELIC
 	for enemy in model.enemies: enemy.hp = 0
 	check(model.begin_wave_reward() and model.wave_chest_tier == 3,"Wave chest uses all ready tier guarantees")
 	check(model.chest_pity.misses == [0,0,0] and model.chest_pity.last_misses == [3,3,3],"Wave outcome commits counters before presentation")

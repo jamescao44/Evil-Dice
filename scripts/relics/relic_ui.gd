@@ -38,6 +38,7 @@ func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
 
 func inventory_rect() -> Rect2:
+	if battle.view_phase == "shop": return battle.shop_ui.inventory_rect()
 	if chest_slot >= 0 or (battle.view_phase == "reward" and pickup.active): return Rect2(48,1376,708,64) if portrait() else Rect2(260,602,760,56)
 	return Rect2(48,982,708,54) if portrait() else Rect2(36,474,480,38)
 
@@ -50,7 +51,7 @@ func skip_rect() -> Rect2:
 	return Rect2(142,1490,520,96) if portrait() else Rect2(422,686,436,58)
 
 func interactable() -> bool:
-	return not pickup.active and not battle._menus_open() and battle.inspecting_enemy < 0 and (battle.view_phase in ["ready","skill"] or (battle.view_phase == "reward" and chest_slot >= 0))
+	return not pickup.active and not battle._menus_open() and battle.inspecting_enemy < 0 and (battle.view_phase in ["ready","skill","shop"] or (battle.view_phase == "wave_reward" and battle.wave_chest.phase == "routes") or (battle.view_phase == "reward" and chest_slot >= 0))
 
 func at_slot(at: Vector2) -> int:
 	for i in range(battle.model.relics.items.size()):
@@ -171,7 +172,7 @@ func _frame(rect: Rect2, color: Color, rarity: bool = false) -> void:
 	draw_rect(rect.grow(-5),Color(color,0.15),false,1)
 
 func _draw() -> void:
-	if not is_instance_valid(battle) or battle._menus_open() or battle.view_phase in ["over","wave_reward"] or (battle.view_phase == "reward" and chest_slot < 0 and not pickup.active): return
+	if not is_instance_valid(battle) or battle._menus_open() or battle.view_phase == "over" or (battle.view_phase == "reward" and chest_slot < 0 and not pickup.active): return
 	if chest_slot >= 0: _draw_chest_replacement()
 	draw_style_box(bar_style,inventory_rect())
 	var order: Array = range(battle.model.relics.items.size())

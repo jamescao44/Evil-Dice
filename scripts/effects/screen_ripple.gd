@@ -43,7 +43,7 @@ func _update_surface() -> void:
 	surface.visible = active
 	capture.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT if active else BackBufferCopy.COPY_MODE_DISABLED
 	if not active: return
-	var size: Vector2 = get_viewport().get_visible_rect().size
+	var size: Vector2 = Vector2(get_window().get_meta("design_size", Vector2i(1280, 800)))
 	surface.size = size
 	# Both the sampled image and the impact follow the battle's camera shake.
 	var screen_origin: Vector2 = battle.get_global_transform_with_canvas() * origin

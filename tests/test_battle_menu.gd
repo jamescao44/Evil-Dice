@@ -148,12 +148,12 @@ func scene_checks(portrait: bool) -> void:
 	check(not g.debug_open and not g.debug_wave_input.visible and g.chest.roll_phase == "closed" and g.chest.tier == 0 and g.chest.upgrade_mode,"Debug spawns a closed Normal Chest with upgrades enabled")
 	check(g.model.opened_chest_tier == 3 and g.model.reroll_progress == 8 and g.model.wave_chest_stage == -1,"Debug uses real upgrade chances without spending Perfect progress or clearing the wave")
 	var locked_rng: int = g.model.reward_rng.state
-	var funds: int = g.model.rubies
+	var funds: int = g.model.blood_gems
 	g.chest.set_process(false)
 	g.chest.audio_clock_enabled = false
 	g.chest._process(10)
 	g._handle_click(Vector2(10,10))
-	check(g.model.rubies == funds and g.chest.roll_phase == "closed","Closed debug chest does not pay, roll, or open from a background tap")
+	check(g.model.blood_gems == funds and g.chest.roll_phase == "closed","Closed debug chest does not pay, roll, or open from a background tap")
 	await snapshot(g,"closed-chest",portrait)
 	g._handle_click(g.chest.closed_rect().get_center())
 	check(g.chest.roll_phase == "spinning" and g.chest.tier == 0,"Opening tap starts rolling without attempting an upgrade")
@@ -168,7 +168,7 @@ func scene_checks(portrait: bool) -> void:
 	var chest_deadline: int = Time.get_ticks_msec()+6000
 	while g.view_phase == "reward" and Time.get_ticks_msec() < chest_deadline: await process_frame
 	check(g.view_phase == "skill" and g.model.pending.dice == held_faces and g.model.hp == before_hp and g.model.stage == before_stage,"Finishing debug chest restores the held skill and current battle")
-	check(g.model.rubies == funds+100 and g.model.open_rewards.is_empty() and g.model.reroll_progress == 8,"Debug chest pays once and preserves the treasure bank")
+	check(g.model.blood_gems == funds+100 and g.model.open_rewards.is_empty() and g.model.reroll_progress == 8,"Debug chest pays once and preserves the treasure bank")
 	g.chest.set_process(true)
 	g.chest.audio_clock_enabled = true
 	for wave in range(1,Waves.COUNT):

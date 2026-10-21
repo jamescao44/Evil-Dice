@@ -32,17 +32,17 @@ func timing_checks() -> void:
 		meter.advance(Meter.PERIOD / 4)
 	for crossing in [Meter.PERIOD / 4.0, Meter.PERIOD * 3.0 / 4.0]:
 		for sign_value in [-1, 1]:
-			meter.elapsed = crossing + sign_value * 0.030
-			check(meter.sample().perfect and is_equal_approx(meter.sample().position,meter.position_ratio()), "Both +/-30 ms boundaries qualify without snapping the marker")
+			meter.elapsed = crossing + sign_value * 0.035
+			check(meter.sample().perfect and is_equal_approx(meter.sample().position,meter.position_ratio()), "Both +/-35 ms boundaries qualify without snapping the marker")
 			check(is_equal_approx(absf(meter.position_ratio() - 0.5) * Meter.WIDTH, Meter.perfect_tolerance_pixels()), "Visible Perfect zone matches the time boundary")
-			meter.elapsed = crossing + sign_value * 0.030001
-			check(not meter.sample().perfect, "A stop just outside +/-30 ms misses")
+			meter.elapsed = crossing + sign_value * 0.035001
+			check(not meter.sample().perfect, "A stop just outside +/-35 ms misses")
 			meter.elapsed = crossing + sign_value * 0.025
 			check(meter.sample().perfect, "25 ms offset qualifies within the widened window")
 	# Every sample moves through the whole window, in both directions.
 	for crossing in [Meter.PERIOD/4.0,Meter.PERIOD*3.0/4.0]:
-		var previous: float = Meter.normal_position_at(crossing-0.031)
-		for millisecond in range(-30,31):
+		var previous: float = Meter.normal_position_at(crossing-0.036)
+		for millisecond in range(-35,36):
 			meter.elapsed = crossing+millisecond/1000.0
 			var position: float = meter.sample().position
 			check(position > previous if crossing < Meter.PERIOD/2 else position < previous,"Perfect-zone animation never sticks at center")
@@ -68,20 +68,20 @@ func timing_checks() -> void:
 	for ms in range(-40,41):
 		meter.elapsed = Meter.PERIOD/4 + ms/1000.0
 		if meter.sample().perfect: available_ms += 1
-	check(available_ms == 61, "Perfect covers exactly -30 through +30 ms inclusive")
+	check(available_ms == 71, "Perfect covers exactly -35 through +35 ms inclusive")
 	for fps in [15, 20, 30, 60, 120]:
 		meter.reset()
 		for frame in range(fps): meter.advance(1.0 / fps)
 		var direct := Meter.new()
 		direct.advance(1)
 		check(is_equal_approx(meter.position_ratio(), direct.position_ratio()), "Meter is frame-rate independent at %d FPS" % fps)
-		for offset in [-0.031, -0.030, 0.0, 0.030, 0.031]:
+		for offset in [-0.036, -0.035, 0.0, 0.035, 0.036]:
 			meter.reset()
 			var tap_time: float = Meter.PERIOD / 4.0 + offset
 			var frames: int = floori(tap_time * fps)
 			for frame in range(frames): meter.advance(1.0 / fps)
 			meter.advance(tap_time - frames / float(fps))
-			check(meter.sample().perfect == (absf(offset) <= 0.030), "Same tap judgment at %d FPS, offset %.3f" % [fps, offset])
+			check(meter.sample().perfect == (absf(offset) <= 0.035), "Same tap judgment at %d FPS, offset %.3f" % [fps, offset])
 	meter.reset()
 	meter.advance(Meter.PERIOD / 4.0 - 0.040)
 	meter.advance(0.080)
@@ -144,6 +144,7 @@ func scene_checks(portrait: bool) -> void:
 	game.muted = true
 	game.speed = 8
 	game.reduced = true
+	for enemy in game.model.enemies: enemy.hp = 100000; enemy.max_hp = 100000
 	var state: int = game.model.rng.state
 	game._handle_click(game.DICE_CENTER)
 	check(game.view_phase == "charging" and game.model.phase == "roll" and game.model.rng.state == state, "Charge does not draw gameplay RNG or start combat")
@@ -155,12 +156,14 @@ func scene_checks(portrait: bool) -> void:
 	check(game.throw_meter.elapsed == elapsed, "Grimoire pauses power meter")
 	game._handle_click(game.GUIDE_CLOSE.get_center())
 	if game.menu_open: game._handle_click(game.MENU_RESUME.get_center())
+	# Opening settings cancels charge; resume with a fresh attempt before the timing fixture.
+	game._start_charge()
 	game.throw_meter.elapsed = Meter.PERIOD / 4
 	game.charge_stamp = Time.get_ticks_usec()
 	game._handle_click(game.DICE_CENTER)
 	check(game.throw_perfect and game.throw_power == 1 and not game.fx.perfect.is_empty(), "Perfect locks power, throws, and displays feedback")
 	check(is_equal_approx(game.throw_meter.sample().position,game.throw_meter.position_ratio()) and game._power_flash_strength() == 1, "Perfect feedback preserves the underlying timing sample and flashes the meter")
-	check(game.result.kind != Rules.Kind.NORMAL, "Perfect throws a combination")
+	check(game.model.pending.is_empty() and game.model.dice_turn.values.size() == 6, "Perfect leaves six dice for manual combination selection")
 	var pending: MultiHitSkill = game.model.pending.duplicate(true)
 	game._handle_click(game.DICE_CENTER)
 	check(game.model.pending.same_as(pending), "Third click cannot reroll committed dice")
@@ -176,7 +179,7 @@ func scene_checks(portrait: bool) -> void:
 	game.throw_meter.elapsed = Meter.PERIOD / 4
 	game.charge_stamp = Time.get_ticks_usec()
 	game._release_charge()
-	check(game.throw_perfect and game.result.kind == Rules.Kind.NORMAL, "Debug result explicitly overrides power odds")
+	check(game.throw_perfect and game.model.dice_turn.values == [1,2,3,4,5,6], "Debug result sets six independent dice without automatically forming a skill")
 	await settle()
 	game._start_charge()
 	game._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)

@@ -23,7 +23,7 @@ const HELP_TEXT := {
 	Status.DARKNESS:"Attack damage x0.5; cannot heal. Lose 1 stack per turn.",
 	Status.CORROSION:"No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",
 	Status.PLAGUE:"Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random uninfected ally each turn.",
-	Status.IMMOBILIZED:"Enemy shield broken: skip the next action, then recover.",
+	Status.IMMOBILIZED:"Non-elite shield broken: skip the next action, then recover. Elites are unaffected.",
 	Status.HIDDEN:"Untargetable for 3 turns. Using an attack skill breaks invisibility.",
 }
 

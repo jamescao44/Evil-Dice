@@ -60,9 +60,9 @@ func model_checks() -> void:
 				slots[model.guaranteed_slot] += 1
 				check(model.chest_relics.has(model.guaranteed_slot),"Guarantee is a real relic")
 				check(Catalog.ITEMS[model.chest_relics[model.guaranteed_slot]].rarity >= Chests.MIN_RARITY[tier],"Guaranteed rarity floor")
-			var funds: int = model.rubies
+			var funds: int = model.blood_gems
 			check(model.release_chest_crystals() == Chests.CRYSTALS[tier],"Correct crystal payout")
-			check(model.release_chest_crystals() == 0 and model.rubies == funds+Chests.CRYSTALS[tier],"Payout is idempotent")
+			check(model.release_chest_crystals() == 0 and model.blood_gems == funds+Chests.CRYSTALS[tier],"Payout is idempotent")
 			var state: int = model.reward_rng.state
 			var outcome: Array = model.open_rewards.duplicate()
 			check(model.open_chest() == outcome and model.reward_rng.state == state,"Reopening never rerolls")
@@ -78,7 +78,7 @@ func model_checks() -> void:
 		for tier in range(4):
 			model.release_chest_crystals(tier)
 			var expected: int = floori(Chests.CRYSTALS[tier]*(1.15 if vessel else 1)+0.0001)
-			check(model.rubies == expected and model.chest_crystals == expected,"Only revealed tier pays crystals, including carried bonus fractions")
+			check(model.blood_gems == expected and model.chest_crystals == expected,"Only revealed tier pays crystals, including carried bonus fractions")
 			check(model.release_chest_crystals(tier) == 0 and model.release_chest_crystals(0) == 0,"Repeated or stale tier cannot pay twice")
 		check(model.chest_crystals_claimed and model.release_chest_crystals() == 0,"Final upgrade fully settles crystal payout")
 	# Floor promotion preserves the 1% legendary weight instead of conditioning on high rarity.
@@ -105,17 +105,17 @@ func model_checks() -> void:
 	check(not model.finish_wave_reward() and model.begin_tarot_reward("wave").is_empty(),"Cannot skip chest or buy before opening")
 	model.open_wave_chest()
 	resolve(model)
-	model.rubies = 29
-	check(not model.can_buy_wave_tarot() and model.begin_tarot_reward("wave").is_empty() and model.rubies == 29,"Cannot overspend")
-	model.rubies = 30
+	model.blood_gems = 29
+	check(not model.can_buy_wave_tarot() and model.begin_tarot_reward("wave").is_empty() and model.blood_gems == 29,"Cannot overspend")
+	model.blood_gems = 30
 	var cards: Array = model.begin_tarot_reward("wave")
-	check(cards.size() == 3 and model.rubies == 0 and model.wave_tarot_bought,"One paid tarot draw deducts 30")
+	check(cards.size() == 3 and model.blood_gems == 0 and model.wave_tarot_bought,"One paid tarot draw deducts 30")
 	check(not model.finish_wave_reward() and model.begin_tarot_reward("wave").is_empty(),"Draw cannot be bought twice or abandoned")
 	check(not model.choose_tarot(1).is_empty() and model.tarots.items.size() == 1,"Buy draw keeps chosen card")
-	model.rubies = 500
+	model.blood_gems = 500
 	check(not model.can_buy_wave_tarot() and model.finish_wave_reward() and model.advance_wave(),"One draw per wave, then continue")
 	model.reset_run()
-	check(model.wave_chest_stage == -1 and model.rubies == 0 and model.open_rewards.is_empty(),"Reset clears chest transaction")
+	check(model.wave_chest_stage == -1 and model.blood_gems == 0 and model.open_rewards.is_empty(),"Reset clears chest transaction")
 
 func frame_until(predicate: Callable, seconds: float = 8) -> bool:
 	var deadline: int = Time.get_ticks_msec()+int(seconds*1000)
@@ -146,12 +146,12 @@ func scene_checks(script, portrait: bool) -> void:
 	if not await frame_until(func(): return game.chest.visible): game.free(); return
 	var state: int = game.model.reward_rng.state
 	var outcomes: Array = game.model.open_rewards.duplicate()
-	check(game.chest.roll_phase == "closed" and game.model.rubies == 0,"Banked chest waits for a click without paying early")
+	check(game.chest.roll_phase == "closed" and game.model.blood_gems == 0,"Banked chest waits for a click without paying early")
 	tap(game,game.chest.closed_rect().get_center())
 	check(game.chest.audio.ultra_started and game.chest.audio.payout.playing,"Opening a banked Ultra starts its finale immediately")
 	check(game.chest.active and game.chest.roll_phase == "settling" and game.model.open_rewards == outcomes and game.model.reward_rng.state == state,"Ultra automatically starts its locked reveal without changing prizes")
 	await frame_until(func(): return game.chest.did_open)
-	check(game.model.rubies == 100 and game.crystal_pickup.pending_total == 100 and game.crystal_pickup.gems.size() >= 30,"Skipping still gives one dramatic crystal burst")
+	check(game.model.blood_gems == 100 and game.crystal_pickup.pending_total == 100 and game.crystal_pickup.gems.size() >= 30,"Skipping still gives one dramatic crystal burst")
 	check(game.crystal_pickup.z_index > game.chest.z_index,"Chest gems render above reward overlay")
 	for i in range(5):
 		var rect: Rect2 = game.chest.reel_rect(i)
@@ -170,7 +170,7 @@ func scene_checks(script, portrait: bool) -> void:
 	await frame_until(func(): return not game.relic_ui.pickup.active)
 	tap(game,game.chest.skip_rect().get_center())
 	await frame_until(func(): return game.view_phase == "ready")
-	check(game.model.rubies == 100 and game.model.reward_history.size() == 1,"Partial pickup retains crystals and only claimed item")
+	check(game.model.blood_gems == 100 and game.model.reward_history.size() == 1,"Partial pickup retains crystals and only claimed item")
 	# Real wave flow with three successful upgrades and no timing-dependent rewards.
 	game._restart()
 	var rng := RandomNumberGenerator.new()
@@ -189,7 +189,7 @@ func scene_checks(script, portrait: bool) -> void:
 	await capture(label+"-closed")
 	tap(game,game.chest.closed_rect().get_center())
 	await frame_until(func(): return game.chest.did_open)
-	check(game.model.rubies == 30,"Opening Normal does not leak the locked Ultra payout")
+	check(game.model.blood_gems == 30,"Opening Normal does not leak the locked Ultra payout")
 	game.chest._process(8)
 	check(game.chest.active and game.chest.announced == 0,"Wave rewards keep rolling until the player stops them")
 	await capture(label+"-normal-rolling")
@@ -199,7 +199,7 @@ func scene_checks(script, portrait: bool) -> void:
 		tap(game,game.fx.canvas_size-Vector2(10,10))
 		check(game.chest.tier == tier,"Rapid second tap cannot skip an upgrade impact")
 		await frame_until(func(): return game.chest.upgrade_age >= game.chest.UPGRADE_BEAT)
-		check(game.chest.visible_reel_count() == Chests.COUNTS[tier] and game.model.rubies == Chests.CRYSTALS[tier],"Upgrade adds reward reels and only its crystal difference")
+		check(game.chest.visible_reel_count() == Chests.COUNTS[tier] and game.model.blood_gems == Chests.CRYSTALS[tier],"Upgrade adds reward reels and only its crystal difference")
 		check(game.model.reward_rng.state == state and game.model.open_rewards == outcomes,"Stop timing leaves committed prizes and RNG untouched")
 		for i in range(game.chest.visible_reel_count()):
 			check(Rect2(Vector2.ZERO,game.fx.canvas_size).encloses(game.chest.reel_rect(i)),"Expanded reels remain inside viewport")
@@ -210,17 +210,17 @@ func scene_checks(script, portrait: bool) -> void:
 	for i in range(outcomes.size()): check(game.chest._symbol_at(i,roundi(game.chest.travel(i))) == game.chest.rewards[i],"Each stopped reel shows its locked prize")
 	tap(game,game.chest.skip_rect().get_center())
 	await frame_until(func(): return game.wave_chest.phase == "after")
-	check(game.model.rubies == 100 and not game.model.wave_reward_resolved,"Wave chest leaves optional purchase screen")
+	check(game.model.blood_gems == 100 and not game.model.wave_reward_resolved,"Wave chest leaves optional purchase screen")
 	await capture(label+"-purchase")
 	tap(game,game.wave_chest.tarot_rect().get_center())
-	check(game.model.rubies == 70 and game.tarot_ui.ceremony.active(),"Purchase opens existing tarot ceremony")
+	check(game.model.blood_gems == 70 and game.tarot_ui.ceremony.active(),"Purchase opens existing tarot ceremony")
 	# Complete through the model + ceremony signal adapter, retaining the existing ceremony tests.
 	game.tarot_ui._collect(0)
 	game.tarot_ui.ceremony.reset()
 	check(game.model.tarots.items.size() == 1 and not game.model.can_buy_wave_tarot(),"Paid tarot is kept, second purchase blocked")
 	tap(game,game.wave_chest.action_rect().get_center())
 	await frame_until(func(): return game.model.stage == 1,12)
-	check(game.model.rubies == 70 and not game.wave_chest.visible,"Continue advances once with balance preserved")
+	check(game.model.blood_gems == 70 and not game.wave_chest.visible,"Continue advances once with balance preserved")
 	game._restart()
 	check(not game.wave_chest.visible and game.crystal_pickup.pending_total == 0,"Restart clears presentation")
 	game.chest.set_process(false)
@@ -237,7 +237,7 @@ func scene_checks(script, portrait: bool) -> void:
 		game.chest._process(3)
 		check(not game.chest.active and game.chest.roll_phase == "complete" and game.chest.tier == target,"First failed upgrade settles the reward reels at the locked tier")
 		check(game.model.reward_rng.state == reward_state,"Stop never consumes reward RNG")
-		check(game.model.rubies == Chests.CRYSTALS[target],"Failed upgrade keeps the correct total payout")
+		check(game.model.blood_gems == Chests.CRYSTALS[target],"Failed upgrade keeps the correct total payout")
 		game._restart()
 	game._restart()
 	game.free()

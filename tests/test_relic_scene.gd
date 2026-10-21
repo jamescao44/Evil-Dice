@@ -219,11 +219,11 @@ func run() -> void:
 	game._handle_click(game.relic_ui.slot_rect(2).get_center())
 	await until_phase("ready")
 	check(game.model.relics.items[2].id == "contract" and game.model.relics.items.size() == 10,"Replacement preserves position and slot limit")
-	var rubies: int = game.model.rubies
+	var rubies: int = game.model.blood_gems
 	await open_test_chest(["bloodstone"])
 	game._handle_click(game.chest.skip_rect().get_center())
 	await until_phase("ready")
-	check(game.model.rubies == rubies+30,"Skipping gifts retains the normal chest crystal payout")
+	check(game.model.blood_gems == rubies+30,"Skipping gifts retains the normal chest crystal payout")
 	game.model.reroll_progress = 15
 	game.model.reward_weights = [0,1,0,0,0,0,0]
 	game._reward_sequence()

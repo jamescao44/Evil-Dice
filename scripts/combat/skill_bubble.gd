@@ -11,6 +11,7 @@ var roll: MultiHitSkill = MultiHitSkill.new()
 var age: float = 0
 var formation: float = 0.45
 var rotation_clock: float = 0
+var aim_dock: float = 0
 var entrance_speed: float = 1
 var converge: float = 0.32
 const RISE := 0.26
@@ -36,6 +37,7 @@ func _ready() -> void:
 	z_index = 40
 
 func begin(value: MultiHitSkill) -> void:
+	aim_dock = 0
 	drag_feedback.reset()
 	slam_age = SLAM_DURATION
 	roll = value.duplicate(true)
@@ -52,6 +54,7 @@ func begin(value: MultiHitSkill) -> void:
 	fragments.clear()
 
 func clear() -> void:
+	aim_dock = 0
 	drag_feedback.reset()
 	slam_age = SLAM_DURATION
 	roll = MultiHitSkill.new()
@@ -149,6 +152,8 @@ func center_at() -> Vector2:
 	var start: Vector2 = battle.DICE_CENTER
 	var reveal: Vector2 = battle._skill_reveal_point()
 	var rest: Vector2 = battle._skill_rest_point()
+	# Dock an aimed landscape skill below the arena so it cannot cover a target.
+	rest = rest.lerp(Vector2(rest.x,battle.DICE_CENTER.y-40),smoothstep(0,1,aim_dock))
 	if t < converge: return start
 	if t < converge+RISE:
 		return start.lerp(reveal, 1-pow(1-clampf((t-converge)/RISE,0,1),3))
@@ -173,6 +178,8 @@ func _process(delta: float) -> void:
 	# Once taken out, the saved skill still plays its cast and dissolve effects.
 	var locked_saved: bool = stored and not is_casting() and not battle._can_use_saved()
 	if not battle._menus_open():
+		var docking: bool = not stored and selected and battle.view_phase == "targeting" and battle._skill_needs_target(roll) and battle.fx.canvas_size.x > battle.fx.canvas_size.y
+		aim_dock = move_toward(aim_dock,1.0 if docking else 0.0,delta/0.24)
 		drag_feedback.advance(delta,is_dragging(),battle.ARENA.has_point(battle.skill_pointer),battle.reduced)
 		age += delta
 		if not locked_saved: rotation_clock += delta * battle._world_time_scale()
@@ -199,7 +206,7 @@ func _draw() -> void:
 	var at: Vector2 = display_center()
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	var radius: float = display_radius()
-	var color: Color = [battle.CREAM,battle.TEAL,battle.PURPLE,battle.GOLD][roll.kind]
+	var color: Color = battle.PatternStyle.color(roll)
 	if dissolving:
 		_draw_dissolve(at,radius,color)
 		return
@@ -278,7 +285,6 @@ func value_text() -> String:
 	var held: bool = battle.view_phase == "skill" and not stored
 	if not selected and not (held and not battle._skill_needs_target(roll)): return ""
 	if Rules.is_attack(roll): return battle.model.damage_caption(roll, battle.hover_target if selected else -1)
-	if roll.pattern == "straight": return GameText.format("+%d SHIELD",roundi(Rules.Patterns.shield_points(roll)*battle.model.tarot_effects.skill_factor(roll)))
 	if roll.face == 2 and roll.kind == Rules.Kind.SPECIAL:
 		if battle.model.status_count(battle.Status.DARKNESS) > 0: return "+0 HP"
 		return "+%d HP" % maxi(0, battle.model.max_hp-battle.model.hp)
@@ -332,9 +338,12 @@ func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, col
 	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font)
 
 func _draw_target(target: int, selected: bool, color: Color) -> void:
-	DragFeedback.paint_target(self,battle._target_rect(target),selected,color,battle.fx.canvas_size.y > battle.fx.canvas_size.x)
+	battle._draw_target_indicator(self,target,selected,color)
 
 func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
+	if roll.pattern == "straight":
+		preload("res://scripts/effects/flame_spell.gd").icon(self,at,side,roll.dice.size()-2,tint.a)
+		return
 	if roll.is_freeze():
 		preload("res://scripts/status/status_paint.gd").icon(self,at,side*0.43,"ice",Color("82dfff",tint.a))
 		return

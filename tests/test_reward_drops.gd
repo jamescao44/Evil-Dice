@@ -96,7 +96,7 @@ func chest_distribution_checks() -> void:
 		frequency(categories[category],SAMPLES,Rewards.DEFAULT_WEIGHTS[category]/100,"Chest category probability stays independent of catalog size")
 	for retired in Rewards.RETIRED_CATEGORIES:
 		check(categories[retired] == 0,"Removed category never drops")
-		var forced: Array = [0,0,0,0,0,0,0]
+		var forced: Array = [0,0,0,0,0,0,0,0]
 		forced[retired] = 1
 		for i in range(100): check(Rewards.draw_category(model.reward_rng,forced) not in Rewards.RETIRED_CATEGORIES,"Custom weights cannot restore removed rewards")
 	check(rarities.reduce(func(a,b): return a+b,0) == categories[Rewards.Category.RELIC],"Relic category gives a real relic")
@@ -121,7 +121,7 @@ func presentation_checks() -> void:
 	for sequence in chest.sequences:
 		var rolling: Array = sequence.slice(0,chest.reel_steps)
 		for category in [Rewards.Category.SHARD,Rewards.Category.TAROT]:
-			check(category in rolling,"Every reel shows shards and tarot regardless of the winning category")
+			check(category not in rolling,"Reels no longer show shards or tarot")
 		for id in Relics.ITEMS:
 			check((chest.relic_symbols[id] in rolling) == (id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false)),"Every obtainable relic appears; suspended and fusion-only relics stay out")
 		for index in sequence:

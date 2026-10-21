@@ -1,0 +1,6 @@
+Flamelings by surt (2012), CC0.
+https://opengameart.org/content/flamelings
+https://creativecommons.org/publicdomain/zero/1.0/
+Levels 2–4: extracted original sprites, background removed, nearest-neighbor fit into transparent 128x128 grounded canvases. Original artwork uses the DawnBringer 16-color palette.
+Level 1: original AI-generated ember starter, made with the built-in image generation tool using the Flamelings set as a visual reference; fitted to the same canvas.
+Prompt: Small round charcoal ember imp, tiny feet, warm bright eyes, mischievous mouth and yellow-orange flame; simpler pre-evolution of the smallest Flamelings creature, facing right, dark outlined pixel clusters, reference palette, no arms or armor, transparent background.

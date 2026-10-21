@@ -34,7 +34,7 @@ func run() -> void:
 	game.model._load_wave()
 	game.visual_stage = 8
 	game.model.reroll_progress = 2
-	game.model.rubies = 300
+	game.model.blood_gems = 300
 	game.model.summon_shards = 4
 	game.model.reroll_progress = 7
 	game.monster_side = 320

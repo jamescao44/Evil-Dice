@@ -3,7 +3,6 @@ extends Node2D
 const Catalog = preload("res://scripts/tarot/tarot_catalog.gd")
 const Paint = preload("res://scripts/tarot/tarot_paint.gd")
 const STATUS_STEP_INTERVAL := 0.12
-const Relics = preload("res://scripts/relics/relic_catalog.gd")
 var battle
 var busy: bool = false
 var choice_type: String = ""
@@ -48,6 +47,23 @@ func request(card: int, point: Vector2, from: Vector2) -> void:
 	battle.tarot_ui.inspected = -1
 	battle.tarot_ui.cancel_gesture()
 	if choice_type.is_empty(): _cast({"target":target})
+	elif choice_type == "replace": battle.inventory_page.open("tarot")
+	queue_redraw()
+
+## Cancel an uncommitted choice without consuming its card or rerolling its reward.
+func cancel_choice() -> void:
+	if busy or choice_type.is_empty(): return
+	var cancelled_id: int = instance_id
+	choice_type = ""
+	prepared.clear()
+	instance_id = -1
+	battle.tarot_ui.cancel_gesture()
+	battle.tarot_ui.swallow_release = true
+	if cancelled_id < 0:
+		battle.model.tarot_effects.dismiss_repeat()
+		_finish_cast()
+	else:
+		battle.tarot_ui.focus_instance(cancelled_id)
 	queue_redraw()
 
 func message(value: String) -> void:
@@ -66,7 +82,7 @@ func cancel_rect() -> Rect2:
 
 func cell_rect(index: int, columns: int, rows: int) -> Rect2:
 	var panel: Rect2 = panel_rect()
-	var top: float = (286 if portrait() else 186) if choice_type == "replace" else (156 if portrait() else 112)
+	var top: float = 156 if portrait() else 112
 	var area := Rect2(panel.position+Vector2(24,top),Vector2(panel.size.x-48,panel.size.y-top-98))
 	var cell := Vector2(area.size.x/columns,area.size.y/rows)
 	return Rect2(area.position+Vector2(index%columns,index/columns)*cell+Vector2(4,4),cell-Vector2(8,8))
@@ -77,13 +93,11 @@ func options() -> Array:
 func click(point: Vector2) -> bool:
 	if busy: return true
 	if choice_type.is_empty(): return false
+	if choice_type == "replace":
+		battle.inventory_page.open("tarot")
+		return true
 	if cancel_rect().has_point(point):
-		choice_type = ""
-		battle.tarot_ui.swallow_release = true
-		if instance_id < 0:
-			battle.model.tarot_effects.dismiss_repeat()
-			_finish_cast()
-		queue_redraw()
+		cancel_choice()
 		return true
 	match choice_type:
 		"repeat_target":
@@ -103,11 +117,6 @@ func click(point: Vector2) -> bool:
 			for i in range(ids.size()):
 				if cell_rect(i,columns,ceili(ids.size()/float(columns))).has_point(point):
 					_cast({"ban":ids[i]})
-					break
-		"replace":
-			for i in range(battle.model.relics.items.size()):
-				if cell_rect(i,2,5).has_point(point):
-					_cast({"replace":i})
 					break
 	queue_redraw()
 	return true
@@ -132,10 +141,9 @@ func _cast(selection: Dictionary) -> void:
 		var target: Vector2 = battle._player_point() if event.target == -1 else battle.CITY_POINT if event.target == -2 else battle._enemy_impact_point(event.target)
 		if target not in targets: targets.append(target)
 	if targets.is_empty(): targets.append(battle._player_point())
-	battle.fx.cast(3,drop_point,targets,0.35)
+	battle.fx.cast(3,drop_point,targets,0.35,true)
 	battle._sound("item/bell",1.2,-14)
 	battle._show_events(result.events)
-	battle._sync_corpses()
 	if not result.relic.is_empty(): battle.relic_ui.collect(result.relic,drop_point,50,previous_ids)
 	if result.id == "fool":
 		for item in battle.model.relics.items: battle.model.relic_activated.emit(item.id)
@@ -177,6 +185,7 @@ func _continue_repeat() -> bool:
 			return true
 	values = [1,1,1]
 	battle.tarot_ui.cast_visual.clear()
+	if choice_type == "replace": battle.inventory_page.open("tarot")
 	queue_redraw()
 	return true
 
@@ -243,20 +252,20 @@ func _label(rect: Rect2, title: String, selected: bool = false, size: int = 22) 
 	Paint.wrap(self,battle.description_font,rect.grow(-8),title,size,Paint.GOLD,true)
 
 func _draw() -> void:
+	if choice_type == "replace": return # The shared backpack owns this choice and its detail page.
 	if choice_type == "repeat_target":
 		var prompt := Rect2(62,1040,680,110) if portrait() else Rect2(340,560,600,80)
 		Paint.panel(self,prompt,Color("211f29"),Paint.GOLD)
 		Paint.wrap(self,battle.description_font,prompt.grow(-12),"Ancient Prophecy: choose another enemy.",26 if portrait() else 20,Paint.GOLD,true)
 		for target in battle.model.attack_targets():
-			var at: Vector2 = battle._enemy_impact_point(target)
-			draw_arc(at,48 if portrait() else 32,0,TAU,32,Paint.GOLD,3)
+			battle._draw_target_indicator(self,target,battle._target_at(battle._pointer_position()) == target,Paint.GOLD)
 		_label(cancel_rect(),"Skip repeat")
 		return
 	if not choice_type.is_empty():
 		draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.025,0.04,0.68))
 		var panel: Rect2 = panel_rect()
 		Paint.panel(self,panel,Color("211f29"),Color("807889"))
-		var title: String = {"magician":"Choose the next three dice","lovers":"Choose odd or even","hanged_man":"Exclude one tarot from future draws","replace":"Choose a relic to replace"}.get(choice_type,"")
+		var title: String = {"magician":"Choose the next three dice","lovers":"Choose odd or even","hanged_man":"Exclude one tarot from future draws"}.get(choice_type,"")
 		if instance_id < 0: title = GameText.text("Ancient Prophecy")+"\n"+GameText.text(title)
 		var title_size: int = (25 if portrait() else 20) if instance_id < 0 else (30 if portrait() else 25)
 		Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(24,20),Vector2(panel.size.x-48,100)),title,title_size,Paint.GOLD,true)
@@ -271,10 +280,6 @@ func _draw() -> void:
 				var ids: Array = options()
 				var columns: int = 4 if portrait() else 6
 				for i in range(ids.size()): _label(cell_rect(i,columns,ceili(ids.size()/float(columns))),Catalog.ITEMS[ids[i]].name,false,22 if portrait() else 17)
-			"replace":
-				Paint.text(self,battle.description_font,panel.position+Vector2(panel.size.x/2,124 if portrait() else 91),Relics.ITEMS[prepared.relic].name,24 if portrait() else 20,Relics.rarity_color(prepared.relic))
-				Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(28,150 if portrait() else 112),Vector2(panel.size.x-56,122 if portrait() else 66)),Relics.ITEMS[prepared.relic].text,24 if portrait() else 18,Color("eee0d6"),true)
-				for i in range(battle.model.relics.items.size()): _label(cell_rect(i,2,5),Relics.ITEMS[battle.model.relics.items[i].id].name,false,24 if portrait() else 18)
 		_label(cancel_rect(),"Skip repeat" if instance_id < 0 else "Cancel")
 	if notice_time > 0:
 		var rect := Rect2(62,1000,680,140) if portrait() else Rect2(340,348,600,100)

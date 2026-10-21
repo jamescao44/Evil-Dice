@@ -61,7 +61,7 @@ func enqueue_chest(origin: Vector2, amount: int) -> void:
 		var ground := origin+Vector2(rng.randf_range(-spread,spread),rng.randf_range(-35,90 if portrait else 42))
 		ground = ground.clamp(Vector2(30,30),battle.fx.canvas_size-Vector2(30,30))
 		var share: int = floori(float(amount)*(i+1)/count)-floori(float(amount)*i/count)
-		gems.append({"origin":origin-Vector2(0,35),"impact":origin.lerp(ground,0.72),"ground":ground,"age":0.0,"delay":i*0.028,"amount":share,"spin":rng.randf_range(-0.9,0.9),"height":rng.randf_range(110,240) if portrait else rng.randf_range(65,140),"side":rng.randf_range(25,40) if portrait else rng.randf_range(19,30)})
+		gems.append({"origin":origin-Vector2(0,35),"impact":origin.lerp(ground,0.72),"ground":ground,"age":0.0,"delay":i*0.008,"speed":1.6,"amount":share,"spin":rng.randf_range(-0.9,0.9),"height":rng.randf_range(110,240) if portrait else rng.randf_range(65,140),"side":rng.randf_range(25,40) if portrait else rng.randf_range(19,30)})
 	pending_total += amount
 	battle._sound("enemy/crystal_drop",0.85,-8)
 	queue_redraw()
@@ -105,7 +105,7 @@ func advance(delta: float) -> void:
 	collect_cooldown = maxf(0,collect_cooldown-delta)
 	var remaining: Array = []
 	for gem in gems:
-		gem.age += delta
+		gem.age += delta*gem.get("speed",1.0)
 		if gem.age >= FLIGHT_START+gem.delay+FLIGHT_TIME:
 			pending_total -= gem.amount
 			pulse = 0.24

@@ -11,7 +11,7 @@ func _process(_delta: float) -> void:
 	queue_redraw()
 
 func focus_rect(index: int) -> Rect2:
-	var side: float = battle._enemy_side()
+	var side: float = battle._enemy_side()*battle.battlefield_view.zoom
 	var feet: Vector2 = battle._enemy_feet(index)
 	var sprite := Rect2(feet-Vector2(side*0.64,side*1.25),Vector2(side*1.28,side*1.3))
 	var health: Rect2 = battle._enemy_health_rect(index)
