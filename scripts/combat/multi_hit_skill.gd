@@ -73,9 +73,9 @@ func consume_use() -> bool:
 func has_use_orbs(additional_modifiers: Dictionary = {}) -> bool:
 	return use_count(additional_modifiers) > 1
 
-## Combo relics apply to matching attacks, independently of targeting style.
+## Rolled auto-attacks are separate from skills eligible for multi-hit relics.
 func is_combo_attack() -> bool:
-	return pattern in ["match","match_auto"] or (pattern.is_empty() and random_target_per_use())
+	return pattern == "match" or (pattern.is_empty() and random_target_per_use())
 
 func random_target_per_use() -> bool:
 	if not pattern.is_empty(): return pattern == "match_auto"

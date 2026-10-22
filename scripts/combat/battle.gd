@@ -1320,9 +1320,12 @@ func _resolve_roll_triggers(token: int) -> bool:
 			for index in group.indices:
 				dice[index].auto_attack_active = true
 				dice[index].pulse_auto_attack()
+			# Let the matching group bounce before the player starts firing.
+			if not await _wait(0.24,token): return false
 		var firing_die = dice[group.indices[auto.uses_spent % group.indices.size()]]
 		firing_die.pulse_auto_attack()
-		var origin: Vector2 = firing_die.position
+		var origin: Vector2 = _player_point()
+		combat_motion.attack(-1)
 		var destination: Vector2 = _enemy_impact_point(target)
 		var hit_speed: float = minf(MULTI_HIT_SPEED_CAP,1.0+auto.uses_spent*MULTI_HIT_SPEED_GAIN)
 		var damage: int = model.attack_damage(auto,target)
@@ -1486,6 +1489,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 			var duration: float = 0.18 if count > 1 else 1.6 if kind == Rules.Kind.ULTIMATE else 0.7 if kind >= Rules.Kind.SPECIAL else 0.38
 			if flame_tier > 0: duration = [0.0,0.46,0.57,0.78,1.1][flame_tier]
 			duration /= hit_speed
+			combat_motion.attack(-1)
 			if flame_tier > 0: fx.flame_cast(flame_tier,_player_point(),targets,duration/_roll_speed(),damages)
 			else: fx.cast(face, _player_point(), targets, duration / _roll_speed(),true,true)
 			var world_impacts: Array = targets.map(func(point): return battlefield_view.transform.affine_inverse()*point)
@@ -1542,6 +1546,7 @@ func _enemy_phase() -> void:
 			var immobilized: bool = model.enemy_cannot_act(i) and human.get("action_hit",0) == 0
 			var attacking: bool = human.intent.get("type","") == "attack"
 			if not human.canceled and model.status_count(Status.HIDDEN) == 0 and not immobilized and attacking:
+				combat_motion.attack(i)
 				fx.enemy_cast(human.role,_enemy_point(i),_player_point(),0.22/speed,human.intent.get("attribute",Status.Attribute.NONE))
 				_sound("enemy/bell" if human.role in [2,4] else "enemy/slash",1.4,-17)
 				if not await _wait(0.18,token): return
@@ -2181,6 +2186,7 @@ func _draw_player() -> void:
 func _draw_player_actor(canvas: CanvasItem) -> void:
 	var hurt: float = hit_times[0]
 	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
+	bob += combat_motion.attack_bob(-1,monster_side,reduced)
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	_shadow(_player_world_feet(),monster_side*_player_growth_scale().x*0.48,0.27,canvas)
 	if model.shield > 0 or model.statuses[6].count > 0:
@@ -2198,6 +2204,7 @@ func _enemy_world_sprite_rect(index: int) -> Rect2:
 	var human: Dictionary = model.enemies[index]
 	var dx: float = combat_motion.offset(index,side,clock_time,model.enemy_cannot_act(index) or human.canceled,reduced)
 	var bob: float = 0 if reduced or model.enemy_cannot_act(index) else snappedf(sin(clock_time*2+index*2)*minf(2,side/64.0),2)
+	bob += combat_motion.attack_bob(index,side,reduced)
 	return Rect2(feet-Vector2(side/2,side)+Vector2(dx,bob),Vector2.ONE*side)
 
 ## Draw an enemy with elite lighting, motion, health, statuses and intent.

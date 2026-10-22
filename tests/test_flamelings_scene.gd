@@ -40,6 +40,13 @@ func scene(portrait: bool) -> void:
 		GameText.set_language(language,false)
 	g.debug_choice = 12
 	g._roll()
+	check(await until(func(): return g.dice[0].auto_attack_active),"Matching dice glow before the player attacks")
+	check(g.fx.feeds.is_empty() and g.model.roll_attacks[0].skill.uses_spent == 0,"Brief matching bounce has no charging orbs or early damage")
+	await capture("match-bounce-"+str(portrait))
+	check(await until(func(): return g.fx.spell.has("flame_tier")),"Player launches auto attack after the matching bounce")
+	check(g.fx.spell.from.distance_to(g._player_point()) < 1,"Auto attack launches from player instead of dice")
+	check(g.combat_motion.attacks.has(-1),"Player bobs when firing")
+	await capture("auto-"+str(portrait))
 	check(await until(func(): return g.view_phase == "ready"),"Roll attacks finish and restore dice interaction")
 	check(g.model.roll_attacks.is_empty() and g.model.dice_turn.locked.is_empty(),"All matching dice remain unlocked")
 	tap(g,g.DICE_POSITIONS[0])

@@ -102,7 +102,7 @@ func _initialize() -> void:
 	form(m,[0,1,2]); m.apply_player(0); form(m,[3,4,5]); m.apply_player(0)
 	check(m.bonus_turn_count == 1 and m.dice_turn.rolls_left == 3 and m.phase == "roll","Two straights using all dice still grant a bonus turn")
 	m = fresh(); m.acquire_relic("twin_scythes"); m.roll_pool(false,[2,2,3,4,5,6])
-	check(automatic(m).size() == 4,"Matching-hit relics retain their extra automatic hits")
+	check(automatic(m).size() == 2,"Auto-attacks do not receive multi-hit relic bonuses")
 	m = fresh(); m.enemies = [m.make_enemy(0)]; m.enemies[0].hp = 1
 	m.roll_pool(false,[6,6,6,6,6,6]); check(automatic(m).size() == 1,"Automatic attacks stop when no living target remains")
 	check(m.roll_attacks.is_empty() and not m.outcome().is_empty(),"Last automatic kill safely clears its queue")

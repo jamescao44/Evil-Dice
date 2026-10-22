@@ -145,7 +145,7 @@ func sprite_frame() -> int:
 func _draw() -> void:
 	var rejection: float = sin(rejection_age*90)*10*(rejection_age/0.28)
 	var bounce: float = auto_attack_bounce()
-	draw_set_transform(Vector2(rejection,-bounce*16),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x+bounce*0.22))
+	draw_set_transform(Vector2(rejection,-bounce*30),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x+bounce*0.36))
 	if auto_attack_active or auto_attack_pulse > 0: _draw_auto_attack_glow()
 	if connection_fire > 0: _draw_connection_fire()
 	if connection_glow:
@@ -162,13 +162,13 @@ func _draw() -> void:
 	if glow > 0.1:
 		draw_rect(Rect2(-53, -55, 106, 109), Color(tint, glow * 0.7), false, 3)
 	if auto_attack_active or auto_attack_pulse > 0:
-		draw_rect(Rect2(-53,-55,106,109),Color("fff4c6",(0.1 if auto_attack_active else 0.0)+auto_attack_pulse*0.3))
-		draw_rect(Rect2(-53,-55,106,109),Color("ffdc87",0.85*maxf(0.9 if auto_attack_active else 0.0,auto_attack_pulse/AUTO_ATTACK_PULSE_SECONDS)),false,3)
+		draw_rect(Rect2(-53,-55,106,109),Color("fff4c6",0.18 if auto_attack_active else auto_attack_pulse*0.3))
+		draw_rect(Rect2(-53,-55,106,109),Color("ffdc87",0.9 if auto_attack_active else 0.85*auto_attack_pulse/AUTO_ATTACK_PULSE_SECONDS),false,3)
 
 ## A layered amber halo distinguishes firing dice from idle selection hints.
 func _draw_auto_attack_glow() -> void:
 	var pulse: float = auto_attack_pulse/AUTO_ATTACK_PULSE_SECONDS
-	var strength: float = (0.65 if auto_attack_active else 0.0)+pulse*0.65
+	var strength: float = 1.0 if auto_attack_active else pulse*0.65
 	for spread in range(5,0,-1):
 		var extent: float = 54+spread*7
 		draw_rect(Rect2(-extent,-extent,extent*2,extent*2),Color("ffbb62",strength*0.035*(6-spread)))

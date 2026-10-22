@@ -317,12 +317,14 @@ func _draw_offer(slot: int) -> void:
 		_text(rect.get_center(),label,24,color if offer.kind == "soul_bottle" else Color("92888c"))
 		return
 	var artwork: Rect2 = offer_art_rect(slot)
-	if offer.kind == "relic":
-		if not (battle.relic_ui.pickup.active and selected == slot) and not (dragging and pressed_offer == slot): RelicPaint.paint(self,offer.id,artwork.get_center(),artwork.size.x/2,true)
-	elif offer.kind == "tarot":
-		draw_texture_rect(Cards.texture(offer.id),artwork,false,Color("d9cedd"))
-	else:
-		Icons.paint(self,battle.chest.art,"soul_bottle",artwork)
+	# Hide the shelf artwork for every item type while its held copy is drawn.
+	if not (dragging and pressed_offer == slot):
+		if offer.kind == "relic":
+			if not (battle.relic_ui.pickup.active and selected == slot): RelicPaint.paint(self,offer.id,artwork.get_center(),artwork.size.x/2,true)
+		elif offer.kind == "tarot":
+			draw_texture_rect(Cards.texture(offer.id),artwork,false,Color("d9cedd"))
+		else:
+			Icons.paint(self,battle.chest.art,"soul_bottle",artwork)
 	var label := offer_name(offer)
 	_wrap(offer_name_rect(slot),label,offer_name_size(slot,label),color,true)
 	_price(Vector2(rect.get_center().x,rect.end.y-(10 if portrait() else 14)),offer.price,battle.model.blood_gems >= offer.price)
