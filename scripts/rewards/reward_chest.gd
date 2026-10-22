@@ -110,6 +110,7 @@ func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = fals
 	celebrations.clear()
 	landing_bursts.clear()
 	sequences.clear()
+	_refresh_scroll_symbols()
 	reel_steps = maxi(REEL_STEPS,scroll_symbols.size())
 	for outcome in rewards:
 		var sequence: Array = _scroll_sequence()
@@ -147,7 +148,20 @@ func _start_rolling_audio() -> void:
 	audio.start_rolling(tier)
 	_sync_audio()
 
-## Build cosmetic reels from every obtainable item independently of prize odds.
+## Refresh cosmetic eligibility for each chest, including stackable owned relics.
+func _refresh_scroll_symbols() -> void:
+	scroll_symbols.clear()
+	for id in relic_symbols:
+		if id in Relics.DISABLED or Relics.ITEMS[id].get("fusion",false): continue
+		if is_instance_valid(battle) and battle.model.relics.has(id): continue
+		scroll_symbols.append(relic_symbols[id])
+
+## Choose cosmetic filler that differs from both adjacent symbols.
+func _different_symbol(left: int, right: int) -> int:
+	var choices: Array = scroll_symbols.filter(func(symbol): return symbol != left and symbol != right)
+	return choices[cosmetic.randi_range(0,choices.size()-1)] if not choices.is_empty() else -1
+
+## Build cosmetic reels from every unowned obtainable item independently of prize odds.
 func _scroll_sequence() -> Array:
 	# Every obtainable reward gets screen time, independent of the locked winner
 	# and its drop odds. Each cosmetic bag is exhausted before any item repeats.
@@ -158,6 +172,16 @@ func _scroll_sequence() -> Array:
 			var index: int = cosmetic.randi_range(0,bag.size()-1)
 			if not sequence.is_empty() and bag.size() > 1 and bag[index] == sequence[-1]: index = (index+1)%bag.size()
 			sequence.append(bag.pop_at(index))
+	# Keep the looping seam distinct without removing any item from the first bag.
+	if sequence[reel_steps-1] == sequence[0]:
+		for i in range(1,reel_steps-2):
+			var last: int = sequence[reel_steps-1]
+			if sequence[i] != sequence[0] and sequence[i] != sequence[reel_steps-2] and last != sequence[i-1] and last != sequence[i+1]:
+				sequence[reel_steps-1] = sequence[i]
+				sequence[i] = last
+				break
+	# Padding follows the same loop, including the seam.
+	for i in range(reel_steps,sequence.size()): sequence[i] = sequence[i-reel_steps]
 	return sequence
 
 func cancel() -> void:
@@ -269,6 +293,10 @@ func _begin_settle(at: float) -> void:
 		var sequence: Array = []
 		for row in range(end+4): sequence.append(_symbol_at(reel,row))
 		sequence[end] = rewards[reel]
+		# Preserve the locked prize; repair only its cosmetic neighbors.
+		for neighbor in [end-1,end+1]:
+			if sequence[neighbor] == rewards[reel]:
+				sequence[neighbor] = _different_symbol(sequence[neighbor-1],sequence[neighbor+1])
 		sequences[reel] = sequence
 	reel_steps = end
 	settle_started = at

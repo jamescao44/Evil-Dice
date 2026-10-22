@@ -54,7 +54,7 @@ func _initialize() -> void:
 		counts[Catalog.ITEMS[offers[0]].rarity] += 1
 		for id in offers: check(not Catalog.ITEMS[id].get("fusion",false),"Fusion relics never drop directly")
 	for tier in range(5): check(absf(counts[tier]/120.0-Catalog.RARITY_WEIGHTS[tier]) < 1.5,"Drop rarity matches specified probability")
-	check(Catalog.ITEMS.size() == 53,"All 53 relic definitions exist")
+	check(Catalog.ITEMS.size() == 60,"All 60 relic definitions exist")
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","codex_page"]:
 		check(m.acquire_relic(id),"Acquire " + id)
 	check(not m.acquire_relic("heart"),"Relics are unique")

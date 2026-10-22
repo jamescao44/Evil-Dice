@@ -51,9 +51,12 @@ func request(card: int, point: Vector2, from: Vector2) -> void:
 	elif choice_type == "replace": battle.inventory_page.open("tarot")
 	queue_redraw()
 
-## Cancel an uncommitted choice without consuming its card or rerolling its reward.
+## Cancel choices; already-consumed relic cards decline their pending reward.
 func cancel_choice() -> void:
 	if busy or choice_type.is_empty(): return
+	if choice_type == "replace" and battle.model.tarot_effects.committed_grants.has(instance_id):
+		_cast({"discard":true})
+		return
 	var cancelled_id: int = instance_id
 	choice_type = ""
 	prepared.clear()
@@ -168,6 +171,8 @@ func _cast(selection: Dictionary) -> void:
 			battle.fx.z_index = 0
 		return
 	if result.get("reroll",false):
+		battle._clear_skill()
+		battle.dice_selection.cancel_gesture()
 		battle.tarot_ui.close_inventory()
 		battle.view_phase = "ready"
 		await battle._roll(0,false,true)

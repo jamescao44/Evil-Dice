@@ -38,6 +38,13 @@ func scene(portrait: bool) -> void:
 			await capture("guide-"+locale+"-"+str(portrait))
 		g.guide = false
 		GameText.set_language(language,false)
+	var previous_phase: String = g.view_phase
+	g.view_phase = "transition"
+	g.travel_progress = 0.2
+	var anchor: Vector2 = g._character_counter_center()
+	g.travel_progress = 0.65
+	check(g._character_counter_center().is_equal_approx(anchor),"Counter ignores advancing stretch and bounce")
+	g.view_phase = previous_phase
 	g.debug_choice = 12
 	g._roll()
 	check(await until(func(): return g.dice[0].auto_attack_active),"Matching dice glow before the player attacks")
@@ -54,12 +61,25 @@ func scene(portrait: bool) -> void:
 	# Begin a controlled straight roll after the automatic-only throw.
 	g.debug_choice = 0; g._roll()
 	check(await until(func(): return g.view_phase == "ready"),"Straight roll returns to selection")
+	tap(g,g.DICE_POSITIONS[0])
+	tap(g,g.dice_selection.cancel_rect().get_center())
+	check(g.model.dice_turn.selected.is_empty(),"Raised Deselect clears tapped dice")
 	for i in range(3): tap(g,g.DICE_POSITIONS[i])
 	check(g.dice_selection.preview.dice.size() == 3,"Three connected dice preview Fireball")
 	await capture("selection-"+str(portrait))
 	tap(g,g.DICE_CENTER)
 	check(await until(func(): return g.view_phase == "skill"),"OK summons Fireball")
 	check(g._skill_needs_target() and g.skill_bubble.caption.name == "Fireball","Fireball shows its name and asks for a target")
+	var rolls_before: int = g.model.dice_turn.rolls_left
+	var start: Vector2 = g.skill_bubble.display_center()
+	var drop := Vector2(g.fx.canvas_size.x-12,g.DICE_CENTER.y+24)
+	check(not g.dice_selection.center_hit(drop) and g.dice_selection.skill_cancel_rect().has_point(drop),"Cancel zone spans beyond the old center target")
+	g._handle_click(start); g._handle_motion(drop); g._handle_release(drop)
+	check(g.model.pending.is_empty() and g.model.dice_turn.locked.is_empty(),"Wide-zone drop cancels and unlocks skill dice")
+	check(g.model.dice_turn.rolls_left == rolls_before,"Cancellation preserves remaining throws")
+	for i in range(3): tap(g,g.DICE_POSITIONS[i])
+	tap(g,g.DICE_CENTER)
+	check(await until(func(): return g.view_phase == "skill"),"Reformed Fireball is ready")
 	g._activate_skill(0)
 	check(await until(func(): return g.fx.spell.has("flame_tier")),"Fireball uses new flame visuals")
 	check(is_equal_approx(g.fx.spell.scales[0],g.Effects.damage_scale(g.model.attack_damage(g.model.pending,0))),"Fireball visual scale follows its actual target damage")

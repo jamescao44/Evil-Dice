@@ -12,6 +12,7 @@ var face: int = 1
 var final_face: int = 1
 var rolling: bool = false
 var elapsed: float = 0.0
+const ROLL_PLAYBACK_SPEED := 0.75
 var duration: float = 1.0
 var reveal_order: int = 0
 var glow: float = 0.0
@@ -87,7 +88,7 @@ func roll_to(value: int, order: int, speed: float, power: float = 0.0, perfect: 
 	final_face = value
 	reveal_order = order
 	var roll_seconds := 0.82 if perfect else 0.55+throw_power*0.15+order*0.055
-	duration = roll_seconds / speed
+	duration = roll_seconds / (speed*ROLL_PLAYBACK_SPEED) # Slow travel, spin and frame playback together.
 	roll_motion.begin(cosmetic,resting,roll_center if roll_radius > 0 else resting,roll_radius if roll_radius > 0 else 64,roll_seconds,throw_power,perfect)
 	elapsed = 0
 	rolling = true

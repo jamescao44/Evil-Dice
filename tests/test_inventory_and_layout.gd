@@ -148,6 +148,17 @@ func chest_inventory(g, label: String) -> void:
 	tap(g,g.inventory_page.replace_rect().get_center())
 	check(not g.inventory_page.opened and g.model.relics.items[2].id == "contract" and g.model.claimed_slots == [0],"Explicit item-page confirmation replaces once")
 	check(g.model.reward_rng.state == rng_before,"Inventory never rerolls a chest")
+	g.relic_ui.pickup.clear()
+	g.model.claimed_slots.clear(); g.chest.collected.clear()
+	g.model.chest_relics = {0:"runestone"}
+	g.relic_ui.chest_slot = 0
+	g.inventory_page.open("chest")
+	var owned: Array = g.model.relics.items.duplicate(true)
+	check(Rect2(Vector2.ZERO,g.fx.canvas_size).encloses(g.inventory_page.discard_rect()),"Discard remains within the viewport")
+	tap(g,g.inventory_page.discard_rect().get_center())
+	check(not g.inventory_page.opened and g.model.claimed_slots == [0] and g.chest.collected == [0],"Discard resolves just the incoming chest prize")
+	check(g.model.relics.items == owned and not g.relic_ui.pickup.active,"Discard keeps every owned item and creates no pickup")
+	check(g.model.reward_rng.state == rng_before and g.relic_ui.chest_slot == -1,"Discard does not reroll or retain a stale replacement")
 	g._restart()
 
 ## Run on both real scene variants and preserve the user's language preference.

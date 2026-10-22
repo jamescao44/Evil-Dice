@@ -1,4 +1,5 @@
 extends RefCounted
+const RelicRollRules = preload("res://scripts/relics/relic_roll_rules.gd")
 ## Deterministic battle model. Rendering and cosmetic randomness never alter it.
 signal relic_activated(id: String)
 const Weighted = preload("res://scripts/shared/weighted_choice.gd")
@@ -10,6 +11,8 @@ const RelicEffects = preload("res://scripts/relics/relic_effects.gd")
 const AreaAttack = preload("res://scripts/combat/area_attack.gd")
 const TarotEffects = preload("res://scripts/tarot/tarot_effects.gd")
 var tarot_effects = TarotEffects.new()
+const FlamelingsPassive = preload("res://scripts/combat/flamelings_passive.gd")
+var character_passive = FlamelingsPassive.new()
 const CharacterSkills = preload("res://scripts/combat/flamelings_skills.gd")
 const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 const SAVED_SKILLS_ENABLED := false
@@ -87,6 +90,7 @@ func _init(seed_value: int = -1) -> void:
 	reset()
 
 func reset() -> void:
+	character_passive = FlamelingsPassive.new()
 	tarot_effects = TarotEffects.new()
 	dice_turn = DiceTurn.new()
 	skill_dice_indices.clear()
@@ -245,6 +249,7 @@ func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false) ->
 	perfect = perfect or forces_perfect()
 	var changed: Array = dice_turn.roll(rng, perfect, forced, free)
 	if changed.is_empty(): return []
+	RelicRollRules.apply(self,changed)
 	tarot_effects.modify_pool(self,changed)
 	tarot_effects.star_throws = maxi(0,tarot_effects.star_throws-1)
 	record_perfect(perfect)
@@ -489,6 +494,7 @@ func begin_player_cast(primary: int = -1) -> bool:
 		pending.target = primary
 	_commit_formed_skill()
 	pending.begin_cast(skill_modifiers_for(pending))
+	character_passive.on_cast(pending)
 	if pending.is_attack() and not is_instant_kill(pending): tarot_effects.extra_uses = 0
 	if pending.pattern != "cleanup": tarot_effects.begin_skill(pending)
 	if pending.is_attack(): statuses[Status.HIDDEN].count = 0
@@ -507,7 +513,7 @@ func boon_turns(face: int) -> int:
 
 ## Get the skill’s base damage with current flat relic bonuses.
 func attack_base(result: MultiHitSkill) -> float:
-	return attack_base_with_bonus(result,relic_base_damage())*tarot_effects.skill_factor(result)
+	return (attack_base_with_bonus(result,relic_base_damage())+RelicEffects.auto_damage(relics.items,result))*tarot_effects.skill_factor(result)
 
 func regular_base_damage() -> float:
 	return (REGULAR_ATTACK_POWER + reward_base_damage * DAMAGE_PER_PIP)*character_damage_factor()
@@ -574,11 +580,13 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 	if status_count(Status.DARKNESS) > 0: value *= 0.5
 	var strength_factor: float = tarot_effects.skill_factor(result)
 	var base_bonus: float = 0
+	var auto_bonus: float = 0
 	for step in steps:
 		if step.source == "skill": continue
 		step.base_before = base
 		base_bonus += step.get("base_bonus",0.0)
-		base = attack_base_with_bonus(result,base_bonus)
+		auto_bonus += step.get("auto_bonus",0.0)
+		base = attack_base_with_bonus(result,base_bonus)+auto_bonus
 		step.base_after = base
 		if not is_equal_approx(step.base_before,base):
 			step.note = "+%s BASE"
@@ -590,7 +598,7 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 	return steps
 
 func cast_damage_multiplier(result: MultiHitSkill) -> float:
-	return damage_multiplier(result)*(RelicEffects.CRITICAL_FACTOR if result.critical else 1.0)
+	return damage_multiplier(result)
 
 func is_instant_kill(result: MultiHitSkill) -> bool:
 	return result.kind == Kind.ULTIMATE or (result.pattern.is_empty() and result.kind == Kind.SPECIAL and result.face == 1)
@@ -598,7 +606,9 @@ func is_instant_kill(result: MultiHitSkill) -> bool:
 ## Keep fractional damage until target-specific bonuses have been applied.
 func raw_attack_damage(result: MultiHitSkill) -> float:
 	var critical: bool = result.critical or (result.pattern != "match_auto" and phase != "executing" and RelicEffects.has_critical(relics.items))
-	return attack_base(result)*damage_multiplier(result)*(RelicEffects.CRITICAL_FACTOR if critical else 1.0)
+	var evaluated: MultiHitSkill = result.duplicate(true)
+	evaluated.critical = critical
+	return attack_base(result)*damage_multiplier(evaluated)
 
 ## Combine base damage, multiplier and critical before target defenses.
 func unmitigated_damage(result: MultiHitSkill) -> int:
@@ -831,6 +841,8 @@ func resolve_roll_attack_step() -> Array:
 func _complete_skill_use(result: MultiHitSkill, events: Array) -> void:
 	if result.kind == Kind.ULTIMATE and result.pattern.is_empty(): events.append(event(-1, heal(roundi(12*tarot_effects.skill_factor(result))), "heal", "+12 HP"))
 	pending.consume_use()
+	if pending.bonus_random_from >= 0 and pending.uses_spent == pending.bonus_random_from:
+		events.append(event(-1,0,"bonus_skill","Bonus Skill"))
 	if pending.random_target_per_use(): pending.target = -1
 	if pending.uses_left() == 0 or not outcome().is_empty():
 		# One charge covers the whole cast, including every multi-hit impact.

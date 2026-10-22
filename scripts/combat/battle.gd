@@ -26,6 +26,7 @@ const Run = preload("res://scripts/progression/run_rules.gd")
 const SkillBubble = preload("res://scripts/combat/skill_bubble.gd")
 const ScreenRipple = preload("res://scripts/effects/screen_ripple.gd")
 var screen_ripple: CanvasLayer
+const RelicOrbit = preload("res://scripts/relics/relic_orbit.gd")
 const RelicUI = preload("res://scripts/relics/relic_ui.gd")
 var relic_ui: Node2D
 var inventory_page: Node2D
@@ -168,6 +169,7 @@ var throw_power: float = 0
 var throw_perfect: bool = false
 var power_lock_until: float = 0
 var combo_flash_until: float = 0
+var skill_counter_flash_until: float = 0
 var skill_bubble: Node2D
 var saved_bubble: Node2D
 var skill_source: String = "current"
@@ -945,7 +947,7 @@ func _handle_release(point: Vector2) -> void:
 	if not dragged:
 		if skill_was_selected or (skill_source == "saved" and not _skill_needs_target()): _cancel_targeting()
 		return
-	if skill_source == "current" and dice_selection.center_hit(point):
+	if skill_source == "current" and dice_selection.skill_cancel_rect().has_point(point):
 		_cancel_targeting()
 		if model.cancel_formed_skill():
 			_clear_skill()
@@ -1834,6 +1836,7 @@ func _advance_wave() -> void:
 ## Reset run state and all pending presentation at the requested wave.
 func _restart(wave_number: int = 1) -> void:
 	if is_instance_valid(inventory_page): inventory_page.close(false)
+	skill_counter_flash_until = 0
 	battlefield_view.reset()
 	kill_slow_remaining = 0
 	bonus_turn_banner.clear()
@@ -1906,6 +1909,10 @@ static func _event_font_size(event: Dictionary) -> int:
 func _show_events(events: Array) -> void:
 	var offsets: Dictionary = {}
 	for event in events:
+		if event.type == "bonus_skill":
+			skill_counter_flash_until = clock_time+0.35
+			fx.floating(battlefield_view.transform*_character_counter_center()-Vector2(0,12),GameText.text("Bonus Skill"),GOLD,28 if fx.canvas_size.y > fx.canvas_size.x else 22)
+			continue
 		if event.type == "bonus_turn":
 			bonus_turn_banner.play()
 			_sound("dice/confirmation_002",1.25,-12)
@@ -2188,11 +2195,42 @@ func _draw_player_actor(canvas: CanvasItem) -> void:
 	var bob: float = 0 if reduced or model.is_frozen() else snappedf(sin(clock_time * (8 if view_phase == "transition" else 1.8)) * 3, 2)
 	bob += combat_motion.attack_bob(-1,monster_side,reduced)
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
+	var orbit: Array = RelicOrbit.poses(self)
+	RelicOrbit.paint(canvas,self,orbit,false)
 	_shadow(_player_world_feet(),monster_side*_player_growth_scale().x*0.48,0.27,canvas)
 	if model.shield > 0 or model.statuses[6].count > 0:
 		Pixel.circle(canvas,_player_world_feet()-Vector2(0,monster_side*0.48),monster_side*0.47,Color(TEAL,0.45),4)
 	evolution.draw_actor(canvas,_player_world_sprite_rect(dx,bob),Color(Color.WHITE.lerp(RED,hurt*0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
+	RelicOrbit.paint(canvas,self,orbit,true)
 	_draw_player_afflictions(canvas)
+	_draw_character_skill_counter(canvas)
+
+## Anchor charge UI to the resting sprite bounds, independent of idle, attacks and recoil.
+func _character_counter_center() -> Vector2:
+	var sprite := Rect2(_player_world_feet()-Vector2(monster_side*0.5,monster_side),Vector2.ONE*monster_side)
+	var rect: Rect2 = evolution.visible_rect(sprite)
+	return Vector2(rect.get_center().x,rect.position.y-10)
+
+func _draw_character_skill_counter(canvas: CanvasItem) -> void:
+	var center: Vector2 = _character_counter_center()
+	var flash: float = clampf((skill_counter_flash_until-clock_time)/0.35,0,1)
+	var filled: int = model.character_passive.displayed_charge(model.pending)
+	for i in range(model.FlamelingsPassive.CHARGES):
+		var at: Vector2 = center+Vector2((i-(model.FlamelingsPassive.CHARGES-1)*0.5)*24,0)
+		canvas.draw_circle(at,8,Color("25202a"))
+		if i < filled:
+			# Staggered rising tongues stay local to each charged ember.
+			for flame in range(5):
+				var phase: float = 0.35 if reduced else fposmod(clock_time*1.8+flame*0.21+i*0.13,1)
+				var tip: Vector2 = at+Vector2(sin(flame*2.1+clock_time*3)*(4-phase*2),-phase*18)
+				canvas.draw_circle(tip,4*(1-phase)+1,Color(1,0.35+phase*0.4,0.08,(1-phase)*0.95))
+			canvas.draw_circle(at,16,Color(1,0.50,0.10,0.24))
+			canvas.draw_circle(at,12,Color(1,0.66,0.18,0.50))
+			canvas.draw_circle(at,7,Color("fff1a3"))
+			canvas.draw_circle(at,3,Color("fffde8"))
+		canvas.draw_arc(at,8,0,TAU,24,Color("f1d4a5"),2,true)
+		if flash > 0:
+			canvas.draw_circle(at,8+12*(1-flash),Color(1,0.9,0.6,flash*0.8))
 
 ## Share the exact living sprite pose with its death-fragment emission points.
 func _enemy_sprite_rect(index: int) -> Rect2:

@@ -103,6 +103,16 @@
         "hamburger"
       ],
       "modifications": "Unmodified source PNG; region selected by AtlasTexture"
+    },
+    "food_meals": {
+      "source": "https://karsiori.itch.io/free-pixel-art-food-pack-2",
+      "author": "KARSIORI STUDIO",
+      "license": "CC0",
+      "files": {
+        "lemon_soda.png": "Soda Can 4.png",
+        "fried_chicken.png": "Chicken Drumstick.png"
+      },
+      "other": "Oreo sundae uses the ice cream cell of existing CC0 Icons: Food by thekingphoenix; meals compose only collected ingredient sprites."
     }
   },
   "files": {

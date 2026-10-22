@@ -74,12 +74,30 @@ func back_rect() -> Rect2:
 func replace_rect() -> Rect2:
 	return Rect2(376,1510,380,90) if portrait() else Rect2(682,686,428,64)
 
+## Put declining the new reward inside its description card, away from owned items.
+func discard_rect() -> Rect2:
+	return Rect2(80,1240,140,68) if portrait() else Rect2(212,738,138,34)
+
+## Discard only the incoming reward; closing the page remains a reversible cancel.
+func _discard_incoming() -> void:
+	if incoming_relic().is_empty(): return
+	if replacement == "chest":
+		if battle._claim_chest_reward(battle.relic_ui.chest_slot,-1,true):
+			battle.relic_ui.chest_slot = -1
+			close(false)
+	elif replacement == "tarot":
+		battle.tarot_cast._cast({"discard":true})
+		if battle.tarot_cast.busy: close(false)
+
 ## Swallow modal input; the shortcut opens before chest or shop hit handlers.
 func click(at: Vector2) -> bool:
 	if not opened:
 		if available() and button_rect().has_point(at): open(); return true
 		return false
 	if close_rect().has_point(at): close(); return true
+	if selected < 0 and not incoming_relic().is_empty() and discard_rect().has_point(at):
+		_discard_incoming()
+		return true
 	if selected >= 0:
 		if back_rect().has_point(at): selected = -1
 		elif not replacement.is_empty() and replace_rect().has_point(at): _replace()
@@ -153,6 +171,7 @@ func _draw_incoming(compact: bool) -> void:
 	var size: int = 28 if portrait() else 22
 	while size > 18 and GameText.lines(description,battle.description_font,size,text_rect.size.x).size()*size*1.3 > text_rect.size.y: size -= 1
 	Panels.wrap(self,battle.description_font,text_rect,description,size,Color("eee4d2"),false)
+	_button(discard_rect(),"DISCARD")
 
 ## Keep empty cells visible and tint collected cells by their item's rarity.
 func _draw_slot(index: int) -> void:
@@ -164,7 +183,7 @@ func _draw_slot(index: int) -> void:
 	if not occupied:
 		draw_line(rect.get_center()-Vector2(12,0),rect.get_center()+Vector2(12,0),Color("42474b"),2)
 		return
-	Paint.paint(self,item.id,rect.get_center()-Vector2(0,16),48 if portrait() else 46,true)
+	Paint.paint(self,item.id,rect.get_center()-Vector2(0,16),48 if portrait() else 46,true,item)
 	var label: String = GameText.text(Catalog.RARITY_NAMES[Catalog.ITEMS[item.id].rarity])
 	_text(Vector2(rect.get_center().x,rect.end.y-14),label,19 if portrait() else 16,color)
 	var count: int = Catalog.counter_value(item)
@@ -176,7 +195,7 @@ func _draw_item() -> void:
 	var item: Dictionary = battle.model.relics.items[selected]
 	var color: Color = Catalog.rarity_color(item.id)
 	var mid: float = battle.fx.canvas_size.x/2
-	Paint.paint(self,item.id,Vector2(mid,550 if portrait() else 256),126 if portrait() else 90,true)
+	Paint.paint(self,item.id,Vector2(mid,550 if portrait() else 256),126 if portrait() else 90,true,item)
 	_text(Vector2(mid,775 if portrait() else 398),Catalog.ITEMS[item.id].name,40 if portrait() else 32,color)
 	_text(Vector2(mid,835 if portrait() else 442),Catalog.RARITY_NAMES[Catalog.ITEMS[item.id].rarity],26 if portrait() else 21,color)
 	var rect := Rect2(66,916,672,500) if portrait() else Rect2(228,476,824,186)

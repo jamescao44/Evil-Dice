@@ -1,6 +1,7 @@
 extends RefCounted
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Drops = preload("res://scripts/relics/relic_drop_table.gd")
+const Sets = preload("res://scripts/relics/relic_sets.gd")
 var items: Array = []
 
 func clear() -> void:
@@ -14,7 +15,7 @@ func has(id: String) -> bool:
 	return index_of(id) >= 0
 
 func index_of(id: String) -> int:
-	return items.find_custom(func(item): return item.id == id)
+	return items.find_custom(func(item): return item.id == id or id in Sets.ingredients(item))
 
 func has_stone(id: String) -> bool:
 	return has(id) or has("prismatic_stone")
@@ -41,11 +42,18 @@ func draw_one(rng: RandomNumberGenerator, excluded: Array = [], rarity_weights: 
 			eligible.append(id)
 	return Drops.draw(rng,eligible,rarity_weights,minimum_rarity)
 
+## An ingredient can fuse into an existing meal even with all inventory slots occupied.
+func needs_slot(id: String) -> bool:
+	if id == "codex_page" and has(id): return false
+	return not Sets.can_merge(items,id)
+
 func add(id: String, replace_index: int = -1) -> bool:
 	if not can_add(id,replace_index): return false
 	var page: int = index_of("codex_page")
 	if id == "codex_page" and page >= 0:
 		items[page].count += 1
+	elif not needs_slot(id):
+		items.append(_new_item(id))
 	elif replace_index >= 0 or items.size() >= Catalog.MAX_SLOTS:
 		if replace_index < 0 or replace_index >= items.size(): return false
 		items[replace_index] = _new_item(id)
@@ -58,6 +66,7 @@ func _new_item(id: String) -> Dictionary:
 	return {"id":id, "count":1, "turns":0, "charges":0, "kills":0, "waves":0}
 
 func _fuse() -> void:
+	Sets.fuse(items)
 	var page: int = index_of("codex_page")
 	if page >= 0 and items[page].count >= 10 and not has("ancient_codex"):
 		items[page] = _new_item("ancient_codex")

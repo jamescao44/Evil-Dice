@@ -91,6 +91,16 @@ func _initialize() -> void:
 	check(m.tarot_effects.cast(m,card.instance_id).has("error"),"Judgement rejects playable unused straights")
 	m = fresh(); roll(m,[1,2,3,4,4,6]); spend(m,[0,1,2]); use(m,"judgement")
 	check(m.dice_turn.rolls_left == 4,"Judgement checks unused dice, not original straight")
+	m = fresh(); roll(m)
+	spend(m,[0,1,2])
+	m.dice_turn.selected = [3,4,5]
+	check(not m.form_selected_skill().is_empty(),"Form a second skill before Justice")
+	budget = m.dice_turn.rolls_left
+	var justice_result: Dictionary = use(m,"justice")
+	check(justice_result.reroll and m.pending.is_empty() and m.phase == "roll","Justice cancels the formed skill and requests a reroll")
+	check(m.dice_turn.unused() == [0,1,2,3,4,5] and m.dice_turn.committed.is_empty() and m.dice_turn.groups.is_empty(),"Justice restores spent and pending dice")
+	roll(m,[2,3,4,5,6,1],true)
+	check(m.dice_turn.rolls_left == budget,"Justice reroll remains free after cancelling a skill")
 	m = fresh(); m.hp = 20; roll(m); use(m,"temperance")
 	check(m.tarot_effects.carried_rolls == 2 and m.dice_turn.rolls_left == 0,"Temperance transfers exactly the remaining budget")
 	check(m.end_dice_turn(),"Temperance can finish the pool")
@@ -142,7 +152,7 @@ func _initialize() -> void:
 	var setup: Dictionary = m.tarot_effects.prepare(m,card.instance_id)
 	var state: int = m.reward_rng.state
 	check(setup.get("choice","") == "replace" and m.tarot_effects.prepare(m,card.instance_id) == setup and state == m.reward_rng.state,"Full-inventory offer is locked across cancellation")
-	check(m.tarot_effects.cast(m,card.instance_id).has("error") and m.tarots.find_instance(card.instance_id) >= 0,"Cancel keeps Emperor")
+	check(m.tarot_effects.cast(m,card.instance_id).has("error") and m.tarots.find_instance(card.instance_id) < 0,"Offering a relic consumes Emperor immediately")
 	check(not m.tarot_effects.cast(m,card.instance_id,{"replace":4}).has("error") and m.relics.items[4].id == setup.relic,"Confirmed replacement consumes Emperor")
 	var owned: Array = m.relics.items.map(func(item): return item.id)
 	use(m,"fool"); check(m.relics.items.size() == 10 and m.relics.items.all(func(item): return item.id not in owned),"Fool excludes all former relics")
@@ -152,7 +162,7 @@ func _initialize() -> void:
 		m.tarot_effects.prepare(m,card.instance_id)
 		var id: String = m.tarot_effects.locked_grants[card.instance_id]
 		counts[id] = counts.get(id,0)+1
-		m.tarot_effects.locked_grants.erase(card.instance_id); m.tarots.remove_instance(card.instance_id)
+		m.tarot_effects.locked_grants.erase(card.instance_id); m.tarot_effects.committed_grants.erase(card.instance_id); m.tarots.remove_instance(card.instance_id)
 	check(counts.keys().all(func(id): return id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false)),"Emperor eligibility excludes disabled/fusion items")
 	check(counts.values().min() > 70 and counts.values().max() < 190,"Emperor is uniform by item rather than rarity")
 	m = fresh(); var wins := 0; var rares := 0
@@ -163,5 +173,14 @@ func _initialize() -> void:
 			if m.tarot_effects.bonus_chests[0] == 2: rares += 1
 			m.tarot_effects.bonus_chests.clear()
 	check(wins > 850 and wins < 1150 and rares > 65 and rares < 140,"Wheel keeps 25% chest and conditional 10% upgrade")
+	m = fresh()
+	for id in ["codex_page","heart","bracelet","armor","coin","magic_shield","magic_sword","twin_scythes","orange_stone","blue_stone"]: m.acquire_relic(id)
+	var discard_owned: Array = m.relics.items.duplicate(true)
+	card = m.tarots.add("emperor")
+	check(m.tarot_effects.prepare(m,card.instance_id).get("choice","") == "replace","Full inventory requests a replacement")
+	var reward_rng: int = m.reward_rng.state
+	check(not m.tarot_effects.cast(m,card.instance_id,{"discard":true}).has("error"),"Explicitly discard Emperor's incoming reward")
+	check(m.relics.items == discard_owned and m.tarots.find_instance(card.instance_id) == -1,"Explicit discard consumes the card without replacing inventory")
+	check(m.reward_rng.state == reward_rng and not m.tarot_effects.locked_grants.has(card.instance_id),"Discard resolves the locked offer without another roll")
 	print("Tarot effects: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

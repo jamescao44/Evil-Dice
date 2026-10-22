@@ -780,3 +780,31 @@ No spent dice to restore.,No spent dice to restore.,没有已消耗的骰子。
 Choose an unused die and a different face.,Choose an unused die and a different face.,请选择未使用的骰子及不同点数。
 Choose a different face.,Choose a different face.,请选择不同点数。
 Choose a face. Tap the die to go back.,Choose a face. Tap the die to go back.,选择点数；再点中间骰子可返回。
+
+DISCARD,DISCARD,放弃
+"Cancel any formed skill, then immediately reroll all unused dice for free.","Cancel any formed skill, then immediately reroll all unused dice for free.",取消已形成的技能，解锁其骰子，然后免费重掷所有未使用骰子。
+Bonus Skill,Bonus Skill,额外技能
+"Cancel any formed skill, restore spent dice, and reroll all six dice for free.","Cancel any formed skill, restore spent dice, and reroll all six dice for free.",取消已形成的技能并恢复已用骰子，立即免费重掷全部六枚骰子。
+Lemon Soda,Lemon Soda,柠檬汽水
+Oreo Sundae,Oreo Sundae,奥利奥圣代
+Fried Chicken,Fried Chicken,炸鸡
+Budget Meal,Budget Meal,穷鬼套餐
+Happy Trio,Happy Trio,欢乐三件套
+Deluxe Quartet,Deluxe Quartet,豪华四件套
+Super Feast,Super Feast,超级五件套
+Auto-attack damage +20. Meal ingredient.,Auto-attack damage +20. Meal ingredient.,自动攻击伤害+20（倍率前）。套餐食材。
+Base damage +20. Meal ingredient.,Base damage +20. Meal ingredient.,基础伤害+20。套餐食材。
+Damage multiplier x1.1. Meal ingredient.,Damage multiplier x1.1. Meal ingredient.,伤害乘数×1.1。套餐食材。
+"Combines two food effects, then adds 10 base damage.","Combines two food effects, then adds 10 base damage.",保留两件食材效果，额外+10基础伤害。
+"Combines three food effects, then adds 20 base damage.","Combines three food effects, then adds 20 base damage.",保留三件食材效果，额外+20基础伤害，替换旧套餐奖励。
+"Combines four food effects, then adds 20 base damage and +2 damage multiplier.","Combines four food effects, then adds 20 base damage and +2 damage multiplier.",保留四件食材效果，额外+20基础伤害、+2伤害乘数，替换旧套餐奖励。
+"Combines five food effects, then adds 50 base damage and doubles the damage multiplier.","Combines five food effects, then adds 50 base damage and doubles the damage multiplier.",保留五件食材效果，额外+50基础伤害、伤害乘数×2，替换旧套餐奖励。
+"After 10 throws, the next throw with at least four unused dice guarantees a four-straight. Tarot rules take priority.","After 10 throws, the next throw with at least four unused dice guarantees a four-straight. Tarot rules take priority.",累计10次投掷后，下次至少四枚余骰的投掷保证四顺子。塔罗规则优先。
+Each eligible throw has a 10% chance to guarantee at least a four-straight. Tarot rules take priority.,Each eligible throw has a 10% chance to guarantee at least a four-straight. Tarot rules take priority.,至少四枚余骰时，每次投掷有10%概率保证至少四顺子。塔罗规则优先。
+Each eligible throw has a 5% chance to guarantee at least a five-straight. Tarot rules take priority.,Each eligible throw has a 5% chance to guarantee at least a five-straight. Tarot rules take priority.,至少五枚余骰时，每次投掷有5%概率保证至少五顺子。塔罗规则优先。
+"Receive a random tarot immediately, then another every 5 completed turns.","Receive a random tarot immediately, then another every 5 completed turns.",获得时立即生成一张随机塔罗，此后每完成五个完整回合再生成一张。
+Turns: %d / 5.,Turns: %d / 5.,回合：%d / 5。
+Throws: %d / 10.,Throws: %d / 10.,投掷：%d / 10。
+"After each throw, deal 5 base damage to a random enemy.","After each throw, deal 5 base damage to a random enemy.",每次投掷后，对随机敌人造成5基础伤害。
+"After a throw with no playable straight, deal 10 base damage to a random enemy.","After a throw with no playable straight, deal 10 base damage to a random enemy.",投掷后无可用顺子时，对随机敌人造成10基础伤害。
+"After each throw, attack a random enemy for half the rolled pip sum as base damage.","After each throw, attack a random enemy for half the rolled pip sum as base damage.",每次投掷后，以本次所投点数之和的一半为基础伤害攻击随机敌人。

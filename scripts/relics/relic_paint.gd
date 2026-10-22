@@ -4,12 +4,21 @@ extends RefCounted
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
 const VECTOR_ICONS := ["four_leaf_clover", "five_leaf_clover", "ice_rose", "cursed_die_1", "cursed_die_2", "cursed_die_3", "cursed_die_4", "cursed_die_5", "cursed_die"]
-const SPRITE_FILES := {"fries":"fries.tres","hamburger":"hamburger.tres"}
+const SPRITE_FILES := {"fries":"fries.tres","hamburger":"hamburger.tres","oreo_sundae":"oreo_sundae.tres"}
 static var textures: Dictionary = {}
 static var regions: Dictionary = {}
 
-static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow: bool = true) -> void:
+static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow: bool = true, item: Dictionary = {}) -> void:
 	if glow: Glow.paint(node,at,radius,Catalog.rarity_color(id))
+	if Catalog.Sets.is_fused(id):
+		var parts: Array = Catalog.Sets.display_parts(id,item)
+		# Show the actual foods in collection order, arranged in a compact meal cluster.
+		var count: int = parts.size()
+		for i in range(count):
+			var angle: float = -PI/2+TAU*i/count
+			var offset: Vector2 = Vector2.from_angle(angle)*radius*0.52 if count > 2 else Vector2((i-0.5)*radius,0)
+			paint(node,parts[i],at+offset,radius*(0.49 if count > 3 else 0.58),false)
+		return
 	var stone: bool = id in Catalog.STONES or id == "prismatic_stone"
 	var sprite: String = "magic_gem" if stone else id
 	if not textures.has(sprite):

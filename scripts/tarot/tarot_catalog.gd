@@ -28,7 +28,7 @@ const ITEMS := {
 	"strength": {"name": "Strength", "design": "Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.", "target": "self", "art": "res://assets/art/tarot/08.png", "implemented": true},
 	"hermit": {"name": "The Hermit", "design": "Restore all dice spent this turn so they can be used again immediately.", "target": "self", "art": "res://assets/art/tarot/09.png", "implemented": true},
 	"wheel": {"name": "Wheel of Fortune", "design": "A 1 in 4 chance of a chest; 1 in 10 of those is rare.", "target": "self", "art": "res://assets/art/tarot/10.png", "implemented": true},
-	"justice": {"name": "Justice", "design": "Immediately reroll all unused dice without spending a roll.", "target": "dice", "art": "res://assets/art/tarot/11.png", "implemented": true},
+	"justice": {"name": "Justice", "design": "Cancel any formed skill, restore spent dice, and reroll all six dice for free.", "target": "dice", "art": "res://assets/art/tarot/11.png", "implemented": true},
 	"hanged_man": {"name": "The Hanged Man", "design": "Choose a tarot card to exclude from future draws.", "target": "tarot_type", "art": "res://assets/art/tarot/12.png", "implemented": true},
 	"death": {"name": "Death", "design": "Execute a selected enemy.", "target": "enemy", "art": "res://assets/art/tarot/13.png", "implemented": true},
 	"temperance": {"name": "Temperance", "design": "End this turn and carry unused rolls into the next turn.", "target": "self", "art": "res://assets/art/tarot/14.png", "implemented": true},

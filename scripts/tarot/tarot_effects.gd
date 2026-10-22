@@ -19,6 +19,7 @@ var devil: int = 0
 var banned: Array = []
 # Concrete reward IDs are locked before a full-inventory replacement picker.
 var locked_grants: Dictionary = {}
+var committed_grants: Dictionary = {}
 var bonus_chests: Array = []
 var pending_steps: Array = []
 # A second activation belongs to the consumed card, not a new inventory item.
@@ -27,6 +28,7 @@ var pending_repeat: Dictionary = {}
 
 func _card(model, instance_id: int) -> Dictionary:
 	if pending_repeat.get("instance_id",0) == instance_id: return pending_repeat
+	if committed_grants.has(instance_id): return committed_grants[instance_id]
 	var index: int = model.tarots.find_instance(instance_id)
 	return {} if index < 0 else model.tarots.items[index]
 
@@ -97,7 +99,7 @@ func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) 
 	if id == "devil" and model.dice_turn.unused().size() < 3: return "Devil needs at least three unused dice."
 	if id == "judgement" and (not model.dice_turn.has_rolled() or model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i]))): return "Judgement needs unused dice with no straight."
 	if id == "temperance" and not model.dice_turn.has_rolled(): return "Roll before using Temperance."
-	if id == "justice" and (not model.dice_turn.has_rolled() or not model.dice_turn.can_roll(true)): return "Roll first and finish the summoned skill before using this card."
+	if id == "justice" and (not model.dice_turn.has_rolled() or not (model.dice_turn.can_roll(true) or model.dice_turn.has_pending_group())): return "Roll first and finish the summoned skill before using this card."
 	if id in ["magician","hermit","high_priestess","temperance"] and model.dice_turn.has_pending_group(): return "Use or cancel the summoned skill first."
 	if id == "hermit" and model.dice_turn.committed.is_empty(): return "No spent dice to restore."
 	if id == "fool" and model.relics.items.is_empty(): return "No relics to reroll."
@@ -124,7 +126,11 @@ func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			locked_grants[instance_id] = rolled
 		var reward: String = locked_grants[instance_id]
 		if not model.relics.can_add(reward): return {"error":"This relic is already owned."}
-		if model.relics.items.size() >= Relics.MAX_SLOTS and not (reward == "codex_page" and model.relics.has(reward)):
+		# Offering a valid reward spends Emperor/World before the replacement decision.
+		if not repeating and not committed_grants.has(instance_id):
+			committed_grants[instance_id] = card.duplicate(true)
+			model.tarots.remove_instance(instance_id)
+		if model.relics.items.size() >= Relics.MAX_SLOTS and model.relics.needs_slot(reward):
 			return {"choice":"replace","relic":reward}
 	return {}
 
@@ -142,7 +148,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"hanged_man":
 			if choice.get("ban", "") not in Catalog.eligible(banned): return {"error":"Choose a tarot still in the deck."}
 		"replace":
-			if choice.get("replace",-1) < 0 or choice.replace >= model.relics.items.size(): return {"error":"Choose a relic to replace."}
+			if not choice.get("discard",false) and (choice.get("replace",-1) < 0 or choice.replace >= model.relics.items.size()): return {"error":"Choose a relic to replace."}
 	var repeats: Array = pending_repeat.get("sources",[]).duplicate() if repeating else model.RelicEffects.repeat_sources(model.relics.items,"ancient_prophecy")
 	if repeating and not repeats.is_empty(): model.RelicEffects.Sequence.activate(model,repeats.pop_front())
 	# Siege opens its next turn lazily. A committed tarot can begin that turn,
@@ -177,9 +183,11 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"empress":
 			model.grant_random_tarots(2)
 		"emperor", "world":
-			reward = locked_grants[instance_id]
-			if not model.acquire_relic(reward,choice.get("replace",-1)): return {"error":"Choose a relic to replace."}
+			if not choice.get("discard",false):
+				reward = locked_grants[instance_id]
+				if not model.acquire_relic(reward,choice.get("replace",-1)): return {"error":"Choose a relic to replace."}
 			locked_grants.erase(instance_id)
+			committed_grants.erase(instance_id)
 		"hierophant":
 			for status in Status.HARMFUL:
 				model.statuses[status].count = 0
@@ -200,7 +208,13 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"wheel":
 			if model.reward_rng.randi_range(1,4) == 1: bonus_chests.append(2 if model.reward_rng.randi_range(1,10) == 1 else 1)
 			else: events.append(model.event(-1,0,"relic","NO TREASURE"))
-		"justice": pass # TarotCast runs a normal animated roll with no budget cost.
+		"justice":
+			# Cancel the pending group, then restore all six dice for the free reroll.
+			if model.dice_turn.has_pending_group(): model.cancel_formed_skill()
+			model.dice_turn.locked.clear()
+			model.dice_turn.committed.clear()
+			model.dice_turn.groups.clear()
+			model.dice_turn.selected.clear()
 		"hanged_man": banned.append(choice.ban)
 		"devil":
 			devil = mini(6,devil+1) if devil > 0 else 3

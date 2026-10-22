@@ -63,6 +63,7 @@ func scene_checks(game) -> void:
 		tap(game,game.DICE_POSITIONS[index])
 		check(cast_ui.magician_choice.selected == index,"Every unused die opens its face ring")
 		for face in range(1,7):
+			check(Rect2(Vector2.ZERO,game.fx.canvas_size).encloses(cast_ui.magician_choice.option_rect(game,face)),"Padded face option stays inside the screen")
 			var at: Vector2 = cast_ui.magician_choice.face_center(game,face)
 			check(Rect2(Vector2.ZERO,game.fx.canvas_size).grow(-28).has_point(at),"All six face options stay on screen")
 		tap(game,cast_ui.magician_choice.face_center(game,game.model.dice_turn.values[index]))
@@ -80,6 +81,16 @@ func scene_checks(game) -> void:
 	var columns: int = 4 if ui.portrait() else 6
 	tap(game,cast_ui.cell_rect(0,columns,ceili(cast_ui.options().size()/float(columns))).get_center()); await settle(game)
 	check(ban in game.model.tarot_effects.banned,"Ban chooser remains usable")
+	game._restart(); tough_enemies(game); prepare_roll(game)
+	game.model.dice_turn.selected = [0,1,2]
+	game.model.form_selected_skill()
+	game._show_pending_skill(false)
+	var justice_budget: int = game.model.dice_turn.rolls_left
+	var justice: Dictionary = give_front(game,"justice")
+	drag(game,drop); await settle(game)
+	check(game.model.pending.is_empty() and game.skill_bubble.roll.is_empty(),"Justice removes the pending model and visible skill")
+	check(game.view_phase == "ready" and game.model.dice_turn.unused().size() == 6,"Justice rerolls unlocked dice and restores control")
+	check(game.model.dice_turn.rolls_left == justice_budget and game.model.tarots.find_instance(justice.instance_id) == -1,"Justice consumes its card but no roll")
 	game._restart(); tough_enemies(game); prepare_roll(game); game.model.hp = 20
 	give_front(game,"temperance"); drag(game,drop)
 	var deadline: int = Time.get_ticks_msec()+10000
@@ -104,7 +115,9 @@ func scene_checks(game) -> void:
 	var emperor: Dictionary = give_front(game,"emperor"); drag(game,drop)
 	check(cast_ui.choice_type == "replace" and game.inventory_page.opened,"Full inventory opens replacement backpack")
 	tap(game,game.inventory_page.close_rect().get_center())
-	check(game.model.tarots.find_instance(emperor.instance_id) >= 0,"Cancel first Emperor retains card")
+	await settle(game)
+	check(game.model.tarots.find_instance(emperor.instance_id) < 0,"Cancel first Emperor does not refund card")
+	give_front(game,"emperor")
 	while ui.expansion < 0.98: await process_frame
 	drag(game,drop); var offered: String = cast_ui.prepared.relic
 	tap(game,game.inventory_page.slot_rect(4).get_center()); tap(game,game.inventory_page.replace_rect().get_center()); await settle(game)

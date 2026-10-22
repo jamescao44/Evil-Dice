@@ -118,3 +118,7 @@ See `art/tarot/LICENSE.txt` for the source and license summary.
 ### Player evolution forms
 
 All three active levels use [Flamelings by surt](https://opengameart.org/content/flamelings), CC0. Sprites extracted with transparent backgrounds and nearest-neighbor scaling. The former original AI-generated ember starter is retained as an unused source asset. See [source and generation record](licenses/Flamelings.txt).
+
+### Meal ingredient additions
+- Lemon soda and fried chicken: **KARSIORI STUDIO**, [Food Pack 2](https://karsiori.itch.io/free-pixel-art-food-pack-2), CC0. Original Soda Can 4 and Chicken Drumstick PNGs.
+- Oreo sundae placeholder: ice cream from **thekingphoenix**, [Icons: Food](https://opengameart.org/content/icons-food), CC0; same sheet as fries and hamburger. Meal icons combine only foods actually collected.

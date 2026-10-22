@@ -95,9 +95,10 @@ func layout(portrait: bool) -> void:
 	await capture(g,label+"-ready")
 	g.debug_choice = 0
 	g._roll(0.8,"--perfect" in OS.get_cmdline_user_args())
+	check(g.dice[0].duration > 0.85,"Rolling uses the slower animation pace")
 	var gameplay_rng: int = g.model.rng.state
 	var reward_rng: int = g.model.reward_rng.state
-	for sample in range(11):
+	for sample in range(16):
 		for frame in range(6):
 			for die in g.dice: die._process(1.0/60.0)
 		for die in g.dice:

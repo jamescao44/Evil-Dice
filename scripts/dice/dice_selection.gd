@@ -37,10 +37,14 @@ func available() -> bool:
 func center_hit(point: Vector2) -> bool:
 	return point.distance_to(battle.DICE_CENTER) <= (78 if portrait() else 48)
 
-## A small text-only control clears tap selections without spending dice or rolls.
+## A large text-only control clears tap selections without spending dice or rolls.
 func cancel_rect() -> Rect2:
-	var size := Vector2(152,38) if portrait() else Vector2(112,28)
-	return Rect2(battle.DICE_CENTER+Vector2(0,90 if portrait() else 62)-size/2,size)
+	var size := Vector2(208,52) if portrait() else Vector2(156,40)
+	return Rect2(battle.DICE_CENTER+Vector2(0,56 if portrait() else 38)-size/2,size)
+
+## A formed skill may be dropped anywhere below the dice area's midline.
+func skill_cancel_rect() -> Rect2:
+	return Rect2(0,battle.DICE_CENTER.y,battle.fx.canvas_size.x,battle.fx.canvas_size.y-battle.DICE_CENTER.y)
 
 func die_rect(index: int) -> Rect2:
 	var side: float = 114 if portrait() else 82
@@ -250,10 +254,13 @@ func _draw_center() -> void:
 	var size: int = 46 if portrait() else 32
 	var cancelling: bool = battle._current_skill_selected()
 	if cancelling:
-		var over: bool = battle.skill_dragging and center_hit(battle.skill_pointer)
-		draw_circle(at,78 if portrait() else 48,Color("db7474",0.15 if over else 0.06))
-		draw_arc(at,78 if portrait() else 48,0,TAU,64,Color("db7474",0.65 if over else 0.28),2,true)
-		battle._center(at+Vector2(0,60 if portrait() else 38),"CANCEL SKILL",24 if portrait() else 14,Color("db7474",0.9 if over else 0.65),self)
+		var zone: Rect2 = skill_cancel_rect()
+		var skill_at: Vector2 = battle._source_bubble(battle.skill_source).display_center()
+		var distance: float = maxf(0,zone.position.y-skill_at.y)
+		var proximity: float = 1.0-smoothstep(0,260 if portrait() else 180,distance)
+		draw_rect(zone,Color("db7474",lerpf(0.025,0.17,proximity)))
+		draw_line(zone.position,Vector2(zone.end.x,zone.position.y),Color("db7474",lerpf(0.18,0.85,proximity)),2,true)
+		battle._center(at+Vector2(0,68 if portrait() else 46),"CANCEL SKILL",38 if portrait() else 28,Color("ef9999",lerpf(0.28,1.0,proximity)),self)
 		return
 	var charging: bool = battle.view_phase == "charging"
 	var selected: bool = not battle.model.dice_turn.selected.is_empty()
@@ -277,4 +284,4 @@ func _draw_center() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if reroll and not charging and not selected:
 		battle._center(at+Vector2(0,35 if portrait() else 27),str(battle.model.dice_turn.rolls_left),26 if portrait() else 20,color,self)
-	if selected and available(): battle._center(cancel_rect().get_center()+Vector2(0,8 if portrait() else 6),"Deselect",24 if portrait() else 16,Color("df9696"),self)
+	if selected and available(): battle._center(cancel_rect().get_center()+Vector2(0,8 if portrait() else 6),"Deselect",34 if portrait() else 24,Color("df9696"),self)

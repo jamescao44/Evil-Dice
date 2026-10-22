@@ -14,6 +14,8 @@ var bar_style: StyleBoxFlat
 var drop_style: StyleBoxFlat
 const ACTIVATION_TIME := 0.65
 const ICON_RADIUS_SCALE := 0.49
+const BATTLE_BAR_HEIGHT_PORTRAIT := 54.0
+const BATTLE_BAR_HEIGHT_LANDSCAPE := 38.0
 const HELD_RADIUS_SCALE := 0.59
 var activations: Dictionary = {}
 var ready_clock: float = 0.0
@@ -40,7 +42,16 @@ func portrait() -> bool:
 func inventory_rect() -> Rect2:
 	if battle.view_phase == "shop": return battle.shop_ui.inventory_rect()
 	if chest_slot >= 0 or (battle.view_phase == "reward" and pickup.active): return Rect2(48,1376,708,64) if portrait() else Rect2(260,602,760,56)
-	return Rect2(48,982,708,54) if portrait() else Rect2(36,474,480,38)
+	return Rect2(48,982,708,BATTLE_BAR_HEIGHT_PORTRAIT) if portrait() else Rect2(36,474,480,BATTLE_BAR_HEIGHT_LANDSCAPE)
+
+## Stable battle-icon size for decorative satellites, regardless of open reward pages.
+func battle_icon_radius() -> float:
+	return (BATTLE_BAR_HEIGHT_PORTRAIT if portrait() else BATTLE_BAR_HEIGHT_LANDSCAPE)*ICON_RADIUS_SCALE
+
+## Share one activation envelope across inventory icons and their orbiting copies.
+func activation_strength(id: String) -> float:
+	if not activations.has(id): return 0.0
+	return sin(clampf(activations[id].age/ACTIVATION_TIME,0,1)*PI)
 
 func slot_rect(index: int) -> Rect2:
 	var row: Rect2 = inventory_rect()
@@ -204,8 +215,7 @@ func ready_glow(item: Dictionary) -> float:
 
 func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, landing_scale: Vector2 = Vector2.ONE) -> void:
 	var id: String = item.id
-	var strength: float = 0.0
-	if activations.has(id): strength = sin(clampf(activations[id].age/ACTIVATION_TIME,0,1)*PI)
+	var strength: float = activation_strength(id)
 	var at: Vector2 = rect.get_center()
 	var radius: float = rect.size.y*(HELD_RADIUS_SCALE if held else ICON_RADIUS_SCALE)
 	var pulse: float = ready_glow(item)
@@ -224,7 +234,7 @@ func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, la
 		draw_arc(at,radius*1.18,0,TAU,32,Color(color,strength*0.85),2)
 	var scale_factor: float = 1.0 if battle.reduced else 1.0+strength*0.08
 	draw_set_transform(at,activation_tilt(id),landing_scale*scale_factor)
-	Paint.paint(self,id,Vector2.ZERO,radius,held)
+	Paint.paint(self,id,Vector2.ZERO,radius,held,item)
 	draw_set_transform(Vector2.ZERO)
 	_draw_counter(item,at,radius)
 

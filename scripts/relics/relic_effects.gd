@@ -8,9 +8,13 @@ const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 const Attack = preload("res://scripts/relics/relic_attack.gd")
 const EMPTY := {}
+const Sets = preload("res://scripts/relics/relic_sets.gd")
 const STATS := {
 	"codex_page": {"damage_add":0.2},
 	"fries": {"damage_add":0.5},
+	"lemon_soda": {"auto_damage":20.0},
+	"oreo_sundae": {"base_damage":20.0},
+	"fried_chicken": {"damage_factor":1.1},
 	"hamburger": {"damage_add":1.0},
 	"worn_dagger": {"combo_uses_add":1},
 	"royal_dagger": {"combo_uses_add":3},
@@ -40,7 +44,7 @@ const TURN_CHARGES := {
 }
 const CRITICAL_FACTOR := 3.0
 const PERFECT_STRIKE_BASE := 100.0
-const TAROT_GENERATORS := {"fortune_cookie":3,"crystal_ball":1}
+const TAROT_GENERATORS := {"fortune_cookie":5,"crystal_ball":1}
 
 ## Run a relic’s immediate acquisition effect after inventory insertion.
 static func acquired(model, id: String, batch: bool = false) -> void:
@@ -67,18 +71,25 @@ static func currency_bonus(model, amount: int) -> float:
 
 static func has_flag(items: Array, flag: String) -> bool:
 	for item in items:
-		if item.id not in Catalog.DISABLED and STATS.get(item.id,EMPTY).get(flag,false): return true
+		if item.id not in Catalog.DISABLED and Sets.stats(item,STATS).get(flag,false): return true
 	return false
 
 static func max_health(items: Array, base: int) -> float:
 	var value: float = base
-	for entry in Sequence.entries(items): value *= STATS.get(entry.item.id,EMPTY).get("max_hp_factor",1.0)
+	for entry in Sequence.entries(items): value *= Sets.stats(entry.item,STATS).get("max_hp_factor",1.0)
 	return value
 
 static func base_damage(items: Array) -> float:
 	var value: float = 0
-	for entry in Sequence.entries(items): value += STATS.get(entry.item.id,EMPTY).get("base_damage",0.0)
+	for entry in Sequence.entries(items): value += Sets.stats(entry.item,STATS).get("base_damage",0.0)
 	return value
+
+## Soda adds flat damage to automatic hits, before the ordered multiplier.
+static func auto_damage(items: Array, skill: MultiHitSkill) -> float:
+	if skill.pattern != "match_auto": return 0.0
+	var amount := 0.0
+	for entry in Sequence.entries(items): amount += Sets.stats(entry.item,STATS).get("auto_damage",0.0)
+	return amount
 
 static func damage_multiplier(items: Array, value: float, skill: MultiHitSkill) -> float:
 	for entry in Sequence.entries(items):
@@ -88,9 +99,11 @@ static func damage_multiplier(items: Array, value: float, skill: MultiHitSkill) 
 
 ## Apply one relic’s damage rule in inventory order.
 static func apply_damage_modifier(item: Dictionary, value: float, skill: MultiHitSkill) -> float:
-	var stats: Dictionary = STATS.get(item.id,EMPTY)
-	value += stats.get("damage_add",0.0)*item.count
-	value *= stats.get("damage_factor",1.0)
+	var stats: Dictionary = Sets.stats(item,STATS)
+	for part in Sets.modifiers(item,STATS):
+		value += part.get("damage_add",0.0)*item.count
+		value *= part.get("damage_factor",1.0)
+	if item.id == "magic_sword" and skill.critical: value *= CRITICAL_FACTOR
 	if stats.has("damage_per_kill"): value *= pow(stats.damage_per_kill,item.kills)
 	if not skill.is_empty():
 		if item.id == "cursed_skull": value *= 2.0 if 6 in skill.dice else 0.5
@@ -101,26 +114,23 @@ static func apply_damage_modifier(item: Dictionary, value: float, skill: MultiHi
 ## Describe ordered relic damage activations without consuming their effects.
 static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Array:
 	var steps: Array = []
-	var critical: float = 1.0
+
 	for entry in Sequence.entries(items):
 		var item: Dictionary = entry.item
 		var slot: int = entry.slot
-		var before: float = value*critical
+		var before: float = value
 		value = apply_damage_modifier(item,value,skill)
-		if item.id == "magic_sword" and skill.critical: critical = CRITICAL_FACTOR
-		var stats: Dictionary = STATS.get(item.id,EMPTY)
+		var stats: Dictionary = Sets.stats(item,STATS)
 		var extra: String = ""
 		var extra_values: Array = []
-		if stats.get("base_damage",0) != 0:
+		if stats.get("base_damage",0) != 0 or (skill.pattern == "match_auto" and stats.get("auto_damage",0) != 0):
 			extra = "+%d BASE"
-			extra_values = [stats.base_damage]
+			extra_values = [stats.get("base_damage",0)+ (stats.get("auto_damage",0) if skill.pattern == "match_auto" else 0)]
 		if skill.is_combo_attack() and (stats.has("combo_uses_factor") or stats.has("combo_uses_add") or stats.get("combo_uses_per_wave",0)*item.waves > 0):
 			extra = "EXTRA HITS"
 			extra_values.clear()
-		if not is_equal_approx(before,value*critical) or not extra.is_empty():
-			steps.append({"source":"relic","id":entry.source,"slot":slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value*critical,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0))})
-	if skill.critical and critical == 1.0:
-		steps.append({"source":"critical","id":"","slot":-1,"before":value,"after":value*CRITICAL_FACTOR,"note":""})
+		if not is_equal_approx(before,value) or not extra.is_empty():
+			steps.append({"source":"relic","id":entry.source,"slot":slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0)),"auto_bonus":float(stats.get("auto_damage",0.0)) if skill.pattern == "match_auto" else 0.0})
 	return steps
 
 ## Combine relic extra-hit rules with the skill’s existing use modifiers.
@@ -129,7 +139,7 @@ static func use_modifiers(items: Array, skill: MultiHitSkill, modifiers: Diction
 	if not skill.is_combo_attack(): return result
 	for entry in Sequence.entries(items):
 		var item: Dictionary = entry.item
-		var stats: Dictionary = STATS.get(item.id,EMPTY)
+		var stats: Dictionary = Sets.stats(item,STATS)
 		if stats.has("combo_uses_factor"): result[str(result.size())+":"+item.id] = stats.combo_uses_factor
 		elif stats.has("combo_uses_add"): result[str(result.size())+":"+item.id] = {"add":stats.combo_uses_add}
 		elif stats.has("combo_uses_per_wave"): result[str(result.size())+":"+item.id] = {"add":item.waves*stats.combo_uses_per_wave}
@@ -209,7 +219,7 @@ static func incoming(items: Array, amount: float, corroded: bool, burning: bool)
 		for entry in Sequence.entries(items):
 			var item: Dictionary = entry.item
 			var before: float = amount
-			amount *= STATS.get(item.id,EMPTY).get("incoming_factor",1.0)
+			amount *= Sets.stats(item,STATS).get("incoming_factor",1.0)
 			if not is_equal_approx(amount,before): activated.append_array(entry.activators)
 			if item.id == "magic_shield" and item.charges > 0 and not burning:
 				item.charges -= 1
@@ -254,7 +264,7 @@ static func turn_finished(model) -> Array:
 static func enemy_killed(model) -> void:
 	for entry in Sequence.entries(model.relics.items):
 		var item: Dictionary = entry.item
-		if STATS.get(item.id,EMPTY).has("damage_per_kill"):
+		if Sets.stats(item,STATS).has("damage_per_kill"):
 			if entry.origin == entry.slot: item.kills += 1
 			Sequence.activate(model,entry)
 
@@ -263,7 +273,7 @@ static func wave_cleared(model) -> int:
 	var rubies: int = 0
 	for entry in Sequence.entries(model.relics.items):
 		var item: Dictionary = entry.item
-		var stats: Dictionary = STATS.get(item.id,EMPTY)
+		var stats: Dictionary = Sets.stats(item,STATS)
 		rubies += stats.get("wave_rubies",0)
 		if stats.has("combo_uses_per_wave") and entry.origin == entry.slot: item.waves += 1
 		if stats.has("wave_rubies") or stats.has("combo_uses_per_wave"): Sequence.activate(model,entry)
@@ -369,11 +379,11 @@ static func roll_actions(model, perfect: bool) -> Array:
 		var area: bool = false
 		var count: int = 1
 		match item.id:
-			"worn_bow": amount = 5; fixed = true
+			"worn_bow": amount = 5
 			"tissue_pack":
-				if not model.dice_turn.active and model.pending.kind == Skill.Kind.NORMAL: amount = 10
+				if not model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i])): amount = 10
 			"magic_slingshot":
-				if not model.dice_turn.active and model.pending.kind == Skill.Kind.PAIR: amount = model.pending.spare
+				amount = model.dice_turn.unused().reduce(func(total,i): return total+model.dice_turn.values[i],0)*0.5
 			"pet_ghost": amount = 50; fixed = true; area = true
 			"pet_dragon": amount = 50; count = 2
 			"spiked_helmet":
@@ -384,12 +394,6 @@ static func roll_actions(model, perfect: bool) -> Array:
 			for i in range(count): actions.append({"id":item.id,"activation":entry,"amount":amount,"fixed":fixed,"area":area})
 	return actions
 
-## Resolve trio-dependent relics once when the player locks a skill.
-static func formation_actions(model, skill: MultiHitSkill) -> Array:
-	var actions: Array = []
-	for entry in Sequence.entries(model.relics.items):
-		var amount: int = 0
-		if entry.item.id == "tissue_pack" and (skill.pattern == "straight" or (skill.pattern.is_empty() and skill.kind == Skill.Kind.NORMAL)): amount = 10
-		if entry.item.id == "magic_slingshot" and skill.kind == Skill.Kind.PAIR: amount = skill.spare
-		if amount > 0: actions.append({"id":entry.item.id,"activation":entry,"amount":amount,"fixed":false,"area":false})
-	return actions
+## Roll-trigger relics no longer trigger a second time when a skill is formed.
+static func formation_actions(_model, _skill: MultiHitSkill) -> Array:
+	return []

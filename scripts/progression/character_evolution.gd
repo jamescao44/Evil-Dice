@@ -11,6 +11,7 @@ var queued: Array = []
 var age := -1.0
 var forms: Array[Texture2D] = []
 var silhouettes: Array[Texture2D] = []
+var visible_bounds: Array[Rect2] = []
 
 ## Cache sprites and white silhouettes once, rather than rebuilding them during effects.
 func _ready() -> void:
@@ -21,6 +22,8 @@ func _ready() -> void:
 		var texture: Texture2D = load("res://assets/art/player/flamelings/level-%d.png" % (i+2))
 		forms.append(texture)
 		var mask: Image = texture.get_image()
+		var used: Rect2 = Rect2(mask.get_used_rect())
+		visible_bounds.append(Rect2(used.position/Vector2(mask.get_size()),used.size/Vector2(mask.get_size())))
 		for y in range(mask.get_height()):
 			for x in range(mask.get_width()): mask.set_pixel(x,y,Color(1,1,1,mask.get_pixel(x,y).a))
 		silhouettes.append(ImageTexture.create_from_image(mask))
@@ -65,6 +68,12 @@ func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
 	if age < 0: return
 	var glow: float = smoothstep(0.15,REVEAL,age)*(1-smoothstep(REVEAL,1.3,age))
 	canvas.draw_texture_rect(silhouettes[index],rect,false,Color(0.8,0.97,1,glow*0.95))
+
+## Exclude transparent sprite padding when placing character-attached UI.
+func visible_rect(rect: Rect2) -> Rect2:
+	if visible_bounds.is_empty(): return rect
+	var bounds: Rect2 = visible_bounds[clampi(displayed_level-1,0,visible_bounds.size()-1)]
+	return Rect2(rect.position+bounds.position*rect.size,bounds.size*rect.size)
 
 ## Keep the level visible in the header with no manual upgrade button.
 func _draw() -> void:

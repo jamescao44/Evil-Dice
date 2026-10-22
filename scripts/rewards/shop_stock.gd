@@ -84,7 +84,7 @@ func can_buy(run, slot: int) -> bool:
 ## Indicate when a purchase requires choosing an owned relic to replace.
 func needs_replacement(run, slot: int) -> bool:
 	if not can_buy(run,slot) or offers[slot].kind != "relic": return false
-	return run.relics.items.size() >= Relics.MAX_SLOTS and not (offers[slot].id == "codex_page" and run.relics.has("codex_page"))
+	return run.relics.items.size() >= Relics.MAX_SLOTS and run.relics.needs_slot(offers[slot].id)
 
 ## Commit one paid grant; failed replacements and repeat taps cost nothing.
 func buy(run, slot: int, replace_index: int = -1) -> Dictionary:

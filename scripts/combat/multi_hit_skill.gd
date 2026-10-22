@@ -14,6 +14,7 @@ var base_uses: int = 1
 var use_modifiers: Dictionary = {}
 var target: int = -1
 var uses_spent: int = 0
+var bonus_random_from: int = -1
 var _cast_uses: int = 0
 var perfect: bool = false
 var critical: bool = false
@@ -78,6 +79,7 @@ func is_combo_attack() -> bool:
 	return pattern == "match" or (pattern.is_empty() and random_target_per_use())
 
 func random_target_per_use() -> bool:
+	if bonus_random_from >= 0 and uses_spent >= bonus_random_from: return true
 	if not pattern.is_empty(): return pattern == "match_auto"
 	return face == 5 and kind in [Kind.PAIR, Kind.SPECIAL]
 
@@ -91,6 +93,7 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 	copy.use_modifiers = use_modifiers.duplicate()
 	copy.target = target
 	copy.uses_spent = uses_spent
+	copy.bonus_random_from = bonus_random_from
 	copy._cast_uses = _cast_uses
 	copy.perfect = perfect
 	copy.critical = critical
@@ -99,4 +102,4 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 	return copy
 
 func same_as(other: MultiHitSkill) -> bool:
-	return other != null and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked
+	return other != null and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and bonus_random_from == other.bonus_random_from and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked
