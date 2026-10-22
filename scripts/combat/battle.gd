@@ -80,7 +80,7 @@ const PURPLE := Color("c5a4de")
 const RED := Color("e99b81")
 # Layout geometry is instance-local; the portrait scene overrides it before setup.
 var ARENA := Rect2(24, 80, 1232, 372)
-var DICE_CENTER := Vector2(639, 610)
+var DICE_CENTER := Vector2(639, 598)
 var DICE_RADIUS := 144.0
 var DICE_POSITIONS: Array = []
 var dice_selection: Node2D
@@ -107,7 +107,7 @@ var DEBUG_TAROTS := Rect2(808,568,332,44)
 var DEBUG_TAROT_DRAW := Rect2(808,626,332,40)
 var DEBUG_CHEST := Rect2(136,568,300,44)
 var DEBUG_TREASURE := Rect2(456,568,332,44)
-var REWARD_CENTER := Vector2(195, 625)
+var REWARD_CENTER := Vector2(195, 613)
 var CITY_POINT := Vector2(925, 282)
 static var HORROR_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.player_size)
 static var HUMAN_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.enemy_size)
@@ -503,6 +503,7 @@ func _notification(what: int) -> void:
 	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(dice_selection): dice_selection.cancel_gesture()
 	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(tarot_ui): tarot_ui.cancel_gesture()
 	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(relic_ui): relic_ui.cancel_hold()
+	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(inventory_page): inventory_page.cancel_drag()
 	if what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED] and is_instance_valid(shop_ui): shop_ui.cancel_drag()
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		active_touch = -1
@@ -763,7 +764,7 @@ func _skill_reveal_point() -> Vector2:
 	return Vector2(402, 668) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 340)
 
 func _skill_rest_point() -> Vector2:
-	return Vector2(402, 1196) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 420)
+	return DICE_CENTER-Vector2(0,214) if fx.canvas_size.y > fx.canvas_size.x else Vector2(640, 420)
 
 func _skill_center() -> Vector2:
 	return skill_bubble.center_at() if is_instance_valid(skill_bubble) else _skill_rest_point()
@@ -908,7 +909,7 @@ func _handle_skill_click(point: Vector2) -> void:
 
 ## Move a held skill and refresh its target highlight.
 func _handle_motion(point: Vector2) -> void:
-	if is_instance_valid(inventory_page) and inventory_page.opened: return
+	if is_instance_valid(inventory_page) and inventory_page.motion(point): return
 	if is_instance_valid(shop_ui) and shop_ui.motion(point): return
 	if is_instance_valid(dice_selection) and dice_selection.motion(point): return
 	if is_instance_valid(tarot_cast) and tarot_cast.active(): return
@@ -924,7 +925,7 @@ func _handle_motion(point: Vector2) -> void:
 
 ## Resolve a skill drop into casting, saving or cancellation.
 func _handle_release(point: Vector2) -> void:
-	if is_instance_valid(inventory_page) and inventory_page.opened: return
+	if is_instance_valid(inventory_page) and inventory_page.release(point): return
 	if is_instance_valid(shop_ui) and shop_ui.release(point): return
 	if is_instance_valid(dice_selection) and dice_selection.release(point): return
 	if is_instance_valid(tarot_cast) and tarot_cast.active(): return
@@ -1844,7 +1845,7 @@ func _restart(wave_number: int = 1) -> void:
 	if is_instance_valid(shop_ui): shop_ui.cancel()
 	if is_instance_valid(crystal_pickup): crystal_pickup.reset()
 	if is_instance_valid(soul_pickup): soul_pickup.reset()
-	if is_instance_valid(relic_ui): relic_ui.reset()
+	if is_instance_valid(relic_ui): relic_ui.reset(true)
 	if is_instance_valid(tarot_ui): tarot_ui.reset()
 	if is_instance_valid(tarot_cast): tarot_cast.reset()
 	_clear_skill()
@@ -2634,7 +2635,7 @@ func _status_description(id: int, count: int) -> String:
 
 func _draw_console() -> void:
 	_draw_reward_progress(REWARD_CENTER, 1.0)
-	if _power_meter_visible(): _draw_power_meter(Rect2(967, 580, 216, 16),12)
+	if _power_meter_visible(): _draw_power_meter(Rect2(967, DICE_CENTER.y-30, 216, 16),12)
 
 func _dice_spent() -> bool:
 	return view_phase in ["forming", "skill", "targeting", "resolving"]
@@ -2742,10 +2743,9 @@ func _draw_dice_circle() -> void:
 	_draw_perfect_combo()
 	if is_instance_valid(tarot_ui): draw_set_transform_matrix(tarot_ui.dice_transform())
 	var layout_scale: float = DICE_RADIUS / 144.0
-	var available: bool = view_phase in ["ready", "skill", "charging"] and not _menus_open()
 	var spent: bool = _dice_spent()
 	var fever: bool = model.is_city() and view_phase in ["ready", "charging", "rolling"] and not _menus_open()
-	var color: Color = Color("696a70") if spent else GOLD if available or fever else status_color
+	var color: Color = GOLD
 	Pixel.disc(self, DICE_CENTER + Vector2(0, 6), DICE_RADIUS + 6, Color(INK, 0.7))
 	Pixel.disc(self, DICE_CENTER, DICE_RADIUS, Color("29292d") if spent else Color("303529"))
 	Pixel.disc(self, DICE_CENTER, DICE_RADIUS - 10, Color("202024") if spent else Color("252d25"))

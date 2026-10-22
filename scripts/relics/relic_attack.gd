@@ -12,6 +12,7 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 		targets = [target]
 	var skill = Skill.new(Skill.Kind.PAIR,4 if all_targets else 1,model.pending.dice)
 	var damage: int = maxi(0,floori(amount if fixed else (amount+model.relic_base_damage())*model.damage_multiplier(skill)+0.000001))
+	if not fixed: model.RelicEffects.activate_damage_modifiers(model,skill)
 	var guards: Array = model.taunting_enemies()
 	var events: Array = []
 	var old_lifesteal: int = model.lifesteal_used

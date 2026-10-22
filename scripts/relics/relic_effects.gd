@@ -133,6 +133,12 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill) -> Ar
 			steps.append({"source":"relic","id":entry.source,"slot":slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0)),"auto_bonus":float(stats.get("auto_damage",0.0)) if skill.pattern == "match_auto" else 0.0})
 	return steps
 
+## Auto and relic attacks bypass the damage-build UI but still show contributing relics.
+static func activate_damage_modifiers(model, skill: MultiHitSkill) -> void:
+	var start: float = model.damage_baseline()+model.reward_damage_multiplier+(model.attack_multiplier()-1.0)
+	for step in attack_steps(model.relics.items,start,skill):
+		Sequence.activate_ids(model,step.activators,step.speed)
+
 ## Combine relic extra-hit rules with the skill’s existing use modifiers.
 static func use_modifiers(items: Array, skill: MultiHitSkill, modifiers: Dictionary) -> Dictionary:
 	var result: Dictionary = modifiers.duplicate()

@@ -824,6 +824,7 @@ func resolve_roll_attack_step() -> Array:
 		return []
 	var skill: MultiHitSkill = roll_attacks[0].skill
 	if skill.uses_spent == 0: lifesteal_used = 0
+	RelicEffects.activate_damage_modifiers(self,skill)
 	var events: Array = _apply_attack_hit(skill,{"target":target,"damage":attack_damage(skill,target),"ignore":false})
 	events.append_array(RelicEffects.attack_used(self))
 	skill.consume_use()

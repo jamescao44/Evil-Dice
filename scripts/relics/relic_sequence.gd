@@ -24,9 +24,13 @@ static func _copy(items: Array, index: int, slot: int, chain: Array) -> Array:
 	return [{"item":item,"origin":index,"slot":slot,"source":items[slot].id,"activators":activators}]
 
 static func activate(model, entry: Dictionary) -> void:
+	activate_ids(model,entry.activators,animation_speed(entry))
+
+## Notify presentation without applying effects or advancing counters a second time.
+static func activate_ids(model, ids: Array, speed: float = 1.0) -> void:
 	var previous: float = model.relic_activation_speed
-	model.relic_activation_speed = animation_speed(entry)
-	for id in entry.activators: model.relic_activated.emit(id)
+	model.relic_activation_speed = speed
+	for id in ids: model.relic_activated.emit(id)
 	model.relic_activation_speed = previous
 
 static func animation_speed(entry: Dictionary) -> float:

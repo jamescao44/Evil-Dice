@@ -39,6 +39,14 @@ func _ready() -> void:
 func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
 
+## The battle uses a backpack; the shop retains its separate owned-item rail.
+func strip_visible() -> bool:
+	return battle.view_phase == "shop"
+
+## Land acquisitions in the visible backpack when the battle rail is absent.
+func pickup_target() -> Vector2:
+	return slot_rect(pickup.slot).get_center() if strip_visible() else battle.inventory_page.button_rect().get_center()
+
 func inventory_rect() -> Rect2:
 	if battle.view_phase == "shop": return battle.shop_ui.inventory_rect()
 	if chest_slot >= 0 or (battle.view_phase == "reward" and pickup.active): return Rect2(48,1376,708,64) if portrait() else Rect2(260,602,760,56)
@@ -51,7 +59,8 @@ func battle_icon_radius() -> float:
 ## Share one activation envelope across inventory icons and their orbiting copies.
 func activation_strength(id: String) -> float:
 	if not activations.has(id): return 0.0
-	return sin(clampf(activations[id].age/ACTIVATION_TIME,0,1)*PI)
+	var t: float = clampf(activations[id].age/ACTIVATION_TIME,0,1)
+	return lerpf(activations[id].get("start_strength",0.55),1.0,smoothstep(0,0.22,t))*(1-smoothstep(0.22,1,t))
 
 func slot_rect(index: int) -> Rect2:
 	var row: Rect2 = inventory_rect()
@@ -62,7 +71,7 @@ func skip_rect() -> Rect2:
 	return Rect2(142,1490,520,96) if portrait() else Rect2(422,686,436,58)
 
 func interactable() -> bool:
-	return not pickup.active and not battle._menus_open() and battle.inspecting_enemy < 0 and (battle.view_phase in ["ready","skill","shop"] or (battle.view_phase == "wave_reward" and battle.wave_chest.phase == "routes") or (battle.view_phase == "reward" and chest_slot >= 0))
+	return strip_visible() and not pickup.active and not battle._menus_open() and battle.inspecting_enemy < 0
 
 func at_slot(at: Vector2) -> int:
 	for i in range(battle.model.relics.items.size()):
@@ -130,17 +139,24 @@ func cancel_hold() -> void:
 	pressed = -1
 	dragging = false
 
-func reset() -> void:
+## Closing reward UI must not restart the orbit or erase just-triggered wave bonuses.
+func reset(new_run: bool = false) -> void:
 	cancel_hold()
 	chest_slot = -1
-	activations.clear()
-	ready_clock = 0.0
 	pickup.clear()
+	if new_run:
+		activations.clear()
+		ready_clock = 0.0
 
 func activate(id: String, animation_speed: float = 0.0) -> void:
 	var slot: int = battle.model.relics.index_of(id)
 	if animation_speed <= 0: animation_speed = battle.model.relic_activation_speed
-	if slot >= 0: activations[id] = {"age":0.0,"slot":slot,"speed":animation_speed}
+	if slot < 0: return
+	# Ingredient activations belong to their fused icon; retriggers never dip to zero.
+	var item: Dictionary = battle.model.relics.items[slot]
+	var key: String = item.id
+	var start: float = maxf(0.55,activation_strength(key))
+	activations[key] = {"age":0.0,"slot":slot,"speed":animation_speed,"start_strength":start,"item":item.duplicate(true)}
 
 func activation_tilt(id: String) -> float:
 	if battle.reduced or not activations.has(id): return 0.0
@@ -184,6 +200,9 @@ func _frame(rect: Rect2, color: Color, rarity: bool = false) -> void:
 
 func _draw() -> void:
 	if not is_instance_valid(battle) or battle._menus_open() or battle.view_phase == "over" or (battle.view_phase == "reward" and chest_slot < 0 and not pickup.active): return
+	if not strip_visible():
+		if pickup.active: pickup.paint(self,pickup_target(),battle_icon_radius(),battle.reduced)
+		return
 	if chest_slot >= 0: _draw_chest_replacement()
 	draw_style_box(bar_style,inventory_rect())
 	var order: Array = range(battle.model.relics.items.size())

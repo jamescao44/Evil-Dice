@@ -4,10 +4,23 @@ const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Paint = preload("res://scripts/relics/relic_paint.gd")
 const Panels = preload("res://scripts/tarot/tarot_paint.gd")
 const GOLD := Color("dfc78d")
+const BACKPACK_PIXELS := [
+	"000000kkkkkk000000", "00000kk0000kk00000", "00000kl0000lk00000",
+	"000kkkkkkkkkkkk000", "00kllbbbbbbbbllk00", "0klbbbbbbbbbbbblk0",
+	"0klbbbbbbbbbbbblk0", "0kllllllllllllllk0", "0kllffffffffffllk0",
+	"0klllfffffffflllk0", "0klbllllggllllblk0", "0klbbbbkggkbbbblk0",
+	"0klbbbbkkkkbbbblk0", "0klbbbbbbbbbbbblk0", "0klbkkkkkkkkbblk00",
+	"0klbklpppplkbblk00", "0klbkllllllkbblk00", "0klbkkkkkkkkbblk00",
+	"00kbbbbbbbbbbbk000", "000kkkkkkkkkkk0000"]
+const BACKPACK_PALETTE := {"k":Color("171b1a"),"b":Color("8c6749"),"l":Color("b79762"),"f":Color("c6ab72"),"g":GOLD,"p":Color("72543d")}
 var battle
 var opened: bool = false
 var selected: int = -1
 var replacement: String = ""
+var pressed: int = -1
+var dragging: bool = false
+var press_origin := Vector2.ZERO
+var pointer := Vector2.ZERO
 
 ## Cover held items while remaining below settings and help.
 func _ready() -> void:
@@ -18,11 +31,12 @@ func _ready() -> void:
 func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
 
-## Place the inventory shortcut in free header space on every supported page.
+## Mirror the tarot shortcut in battle; reward and shop pages keep a header shortcut.
 func button_rect() -> Rect2:
 	if battle.view_phase in ["shop","reward","over"]:
-		return Rect2(620,124,136,76) if portrait() else Rect2(1090,26,148,48)
-	return Rect2(338,124,108,88) if portrait() else Rect2(974,24,96,34)
+		return Rect2(652,124,104,104) if portrait() else Rect2(1168,26,66,66)
+	var tarot: Rect2 = battle.tarot_ui.icon_rect()
+	return Rect2(Vector2(2*battle.DICE_CENTER.x-tarot.end.x,tarot.position.y),tarot.size)
 
 ## Permit browsing during battle, shop decisions and chest collection.
 func available(source: String = "") -> bool:
@@ -34,6 +48,7 @@ func open(source: String = "") -> void:
 	if not available(source): return
 	opened = true
 	selected = -1
+	cancel_drag()
 	replacement = source
 	if replacement.is_empty() and battle.view_phase == "shop" and battle.shop_ui.replacing: replacement = "shop"
 	if replacement.is_empty() and battle.view_phase == "reward" and battle.relic_ui.chest_slot >= 0: replacement = "chest"
@@ -41,6 +56,7 @@ func open(source: String = "") -> void:
 	battle._cancel_enemy_hold()
 	battle.relic_ui.cancel_hold()
 	battle.tarot_ui.cancel_gesture()
+	battle.tarot_ui.inspected = -1
 	battle.shop_ui.cancel_drag()
 	battle._sound("ui/book",1,-17)
 	queue_redraw()
@@ -50,6 +66,7 @@ func close(cancel_pending: bool = true) -> void:
 	var source: String = replacement
 	opened = false
 	selected = -1
+	cancel_drag()
 	replacement = ""
 	battle.tarot_ui.swallow_release = true
 	if cancel_pending:
@@ -63,6 +80,44 @@ func slot_rect(index: int) -> Rect2:
 	var size := Vector2(132,164) if portrait() else Vector2(168,154)
 	var start := Vector2(48,520) if portrait() else Vector2(176,244)
 	return Rect2(start+Vector2(index%5,index/5)*step,size)
+
+## Number the first row from above and the second row from below.
+func number_position(index: int) -> Vector2:
+	var rect: Rect2 = slot_rect(index)
+	return Vector2(rect.get_center().x,rect.position.y-14 if index < 5 else rect.end.y+(32 if portrait() else 28))
+
+## Empty cells accept an append, preserving continuous left-to-right activation order.
+func drop_index(at: Vector2) -> int:
+	var count: int = battle.model.relics.items.size()
+	if count == 0: return -1
+	for i in range(Catalog.MAX_SLOTS):
+		if slot_rect(i).grow(6).has_point(at): return mini(i,count-1)
+	return -1
+
+## Capture a two-dimensional drag only after a small mouse or finger movement.
+func motion(at: Vector2) -> bool:
+	if not opened: return false
+	if pressed >= 0:
+		pointer = at
+		if at.distance_to(press_origin) > (14 if portrait() else 8): dragging = true
+	return true
+
+## A tap opens details; a drop reorders exactly once and never selects a reward.
+func release(at: Vector2) -> bool:
+	if not opened: return false
+	if pressed >= 0:
+		motion(at)
+		if dragging:
+			var destination: int = drop_index(at)
+			if destination >= 0: battle.model.move_relic(pressed,destination)
+		elif slot_rect(pressed).has_point(at): selected = pressed
+	cancel_drag()
+	return true
+
+## Cancel gestures on close or focus loss without changing inventory priority.
+func cancel_drag() -> void:
+	pressed = -1
+	dragging = false
 
 ## Keep close and back controls separate from item or replacement taps.
 func close_rect() -> Rect2:
@@ -103,7 +158,12 @@ func click(at: Vector2) -> bool:
 		elif not replacement.is_empty() and replace_rect().has_point(at): _replace()
 	else:
 		for i in range(battle.model.relics.items.size()):
-			if slot_rect(i).has_point(at): selected = i; break
+			if slot_rect(i).has_point(at):
+				pressed = i
+				press_origin = at
+				pointer = at
+				dragging = false
+				break
 	return true
 
 ## Confirm replacement only from the inspected item's explicit action button.
@@ -140,7 +200,7 @@ func _button(rect: Rect2, label: String) -> void:
 ## Paint a compact shortcut or the opaque inventory page above every game layer.
 func _draw() -> void:
 	if not opened:
-		if available(): _button(button_rect(),"ITEMS")
+		if not battle.menu_open and not battle.guide and not battle.debug_open and not battle.tarot_ui.ceremony.active() and not battle.tarot_cast.active(): _draw_shortcut()
 		return
 	draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color("15191e"))
 	_button(close_rect(),"CANCEL" if replacement in ["chest","tarot"] else "CLOSE")
@@ -148,10 +208,41 @@ func _draw() -> void:
 	if selected >= 0: _draw_item(); return
 	_text(Vector2(battle.fx.canvas_size.x/2,320 if portrait() else 156),"RELIC INVENTORY",44 if portrait() else 36)
 	_text(Vector2(battle.fx.canvas_size.x/2,388 if portrait() else 202),GameText.format("%d / 10 ITEMS",battle.model.relics.items.size()),27 if portrait() else 21,Color("a9a39c"))
-	for i in range(Catalog.MAX_SLOTS): _draw_slot(i)
-	var message: String = "Choose an owned item to inspect before replacing it." if not replacement.is_empty() else "Tap an item to view its details."
-	Panels.wrap(self,battle.description_font,Rect2(48 if portrait() else 176,956 if portrait() else 604,708 if portrait() else 928,80),message,28 if portrait() else 22,Color("c4bba8"),true)
+	var order: Array = range(battle.model.relics.items.size())
+	var destination: int = drop_index(pointer) if dragging else -1
+	if dragging:
+		order.erase(pressed)
+		order.insert(destination if destination >= 0 else pressed,-1)
+	for i in range(Catalog.MAX_SLOTS):
+		_draw_slot(i,order[i] if i < order.size() else -1)
+		_text(number_position(i),str(i+1),28 if portrait() else 22,Color("a9a39c"))
+	var message: String = "Tap to compare · Drag to reorder" if not replacement.is_empty() else "Tap to inspect · Drag to reorder"
+	Panels.wrap(self,battle.description_font,Rect2(48 if portrait() else 176,956 if portrait() else 620,708 if portrait() else 928,64),message,28 if portrait() else 22,Color("c4bba8"),true)
 	_draw_incoming(false)
+	if dragging and pressed >= 0 and pressed < battle.model.relics.items.size():
+		if destination >= 0:
+			var rect: Rect2 = slot_rect(destination)
+			Panels.panel(self,rect.grow(-4),Color("a8adb0",0.22),Color("c8cbce",0.9),12)
+		var item: Dictionary = battle.model.relics.items[pressed]
+		var at: Vector2 = slot_rect(pressed).get_center()-Vector2(0,16)+pointer-press_origin
+		Paint.paint(self,item.id,at,58 if portrait() else 55,true,item)
+
+## A hand-drawn pixel backpack stays visible as the destination for incoming relics.
+func _draw_shortcut() -> void:
+	var rect: Rect2 = button_rect()
+	var scale_factor: Vector2 = battle.relic_ui.pickup.inventory_scale(battle.relic_ui.pickup.slot,battle.reduced)
+	draw_set_transform(rect.get_center(),0,scale_factor)
+	Panels.panel(self,Rect2(-rect.size/2,rect.size),Color("292821"),Color("9b8863"),14)
+	var unit: float = rect.size.x/28.0
+	var origin := Vector2(-9,-10)*unit
+	for y in range(BACKPACK_PIXELS.size()):
+		for x in range(BACKPACK_PIXELS[y].length()):
+			var key: String = BACKPACK_PIXELS[y][x]
+			if BACKPACK_PALETTE.has(key): draw_rect(Rect2(origin+Vector2(x,y)*unit,Vector2.ONE*unit),BACKPACK_PALETTE[key])
+	var count: int = battle.model.relics.items.size()
+	if count > 0: _text(rect.size/2-Vector2(17,8),str(count),22 if portrait() else 16)
+	if not available(): Panels.panel(self,Rect2(-rect.size/2,rect.size),Color(0.06,0.06,0.07,0.45),Color.TRANSPARENT,14)
+	draw_set_transform(Vector2.ZERO)
 
 ## Keep the new relic visible while players compare it with an owned item's details.
 func _draw_incoming(compact: bool) -> void:
@@ -174,10 +265,10 @@ func _draw_incoming(compact: bool) -> void:
 	_button(discard_rect(),"DISCARD")
 
 ## Keep empty cells visible and tint collected cells by their item's rarity.
-func _draw_slot(index: int) -> void:
+func _draw_slot(index: int, item_index: int) -> void:
 	var rect: Rect2 = slot_rect(index)
-	var occupied: bool = index < battle.model.relics.items.size()
-	var item: Dictionary = battle.model.relics.items[index] if occupied else {}
+	var occupied: bool = item_index >= 0
+	var item: Dictionary = battle.model.relics.items[item_index] if occupied else {}
 	var color: Color = Catalog.rarity_color(item.id) if occupied else Color("42474b")
 	Panels.panel(self,rect,Color(color,0.09 if occupied else 0.03),Color(color,0.75 if occupied else 0.55),12)
 	if not occupied:

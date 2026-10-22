@@ -45,11 +45,57 @@ func formation(g, label: String) -> void:
 func tap(g, at: Vector2) -> void:
 	g._handle_click(at); g._handle_release(at)
 
+## Verify tap/drag separation, cross-row priority and cancelled drops through real input.
+func reorder(g, label: String) -> void:
+	var page = g.inventory_page
+	var before: Array = g.model.relics.items.duplicate(true)
+	var money: int = g.model.blood_gems
+	var rng_before: int = g.model.reward_rng.state
+	var first: Vector2 = page.slot_rect(0).get_center()
+	var second_row: Vector2 = page.slot_rect(5).get_center()
+	g._handle_click(first)
+	check(page.selected < 0,"Press waits for release before opening details")
+	g._handle_motion(second_row)
+	check(page.dragging and page.drop_index(second_row) == 5,"Drag reaches the second row")
+	check(g.model.relics.items == before,"Drop preview does not mutate priority")
+	await capture(g,"backpack-drag-"+label)
+	g._handle_release(second_row)
+	check(page.selected < 0 and g.model.relics.items[5] == before[0],"Cross-row drop moves the exact item without opening details")
+	var moved: Array = g.model.relics.items.duplicate(true)
+	g._handle_release(second_row)
+	check(g.model.relics.items == moved,"Repeated release cannot reorder twice")
+	g._handle_click(second_row); g._handle_motion(first); g._handle_release(first)
+	check(g.model.relics.items == before,"Dragging back restores the original order")
+	g._handle_click(first); g._handle_motion(Vector2.ZERO); g._handle_release(Vector2.ZERO)
+	check(g.model.relics.items == before and page.selected < 0,"Dropping outside the grid cancels")
+	g._handle_click(first); g._handle_motion(second_row)
+	g._notification(MainLoop.NOTIFICATION_APPLICATION_PAUSED)
+	g._handle_release(second_row)
+	check(not page.dragging and g.model.relics.items == before,"Focus loss cancels without moving an item")
+	g._handle_click(first); g._handle_motion(first+Vector2(2,2)); g._handle_release(first+Vector2(2,2))
+	check(page.selected == 0,"A small finger wobble still opens the item description")
+	tap(g,page.back_rect().get_center())
+	if before.size() < 10:
+		var empty: Vector2 = page.slot_rect(9).get_center()
+		g._handle_click(first); g._handle_motion(empty); g._handle_release(empty)
+		check(g.model.relics.items[-1] == before[0] and g.model.relics.items.size() == before.size(),"An empty slot appends without losing items")
+		var last: Vector2 = page.slot_rect(before.size()-1).get_center()
+		g._handle_click(last); g._handle_motion(first); g._handle_release(first)
+	check(g.model.relics.items == before and g.model.blood_gems == money and g.model.reward_rng.state == rng_before,"Reordering preserves contents, payment and reward RNG")
+
 ## Verify ten empty/owned slots, item pages and restoration across all contexts.
 func inventory(g, label: String) -> void:
 	g._restart()
 	var page = g.inventory_page
 	for id in ["heart","magic_sword","runestone","mithril_blade","cursed_skull","codex_page"]: g.model.acquire_relic(id)
+	check(not g.relic_ui.strip_visible() and not g.relic_ui.interactable(),"Removed battle strip has no invisible hit targets")
+	check(is_equal_approx(page.button_rect().get_center().x+g.tarot_ui.icon_rect().get_center().x,g.DICE_CENTER.x*2),"Backpack mirrors the tarot shortcut")
+	check(is_equal_approx(page.button_rect().get_center().y,g.tarot_ui.icon_rect().get_center().y),"Both shortcuts share the same height")
+	check(g.DICE_CENTER.y < (1410 if label == "portrait" else 610),"Dice move upward")
+	check(g.DICE_CENTER.y-g.DICE_RADIUS >= g.ARENA.end.y,"Raised dice do not overlap the battlefield")
+	check(not page.button_rect().intersects(g.dice_selection.skill_cancel_rect()) or page.button_rect().position.x > g.DICE_CENTER.x+g.DICE_RADIUS,"Backpack stays clear of the dice")
+	g._process(0)
+	await capture(g,"backpack-battle-"+label)
 	for context in ["ready","shop","reward","wave_reward"]:
 		g.view_phase = context
 		if context == "shop":
@@ -62,6 +108,8 @@ func inventory(g, label: String) -> void:
 		for i in range(10):
 			check(Rect2(Vector2.ZERO,g.fx.canvas_size).encloses(page.slot_rect(i)),"Ten slots stay on screen")
 			check(is_equal_approx(page.slot_rect(i).position.y,page.slot_rect(0 if i < 5 else 5).position.y),"Exactly five slots per row")
+			check(page.number_position(i).y < page.slot_rect(i).position.y if i < 5 else page.number_position(i).y > page.slot_rect(i).end.y,"Slot numbers sit outside their respective row")
+		await reorder(g,label+context)
 		tap(g,page.slot_rect(9).get_center())
 		check(page.selected < 0,"Empty slot has no item detail")
 		await capture(g,"inventory-"+label+context)
@@ -73,6 +121,14 @@ func inventory(g, label: String) -> void:
 		check(not page.opened and g.view_phase == context and g.model.blood_gems == money and g.model.reward_rng.state == rng_before,"Browsing preserves purchases, rewards and RNG")
 		g.shop_ui.cancel()
 	g.model.shop.active = false
+	g.view_phase = "ready"
+	g.model.tarots.add("tower"); g.tarot_ui.opened = true; g.tarot_ui.expansion = 1; g.tarot_ui.inspected = 0
+	tap(g,page.button_rect().get_center())
+	check(page.opened and g.tarot_ui.opened and g.tarot_ui.inspected < 0,"Backpack opens from tarot mode and clears stale card inspection")
+	await reorder(g,label+"-tarot")
+	tap(g,page.close_rect().get_center())
+	check(g.tarot_ui.opened,"Closing the backpack restores tarot mode")
+	g.tarot_ui.close_inventory()
 
 ## Exercise drag cancellation, direct buys, duplicate protection and pickup layering.
 func shop_drag(g, label: String) -> void:
@@ -138,6 +194,8 @@ func chest_inventory(g, label: String) -> void:
 	check(g.relic_ui.chest_slot == 0 and g.model.claimed_slots.is_empty(),"Full inventory retains pending prize")
 	check(g.inventory_page.opened and g.inventory_page.replacement == "chest","Full chest claim automatically opens the replacement backpack")
 	check(g.inventory_page.incoming_relic() == "contract","The backpack shows the locked incoming relic")
+	await reorder(g,label+"-replacement")
+	check(g.inventory_page.incoming_relic() == "contract" and g.model.claimed_slots.is_empty(),"Reordering during replacement does not claim the pending prize")
 	tap(g,g.inventory_page.close_rect().get_center())
 	check(not g.inventory_page.opened and g.relic_ui.chest_slot == -1 and g.model.claimed_slots.is_empty(),"Cancelling returns to the chest without discarding its prize")
 	tap(g,g.chest.reel_rect(0).get_center())
@@ -147,6 +205,7 @@ func chest_inventory(g, label: String) -> void:
 	await capture(g,"chest-item-replace-"+label)
 	tap(g,g.inventory_page.replace_rect().get_center())
 	check(not g.inventory_page.opened and g.model.relics.items[2].id == "contract" and g.model.claimed_slots == [0],"Explicit item-page confirmation replaces once")
+	check(g.relic_ui.pickup_target() == g.inventory_page.button_rect().get_center(),"Chest pickup now lands in the backpack shortcut")
 	check(g.model.reward_rng.state == rng_before,"Inventory never rerolls a chest")
 	g.relic_ui.pickup.clear()
 	g.model.claimed_slots.clear(); g.chest.collected.clear()

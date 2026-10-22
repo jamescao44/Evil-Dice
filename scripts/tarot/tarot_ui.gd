@@ -335,7 +335,7 @@ func _draw() -> void:
 	if expansion > 0:
 		var center: Vector2 = battle.DICE_CENTER+Vector2(0,-40)
 		for i in range(7,0,-1): draw_circle(center,battle.DICE_RADIUS+i*4,Color(0.08,0.07,0.15,expansion*0.07))
-		Paint.text(self,battle.description_font,Vector2(center.x,1196 if portrait() else 493),"TAROT COLLECTION",26 if portrait() else 18,Color(Paint.GOLD,expansion))
+		Paint.text(self,battle.description_font,Vector2(center.x,battle.DICE_CENTER.y-(214 if portrait() else 117)),"TAROT COLLECTION",26 if portrait() else 18,Color(Paint.GOLD,expansion))
 		for i in carousel_order():
 			if gesture == "card" and pressed_card == i: continue
 			var pose: Dictionary = carousel_pose(i)
@@ -343,8 +343,8 @@ func _draw() -> void:
 		var front: int = front_index()
 		if front >= 0:
 			var id: String = battle.model.tarots.items[front].id
-			Paint.text(self,battle.description_font,Vector2(center.x,1652 if portrait() else 771),Catalog.ITEMS[id].name,26 if portrait() else 18,Color(Paint.GOLD,expansion))
-			Paint.text(self,battle.description_font,Vector2(center.x,1693 if portrait() else 794),"SWIPE · TAP TO INSPECT · DRAG TO CAST",19 if portrait() else 13,Color(Paint.LILAC,expansion))
+			Paint.text(self,battle.description_font,Vector2(center.x,battle.DICE_CENTER.y+(242 if portrait() else 161)),Catalog.ITEMS[id].name,26 if portrait() else 18,Color(Paint.GOLD,expansion))
+			Paint.text(self,battle.description_font,Vector2(center.x,battle.DICE_CENTER.y+(283 if portrait() else 184)),"SWIPE · TAP TO INSPECT · DRAG TO CAST",19 if portrait() else 13,Color(Paint.LILAC,expansion))
 		else:
 			Paint.text(self,battle.description_font,center,"NO TAROT CARDS YET",27 if portrait() else 19,Paint.GOLD)
 			Paint.wrap(self,battle.description_font,Rect2(center+Vector2(-220,28),Vector2(440,140)),"Find cards in wave rewards and treasures.",24 if portrait() else 17,Paint.LILAC,true)
@@ -400,7 +400,7 @@ func _draw_inspection() -> void:
 	draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.02,0.05,0.62*lift))
 	var pose: Dictionary = carousel_pose(inspected)
 	Paint.card(self,item.id,pose.at,pose.size,0,1,0.8)
-	var rect := Rect2(62,1040,680,236) if portrait() else Rect2(372,320,536,180)
+	var rect := Rect2(62,battle.DICE_CENTER.y-370,680,236) if portrait() else Rect2(372,battle.DICE_CENTER.y-290,536,180)
 	Paint.panel(self,rect,Color("211a38",0.94),Color("75628d"))
 	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,12),Vector2(rect.size.x-44,76)),Catalog.ITEMS[item.id].name,30 if portrait() else 23,Paint.GOLD)
 	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),Catalog.description(item.id),26 if portrait() else 19)

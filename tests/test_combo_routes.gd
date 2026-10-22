@@ -47,22 +47,25 @@ func damage_checks() -> void:
 	m.record_perfect(false)
 	check(m.perfect_combo == 0 and m.combo_multiplier() == 1.0,"A miss removes the entire independent factor")
 
-## Route choice keeps held relics visible and lets the ordinary inventory gestures work.
+## Route choice keeps the backpack available without routing its gestures into a destination.
 func presentation(portrait: bool) -> void:
 	root.content_scale_size = Vector2i(804,1748) if portrait else Vector2i(1280,800)
 	root.size = Vector2i(402,874) if portrait else Vector2i(1280,800)
 	var g = Portrait.new() if portrait else Battle.new()
 	root.add_child(g); g.muted = true; g.set_process_input(false)
-	g.model.acquire_relic("fries"); g.model.acquire_relic("hamburger")
+	g.model.acquire_relic("fries"); g.model.acquire_relic("heart")
 	g.view_phase = "wave_reward"
 	g.wave_chest.present_routes([g.model.WaveRewards.SOULS,g.model.WaveRewards.BLOOD_GEMS])
-	check(g.relic_ui.interactable(),"Route selection keeps inventory interactive")
-	var first: Vector2 = g.relic_ui.slot_rect(0).get_center()
-	var second: Vector2 = g.relic_ui.slot_rect(1).get_center()
+	var page = g.inventory_page
+	check(page.available() and not g.relic_ui.interactable(),"Route selection uses the backpack instead of a hidden inventory strip")
+	g._handle_click(page.button_rect().get_center()); g._handle_release(page.button_rect().get_center())
+	var first: Vector2 = page.slot_rect(0).get_center()
+	var second: Vector2 = page.slot_rect(1).get_center()
 	g._handle_click(first)
-	check(g.relic_ui.pressed == 0 and g.wave_chest.phase == "routes","Route overlay no longer swallows relic inspection")
+	check(page.pressed == 0 and g.wave_chest.phase == "routes","Route overlay does not swallow backpack input")
 	g._handle_motion(second); g._handle_release(second)
 	check(g.model.relics.items[1].id == "fries","Relic reordering works while choosing the next route")
+	g._handle_click(page.close_rect().get_center()); g._handle_release(page.close_rect().get_center())
 	g.model.perfect_combo = 5
 	if "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless":
 		await create_timer(0.3).timeout

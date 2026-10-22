@@ -23,7 +23,7 @@ func _configure_layout() -> void:
 	window.title = "Evil Dice | Portrait"
 	# All controls sit below the island and above the home-indicator safe zones.
 	ARENA = Rect2(24, 228, 756, 722)
-	DICE_CENTER = Vector2(402, 1410)
+	DICE_CENTER = Vector2(402, 1346)
 	DICE_RADIUS = 232
 	MENU_RECT = Rect2(672, 124, 88, 88)
 	MENU_CLOSE = Rect2(660, 132, 104, 88)
@@ -46,7 +46,7 @@ func _configure_layout() -> void:
 	DEBUG_WAVE_INPUT = Rect2(220, 1578, 150, 88)
 	DEBUG_WAVE_LOAD = Rect2(414, 1578, 350, 88)
 	REPLAY_RECT = Rect2(162, 1360, 480, 104)
-	REWARD_CENTER = Vector2(402,1064)
+	REWARD_CENTER = Vector2(402,1000)
 	CITY_POINT = CITY_TRANSFORM * Vector2(925, 282)
 
 func _configure_effects() -> void:
@@ -194,7 +194,7 @@ func _meter(rect: Rect2, ratio: float, color: Color) -> void:
 func _draw_console() -> void:
 	_draw_reward_progress(REWARD_CENTER, 1.5)
 	if _power_meter_visible():
-		_draw_power_meter(Rect2(186, 1126, 432, 24), 28)
+		_draw_power_meter(Rect2(186, DICE_CENTER.y-284, 432, 24), 28)
 
 func _draw_tooltips() -> void:
 	var index: int = selected_status if clock_time < status_until else -1

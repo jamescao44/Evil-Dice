@@ -714,6 +714,8 @@ DROP TO BUY,DROP TO BUY,松手购买
 %d / 10 ITEMS,%d / 10 ITEMS,%d / 10 件法具
 Choose an owned item to inspect before replacing it.,Choose an owned item to inspect before replacing it.,选择已有道具查看详情，再确认替换。
 Tap an item to view its details.,Tap an item to view its details.,点击道具查看详情。
+Tap to inspect · Drag to reorder,Tap to inspect · Drag to reorder,点击查看详情 · 拖动调整顺序
+Tap to compare · Drag to reorder,Tap to compare · Drag to reorder,点击比较道具 · 拖动调整顺序
 BACK TO INVENTORY,BACK TO INVENTORY,返回背包
 REPLACE THIS ITEM,REPLACE THIS ITEM,替换此道具
 CLOSE,CLOSE,关闭
