@@ -30,6 +30,7 @@ func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
 
 func available() -> bool:
+	if is_instance_valid(battle.tarot_cast) and battle.tarot_cast.active(): return false
 	return battle.view_phase == "ready" and battle.model.pending.is_empty() and not battle._menus_open() and not battle.tarot_ui.blocks_battle() and battle.inspecting_enemy < 0 and battle.model.outcome().is_empty()
 
 ## Keep the center hit area clear of all six dice.
@@ -159,7 +160,7 @@ func skill_color() -> Color:
 ## Prompt the first throw, or a usable reroll when the remaining pool has no straight.
 func should_prompt_roll() -> bool:
 	var pool = battle.model.dice_turn
-	return available() and pool.selected.is_empty() and pool.can_roll() and (pool.rolls_left == pool.ROLLS or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i])))
+	return available() and pool.selected.is_empty() and pool.can_roll() and (not pool.has_rolled() or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i])))
 
 ## Animate a bounded stream of sparks while the valid pattern is selected.
 func _process(delta: float) -> void:
@@ -233,7 +234,7 @@ func _draw() -> void:
 ## Send a fading pixel wave outward every two seconds; reduced effects stay still.
 func _draw_interactable_dice() -> void:
 	var pool = battle.model.dice_turn
-	if not available() or not pool.active or pool.rolls_left == pool.ROLLS or pool.has_pending_group(): return
+	if not available() or not pool.active or not pool.has_rolled() or pool.has_pending_group(): return
 	for index in idle_feedback.ring_indices:
 		var progress: float = 0 if battle.reduced else idle_feedback.wave_age/IdleFeedback.WAVE_PERIOD
 		var radius: float = (65 if portrait() else 49)+(40 if portrait() else 30)*progress
@@ -243,6 +244,7 @@ func _draw_interactable_dice() -> void:
 
 ## The center contains only glowing text, or a faint red skill-cancellation target.
 func _draw_center() -> void:
+	if is_instance_valid(battle.tarot_cast) and battle.tarot_cast.choice_type == "magician": return
 	if (dragging and moved) or battle.view_phase == "rolling": return
 	var at: Vector2 = battle.DICE_CENTER
 	var size: int = 46 if portrait() else 32
@@ -255,7 +257,7 @@ func _draw_center() -> void:
 		return
 	var charging: bool = battle.view_phase == "charging"
 	var selected: bool = not battle.model.dice_turn.selected.is_empty()
-	var reroll: bool = battle.model.dice_turn.rolls_left < battle.model.DiceTurn.ROLLS
+	var reroll: bool = battle.model.dice_turn.has_rolled()
 	var enabled: bool = charging or (available() and (not preview.is_empty() if selected else battle.model.dice_turn.can_roll()))
 	var label: String = GameText.text("STOP!" if charging else "OK" if selected else "REROLL" if reroll else "ROLL")
 	var color: Color = battle.GOLD if enabled else Color("505156")

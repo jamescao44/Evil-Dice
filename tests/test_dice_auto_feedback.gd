@@ -29,7 +29,7 @@ func hint_checks() -> void:
 	check(Idle.combination_indices([1,1,2,3,5,6],range(6),[0]) == [0,2,3],"Selected pip excludes its duplicate from compatible combinations")
 	check(Idle.combination_indices([1,1,3,3,5,5],range(6)).is_empty(),"Automatic-only rolls have no selection rings")
 	check(Idle.combination_indices([1,2,3,4,5,6],[0,1,4,5]).is_empty(),"Spent middle dice cannot complete a straight")
-	var pool = Pool.new(); pool.reset(); pool.values = [1,2,3,4,5,6]; pool.rolls_left = 2
+	var pool = Pool.new(); pool.reset(); pool.values = [1,2,3,4,5,6]; pool.rolls_left = 2; pool.rolls_made = 1
 	var idle = Idle.new(); idle.advance(0.95,pool,true,false)
 	check(idle.groups == [range(6)] and idle.hint_pose(5).x > 0,"Six-straight hints every die together")
 	pool.locked = [4,5]; pool.committed = [4,5]; idle.advance(0.95,pool,true,false)

@@ -69,7 +69,7 @@ func icon_rect() -> Rect2:
 
 ## Check whether a tarot action is allowed in the current battle phase.
 func available() -> bool:
-	return battle.view_phase in ["ready","skill"] and battle.inspecting_enemy < 0 and not settings_open() and not battle.relic_ui.pickup.active
+	return battle.view_phase in ["ready","skill","frozen"] and battle.inspecting_enemy < 0 and not settings_open() and not battle.relic_ui.pickup.active
 
 ## Shrink the dice toward the card icon as the tarot inventory expands.
 func dice_transform() -> Transform2D:

@@ -5,17 +5,17 @@ const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const Drops = preload("res://scripts/relics/relic_drop_table.gd")
 const Skill = preload("res://scripts/combat/multi_hit_skill.gd")
 const Status = preload("res://scripts/status/status_effect.gd")
+var dice_boost: int = 0
+var lovers: bool = false
+var carried_rolls: int = 0
+var carry_wave: int = -1
+var pending_turn_end: bool = false
 var strength: int = 0
 var extra_uses: int = 0
 var extra_rolls: int = 0
 var next_extra_rolls: int = 0
 var star_throws: int = 0
-var justice: bool = false
 var devil: int = 0
-var revelation: int = 0
-var magician: Array = []
-var parity: int = -1
-var conditional_order: Array = []
 var banned: Array = []
 # Concrete reward IDs are locked before a full-inventory replacement picker.
 var locked_grants: Dictionary = {}
@@ -50,50 +50,56 @@ func begin_skill(skill: MultiHitSkill) -> void:
 	skill.amplifier_locked = true
 	strength = 0
 
-func modify_dice(model, natural: Array) -> Array:
-	if not Catalog.ROLL_EFFECTS_ENABLED: return natural.duplicate()
-	# A newer direct setting replaces an older setting. Conditional transformations
-	# react afterwards; their order is the order the player actually used them.
-	var values: Array = natural.duplicate()
-	var no_ultimate: bool = model.RelicEffects.has_flag(model.relics.items,"no_ultimate")
-	if not magician.is_empty(): values = magician.duplicate()
-	elif parity >= 0:
-		for i in range(3): values[i] = model.rng.randi_range(0,2)*2+(1 if parity == 1 else 2)
-	elif justice:
-		var face: int = values[model.rng.randi_range(0,2)]
-		if no_ultimate and face == 6: face = model.rng.randi_range(1,5)
-		values = [face,face,face]
-	var original: Array = values.duplicate()
-	var winner: String = ""
-	for transform in conditional_order:
-		if transform == "hierophant" and revelation > 0 and (revelation in values or revelation in original):
-			values = [revelation,revelation,revelation]
-			winner = transform
-		elif transform == "devil" and devil > 0 and values[0] == values[1] and values[1] == values[2] and not no_ultimate:
-			values = [6,6,6]
-			winner = transform
-	if winner == "devil": devil = 0
-	# A direct Magician choice may explicitly override a relic, as requested.
-	if no_ultimate and values == [6,6,6] and magician != [6,6,6]: values[2] = model.rng.randi_range(1,5)
-	magician.clear()
-	parity = -1
-	revelation = 0
-	justice = false
-	conditional_order.erase("hierophant")
-	if devil == 0: conditional_order.erase("devil")
+## Legacy scripted rolls do not use six-die outcome settings.
+func modify_dice(_model, natural: Array) -> Array:
 	star_throws = maxi(0,star_throws-1)
-	return values
+	return natural.duplicate()
+
+## Reset turn-only boosts and redeem carryover only within its original wave.
+func start_pool(model) -> int:
+	dice_boost = 0
+	var wave: int = model.stage if "stage" in model else 0
+	var bonus: int = carried_rolls if wave == carry_wave else 0
+	carried_rolls = 0
+	carry_wave = -1
+	return bonus
+
+## Apply value boosts, then the latest guaranteed outcome to newly rolled dice.
+func modify_pool(model, indices: Array) -> void:
+	var pool = model.dice_turn
+	for index in indices: pool.values[index] = mini(6,pool.values[index]+dice_boost)
+	if lovers and indices.size() >= 4:
+		# Restrict the start to boosted faces when possible, retaining a real straight.
+		var first: int = model.rng.randi_range(mini(3,1+dice_boost),3)
+		var slots: Array = indices.duplicate()
+		for face in range(first,first+4):
+			var at: int = model.rng.randi_range(0,slots.size()-1)
+			pool.values[slots.pop_at(at)] = face
+		lovers = false
+	elif devil > 0 and indices.size() >= 3:
+		var slots: Array = indices.duplicate()
+		for i in range(mini(indices.size(),devil)):
+			pool.values[slots.pop_at(model.rng.randi_range(0,slots.size()-1))] = 6
+		devil = 0
 
 func usable(model) -> bool:
-	return pending_steps.is_empty() and (model.phase in ["roll","player"] or (model.is_city() and model.phase == "round_end")) and model.outcome().is_empty() and model.tarot_source.is_empty() and model.open_rewards.is_empty()
+	return pending_steps.is_empty() and (model.phase in ["roll","player","frozen"] or (model.is_city() and model.phase == "round_end")) and model.outcome().is_empty() and model.tarot_source.is_empty() and model.open_rewards.is_empty()
 
 func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) -> String:
 	if not model.outcome().is_empty() or (not repeating and not usable(model)): return "Use tarot between actions, before or after rolling."
 	if not Catalog.ITEMS.has(id): return "Unknown tarot card."
+	if model.phase == "frozen" and id != "hierophant": return "Use Hierophant to clear freezing first."
 	if id in Catalog.DISABLED: return "Temporarily disabled for six-dice turns."
-	if id in ["death","judgement"] and model.is_city(): return "This card cannot affect the city."
+	if id == "death" and model.is_city(): return "This card cannot affect the city."
 	if id == "death" and choice.get("target",-1) not in model.attack_targets(): return "Drag Death onto an eligible enemy. Paladins protect their allies."
-	if id == "judgement" and (model.living().is_empty() or model.living().size()%6 != 0): return "Judgement needs a multiple of six living enemies."
+	if id == "magician" and (not model.dice_turn.has_rolled() or model.dice_turn.unused().is_empty()): return "Roll first, then choose an unused die."
+	if id == "lovers" and model.dice_turn.unused().size() < 4: return "Lovers needs at least four unused dice."
+	if id == "devil" and model.dice_turn.unused().size() < 3: return "Devil needs at least three unused dice."
+	if id == "judgement" and (not model.dice_turn.has_rolled() or model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i]))): return "Judgement needs unused dice with no straight."
+	if id == "temperance" and not model.dice_turn.has_rolled(): return "Roll before using Temperance."
+	if id == "justice" and (not model.dice_turn.has_rolled() or not model.dice_turn.can_roll(true)): return "Roll first and finish the summoned skill before using this card."
+	if id in ["magician","hermit","high_priestess","temperance"] and model.dice_turn.has_pending_group(): return "Use or cancel the summoned skill first."
+	if id == "hermit" and model.dice_turn.committed.is_empty(): return "No spent dice to restore."
 	if id == "fool" and model.relics.items.is_empty(): return "No relics to reroll."
 	if id == "hanged_man" and Catalog.eligible(banned).size() <= 1: return "At least one tarot must remain in the deck."
 	return ""
@@ -106,13 +112,14 @@ func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	var id: String = card.id
 	var reason: String = error(model,id,choice,repeating)
 	if not reason.is_empty(): return {"error":reason}
-	if id in ["magician","lovers","hanged_man"]: return {"choice":id}
+	if id in ["magician","hanged_man"]: return {"choice":id}
 	if id in ["emperor","world"]:
 		if not locked_grants.has(instance_id):
 			var eligible: Array = []
 			for relic_id in Relics.ITEMS:
+				if relic_id in Relics.DISABLED or Relics.ITEMS[relic_id].get("fusion",false): continue
 				if model.relics.can_add(relic_id) and (id != "world" or Relics.ITEMS[relic_id].rarity == Relics.Rarity.LEGENDARY): eligible.append(relic_id)
-			var rolled: String = Drops.draw(model.reward_rng,eligible,model.relic_drop_weights())
+			var rolled: String = "" if eligible.is_empty() else eligible[model.reward_rng.randi_range(0,eligible.size()-1)]
 			if rolled.is_empty(): return {"error":"No eligible relic is available."}
 			locked_grants[instance_id] = rolled
 		var reward: String = locked_grants[instance_id]
@@ -128,27 +135,21 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	var repeating: bool = instance_id < 0
 	match setup.get("choice",""):
 		"magician":
-			var values: Array = choice.get("dice",[])
-			if values.size() != 3 or values.any(func(v): return not v is int or v < 1 or v > 6): return {"error":"Choose all three dice."}
-		"lovers":
-			if choice.get("parity",-1) not in [0,1]: return {"error":"Choose odd or even."}
+			var index: int = choice.get("die",-1)
+			var face: int = choice.get("face",0)
+			if index not in model.dice_turn.unused() or face < 1 or face > 6: return {"error":"Choose an unused die and a different face."}
+			if model.dice_turn.values[index] == face: return {"error":"Choose a different face."}
 		"hanged_man":
 			if choice.get("ban", "") not in Catalog.eligible(banned): return {"error":"Choose a tarot still in the deck."}
 		"replace":
 			if choice.get("replace",-1) < 0 or choice.replace >= model.relics.items.size(): return {"error":"Choose a relic to replace."}
 	var repeats: Array = pending_repeat.get("sources",[]).duplicate() if repeating else model.RelicEffects.repeat_sources(model.relics.items,"ancient_prophecy")
 	if repeating and not repeats.is_empty(): model.RelicEffects.Sequence.activate(model,repeats.pop_front())
-	if id in Catalog.ROLL_FACE_SETTINGS:
-		magician.clear()
-		parity = -1
-		justice = false
-	if id in Catalog.ROLL_TRIGGERS:
-		conditional_order.erase(id)
-		conditional_order.append(id)
 	# Siege opens its next turn lazily. A committed tarot can begin that turn,
 	# while inspecting/canceling a choice must not grant another regen tick.
 	var events: Array = model.begin_round() if model.phase == "round_end" and not repeating else []
 	var reward: String = ""
+	var carry: int = pending_repeat.get("carry",0) if repeating else model.dice_turn.rolls_left
 	match id:
 		"fool":
 			var original: Array = model.relics.items.map(func(item): return item.id)
@@ -165,36 +166,56 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			model.relics._fuse()
 			model.refresh_relic_health(old_max)
 			for item in replacements: model.RelicEffects.acquired(model,item.id,true)
-		"magician": magician = choice.dice.duplicate()
-		"high_priestess": extra_uses += 1
+		"magician":
+			model.dice_turn.values[choice.die] = choice.face
+			model.dice_turn.selected.clear()
+		"high_priestess":
+			dice_boost += 1
+			if model.dice_turn.has_rolled():
+				for index in model.dice_turn.unused(): model.dice_turn.values[index] = mini(6,model.dice_turn.values[index]+1)
+			model.dice_turn.selected.clear()
 		"empress":
 			model.grant_random_tarots(2)
 		"emperor", "world":
 			reward = locked_grants[instance_id]
 			if not model.acquire_relic(reward,choice.get("replace",-1)): return {"error":"Choose a relic to replace."}
 			locked_grants.erase(instance_id)
-		"hierophant": revelation = model.rng.randi_range(1,6)
-		"lovers": parity = choice.parity
+		"hierophant":
+			for status in Status.HARMFUL:
+				model.statuses[status].count = 0
+				model.statuses[status].permanent = false
+			if model.phase == "frozen":
+				model.ice_hits_remaining = 0
+				model.dice_turn.active = true
+				model.phase = "roll"
+		"lovers":
+			lovers = true
+			devil = 0
 		"strength": strength += 1
-		"hermit": model.statuses[Status.HIDDEN].apply(3)
+		"hermit":
+			model.dice_turn.locked.clear()
+			model.dice_turn.committed.clear()
+			model.dice_turn.groups.clear()
+			model.dice_turn.selected.clear()
 		"wheel":
 			if model.reward_rng.randi_range(1,4) == 1: bonus_chests.append(2 if model.reward_rng.randi_range(1,10) == 1 else 1)
 			else: events.append(model.event(-1,0,"relic","NO TREASURE"))
-		"justice": justice = true
+		"justice": pass # TarotCast runs a normal animated roll with no budget cost.
 		"hanged_man": banned.append(choice.ban)
-		"devil": devil = 1
+		"devil":
+			devil = mini(6,devil+1) if devil > 0 else 3
+			lovers = false
 		"star": star_throws = 3
 		"temperance":
-			next_extra_rolls += 1
-			extra_rolls = 0
-			model._finish_player_action(Skill.new(Skill.Kind.NORMAL))
+			carried_rolls += carry
+			carry_wave = model.stage if "stage" in model else 0
+			model.dice_turn.rolls_left = 0
+			pending_turn_end = true
 		"death": events.append_array(_execute(model,choice.target))
-		"judgement":
-			var count: int = model.living().size()/2
-			for i in range(count):
-				var targets: Array = model.attack_targets()
-				events.append_array(_execute(model,targets[model.rng.randi_range(0,targets.size()-1)]))
-		"chariot": events.append_array(_chariot(model))
+		"judgement": model.dice_turn.rolls_left += 2
+		"chariot":
+			model.shield += 50
+			events.append(model.event(-1,50,"shield","SHIELD +50"))
 		"moon":
 			for target in model.living():
 				events.append_array(model.apply_enemy_status(target,Status.DARKNESS,1))
@@ -202,19 +223,12 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"sun":
 			events.append(model.event(-1,model.heal(model.max_hp),"heal","FULL HEAL"))
 			for target in model.living(): events.append_array(_status(model,target,Status.BURNING,1))
-		"tower":
-			for i in range(10):
-				var targets: Array = model.attack_targets()+[-1]
-				# The city is immune; its troops are not separately targetable characters.
-				var target: int = targets[model.rng.randi_range(0,targets.size()-1)]
-				var statuses: Array = Status.PLAYER_HARMFUL if target == -1 else Status.ENEMY_HARMFUL
-				var status: int = statuses[model.rng.randi_range(0,statuses.size()-1)]
-				pending_steps.append({"target":target,"status":status,"count":1})
+		"tower": events.append_array(_tower(model))
 	if repeating: dismiss_repeat()
 	else: model.tarots.remove_instance(instance_id)
-	if not repeats.is_empty(): pending_repeat = {"id":id,"instance_id":-absi(instance_id),"sources":repeats}
+	if not repeats.is_empty(): pending_repeat = {"id":id,"instance_id":-absi(instance_id),"sources":repeats,"carry":carry}
 	if pending_steps.is_empty(): _finish_effect(model,events)
-	return {"id":id,"events":events,"relic":reward,"repeated":repeating}
+	return {"id":id,"events":events,"relic":reward,"repeated":repeating,"reroll":id == "justice"}
 
 func resolve_next_step(model) -> Dictionary:
 	if pending_steps.is_empty(): return {}
@@ -245,7 +259,22 @@ func _execute(model, target: int) -> Array:
 	var loss: int = model.hit_enemy(target,model.enemies[target].hp,true)
 	return [model.damage_event(target,loss,loss,"damage",true)]
 
-func _chariot(model) -> Array:
-	var skill = Skill.new(Skill.Kind.SPECIAL,4)
-	skill.amplifier_locked = true # Strength and stored critical belong to the next skill.
-	return preload("res://scripts/combat/area_attack.gd").apply_fixed(model,50,skill)
+## Fixed tarot damage bypasses offensive modifiers, taunt and player defenses.
+func _tower(model) -> Array:
+	var events: Array = []
+	for target in model.living():
+		var enemy: Dictionary = model.enemies[target]
+		if enemy.shield > 0:
+			var shield: int = enemy.shield
+			enemy.shield = 0
+			events.append(model.event(target,shield,"shield_break","SHIELD BREAK"))
+			if not enemy.elite: events.append_array(model.apply_enemy_status(target,Status.IMMOBILIZED,1))
+		var loss: int = mini(enemy.hp,50)
+		enemy.hp -= loss
+		events.append(model.damage_event(target,loss,50))
+		if enemy.hp == 0: model.RelicEffects.enemy_killed(model)
+	var loss: int = mini(model.hp,30)
+	model.hp -= loss
+	events.append(model.damage_event(-1,loss,30))
+	if model.hp <= 0: events.append_array(model.RelicEffects.prevent_death(model))
+	return events

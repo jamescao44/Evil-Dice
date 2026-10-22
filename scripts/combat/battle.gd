@@ -1269,14 +1269,14 @@ func _debug_values() -> Array:
 	for i in range(count): values.append(debug_choice if i < 2 else 1+(debug_choice+i-2)%6)
 	return values
 
-func _roll(strength: float = 0.0, perfect: bool = false) -> void:
+func _roll(strength: float = 0.0, perfect: bool = false, free: bool = false) -> void:
 	if view_phase not in ["ready", "skill"] or _menus_open() or not model.outcome().is_empty(): return
 	var token: int = run_id
 	throw_power = clampf(strength, 0, 1)
-	throw_perfect = perfect or debug_perfect
+	throw_perfect = perfect or debug_perfect or model.forces_perfect()
 	if throw_perfect: throw_power = 1.0
 	var forced: Array = _debug_values()
-	var changed: Array = model.roll_pool(throw_perfect, forced)
+	var changed: Array = model.roll_pool(throw_perfect, forced, free)
 	if changed.is_empty(): return
 	view_phase = "rolling"
 	combo_flash_until = clock_time + 0.45 if throw_perfect else 0.0
@@ -1358,7 +1358,7 @@ func _show_pending_skill(animate: bool = true) -> void:
 	if result.is_empty():
 		skill_bubble.clear()
 		view_phase = "ready"
-		status_title = "READY" if model.dice_turn.rolls_left == Rules.DiceTurn.ROLLS else "SELECT DICE"
+		status_title = "READY" if not model.dice_turn.has_rolled() else "SELECT DICE"
 		return
 	skill_bubble.begin(result)
 	if animate:
@@ -1938,7 +1938,7 @@ func _show_events(events: Array) -> void:
 				fx.burst(_troop_point(i), RED, 8, 70)
 			while city_corpses.size() > 24: city_corpses.pop_front()
 			continue
-		if event.type == "shield_hit":
+		if event.type in ["shield_hit","shield_break"]:
 			fx.floating(point-Vector2(0,69), _damage_popup(event), PURPLE,_event_font_size(event))
 			fx.floating(point-Vector2(0,41), event.text, PURPLE)
 			fx.activate_circle(point, PURPLE, maxf(18,_enemy_side()*0.3), 0.3)
@@ -2638,8 +2638,8 @@ func _can_end_turn() -> bool:
 	return view_phase == "ready" and model.can_end_dice_turn() and not _menus_open() and not tarot_ui.inventory_visible() and not dice_selection.dragging
 
 ## Return leftover embers as healing, then let the enemies act.
-func _end_dice_turn() -> void:
-	if not _can_end_turn() or not model.end_dice_turn(): return
+func _end_dice_turn(from_tarot: bool = false) -> void:
+	if (not from_tarot and not _can_end_turn()) or not model.end_dice_turn(): return
 	var token: int = run_id
 	_clear_skill()
 	_sound("ui/book",1.0,-18)

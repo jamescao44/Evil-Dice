@@ -191,7 +191,7 @@ func record_perfect(perfect: bool) -> void:
 
 ## Bank unused throws once per completed turn; untouched or frozen turns earn none.
 func _bank_unused_rolls() -> void:
-	if treasure_settled_turn == dice_turn.turn_id or dice_turn.rolls_left >= DiceTurn.ROLLS: return
+	if treasure_settled_turn == dice_turn.turn_id or not dice_turn.has_rolled(): return
 	treasure_settled_turn = dice_turn.turn_id
 	if hp <= 0 or RelicEffects.has_flag(relics.items,"no_treasure"): return
 	reroll_progress = mini(CHEST_THRESHOLDS[-1],reroll_progress + maxi(0,dice_turn.rolls_left))

@@ -34,6 +34,7 @@ var effect_age: float = 0
 var rejection_age: float = 0.0
 var idle_hint := Vector2.ZERO # Extra scale and tilt supplied by idle dice feedback.
 const AUTO_ATTACK_PULSE_SECONDS := 0.30
+var magician_hint: bool = false
 var auto_attack_active: bool = false
 var auto_attack_pulse: float = 0.0
 
@@ -145,7 +146,8 @@ func sprite_frame() -> int:
 func _draw() -> void:
 	var rejection: float = sin(rejection_age*90)*10*(rejection_age/0.28)
 	var bounce: float = auto_attack_bounce()
-	draw_set_transform(Vector2(rejection,-bounce*30),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x+bounce*0.36))
+	var magic_scale: float = (0.1 if reduced else 0.1+0.08*sin(effect_age*TAU*1.8)) if magician_hint else 0.0
+	draw_set_transform(Vector2(rejection,-bounce*30),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x+bounce*0.36+magic_scale))
 	if auto_attack_active or auto_attack_pulse > 0: _draw_auto_attack_glow()
 	if connection_fire > 0: _draw_connection_fire()
 	if connection_glow:

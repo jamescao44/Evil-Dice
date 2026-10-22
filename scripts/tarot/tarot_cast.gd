@@ -2,6 +2,8 @@ extends Node2D
 ## Battle-facing input/FX adapter. Rules and transactional consumption stay in the model.
 const Catalog = preload("res://scripts/tarot/tarot_catalog.gd")
 const Paint = preload("res://scripts/tarot/tarot_paint.gd")
+const Magician = preload("res://scripts/tarot/magician_choice.gd")
+var magician_choice = Magician.new()
 const STATUS_STEP_INTERVAL := 0.12
 var battle
 var busy: bool = false
@@ -9,7 +11,6 @@ var choice_type: String = ""
 var instance_id: int = -1
 var drop_point := Vector2.ZERO
 var origin := Vector2.ZERO
-var values: Array = [1,1,1]
 var prepared: Dictionary = {}
 var notice: String = ""
 var notice_time: float = 0
@@ -43,9 +44,9 @@ func request(card: int, point: Vector2, from: Vector2) -> void:
 		message(prepared.error)
 		return
 	choice_type = prepared.get("choice","")
-	values = [1,1,1]
 	battle.tarot_ui.inspected = -1
 	battle.tarot_ui.cancel_gesture()
+	if choice_type == "magician": _begin_magician()
 	if choice_type.is_empty(): _cast({"target":target})
 	elif choice_type == "replace": battle.inventory_page.open("tarot")
 	queue_redraw()
@@ -65,6 +66,12 @@ func cancel_choice() -> void:
 	else:
 		battle.tarot_ui.focus_instance(cancelled_id)
 	queue_redraw()
+
+## Expose the existing dice area while the held card moves above the battle.
+func _begin_magician() -> void:
+	battle.tarot_ui.close_inventory()
+	battle.dice_selection.cancel_gesture()
+	magician_choice.start(drop_point)
 
 func message(value: String) -> void:
 	notice = value
@@ -96,6 +103,11 @@ func click(point: Vector2) -> bool:
 	if choice_type == "replace":
 		battle.inventory_page.open("tarot")
 		return true
+	if choice_type == "magician":
+		var picked: Dictionary = magician_choice.click(battle,point)
+		if picked.has("cancel"): cancel_choice()
+		elif picked.has("die"): _cast(picked)
+		return true
 	if cancel_rect().has_point(point):
 		cancel_choice()
 		return true
@@ -103,14 +115,6 @@ func click(point: Vector2) -> bool:
 		"repeat_target":
 			var target: int = battle._enemy_inspect_at(point)
 			if target in battle.model.attack_targets(): _cast({"target":target})
-		"magician":
-			for i in range(18):
-				if cell_rect(i,6,4).has_point(point): values[i/6] = i%6+1
-			var confirm := cell_rect(3,1,4)
-			if confirm.has_point(point): _cast({"dice":values.duplicate()})
-		"lovers":
-			for i in range(2):
-				if cell_rect(i,2,1).has_point(point): _cast({"parity":1-i})
 		"hanged_man":
 			var ids: Array = options()
 			var columns: int = 4 if portrait() else 6
@@ -129,6 +133,12 @@ func _cast(selection: Dictionary) -> void:
 		message(result.error)
 		return
 	choice_type = ""
+	if result.id in ["magician","high_priestess","hermit"]:
+		battle.dice_selection.cancel_gesture()
+		for index in range(battle.dice.size()):
+			battle.dice[index].face = battle.model.dice_turn.values[index]
+			battle.dice[index].final_face = battle.dice[index].face
+			battle.dice[index].queue_redraw()
 	busy = true
 	var token: int = battle.run_id
 	battle.view_phase = "resolving"
@@ -147,7 +157,7 @@ func _cast(selection: Dictionary) -> void:
 	if not result.relic.is_empty(): battle.relic_ui.collect(result.relic,drop_point,50,previous_ids)
 	if result.id == "fool":
 		for item in battle.model.relics.items: battle.model.relic_activated.emit(item.id)
-	if result.id == "hierophant": message(GameText.format("Revelation: %d · next throw",[battle.model.tarot_effects.revelation]))
+	if result.id == "hierophant" and resume_phase == "frozen": resume_phase = "ready"
 	if result.id == "empress": message("Two tarot cards added.")
 	var finished: bool = await _resolve_steps(token) if not battle.model.tarot_effects.pending_steps.is_empty() else await battle._wait(0.4,token)
 	if not finished:
@@ -157,6 +167,12 @@ func _cast(selection: Dictionary) -> void:
 			busy = false
 			battle.fx.z_index = 0
 		return
+	if result.get("reroll",false):
+		battle.tarot_ui.close_inventory()
+		battle.view_phase = "ready"
+		await battle._roll(0,false,true)
+		if not battle._valid_turn(token): return
+		resume_phase = "ready"
 	while battle.relic_ui.pickup.active:
 		await get_tree().process_frame
 		if not battle._valid_turn(token): return
@@ -183,15 +199,21 @@ func _continue_repeat() -> bool:
 		if choice_type.is_empty():
 			_cast({})
 			return true
-	values = [1,1,1]
 	battle.tarot_ui.cast_visual.clear()
 	if choice_type == "replace": battle.inventory_page.open("tarot")
+	if choice_type == "magician": _begin_magician()
 	queue_redraw()
 	return true
 
 func _finish_cast() -> void:
 	var token: int = battle.run_id
 	if battle._check_over(): return
+	if battle.model.tarot_effects.pending_turn_end:
+		battle.model.tarot_effects.pending_turn_end = false
+		battle.tarot_ui.close_inventory()
+		battle.view_phase = "ready"
+		await battle._end_dice_turn(true)
+		return
 	if battle.model.phase in ["enemy","turn_end","round_end"]:
 		battle.tarot_ui.close_inventory()
 		battle._clear_skill()
@@ -241,6 +263,7 @@ func _resolve_steps(token: int) -> bool:
 	return battle._valid_turn(token)
 
 func _process(delta: float) -> void:
+	magician_choice.advance(battle,delta,choice_type == "magician")
 	if not battle.model.outcome().is_empty() and not choice_type.is_empty():
 		choice_type = ""
 		battle.model.tarot_effects.dismiss_repeat()
@@ -252,6 +275,9 @@ func _label(rect: Rect2, title: String, selected: bool = false, size: int = 22) 
 	Paint.wrap(self,battle.description_font,rect.grow(-8),title,size,Paint.GOLD,true)
 
 func _draw() -> void:
+	if choice_type == "magician":
+		magician_choice.paint(self,battle)
+		return
 	if choice_type == "replace": return # The shared backpack owns this choice and its detail page.
 	if choice_type == "repeat_target":
 		var prompt := Rect2(62,1040,680,110) if portrait() else Rect2(340,560,600,80)
@@ -265,17 +291,11 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.025,0.04,0.68))
 		var panel: Rect2 = panel_rect()
 		Paint.panel(self,panel,Color("211f29"),Color("807889"))
-		var title: String = {"magician":"Choose the next three dice","lovers":"Choose odd or even","hanged_man":"Exclude one tarot from future draws"}.get(choice_type,"")
+		var title: String = {"hanged_man":"Exclude one tarot from future draws"}.get(choice_type,"")
 		if instance_id < 0: title = GameText.text("Ancient Prophecy")+"\n"+GameText.text(title)
 		var title_size: int = (25 if portrait() else 20) if instance_id < 0 else (30 if portrait() else 25)
 		Paint.wrap(self,battle.description_font,Rect2(panel.position+Vector2(24,20),Vector2(panel.size.x-48,100)),title,title_size,Paint.GOLD,true)
 		match choice_type:
-			"magician":
-				for i in range(18): _label(cell_rect(i,6,4),str(i%6+1),values[i/6] == i%6+1,34 if portrait() else 28)
-				_label(cell_rect(3,1,4),"Confirm",true)
-			"lovers":
-				_label(cell_rect(0,2,1),"ODD · 1 / 3 / 5",false,26)
-				_label(cell_rect(1,2,1),"EVEN · 2 / 4 / 6",false,26)
 			"hanged_man":
 				var ids: Array = options()
 				var columns: int = 4 if portrait() else 6

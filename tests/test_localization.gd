@@ -55,6 +55,7 @@ func catalog_checks() -> void:
 	for entry in Relics.ITEMS.values()+Statuses.ENTRIES.values()+Rewards.ITEMS:
 		sources.append(entry.name)
 		sources.append(entry.text)
+	for entry in preload("res://scripts/tarot/tarot_catalog.gd").ITEMS.values(): sources.append(entry.design)
 	for key in sources: check(keys.has(key),"Visible catalog entry has translation: "+key)
 	for locale in GameText.LANGUAGES:
 		GameText.set_language(locale,false)
@@ -119,7 +120,7 @@ func scene_checks(portrait: bool) -> void:
 	g.menu_open = false
 	GameText.set_language("zh_CN",false)
 	g.view_phase = "wave_reward"
-	g.wave_chest.after_chest(3)
+	g.wave_chest.present_chest("relic")
 	await capture(layout+"-zh_CN-relics")
 	g.wave_chest.cancel()
 	g.view_phase = "ready"

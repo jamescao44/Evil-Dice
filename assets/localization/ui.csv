@@ -754,3 +754,29 @@ All enemies; 2x against Burning.,All enemies; 2x against Burning.,全体 · 对�
 All; 2x vs Burning; +2 Burning.,All; 2x vs Burning; +2 Burning.,全体 · 燃烧翻倍／＋2层
 Destroy all enemies.,Destroy all enemies.,消灭所有敌人
 Incoming relic: %s,Incoming relic: %s,待领取法具：%s
+Change one unused rolled die to a different face. Cancel without consuming the card.,Change one unused rolled die to a different face. Cancel without consuming the card.,选择一枚已投掷且未使用的骰子，改为其他点数。取消不消耗此牌。
+"Add 1 to unused dice now and all rolls this turn, up to 6. Repeated uses add another 1.","Add 1 to unused dice now and all rolls this turn, up to 6. Repeated uses add another 1.",未使用骰子及本回合后续投掷点数+1，上限6。重复使用可叠加。
+Receive a random eligible relic. Every eligible relic has an equal chance.,Receive a random eligible relic. Every eligible relic has an equal chance.,随机获得一件合格法具，每件获得概率相同。
+Remove all harmful statuses from the player.,Remove all harmful statuses from the player.,解除玩家所有异常状态。
+The next eligible roll guarantees a straight of at least four dice.,The next eligible roll guarantees a straight of at least four dice.,至少有四枚未使用骰子时可用。下次合格投掷必有四顺子。
+Gain 50 shield points.,Gain 50 shield points.,获得50点护盾。
+Restore all dice spent this turn so they can be used again immediately.,Restore all dice spent this turn so they can be used again immediately.,解锁本回合已消耗的骰子，可立即再次使用。
+Immediately reroll all unused dice without spending a roll.,Immediately reroll all unused dice without spending a roll.,立即重掷所有未使用骰子，不消耗投掷次数。
+End this turn and carry unused rolls into the next turn.,End this turn and carry unused rolls into the next turn.,结束回合并结算余骰治疗，将剩余投掷次数转至下一回合；不跨波保留。
+The next throw includes at least three sixes; repeated uses guarantee one more six.,The next throw includes at least three sixes; repeated uses guarantee one more six.,下次投掷至少有三个六；每次重复使用多保证一个六。
+Break every enemy shield. Deal 50 fixed damage to all enemies and 30 to yourself.,Break every enemy shield. Deal 50 fixed damage to all enemies and 30 to yourself.,破坏所有敌方护盾，所有敌人直接损失50生命，自己损失30生命。
+The next three throws are Perfect. Using this again resets the count to three.,The next three throws are Perfect. Using this again resets the count to three.,接下来三次投掷必定Perfect，重复使用重置为三次。
+"If currently unused dice cannot form a straight, gain 2 rerolls.","If currently unused dice cannot form a straight, gain 2 rerolls.",若当前未使用骰子无法组成顺子，获得2次重掷。
+Choose a die to change,Choose a die to change,选择要更改的骰子
+Use Hierophant to clear freezing first.,Use Hierophant to clear freezing first.,先使用教皇解除冰冻。
+"Roll first, then choose an unused die.","Roll first, then choose an unused die.",先投掷，再选择未使用的骰子。
+Lovers needs at least four unused dice.,Lovers needs at least four unused dice.,恋人需要至少四枚未使用骰子。
+Devil needs at least three unused dice.,Devil needs at least three unused dice.,恶魔需要至少三枚未使用骰子。
+Judgement needs unused dice with no straight.,Judgement needs unused dice with no straight.,当前未使用骰子没有顺子时才能使用审判。
+Roll before using Temperance.,Roll before using Temperance.,投掷后才能使用节制。
+Roll first and finish the summoned skill before using this card.,Roll first and finish the summoned skill before using this card.,请先投掷，并使用或取消已召唤的技能。
+Use or cancel the summoned skill first.,Use or cancel the summoned skill first.,请先使用或取消已召唤的技能。
+No spent dice to restore.,No spent dice to restore.,没有已消耗的骰子。
+Choose an unused die and a different face.,Choose an unused die and a different face.,请选择未使用的骰子及不同点数。
+Choose a different face.,Choose a different face.,请选择不同点数。
+Choose a face. Tap the die to go back.,Choose a face. Tap the die to go back.,选择点数；再点中间骰子可返回。

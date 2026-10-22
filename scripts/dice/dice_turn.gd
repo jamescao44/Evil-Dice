@@ -10,6 +10,7 @@ var selected: Array = []
 var groups: Array = []
 var committed: Array = []
 var rolls_left: int = ROLLS
+var rolls_made: int = 0
 var last_perfect: bool = false
 var turn_id: int = 0
 
@@ -22,34 +23,39 @@ func reset() -> void:
 	groups.clear()
 	committed.clear()
 	rolls_left = ROLLS
+	rolls_made = 0
 	last_perfect = false
 
 ## Return the physical dice that may change on the next throw.
 func unused() -> Array:
 	return range(COUNT).filter(func(index): return index not in locked)
 
-func can_roll() -> bool:
-	return active and not has_pending_group() and rolls_left > 0 and locked.size() < COUNT
+func has_rolled() -> bool:
+	return rolls_made > 0
+
+func can_roll(free: bool = false) -> bool:
+	return active and not has_pending_group() and (free or rolls_left > 0) and locked.size() < COUNT
 
 ## A summoned group suspends the rest of the pool until used or cancelled.
 func has_pending_group() -> bool:
 	return locked.any(func(index): return index not in committed)
 
 ## Roll every unused die independently; test overrides never change locked dice.
-func roll(rng: RandomNumberGenerator, perfect: bool, forced: Array = []) -> Array:
-	if not can_roll(): return []
+func roll(rng: RandomNumberGenerator, perfect: bool, forced: Array = [], free: bool = false) -> Array:
+	if not can_roll(free): return []
 	var indices: Array = unused()
 	if not forced.is_empty() and (forced.size() != indices.size() or forced.any(func(face): return not face is int or face < 1 or face > 6)): return []
 	for offset in range(indices.size()):
 		values[indices[offset]] = rng.randi_range(1, 6) if forced.is_empty() else forced[offset]
-	rolls_left -= 1
+	if not free: rolls_left -= 1
+	rolls_made += 1
 	last_perfect = perfect
 	selected.clear()
 	return indices
 
 ## Toggle an available die only when the selection can still form a useful pattern.
 func select(index: int) -> bool:
-	if not active or has_pending_group() or rolls_left == ROLLS or index < 0 or index >= COUNT or index in locked: return false
+	if not active or has_pending_group() or not has_rolled() or index < 0 or index >= COUNT or index in locked: return false
 	if index in selected: selected.erase(index)
 	elif can_select(index): selected.append(index)
 	else: return false
@@ -65,7 +71,7 @@ func selection_values() -> Array:
 
 ## Reserve a valid variable-length combination until it is used or cancelled.
 func form() -> Array:
-	if not active or rolls_left == ROLLS or has_pending_group() or Patterns.classify(selection_values()).is_empty(): return []
+	if not active or not has_rolled() or has_pending_group() or Patterns.classify(selection_values()).is_empty(): return []
 	var faces: Array = selection_values()
 	groups.append(selected.duplicate())
 	locked.append_array(selected)

@@ -240,10 +240,13 @@ func _match_values(triple: bool) -> Array:
 	return values
 
 ## Roll unused dice only after the previous summoned skill has been resolved.
-func roll_pool(perfect: bool = false, forced: Array = []) -> Array:
+func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false) -> Array:
 	if phase != "roll" or not pending.is_empty() or not outcome().is_empty(): return []
-	var changed: Array = dice_turn.roll(rng, perfect, forced)
+	perfect = perfect or forces_perfect()
+	var changed: Array = dice_turn.roll(rng, perfect, forced, free)
 	if changed.is_empty(): return []
+	tarot_effects.modify_pool(self,changed)
+	tarot_effects.star_throws = maxi(0,tarot_effects.star_throws-1)
 	record_perfect(perfect)
 	roll_attacks = Patterns.automatic_groups(dice_turn.values,changed)
 	for group in roll_attacks: group.skill.begin_cast(RelicEffects.use_modifiers(relics.items,group.skill,{}))
@@ -280,7 +283,7 @@ func _commit_formed_skill() -> void:
 
 ## End Turn is available only after throwing and resolving the summoned skill.
 func can_end_dice_turn() -> bool:
-	return phase == "roll" and dice_turn.active and dice_turn.rolls_left < DiceTurn.ROLLS and pending.is_empty() and outcome().is_empty()
+	return phase == "roll" and dice_turn.active and dice_turn.has_rolled() and pending.is_empty() and outcome().is_empty()
 
 ## Build a read-only leftover healing action for the End Turn preview.
 func leftover_skill() -> MultiHitSkill:
@@ -362,7 +365,7 @@ func record_perfect(perfect: bool) -> void:
 				relic_activated.emit(item.id)
 
 func forces_perfect() -> bool:
-	return false # Roll-changing item effects are suspended for the six-dice rules.
+	return tarot_effects.star_throws > 0
 
 func combo_multiplier() -> float:
 	return 1.0 if perfect_combo <= 0 else 1.2 + perfect_combo * 0.1
@@ -434,6 +437,7 @@ func begin_round() -> Array:
 func _prepare_player_turn() -> void:
 	roll_attacks.clear()
 	dice_turn.reset()
+	dice_turn.rolls_left += tarot_effects.start_pool(self)
 	skill_dice_indices.clear()
 	if is_frozen():
 		tarot_effects.extra_rolls = 0

@@ -16,7 +16,7 @@ var animate_hints: bool = false
 
 ## Cache only the longest available straights when faces change; never move hitboxes.
 func advance(delta: float, pool, enabled: bool, reduced: bool) -> void:
-	active = enabled and pool.active and pool.rolls_left < pool.ROLLS and not pool.has_pending_group()
+	active = enabled and pool.active and pool.has_rolled() and not pool.has_pending_group()
 	animate_hints = active and pool.selected.is_empty() and not reduced
 	if not active:
 		wave_age = 0

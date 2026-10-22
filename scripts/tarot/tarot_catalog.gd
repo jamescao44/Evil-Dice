@@ -3,11 +3,10 @@ extends RefCounted
 enum EffectType { ROLL_SETTING, ROLL_TRIGGER, IMMEDIATE, NEXT_SKILL }
 # Timing and repeat behavior are independent. Star affects Perfect detection,
 # so it shares a category with face settings without replacing their faces.
-const ROLL_EFFECTS_ENABLED := false
-const DISABLED := ["magician", "hierophant", "lovers", "justice", "devil", "star", "temperance"]
-const ROLL_FACE_SETTINGS := ["magician","lovers","justice"]
-const ROLL_TRIGGERS := ["hierophant","devil"]
-const NEXT_SKILL_MODIFIERS := ["strength","high_priestess"]
+const DISABLED: Array = []
+const ROLL_FACE_SETTINGS := ["lovers","devil"]
+const ROLL_TRIGGERS: Array = []
+const NEXT_SKILL_MODIFIERS := ["strength"]
 const Weighted = preload("res://scripts/shared/weighted_choice.gd")
 
 static func effect_type(id: String) -> EffectType:
@@ -19,26 +18,26 @@ static func effect_type(id: String) -> EffectType:
 const BACK = preload("res://assets/art/tarot/back.png")
 const ITEMS := {
 	"fool": {"name": "The Fool", "design": "Reroll every owned relic. New relics cannot match any previously owned relic.", "target": "owned_item", "art": "res://assets/art/tarot/00.png", "implemented": true},
-	"magician": {"name": "The Magician", "design": "Set all three dice for the next throw. Later dice settings replace this; transformations still apply.", "target": "dice", "art": "res://assets/art/tarot/01.png", "implemented": true},
-	"high_priestess": {"name": "The High Priestess", "design": "The next damaging skill gains one extra use. Excludes buffs and instant kills.", "target": "self", "art": "res://assets/art/tarot/02.png", "implemented": true},
+	"magician": {"name": "The Magician", "design": "Change one unused rolled die to a different face. Cancel without consuming the card.", "target": "dice", "art": "res://assets/art/tarot/01.png", "implemented": true},
+	"high_priestess": {"name": "The High Priestess", "design": "Add 1 to unused dice now and all rolls this turn, up to 6. Repeated uses add another 1.", "target": "self", "art": "res://assets/art/tarot/02.png", "implemented": true},
 	"empress": {"name": "The Empress", "design": "Receive two random tarot cards.", "target": "self", "art": "res://assets/art/tarot/03.png", "implemented": true},
-	"emperor": {"name": "The Emperor", "design": "Receive a random item.", "target": "self", "art": "res://assets/art/tarot/04.png", "implemented": true},
-	"hierophant": {"name": "The Hierophant", "design": "Gain a random revelation face for the next throw. If it appears, the roll becomes that triple.", "target": "dice", "art": "res://assets/art/tarot/05.png", "implemented": true},
-	"lovers": {"name": "The Lovers", "design": "Choose all odd or all even dice for the next throw.", "target": "dice", "art": "res://assets/art/tarot/06.png", "implemented": true},
-	"chariot": {"name": "The Chariot", "design": "Deal 50 fixed damage to all enemies.", "target": "all_enemies", "art": "res://assets/art/tarot/07.png", "implemented": true},
+	"emperor": {"name": "The Emperor", "design": "Receive a random eligible relic. Every eligible relic has an equal chance.", "target": "self", "art": "res://assets/art/tarot/04.png", "implemented": true},
+	"hierophant": {"name": "The Hierophant", "design": "Remove all harmful statuses from the player.", "target": "self", "art": "res://assets/art/tarot/05.png", "implemented": true},
+	"lovers": {"name": "The Lovers", "design": "The next eligible roll guarantees a straight of at least four dice.", "target": "dice", "art": "res://assets/art/tarot/06.png", "implemented": true},
+	"chariot": {"name": "The Chariot", "design": "Gain 50 shield points.", "target": "self", "art": "res://assets/art/tarot/07.png", "implemented": true},
 	"strength": {"name": "Strength", "design": "Add one extra base damage or support potency to the next skill. Repeated Strength stacks additively.", "target": "self", "art": "res://assets/art/tarot/08.png", "implemented": true},
-	"hermit": {"name": "The Hermit", "design": "Become invisible for three turns; attacking breaks invisibility.", "target": "self", "art": "res://assets/art/tarot/09.png", "implemented": true},
+	"hermit": {"name": "The Hermit", "design": "Restore all dice spent this turn so they can be used again immediately.", "target": "self", "art": "res://assets/art/tarot/09.png", "implemented": true},
 	"wheel": {"name": "Wheel of Fortune", "design": "A 1 in 4 chance of a chest; 1 in 10 of those is rare.", "target": "self", "art": "res://assets/art/tarot/10.png", "implemented": true},
-	"justice": {"name": "Justice", "design": "The next throw is guaranteed to be a triple.", "target": "dice", "art": "res://assets/art/tarot/11.png", "implemented": true},
+	"justice": {"name": "Justice", "design": "Immediately reroll all unused dice without spending a roll.", "target": "dice", "art": "res://assets/art/tarot/11.png", "implemented": true},
 	"hanged_man": {"name": "The Hanged Man", "design": "Choose a tarot card to exclude from future draws.", "target": "tarot_type", "art": "res://assets/art/tarot/12.png", "implemented": true},
 	"death": {"name": "Death", "design": "Execute a selected enemy.", "target": "enemy", "art": "res://assets/art/tarot/13.png", "implemented": true},
-	"temperance": {"name": "Temperance", "design": "Skip this turn; gain an extra throw and skill use next turn.", "target": "self", "art": "res://assets/art/tarot/14.png", "implemented": true},
-	"devil": {"name": "The Devil", "design": "The next triple becomes 666.", "target": "dice", "art": "res://assets/art/tarot/15.png", "implemented": true},
-	"tower": {"name": "The Tower", "design": "Apply 1 stack of a random status to a random character ten times, including the player.", "target": "random_character", "art": "res://assets/art/tarot/16.png", "implemented": true},
-	"star": {"name": "The Star", "design": "The next three throws are Perfect.", "target": "self", "art": "res://assets/art/tarot/17.png", "implemented": true},
+	"temperance": {"name": "Temperance", "design": "End this turn and carry unused rolls into the next turn.", "target": "self", "art": "res://assets/art/tarot/14.png", "implemented": true},
+	"devil": {"name": "The Devil", "design": "The next throw includes at least three sixes; repeated uses guarantee one more six.", "target": "dice", "art": "res://assets/art/tarot/15.png", "implemented": true},
+	"tower": {"name": "The Tower", "design": "Break every enemy shield. Deal 50 fixed damage to all enemies and 30 to yourself.", "target": "all", "art": "res://assets/art/tarot/16.png", "implemented": true},
+	"star": {"name": "The Star", "design": "The next three throws are Perfect. Using this again resets the count to three.", "target": "self", "art": "res://assets/art/tarot/17.png", "implemented": true},
 	"moon": {"name": "The Moon", "design": "Apply permanent darkness to all enemies.", "target": "all_enemies", "art": "res://assets/art/tarot/18.png", "implemented": true},
 	"sun": {"name": "The Sun", "design": "Fully heal and apply one burning stack to every enemy.", "target": "all", "art": "res://assets/art/tarot/19.png", "implemented": true},
-	"judgement": {"name": "Judgement", "design": "If the enemy count is a multiple of six, execute a random half.", "target": "all_enemies", "art": "res://assets/art/tarot/20.png", "implemented": true},
+	"judgement": {"name": "Judgement", "design": "If currently unused dice cannot form a straight, gain 2 rerolls.", "target": "dice", "art": "res://assets/art/tarot/20.png", "implemented": true},
 	"world": {"name": "The World", "design": "Receive a random legendary item.", "target": "self", "art": "res://assets/art/tarot/21.png", "implemented": true, "weight": 0.5},
 }
 
