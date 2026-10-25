@@ -13,6 +13,7 @@ static func apply(model, indices: Array) -> void:
 		if item.id == "lucky_die" and item.get("throws",0) >= 10 and indices.size() >= 4:
 			desired = 4
 			if item not in lucky_spent: lucky_spent.append(item)
+		elif item.id == "three_leaf_clover" and indices.size() >= 3 and model.rng.randf() < 0.20: desired = 3
 		elif item.id == "four_leaf_clover" and indices.size() >= 4 and model.rng.randf() < 0.10: desired = 4
 		elif item.id == "five_leaf_clover" and indices.size() >= 5 and model.rng.randf() < 0.05: desired = 5
 		if desired > 0:

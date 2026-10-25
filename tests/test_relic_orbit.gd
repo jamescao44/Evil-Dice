@@ -21,6 +21,16 @@ func run() -> void:
 		g._restart();g.view_phase="ready"
 		var ui = g.relic_ui
 		for id in ["fries","orange_stone","codex_page","bracelet"]: g.model.acquire_relic(id)
+		g.reduced = true
+		for level in [1,5,10]:
+			g.evolution.displayed_level = level
+			var sprite := Rect2(g._player_world_feet()-Vector2(g.monster_side*0.5,g.monster_side),Vector2.ONE*g.monster_side)
+			var visible: Rect2 = g.evolution.visible_rect(sprite)
+			for pose in Orbit.poses(g):
+				if pose.slot in [1,3]:
+					check(is_equal_approx(pose.at.y,visible.end.y-visible.size.y/3.0),"Both orbit sides sit one-third of each visible form above its feet")
+		g.evolution.displayed_level = 1
+		g.reduced = false
 		ui.ready_clock=7.3
 		var before: Dictionary = positions(g)
 		ui.reset()

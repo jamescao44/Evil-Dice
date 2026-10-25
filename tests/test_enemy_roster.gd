@@ -19,8 +19,8 @@ func act(m, index: int, skill: String) -> Array:
 	m.enemies[index].intent = Actions.intent(m,index,skill)
 	return m.enemy_act(index)
 func pool_checks() -> void:
-	var expected_hp := [[75,150],[50,100],[35,75],[500,700],[100,200]]
-	var expected_damage := [[7,10],[10,15],[15,20],[20,35],[30,50]]
+	var expected_hp := [[75,150],[50,100],[35,75],[400,560],[100,200]]
+	var expected_damage := [[7,10],[10,15],[15,20],[18,26],[22,30]]
 	for role in range(5):
 		for elite in [false,true]:
 			var m = fresh(role,elite)
@@ -67,35 +67,35 @@ func action_checks() -> void:
 	act(m,0,"shield"); check(m.enemies[0].shield == 50,"Paladin raises fifty shield")
 	act(m,0,"greater_shield"); check(m.enemies[0].shield == 100,"Elite shield caps at one hundred")
 	var before: int = m.hp; act(m,0,"rest"); check(m.hp == before,"Rest does nothing")
+	# Normal specials introduce support only; charging is reserved for elites.
 	for role in [3,4]:
+		m = fresh(role)
+		check(not Actions.options(m,0).has(["charge",3]),"Normal special units never select charging")
 		m = fresh(role,true)
-		var total: int = Enemy.ITEMS[role].charge_turns
-		check(total == 2,"Both special enemies now charge twice before releasing")
+		var immediate: bool = role == Enemy.Role.HIGH_PRIEST
 		act(m,0,"charge")
-		for i in range(1,total):
-			check(m.choose_intent(0).skill == "charge","Charging cannot randomly change move")
-			act(m,0,"charge")
-		check(m.enemies[0].charge == total and m.hp == 10000,"Charge turns deal no damage")
-		var release: String = Enemy.ITEMS[role].release
-		check(m.choose_intent(0).skill == release,"Full charge releases on the following turn")
+		check(m.enemies[0].charge == 1 and m.hp == 10000 and m.choose_intent(0).skill == "charge","First charge commits the next action without damage")
 		m.enemies[0].attack_boost = true
 		m.phase = "enemy"; m.enemies[0].acted = false; m.enemies[0].action_hit = 0
 		m.enemies[0].intent = m.choose_intent(0)
-		var hits: int = 2
-		for i in range(hits):
+		m.enemy_act_step(0)
+		check(m.enemies[0].charge == 2 and m.hp == 10000,"Second charge fills before any attack impact")
+		check(m.enemies[0].acted == not immediate,"Priest remains in its action; Paladin waits until next turn")
+		if not immediate:
+			m.enemies[0].acted = false; m.enemies[0].intent = m.choose_intent(0)
+		check(m.enemies[0].intent.skill == Enemy.ITEMS[role].release,"Full charge selects the correct burst")
+		for i in range(2):
 			m.enemy_act_step(0)
-			check(m.hp == 10000-roundi(m.enemies[0].damage*1.5)*(i+1),"Charged attacks apply one impact at a time with the stored blessing")
-			check(m.enemies[0].acted == (i == hits-1),"Enemy action finishes only after its last impact")
-		check(not m.enemies[0].charging and m.enemies[0].charge == 0 and not m.enemies[0].attack_boost,"Release spends charge and blessing once")
-		check(m.enemy_act_step(0).is_empty(),"Completed burst cannot replay")
-		act(m,0,"charge"); act(m,0,"charge")
-		m.apply_enemy_status(0,Status.FROZEN,1)
-		m.phase = "enemy"; m.enemies[0].acted = false; m.enemies[0].action_hit = 0; m.enemies[0].intent = m.choose_intent(0)
-		before = m.hp; m.enemy_act(0)
-		check(m.hp == before and m.enemies[0].charge == 0 and m.choose_intent(0).skill == "charge","Freeze interrupts even a ready release and restarts charging")
-		act(m,0,"charge"); m.apply_enemy_status(0,Status.IMMOBILIZED,1)
-		m.phase = "enemy"; m.enemies[0].acted = false; m.enemies[0].action_hit = 0; m.enemies[0].intent = m.choose_intent(0)
-		m.enemy_act(0); check(m.enemies[0].charge == 0,"Shield-break immobilization discards charge progress")
+			check(m.hp == 10000-roundi(m.enemies[0].damage*1.5)*(i+1),"Blessing scales each burst impact once")
+			check(m.enemies[0].acted == (i == 1),"Burst completes only after both hits")
+		check(not m.enemies[0].charging and m.enemies[0].charge == 0 and not m.enemies[0].attack_boost,"Release consumes charge and blessing")
+		check(m.enemy_act_step(0).is_empty(),"Finished burst cannot repeat")
+		for status in [Status.FROZEN,Status.IMMOBILIZED]:
+			act(m,0,"charge")
+			m.apply_enemy_status(0,status,1,false)
+			m.phase = "enemy"; m.enemies[0].acted = false; m.enemies[0].action_hit = 0; m.enemies[0].intent = m.choose_intent(0)
+			before = m.hp; m.enemy_act(0)
+			check(m.hp == before and m.enemies[0].charge == 0 and m.choose_intent(0).skill == "charge","Freeze or immobilization cancels progress and restarts elite charging")
 func taunt_checks() -> void:
 	var m = fresh(3)
 	m.enemies.append(Rules.make_enemy(3))
@@ -105,7 +105,7 @@ func taunt_checks() -> void:
 	check(preview.map(func(e): return e.damage) == [30,15,30],"Area attacks damage Paladins fully and protected allies by half")
 	check(m.apply_player_step(1).is_empty(),"Target API refuses a protected ally")
 	m.apply_player(0)
-	check(m.enemies.map(func(e): return e.hp) == [470,60,470],"Area damage matches preview")
+	check(m.enemies.map(func(e): return e.hp) == [370,60,370],"Area damage matches preview")
 	m = fresh(3); m.begin_round(); m.set_test_roll([2,2,3]); m.apply_player()
 	check(m.living().all(func(i): return m.enemy_status_count(i,Status.FROZEN) == 1),"Area freeze still reaches protected allies")
 	m = fresh(3); m.begin_round(); m.set_test_roll([6,6,6]); m.apply_player()
@@ -120,33 +120,25 @@ func taunt_checks() -> void:
 	var card: Dictionary = r.tarots.add("death")
 	check(r.tarot_effects.cast(r,card.instance_id,{"target":1}).has("error"),"Targeted tarot cannot bypass a living Paladin")
 	card = r.tarots.add("chariot"); r.tarot_effects.cast(r,card.instance_id)
-	check(r.enemies[0].hp == 450 and r.enemies[1].hp == 50,"Fixed Chariot area damage is also halved on protected allies")
+	check(r.shield == 50 and r.enemies[0].hp == 400 and r.enemies[1].hp == 75,"Updated Chariot grants player shields without damaging protected allies")
 func wave_checks() -> void:
-	var expected := [[1,0,0,0],[2,0,0,0],[0,1,0,0],[4,0,0,0],[2,1,0,0],[5,0,0,0],[3,2,0,0],[0,3,0,0],[2,3,0,0],[0,0,1,0],[2,0,1,0],[0,5,0,0],[0,2,0,1],[0,0,1,1],[0,2,1,0],[0,3,0,1],[0,0,2,1],[0,3,1,1],[0,0,1,2]]
 	var m = Run.new(19)
 	for wave in range(1,21):
 		check(m.load_debug_wave(wave),"Debug loads wave %d" % wave)
-		check(m.max_hp == 100,"Debug wave loading retains level-one health without wave growth")
-		check(m.power == 1.0,"No natural attack multiplier growth")
-		if wave == 20:
-			check(m.is_city() and m.city_hp == 20000 and m.enemies.is_empty(),"Wave twenty is the twenty-thousand-HP city")
-			continue
-		var counts: Array = [0,0,0,0]
-		for e in m.enemies:
-			counts[int(e.elite) if e.role < 3 else e.role-1] += 1
-			var scale: float = pow(1.1,floori((wave-1)/2.0))
-			check(e.hp == roundi(Enemy.ITEMS[e.role].hp[int(e.elite)]*scale) and e.damage == roundi(Enemy.ITEMS[e.role].damage[int(e.elite)]*scale),"Wave health and attack scale once every two waves")
-		check(counts == expected[wave-1],"Wave table composition %d" % wave)
-		if wave in [10,15,19]: check(m.enemies.filter(func(e): return e.role == 3).all(func(e): return e.elite),"Specified Paladins are elite")
-		if wave == 19: check(m.enemies.all(func(e): return e.elite),"Final squad contains only elite special enemies")
-		check(Run.Waves.player_size(wave) > Run.Waves.player_size(wave-1),"Horror grows every transition")
+		check(m.max_hp == 100 and m.power == 1.0,"Debug loading does not grant player wave bonuses")
+		check(m.enemies.size() == Run.Waves.SQUADS[wave-1].units.size(),"Debug uses the authored roster count")
+		for enemy in m.enemies:
+			var expected: Dictionary = Enemy.make(enemy.role,enemy.level,enemy.elite)
+			check(enemy.hp == expected.hp and enemy.damage == expected.damage,"Wave spawns use each enemy's own level")
+		if wave in [10,20,30]: check(m.enemies.size() == 1 and m.enemies[0].get("boss",false),"Level finales remain boss encounters")
+		check(Run.Waves.player_size(wave) >= Run.Waves.player_size(wave-1),"Horror grows every transition")
 	check(Run.Waves.player_size(0) == 224 and Run.Waves.player_size(19) == 288,"Horror starts at 224 and reaches 288 at the city")
-	check(Run.Waves.enemy_size(18) == 44 and Run.Waves.enemy_size(19) == 20,"Wave nineteen retains old wave nine enemies; city troops keep their separate size")
+	check(Run.Waves.enemy_size(18) == 88 and Run.Waves.enemy_size(29) == 88 and Run.Waves.enemy_size(Run.Waves.CITY_STAGE) == 40,"Late waves preserve the larger readable enemies; city troops keep their separate size")
 	check(Run.Waves.paving_size(18) == 16 and Run.Waves.scenery_size(18) == 16,"Final squad retains old wave nine map scale")
 	for stage in range(1,Run.Waves.COUNT):
-		check(Run.Waves.player_size(stage) > Run.Waves.player_size(stage-1) and Run.Waves.player_size(stage) <= 288,"Player grows without overshooting or shrinking at city entry")
-		check(Run.Waves.enemy_size(stage) < Run.Waves.enemy_size(stage-1),"Enemies shrink each wave without early-wave size bumps")
-		check(Run.Waves.paving_size(stage) <= Run.Waves.paving_size(stage-1) and Run.Waves.scenery_size(stage) < Run.Waves.scenery_size(stage-1),"Map scale decreases throughout the route")
+		check(Run.Waves.player_size(stage) >= Run.Waves.player_size(stage-1) and Run.Waves.player_size(stage) <= 288,"Player grows without overshooting or shrinking at city entry")
+		check(Run.Waves.enemy_size(stage) <= Run.Waves.enemy_size(stage-1),"Enemies shrink each wave without early-wave size bumps")
+		check(Run.Waves.paving_size(stage) <= Run.Waves.paving_size(stage-1) and Run.Waves.scenery_size(stage) <= Run.Waves.scenery_size(stage-1),"Map scale decreases throughout the route")
 ## Shield breaks interrupt normal enemies, but preserve elite actions and charges.
 func shield_break_checks() -> void:
 	for role in range(5):
@@ -165,8 +157,11 @@ func shield_break_checks() -> void:
 		act(m,0,"charge")
 		m.enemies[0].shield = 5
 		m.hit_enemy(0,5)
+		check(m.enemies[0].charge == 1 and not m.enemy_cannot_act(0),"Breaking an elite shield preserves its first charge")
+		var before: int = m.hp
 		act(m,0,"charge")
-		check(m.enemies[0].charge == 2,"Elite shield break keeps charge progress")
+		check(m.enemies[0].charge == (0 if role == 4 else 2) and m.hp == before-(m.enemies[0].damage*2 if role == 4 else 0),"Full-charge timing survives elite shield break")
+		if role == 4: act(m,0,"charge")
 		m.apply_enemy_status(0,Status.FROZEN,1)
 		act(m,0,"charge")
 		check(m.enemies[0].charge == 0,"Freeze still interrupts elite charging")

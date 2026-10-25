@@ -54,7 +54,7 @@ func _initialize() -> void:
 		counts[Catalog.ITEMS[offers[0]].rarity] += 1
 		for id in offers: check(not Catalog.ITEMS[id].get("fusion",false),"Fusion relics never drop directly")
 	for tier in range(5): check(absf(counts[tier]/120.0-Catalog.RARITY_WEIGHTS[tier]) < 1.5,"Drop rarity matches specified probability")
-	check(Catalog.ITEMS.size() == 60,"All 60 relic definitions exist")
+	check(Catalog.ITEMS.size() == 77,"All 77 relic definitions exist")
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","codex_page"]:
 		check(m.acquire_relic(id),"Acquire " + id)
 	check(not m.acquire_relic("heart"),"Relics are unique")
@@ -102,11 +102,11 @@ func _initialize() -> void:
 	m = fresh()
 	m.acquire_relic("heart"); m.acquire_relic("bracelet"); m.acquire_relic("mithril_blade")
 	check(m.max_hp == 110 and m.hp == 110,"Heart increases capacity and fills new capacity")
-	check(m.attack_base(Rules.classify([1,2,3])) == 119,"Flat base damage bonuses apply before multiplier")
+	check(m.attack_base(Rules.classify([1,2,3])) == 14,"Only Bracelet adds flat base; Mithril modifies the multiplier")
 	m.acquire_relic("reaper_scythe")
 	check(m.max_hp == 55 and m.hp == 55,"Reaper halves max health")
 	m.hit_enemy(0,1000,true)
-	check(is_equal_approx(m.damage_multiplier(),1.1),"Kills grow Reaper independently")
+	check(is_equal_approx(m.damage_multiplier(),2.1),"Reaper kill growth multiplies Mithril independently")
 	m = fresh(); m.acquire_relic("armor")
 	m.receive_damage(10)
 	check(m.hp == 91,"Armor reduces incoming damage")
@@ -118,7 +118,7 @@ func _initialize() -> void:
 	m.receive_damage(80)
 	check(m.hp == 100 and m.relics.items[0].charges == 0,"Magic shield consumes one whole-hit block")
 	m.set_test_roll([5,5,5]); m.begin_player_cast()
-	check(m.pending.critical and m.relics.items[1].charges == 0 and m.attack_damage(m.pending) == 45,"Critical covers the whole attack skill")
+	check(m.pending.critical and m.relics.items[1].charges == 0 and m.attack_damage(m.pending) == 75,"Critical covers the whole attack skill")
 	m = fresh(); m.acquire_relic("bloodstone"); m.hp = 1
 	m._attack_relic_effects(-2,1000,Rules.classify([5,5,5]))
 	check(m.hp == 6,"Combo lifesteal has a 5% max HP per-hit cap")
@@ -152,16 +152,10 @@ func _initialize() -> void:
 	m.set_status_counts({Status.PLAGUE:10})
 	check(m.status_count(Status.PLAGUE) == 0 and m.max_hp == plague_hp,"Restoring player statuses cannot reintroduce plague")
 	m = fresh(); m.acquire_relic("cursed_watch"); m.acquire_relic("cursed_die")
-	for i in range(300):
-		m.phase = "roll"
-		roll = m.roll(0,false)
-		check(roll.perfect and 6 in roll.dice and roll.kind != Rules.Kind.ULTIMATE,"Stopwatch + cursed die always Perfect, includes six, never 666")
-	check(m.reroll_progress == 0 and m.perfect_combo == 300,"Stopwatch preserves combo but blocks treasure progress")
-	m = fresh(); m.acquire_relic("cursed_die")
-	for i in range(300):
-		m.phase = "roll"; roll = m.roll(0.8,false)
-		check(6 not in roll.dice,"Cursed die excludes six on misses")
-	m = fresh(); m.acquire_relic("coin"); m.acquire_relic("cursed_bow")
+	check(not m.RelicEffects.has_flag(m.relics.items,"always_perfect") and not m.RelicEffects.has_flag(m.relics.items,"no_treasure"),"Disabled Stopwatch has no passive effects")
+	m.roll_pool(false,[1,2,3,4,5,6])
+	check(m.dice_turn.values == [1,2,3,4,5,6] and m.perfect_combo == 0,"Disabled curses leave manual throw results unchanged")
+	m = fresh(); m.acquire_relic("coin"); m.acquire_relic("cursed_bow"); m.wave_kind = m.WaveRewards.RELIC
 	m.enemies[0].hp = 0
 	m.begin_wave_reward()
 	var first: Array = m.open_rewards.duplicate()
@@ -169,17 +163,16 @@ func _initialize() -> void:
 	check(m.begin_wave_reward() and m.open_rewards == first and m.blood_gems == 10,"Offers and wave rewards cannot reroll or duplicate")
 	check(not m.advance_wave(),"Wave waits for relic decision")
 	m.open_wave_chest()
-	var payout: int = m.Chests.CRYSTALS[m.wave_chest_tier]
+	var payout: int = m.Chests.CRYSTALS[m.wave_chest_tier]+m.unclaimed_relic_gems()
 	m.discard_unclaimed_rewards(); m.close_chest()
 	check(m.finish_wave_reward() and m.blood_gems == 10+payout and not m.finish_wave_reward(),"Chest pays crystals once even when all items are skipped")
-	check(m.advance_wave() and m.power == 1 and m.max_hp == 130,"Wave grows health without free damage multiplier")
+	m.offer_routes(); m.choose_route(0)
+	check(m.advance_wave() and m.power == 1 and m.max_hp == 100,"Wave changes do not grant free health or damage")
 	for wave in range(1,Run.Waves.COUNT+1):
 		m.load_debug_wave(wave)
 		check(m.damage_baseline() == 1,"Every wave including city starts at base x1")
-	m.begin_round(); m.acquire_relic("prismatic_stone"); m.set_test_roll([2,2,2],true)
-	var hp: int = m.city_hp
-	m.resolve_perfect_relic()
-	check(m.city_hp == hp-120 and m.apply_enemy_status(-2,Status.BURNING,3).is_empty(),"City receives prismatic damage but is immune to statuses")
+	m.load_debug_wave(Run.LAST_PLAYABLE_STAGE+1)
+	check(not m.is_city(),"Final playable wave remains a boss while City Fever is disabled")
 	chest_checks()
 	lucky_die_checks()
 	print("Relics and expanded statuses: %d checks, %d failures" % [checks, failures])
@@ -189,7 +182,7 @@ func chest_checks() -> void:
 	for legacy_curse_weight in [false,true]:
 		var m = fresh()
 		m.acquire_relic("heart")
-		m.reroll_progress = 9
+		m.reroll_progress = 10
 		m.reward_weights = [0,0 if legacy_curse_weight else 1,1 if legacy_curse_weight else 0,0,0,0,0]
 		var rewards: Array = m.open_chest()
 		var locked: Dictionary = m.chest_relics.duplicate()
@@ -215,7 +208,7 @@ func chest_checks() -> void:
 	m.chest_relics = {0:"contract",1:"cursed_bow"}
 	check(m.claim_reward(0).is_empty() and m.claimed_slots.is_empty(),"Full inventory leaves a relic unclaimed until a replacement is selected")
 	check(not m.claim_reward(0,2).is_empty() and m.relics.items[2].id == "contract","Chest replacement preserves the chosen slot")
-	check(m.claim_reward(1,-1,true).id == "discard" and not m.relics.has("cursed_bow") and m.blood_gems == 0,"Leaving a chest relic resolves it without awarding skip rubies")
+	check(m.claim_reward(1,-1,true).id == "discard" and not m.relics.has("cursed_bow") and m.blood_gems == 130,"Replacement and discarded relics pay their salvage values")
 	check(m.close_chest(),"Replacement and leaving a relic both allow the chest to close")
 	for n in range(8): m.acquire_relic("codex_page")
 	m.open_rewards = [1]; m.chest_relics = {0:"codex_page"}

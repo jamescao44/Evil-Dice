@@ -14,9 +14,13 @@ func render() -> void:
 		g.view_phase="ready"; g.relic_ui.ready_clock=3.0
 		g.relic_ui.activate("orange_stone");g.relic_ui.activations.orange_stone.age=0.25
 		g.model.character_passive.charge=2
-		g._process(0);g.relic_ui.queue_redraw()
-		await process_frame
-		await RenderingServer.frame_post_draw
-		root.get_texture().get_image().save_png("res://test-output/relic-orbit-"+("portrait" if portrait else "landscape")+".png")
+		g.evolution.set_process(false)
+		for level in [1,5,10]:
+			g.model.character_level = level
+			g.evolution.displayed_level = level
+			g._process(0);g.relic_ui.queue_redraw();g.arena_actors.queue_redraw()
+			await process_frame
+			await RenderingServer.frame_post_draw
+			root.get_texture().get_image().save_png("res://test-output/relic-orbit-"+("portrait" if portrait else "landscape")+"-level-"+str(level)+".png")
 		root.remove_child(g);g.free()
 	quit()

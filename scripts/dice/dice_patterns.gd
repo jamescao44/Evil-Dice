@@ -18,6 +18,7 @@ static func classify(values: Array) -> MultiHitSkill:
 		if ordered[i] != ordered[i-1]+1: return Skill.new()
 	var skill := Skill.new(Skill.Kind.ULTIMATE if values.size() == 6 else Skill.Kind.SPECIAL if values.size() > 3 else Skill.Kind.NORMAL,0,values)
 	skill.pattern = "straight"
+	skill.damage_ticks = preload("res://scripts/combat/flamelings_skills.gd").damage_tick_count(values.size())
 	return skill
 
 ## Snapshot matching groups from newly rolled indices only, highest pip first.
@@ -53,14 +54,17 @@ static func cleanup(values: Array) -> MultiHitSkill:
 	return skill
 
 ## Shared help copy keeps both screen layouts and the home catalogue aligned.
-static func help_entries(straights: bool) -> Array:
+static func help_entries(straights: bool, evolution: int = 0) -> Array:
 	var character = preload("res://scripts/combat/flamelings_skills.gd")
 	if straights:
 		var entries: Array = []
-		for tier in range(4): entries.append({"name":character.NAMES[tier],"text":character.DESCRIPTIONS[tier]})
+		for tier in range(4):
+			var caption: Dictionary = character.caption(classify(range(1,tier+4)),evolution)
+			entries.append({"name":caption.name,"text":caption.description})
 		return entries
 	return [
-		{"name":"Matching Auto Attacks","text":"Each newly rolled group of 2+ matching dice attacks random enemies. One hit per matching die; damage = base x (0.5 + 0.1 x pip)."},
-		{"name":"Dice Stay Available","text":"Automatic attacks do not spend dice. Use them in straights or reroll all unused dice, up to three rolls per turn."},
-		{"name":"Healing Embers","text":"End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing."},
+		{"name":"Matching Auto Attacks","text":"2+ matching dice: one random-target hit per die. Each hit = base x (0.5 + 0.05 x pip)."},
+		{"name":"Five Alike","text":"Five linked dice form a pentagon and fire 5 random-target laser hits, each dealing 4x auto-attack damage."},
+		{"name":"Six Alike","text":"Six linked dice form a hexagon and fire one huge beam: 6 hits to all enemies, each dealing 8x auto-attack damage."},
+		{"name":"Dice Stay Available","text":"Dice stay usable. Reroll unused dice up to 3 times per turn. Leftovers heal 1% HP per pip."},
 	]

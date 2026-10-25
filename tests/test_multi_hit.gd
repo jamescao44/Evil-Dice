@@ -251,7 +251,7 @@ func scene_checks(g) -> void:
 	else: check(false,"Every accelerated impact remains observable")
 	check(rewards_locked,"Scene keeps rewards locked while hitting bodies")
 	while g.view_phase == "collecting" and Time.get_ticks_msec()<deadline: await process_frame
-	check(g.view_phase == "reward" and g.chest.roll_phase == "closed" and g.model.wave_chest_stage == g.model.stage,"Closed wave chest appears only after the complete chain")
+	check(g.view_phase == "wave_reward" and g.wave_chest.phase == "closed" and g.model.wave_chest_stage == g.model.stage,"Closed wave chest appears only after the complete chain")
 	g.fallen[0] = 1.0
 	check(g._enemy_impact_point(0).is_equal_approx(g._enemy_feet(0)-Vector2(0,g._enemy_side()*0.08)),"Follow-through aims at the body on the floor")
 	g.queue_free()

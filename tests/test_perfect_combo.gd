@@ -22,7 +22,8 @@ func fresh(city: bool = false):
 		m.stage = Waves.CITY_STAGE
 		m._load_wave()
 	else:
-		m.enemies = [Rules.make_enemy(0,20)]
+		m.enemies = [Rules.make_enemy(0)]
+		m.enemies[0].hp = 1500; m.enemies[0].max_hp = 1500
 	m.begin_round()
 	return m
 

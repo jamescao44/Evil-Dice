@@ -1,25 +1,32 @@
 extends Node2D
-## Presentation-only damage recipe: regular base -> skill -> ordered modifiers -> hit.
+## Persistent damage HUD: character level -> ordered relic additions -> skill -> hit.
 ## The model supplies the trace; this node never mutates combat or consumes RNG.
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Orb = preload("res://scripts/combat/skill_orb_paint.gd")
 const INTRO := 0.12
 const STEP_TIME := 0.36
+const STEP_ACCELERATION := 0.12
+const MAX_STEP_SPEED := 2.5
+const MAX_ADDITION_PITCH := 1.5
 const FLIGHT_TIME := 0.25
 const IMPACT_TIME := 0.38
 const COMBINE_TIME := 0.28
 const WAVE_TIME := 0.22
 const WAVE_SPREAD := 0.14
 const TREMBLE_THRESHOLD := 100.0
-const TREMBLE_PER_DECADE := 2.0
-const MAX_TREMBLE := 6.0
+const TREMBLE_PER_DECADE := 4.0
+const MAX_TREMBLE := 12.0
+const RESULT_HOLD := 2.2
+const RESULT_SIZE_FACTOR := 1.2
+const RETURN_TIME := 0.28
 var battle
 var active: bool = false
 var building: bool = false
 var value: float = 1.0
-var base_value: float = 15.0
+var base_value: float = 5.0
 var steps: Array = []
 var cursor: int = -1
+var addition_count: int = 0
 var phase: String = ""
 var age: float = 0
 var result_age: float = 0
@@ -34,16 +41,53 @@ var fade_age: float = -1
 var flight_from := Vector2.ZERO
 var landed: bool = false
 var hit_damage: int = -1
+var damage_ticks: int = 1
 
 func _ready() -> void:
 	z_index = 115
 	battle.model.relic_activated.connect(_relic_activated)
-	hide()
+	clear()
+
+## Keep the formula on the battlefield while full-screen pages cover it.
+func should_show() -> bool:
+	return not battle._menus_open() and battle.view_phase not in ["reward","shop","over"]
+
+## Track standing stats without consuming a buff, selecting a skill or rolling an effect.
+func _refresh_standing(animate: bool = false) -> void:
+	var standing: Vector2 = battle.model.standing_damage_values()
+	if animate and (not is_equal_approx(base_value,standing.x) or not is_equal_approx(value,standing.y)):
+		_impact(standing.x,standing.y,Color.WHITE)
+	else:
+		base_value = standing.x
+		value = standing.y
+
+## Automatic attacks update the same formula without adding delays to their volley.
+func show_attack(skill: MultiHitSkill) -> void:
+	if battle.model.is_instant_kill(skill): return
+	active = true
+	building = false
+	phase = "attack"
+	fade_age = -1
+	hit_damage = -1
+	damage_ticks = 1
+	_impact(battle.model.attack_base(skill),battle.model.cast_damage_multiplier(skill),Color("ffb057"))
+	queue_redraw()
+
+## Hold a generated skill's inherited total without replaying modifier buildup.
+func retain_result(total: int) -> void:
+	active = true
+	building = false
+	phase = "result"
+	hit_damage = total
+	damage_ticks = 1
+	fade_age = -1
+	queue_redraw()
 
 func start(values: Array) -> void:
 	clear()
 	if values.is_empty(): return
 	steps = values.duplicate(true)
+	damage_ticks = maxi(1,int(steps.back().get("damage_ticks",1)))
 	base_value = steps[0].base_before
 	value = steps[0].before
 	active = true
@@ -51,15 +95,18 @@ func start(values: Array) -> void:
 	phase = "intro"
 	visible = true
 
-func clear() -> void:
+func clear(preserve_result: bool = false) -> void:
+	if preserve_result and active and phase == "result" and fade_age >= 0: return
 	hit_damage = -1
+	damage_ticks = 1
 	active = false
 	building = false
 	value = 1.0
-	base_value = 15.0
+	_refresh_standing()
 	steps.clear()
 	cursor = -1
-	phase = ""
+	addition_count = 0
+	phase = "idle"
 	age = 0
 	result_age = 0
 	tremble_age = 0
@@ -70,13 +117,16 @@ func clear() -> void:
 	mult_direction = 0
 	fade_age = -1
 	landed = false
-	hide()
+	visible = should_show()
+	queue_redraw()
 
 func finish() -> void:
 	building = false
-	if active: fade_age = 0
+	if active and fade_age < 0: fade_age = 0
 
 static func number(amount: float, multiplier: bool = false) -> String:
+	# Base damage is rounded up only for the HUD; combat and traces retain precision.
+	if not multiplier: return str(ceili(amount))
 	var text: String = "%.2f" % amount
 	while text.ends_with("0"): text = text.left(-1)
 	if text.ends_with("."): text = text + "0" if multiplier else text.left(-1)
@@ -86,21 +136,22 @@ func formula_label() -> String:
 	return "DMG %s x %s" % [number(base_value),number(value,true)]
 
 func combined_damage() -> int:
-	return hit_damage if hit_damage >= 0 else floori(base_value * value + 0.000001)
+	return hit_damage if hit_damage >= 0 else floori(base_value*value/damage_ticks+0.000001)*damage_ticks
 
 func label() -> String:
 	return "DMG %d" % combined_damage() if phase == "result" else formula_label()
 
 func anchor() -> Vector2:
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
-	# Leave room above the baseline for the enlarged wave and maximum tremble.
 	return battle.ARENA.position+Vector2(24 if portrait else 18,50 if portrait else 44)
 
 func text_size() -> int:
 	var size: int = 30 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 24
 	var available: float = battle.ARENA.size.x - 64
 	var width: float = battle.pixel_font.get_string_size(formula_label(),HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
-	return maxi(14,floori(size * minf(1.0,available/maxf(1,width*1.35))))
+	var fitted_width: float = width*1.35
+	if phase == "result": fitted_width = battle.pixel_font.get_string_size(label(),HORIZONTAL_ALIGNMENT_LEFT,-1,size).x*(RESULT_SIZE_FACTOR+0.1)
+	return maxi(14,floori(size * minf(1.0,available/maxf(1,fitted_width))))
 
 func _width(text: String) -> float:
 	return battle.pixel_font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size()).x
@@ -162,7 +213,8 @@ func step_color(step: Dictionary) -> Color:
 	return Color("c18ce8") if step.source == "darkness" else Color("dfb866")
 
 func current_step_speed() -> float:
-	return steps[cursor].get("speed",1.0) if phase == "steps" and cursor >= 0 and cursor < steps.size() else 1.0
+	if phase != "steps" or cursor < 0 or cursor >= steps.size(): return 1.0
+	return steps[cursor].get("speed",1.0)*minf(MAX_STEP_SPEED,1.0+cursor*STEP_ACCELERATION)
 
 func _advance() -> void:
 	cursor += 1
@@ -174,22 +226,31 @@ func _advance() -> void:
 	phase = "steps"
 	var step: Dictionary = steps[cursor]
 	flight_from = battle._perfect_combo_center() if step.source == "combo" else battle._player_point()
-	if step.source == "skill": flight_from = battle._source_bubble(battle.casting_source).cast_position
+	if step.source == "skill":
+		# Direct bonus casts have no bubble; their damage contribution starts at the player.
+		var bubble_point: Vector2 = battle._source_bubble(battle.casting_source).cast_position
+		if bubble_point.is_finite(): flight_from = bubble_point
 	if step.slot >= 0:
 		flight_from = battle.relic_ui.slot_rect(step.slot).get_center()
-		for id in step.get("activators",[step.id]): battle.relic_ui.activate(id,step.get("speed",1.0))
+		for pose in battle.RelicOrbit.poses(battle):
+			if pose.slot == step.slot:
+				flight_from = battle.battlefield_view.transform*pose.at
+				break
+		for id in step.get("activators",[step.id]): battle.relic_ui.activate(id,current_step_speed())
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
-	visible = active and not battle._menus_open() and battle.view_phase == "resolving"
-	if battle._menus_open() or not active: return
+	visible = should_show()
+	if battle._menus_open(): return
+	if not active: _refresh_standing(true)
 	var elapsed: float = delta*clampf(battle._roll_speed(),1,2)
 	impact_age += elapsed*impact_speed
 	tremble_age += elapsed
 	if phase == "result": result_age += elapsed
 	if fade_age >= 0:
-		fade_age += elapsed
-		if fade_age >= 0.2: clear(); return
+		# Final-result readability uses real seconds, independent of battle speed.
+		fade_age += delta if phase == "result" else elapsed
+		if fade_age >= (RESULT_HOLD+RETURN_TIME if phase == "result" else 0.2): clear(); return
 	if building:
 		age += elapsed*current_step_speed()
 		if phase == "intro":
@@ -203,7 +264,12 @@ func _process(delta: float) -> void:
 		elif phase == "steps":
 			if not landed and age >= FLIGHT_TIME:
 				landed = true
-				_impact(steps[cursor].base_after,steps[cursor].after,step_color(steps[cursor]))
+				var step: Dictionary = steps[cursor]
+				var increased: bool = step.base_after > base_value or step.after > value
+				_impact(step.base_after,step.after,step_color(step))
+				if increased:
+					battle._sound("item/pluck_001",minf(MAX_ADDITION_PITCH,0.9+addition_count*0.06),-22)
+					addition_count += 1
 			if age >= STEP_TIME: _advance()
 	queue_redraw()
 
@@ -221,8 +287,16 @@ func result_glyph_motion(index: int, count: int) -> Vector2:
 	return _wave_motion(index,count,result_age,12)
 
 func result_glyph_scale(index: int, count: int) -> float:
-	if battle.reduced: return 1.2
-	return 1.2 + absf(result_glyph_motion(index,count).y)/12.0*0.25
+	if battle.reduced: return RESULT_SIZE_FACTOR
+	return lerpf(RESULT_SIZE_FACTOR+absf(result_glyph_motion(index,count).y)/12.0*0.25,1.0,return_progress())
+
+## Shrink into the live standing formula after the hold, using menu-paused real time.
+func return_progress() -> float:
+	return smoothstep(RESULT_HOLD,RESULT_HOLD+RETURN_TIME,fade_age) if phase == "result" else 0.0
+
+## Scale from a common top-left origin rather than moving the result's baseline down.
+func result_glyph_origin(x: float, character: String, scale_value: float) -> Vector2:
+	return anchor()+Vector2(x+_width(character)*(scale_value-1)*0.5,battle.pixel_font.get_ascent(text_size())*(scale_value-1))
 
 static func damage_tremble_amplitude(damage: float) -> float:
 	if damage <= TREMBLE_THRESHOLD: return 0.0
@@ -230,6 +304,7 @@ static func damage_tremble_amplitude(damage: float) -> float:
 
 func number_tremble(index: int) -> Vector2:
 	if battle.reduced: return Vector2.ZERO
+	if not active and impact_age >= IMPACT_TIME: return Vector2.ZERO
 	var amplitude: float = damage_tremble_amplitude(combined_damage())
 	# Match the dice's charging frequencies without consuming combat randomness.
 	return Vector2(sin(tremble_age*71+index*2.1),cos(tremble_age*83+index*1.7))*amplitude
@@ -262,13 +337,27 @@ func _draw_formula(opacity: float) -> void:
 			index += 1
 
 func _draw_result(opacity: float) -> void:
-	var at: Vector2 = anchor()
+	var x: float = 0
 	var text: String = label()
+	var returning: float = return_progress()
+	var spacing: float = lerpf(RESULT_SIZE_FACTOR+0.1,1.0,returning)
 	for i in range(text.length()):
 		var offset: Vector2 = result_glyph_motion(i,text.length())
 		if i >= 4: offset += number_tremble(4)
-		_glyph(at+offset,text[i],result_glyph_scale(i,text.length()),opacity)
-		at.x += _width(text[i])*1.3
+		var glyph_scale: float = result_glyph_scale(i,text.length())
+		_glyph(result_glyph_origin(x,text[i],glyph_scale)+offset*(1-returning),text[i],glyph_scale,opacity*(1-returning))
+		x += _width(text[i])*spacing
+	if returning > 0: _draw_standing(returning*opacity)
+
+## Crossfade to the current stats at their normal size while the old result contracts.
+func _draw_standing(opacity: float) -> void:
+	var standing: Vector2 = battle.model.standing_damage_values()
+	var text: String = "DMG %s x %s" % [number(standing.x),number(standing.y,true)]
+	var size: int = 30 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 24
+	var width: float = battle.pixel_font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x*1.35
+	size = maxi(14,floori(size*minf(1.0,(battle.ARENA.size.x-64)/maxf(1,width))))
+	draw_string(battle.pixel_font,anchor()+Vector2(2,2),text,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Color(0.04,0.06,0.05,opacity))
+	draw_string(battle.pixel_font,anchor(),text,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Color(1,1,1,opacity))
 
 func _draw_flight(step: Dictionary, opacity: float) -> void:
 	var color: Color = step_color(step)
@@ -295,8 +384,8 @@ func _draw_flight(step: Dictionary, opacity: float) -> void:
 			Orb.paint(self,at,(16-i*2)*particle_scale,color,true)
 
 func _draw() -> void:
-	if not active: return
-	var opacity: float = 1.0 if fade_age < 0 else clampf(1-fade_age/0.2,0,1)
+	# Hold the result briefly, then return to the standing formula without disappearing.
+	var opacity: float = 1.0
 	if phase == "result": _draw_result(opacity)
 	else: _draw_formula(opacity)
 	if phase == "steps" and cursor >= 0 and cursor < steps.size(): _draw_flight(steps[cursor],opacity)

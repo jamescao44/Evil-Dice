@@ -23,11 +23,12 @@ const IDS := [REGEN, MIGHT, ASCENSION, IMMUNITY, FROZEN, BURNING, STUNNED, DARKN
 enum Attribute { NONE, ICE, FIRE, SHOCK, DARK, ACID, DISEASE }
 var permanent: bool = false
 var potency: float = 1.0
+var defer_decay: bool = false
 var id: int
 var count: int = 0:
 	set(value):
 		count = clampi(value, 0, MAX_BURNING_STACKS) if id == BURNING else maxi(0, value)
-		if count == 0: potency = 1.0
+		if count == 0: potency = 1.0; defer_decay = false
 
 ## Bind this status instance to its boon or affliction ID.
 func _init(effect_id: int) -> void:
@@ -41,6 +42,11 @@ func apply(amount: int, effect_potency: float = 1.0) -> void:
 ## Spend status counts unless this effect is permanent.
 func consume(amount: int = 1) -> void:
 	if not permanent: count -= amount
+
+## Optionally preserve a newly applied duration through its application turn.
+func decay() -> void:
+	if defer_decay: defer_decay = false
+	else: consume()
 
 ## Classify this status as an affliction rather than a boon.
 func is_harmful() -> bool:

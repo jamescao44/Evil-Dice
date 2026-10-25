@@ -45,7 +45,7 @@ func economy() -> void:
 		check(not m.shop.open(m),"Battle routes never open shops")
 	for visit in range(1,4):
 		for seed_value in range(50):
-			prepare_shop(m,visit*5)
+			prepare_shop(m,[5,8,15][visit-1]) # Wave ten is now a boss, never a shop.
 			m.shop.number = visit-1
 			m.reward_rng.seed = seed_value
 			check(not m.advance_wave(),"Unvisited shop cannot advance")
@@ -93,20 +93,21 @@ func economy() -> void:
 		if m.relics.items.size() < 10: m.acquire_relic(id)
 	m.shop.offers[0] = {"kind":"relic","id":"mithril_blade","price":456,"sold":false}
 	check(m.shop.needs_replacement(m,0) and m.shop.buy(m,0).is_empty() and m.blood_gems == 10000,"Full inventory requires a replacement before charging")
-	check(not m.shop.buy(m,0,2).is_empty() and m.relics.items[2].id == "mithril_blade" and m.blood_gems == 9544,"Replacement and payment commit together")
+	var replacement_gems: int = m.replacement_gem_preview("mithril_blade",2)
+	check(not m.shop.buy(m,0,2).is_empty() and m.relics.items[2].id == "mithril_blade" and m.blood_gems == 9544+replacement_gems,"Replacement and payment commit together")
 	m.shop.offers[1] = {"kind":"relic","id":"codex_page","price":110,"sold":false}
 	m.relics.items[1] = m.relics._new_item("codex_page")
 	check(not m.shop.needs_replacement(m,1) and not m.shop.buy(m,1).is_empty() and m.relics.items[1].count == 2,"Stackable Codex Pages do not require replacement")
 	var bottle: Dictionary = m.shop.offers[8].duplicate()
-	m.souls = 29
+	m.souls = 9
 	check(not m.shop.needs_replacement(m,8),"Bottle consumes no relic slot even in a full inventory")
 	m.blood_gems = bottle.price-1
-	check(m.shop.buy(m,8).is_empty() and m.souls == 29 and not m.shop.offers[8].sold,"Unaffordable bottle remains sealed without awarding souls")
+	check(m.shop.buy(m,8).is_empty() and m.souls == 9 and not m.shop.offers[8].sold,"Unaffordable bottle remains sealed without awarding souls")
 	m.blood_gems = bottle.price
 	rng_state = m.reward_rng.state
-	check(not m.shop.buy(m,8).is_empty() and m.blood_gems == 0 and m.souls == 29+bottle.souls-30 and m.character_level == 2,"Bottle grants its locked contents and automatically levels the player")
+	check(not m.shop.buy(m,8).is_empty() and m.blood_gems == 0 and m.souls+5*m.character_level*(m.character_level-1) == 9+bottle.souls and m.character_level >= 2,"Bottle grants its locked contents and automatically levels the player")
 	check(rng_state == m.reward_rng.state and m.relics.items.size() == 10,"Purchase never rerolls contents or occupies inventory")
-	check(m.shop.buy(m,8).is_empty() and m.souls == 29+bottle.souls-30,"Repeated bottle purchase cannot duplicate souls")
+	check(m.shop.buy(m,8).is_empty() and m.souls+5*m.character_level*(m.character_level-1) == 9+bottle.souls,"Repeated bottle purchase cannot duplicate souls")
 	m.reset_run()
 	check(not m.shop.active and m.shop.wave == -1 and m.shop.offers.is_empty(),"Restart clears visit and stock")
 
@@ -158,7 +159,9 @@ func scene(portrait: bool) -> void:
 		await process_frame
 		RenderingServer.force_draw()
 		root.get_texture().get_image().save_png("res://test-output/shop-"+("portrait" if portrait else "landscape")+".png")
-	var offer_id: String = g.model.shop.offers[1].id
+	# Use a non-fusing offer: meal ingredients can intentionally fit a full backpack.
+	var offer_id: String = ["mithril_blade","contract","runestone"].filter(func(id): return not g.model.relics.has(id))[0]
+	g.model.shop.offers[1].id = offer_id
 	for id in Relics.ITEMS:
 		if id != offer_id and id != "codex_page" and g.model.relics.items.size() < 10 and id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false): g.model.acquire_relic(id)
 	g.tarot_ui.pickup.reset()
@@ -170,21 +173,33 @@ func scene(portrait: bool) -> void:
 		RenderingServer.force_draw()
 		root.get_texture().get_image().save_png("res://test-output/shop-replace-"+("portrait" if portrait else "landscape")+".png")
 	g._handle_click(g.inventory_page.close_rect().get_center())
+	check(not ui.replacing and ui.selected == -1 and not g.inventory_page.opened and g.inventory_page.replacement.is_empty(),"Cancel completely exits the pending shop purchase")
+	var owned: Array = g.model.relics.items.duplicate(true)
+	g._handle_release(g.inventory_page.close_rect().get_center())
+	g._handle_click(g.relic_ui.slot_rect(3).get_center())
+	g._handle_release(g.relic_ui.slot_rect(3).get_center())
+	ui._buy(3)
 	g._handle_click(ui.buy_rect().get_center())
-	check(not ui.replacing and g.model.blood_gems == money,"Cancelling replacement preserves currency and stock")
-	g._handle_click(ui.buy_rect().get_center())
+	check(not ui.replacing and g.model.blood_gems == money and not g.model.shop.offers[1].sold and g.model.relics.items == owned,"Owned-rail taps, stale replacements and BUY cannot revive a cancelled purchase")
+	g.relic_ui.cancel_hold()
+	g.inventory_page.open()
+	check(g.inventory_page.replacement.is_empty(),"Reopening the backpack after cancel is inspection only")
+	g.inventory_page.close()
+	g._handle_release(g.inventory_page.close_rect().get_center())
+	g._handle_click(ui.offer_rect(1).get_center()); g._handle_click(ui.buy_rect().get_center())
 	g._handle_click(g.inventory_page.slot_rect(3).get_center())
+	g._handle_release(g.inventory_page.slot_rect(3).get_center())
 	check(g.inventory_page.selected == 3 and g.model.blood_gems == money,"Inspecting a replacement does not spend crystals")
 	g._handle_click(g.inventory_page.replace_rect().get_center())
 	check(g.model.shop.offers[1].sold and g.model.relics.items[3].id == offer_id,"Owned slot confirms replacement without triggering inventory drag")
 	g.relic_ui.pickup.clear()
-	g.model.souls = 29
+	g.model.souls = 9
 	var soul_gain: int = g.model.shop.offers[8].souls
 	var bottle_price: int = g.model.shop.offers[8].price
 	money = g.model.blood_gems
 	g._handle_click(ui.offer_rect(8).get_center())
 	ui.motion(ui.buy_rect().get_center()); ui.release(ui.buy_rect().get_center())
-	check(g.model.shop.offers[8].sold and g.model.souls == 29+soul_gain-30 and g.model.blood_gems == money-bottle_price,"Drag-to-buy opens the bottle and grants its souls once")
+	check(g.model.shop.offers[8].sold and g.model.souls+5*g.model.character_level*(g.model.character_level-1) == 9+soul_gain and g.model.blood_gems == money-bottle_price,"Drag-to-buy opens the bottle and grants its souls once")
 	check(ui.offer_description(g.model.shop.offers[8]) == GameText.format("Opened: +%d souls.",soul_gain),"Purchased bottle displays its exact contents")
 	await process_frame
 	check(g.evolution.active() and g.evolution.age < 0,"Shop upgrade waits to show its transformation on the battlefield")

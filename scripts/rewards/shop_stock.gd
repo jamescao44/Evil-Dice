@@ -16,6 +16,7 @@ var wave: int = -1
 var number: int = 0
 var active: bool = false
 var guaranteed_slot: int = -1
+var divination_used: bool = false
 
 ## Discard shop visits and stock when a run restarts.
 func reset() -> void:
@@ -24,6 +25,7 @@ func reset() -> void:
 	number = 0
 	active = false
 	guaranteed_slot = -1
+	divination_used = false
 
 ## A visit is due only after an unfinished chosen shop wave.
 func due(run) -> bool:
@@ -35,8 +37,17 @@ func open(run) -> bool:
 	wave = run.stage+1
 	number += 1
 	active = true
+	divination_used = false
 	_restock(run)
 	return true
+
+## Reserve one free three-card choice per visit before its cosmetic ceremony starts.
+func begin_divination(run) -> Array:
+	if not active or divination_used or not run.tarot_source.is_empty(): return []
+	var choices: Array = Tarot.draw_choices(run.reward_rng,run.tarot_effects.banned)
+	if choices.size() != 3: return []
+	divination_used = true
+	return choices
 
 ## Keep all visits at base prices; refreshing always costs fifty blood gems.
 func price_multiplier() -> float:

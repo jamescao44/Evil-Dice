@@ -152,7 +152,7 @@ func _clear_preview() -> void:
 
 ## Cache the formed skill caption only when the selected pattern changes.
 func _selection_changed() -> void:
-	preview = battle.model.Patterns.classify(battle.model.dice_turn.selection_values())
+	preview = battle.model.relic_skills.preview_upgrade(battle.model,battle.model.Patterns.classify(battle.model.dice_turn.selection_values()))
 	caption = {} if preview.is_empty() else battle._skill_caption(preview)
 	if preview.is_empty(): particles.clear()
 	battle._sound("ui/book",1.5,-24)

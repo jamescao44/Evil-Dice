@@ -86,11 +86,13 @@ func scene_checks(game) -> void:
 	game.model.form_selected_skill()
 	game._show_pending_skill(false)
 	var justice_budget: int = game.model.dice_turn.rolls_left
+	game.model.perfect_combo = 5
 	var justice: Dictionary = give_front(game,"justice")
 	drag(game,drop); await settle(game)
 	check(game.model.pending.is_empty() and game.skill_bubble.roll.is_empty(),"Justice removes the pending model and visible skill")
 	check(game.view_phase == "ready" and game.model.dice_turn.unused().size() == 6,"Justice rerolls unlocked dice and restores control")
 	check(game.model.dice_turn.rolls_left == justice_budget and game.model.tarots.find_instance(justice.instance_id) == -1,"Justice consumes its card but no roll")
+	check(game.model.perfect_combo == 5,"Animated Justice preserves the Perfect combo")
 	game._restart(); tough_enemies(game); prepare_roll(game); game.model.hp = 20
 	give_front(game,"temperance"); drag(game,drop)
 	var deadline: int = Time.get_ticks_msec()+10000
@@ -104,8 +106,10 @@ func scene_checks(game) -> void:
 	check(cast_ui.choice_type == "magician" and cast_ui.instance_id < 0,"Prophecy asks for a second die edit")
 	tap(game,game.DICE_POSITIONS[1]); tap(game,cast_ui.magician_choice.face_center(game,6)); await settle(game)
 	check(game.model.dice_turn.values == [2,6,3,4,5,6] and game.view_phase == "ready","Second edit finishes independently")
+	game.model.perfect_combo = 5
 	give_front(game,"justice"); drag(game,drop); await settle(game)
 	check(game.model.dice_turn.rolls_made == 3 and game.model.dice_turn.rolls_left == 2 and game.view_phase == "ready","Repeated Justice animates two complete free rolls")
+	check(game.model.perfect_combo == 5,"Prophecy repeating Justice also preserves the Perfect combo")
 	game._restart(); tough_enemies(game)
 	game.model.apply_affliction(game.Status.FROZEN,1); game.model._prepare_player_turn(); game.view_phase = "frozen"
 	give_front(game,"hierophant"); drag(game,drop); await settle(game)

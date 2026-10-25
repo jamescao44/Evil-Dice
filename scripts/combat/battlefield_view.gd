@@ -22,11 +22,15 @@ static func focus_transform(arena: Rect2, bounds: Rect2, portrait: bool, enemy_s
 	return Transform2D(0,Vector2.ONE*magnification,0,offset)
 
 ## Return immediately after target commitment, without waiting for the skill to finish.
-func advance(delta: float, requested: bool, arena: Rect2, bounds: Rect2, portrait: bool, enemy_size: float) -> void:
-	if requested != focused:
+func advance(delta: float, requested: bool, arena: Rect2, bounds: Rect2, portrait: bool, enemy_size: float, rest: Transform2D = Transform2D.IDENTITY) -> void:
+	var destination: Transform2D = focus_transform(arena,bounds,portrait,enemy_size) if requested else rest
+	if rest != Transform2D.IDENTITY and requested:
+		# A giant boss is already framed; avoid cropping it on target selection.
+		destination = rest
+	if requested != focused or not destination.is_equal_approx(_to):
 		focused = requested
 		_from = transform
-		_to = focus_transform(arena,bounds,portrait,enemy_size) if focused else Transform2D.IDENTITY
+		_to = destination
 		_duration = ENTER_TIME if focused else EXIT_TIME
 		_age = 0
 	_age = minf(_duration,_age+delta)

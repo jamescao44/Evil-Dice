@@ -1,0 +1,906 @@
+{
+  "date": "2026-10-25",
+  "perfect_rate": 0.35,
+  "assumptions": [
+    "Same 12 seeds and unchanged visible-state policy in each version.",
+    "Ultra prizes discarded; lower tiers and natural legendary rewards allowed.",
+    "Full runs use real dice, skills, tarot, shops, loot and level progression; loot paths may diverge.",
+    "Fixed-loadout probes start healthy, use combat-only prior XP and no tarots.",
+    "Headless tests do not measure touch controls, audiovisual pacing, or human win rate."
+  ],
+  "versions": {
+    "before": {
+      "clears": 12,
+      "runs": 12,
+      "failures": 0,
+      "medians": {
+        "rolls": 108.0,
+        "skills": 46.5,
+        "enemy_phases": 34.0,
+        "damage_taken": 709.5,
+        "boss_releases": 1.5,
+        "tarots": 8.5
+      },
+      "first_full_inventory_median": 11.0,
+      "bosses": {
+        "10": {
+          "rolls": 14.5,
+          "enemy_phases": 6.5,
+          "boss_releases": 1.0,
+          "damage_taken": 20.0
+        },
+        "20": {
+          "rolls": 14.5,
+          "enemy_phases": 6.0,
+          "boss_releases": 0.5,
+          "damage_taken": 27.0
+        }
+      },
+      "controlled": [
+        {
+          "wave": 5,
+          "clears": 12,
+          "count": 12,
+          "median_rolls": 4.0,
+          "median_enemy_phases": 1.0,
+          "median_damage_taken": 14.0,
+          "median_boss_releases": 0.0
+        },
+        {
+          "wave": 10,
+          "clears": 12,
+          "count": 12,
+          "median_rolls": 27.0,
+          "median_enemy_phases": 10.0,
+          "median_damage_taken": 133.5,
+          "median_boss_releases": 2.0
+        },
+        {
+          "wave": 15,
+          "clears": 11,
+          "count": 12,
+          "median_rolls": 15.5,
+          "median_enemy_phases": 5.0,
+          "median_damage_taken": 158.5,
+          "median_boss_releases": 0.0
+        },
+        {
+          "wave": 20,
+          "clears": 12,
+          "count": 12,
+          "median_rolls": 36.5,
+          "median_enemy_phases": 13.5,
+          "median_damage_taken": 153.0,
+          "median_boss_releases": 2.5
+        }
+      ],
+      "runs_detail": [
+        {
+          "seed": 11,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 12,
+            "boss_interrupts": 1,
+            "boss_releases": 4,
+            "damage_taken": 956,
+            "enemy_phases": 41,
+            "healing": 584,
+            "kills": 52,
+            "rolls": 132,
+            "skills": 54,
+            "tarots": 9
+          },
+          "final_relics": [
+            "happy_meal",
+            "disguise_mask",
+            "green_stone",
+            "pet_slime",
+            "fortune_cookie",
+            "armor",
+            "heart",
+            "bracelet",
+            "bloodstone",
+            "five_leaf_clover"
+          ]
+        },
+        {
+          "seed": 29,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 1,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 164,
+            "enemy_phases": 11,
+            "healing": 9,
+            "kills": 44,
+            "rolls": 54,
+            "skills": 30,
+            "tarots": 10
+          },
+          "final_relics": [
+            "magic_sword",
+            "black_stone",
+            "green_stone",
+            "pet_slime",
+            "pet_dragon",
+            "purple_stone",
+            "deluxe_meal",
+            "fortune_cookie",
+            "crystal_ball",
+            "runestone"
+          ]
+        },
+        {
+          "seed": 47,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 12,
+            "boss_interrupts": 0,
+            "boss_releases": 4,
+            "damage_taken": 1268,
+            "enemy_phases": 47,
+            "healing": 941,
+            "kills": 48,
+            "rolls": 131,
+            "skills": 66,
+            "tarots": 8
+          },
+          "final_relics": [
+            "magic_sword",
+            "yellow_stone",
+            "contract",
+            "bracelet",
+            "armor",
+            "pet_slime",
+            "bloodstone",
+            "heart",
+            "happy_meal",
+            "cursed_bow"
+          ]
+        },
+        {
+          "seed": 83,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 11,
+            "boss_interrupts": 3,
+            "boss_releases": 3,
+            "damage_taken": 1030,
+            "enemy_phases": 47,
+            "healing": 887,
+            "kills": 58,
+            "rolls": 156,
+            "skills": 71,
+            "tarots": 10
+          },
+          "final_relics": [
+            "deluxe_meal",
+            "fortune_cookie",
+            "magic_sword",
+            "armor",
+            "five_leaf_clover",
+            "orange_stone",
+            "yellow_stone",
+            "bloodstone",
+            "steel_marble",
+            "four_leaf_clover"
+          ]
+        },
+        {
+          "seed": 109,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 9,
+            "boss_interrupts": 2,
+            "boss_releases": 2,
+            "damage_taken": 1590,
+            "enemy_phases": 67,
+            "healing": 1206,
+            "kills": 51,
+            "rolls": 207,
+            "skills": 94,
+            "tarots": 7
+          },
+          "final_relics": [
+            "pet_ghost",
+            "bracelet",
+            "blue_stone",
+            "fortune_cookie",
+            "armor",
+            "yellow_stone",
+            "budget_meal",
+            "pet_slime",
+            "magic_sword",
+            "bloodstone"
+          ]
+        },
+        {
+          "seed": 157,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 17,
+            "boss_interrupts": 0,
+            "boss_releases": 6,
+            "damage_taken": 1207,
+            "enemy_phases": 48,
+            "healing": 779,
+            "kills": 49,
+            "rolls": 140,
+            "skills": 69,
+            "tarots": 10
+          },
+          "final_relics": [
+            "pet_ghost",
+            "disguise_mask",
+            "budget_meal",
+            "bracelet",
+            "orange_stone",
+            "fortune_cookie",
+            "runestone",
+            "five_leaf_clover",
+            "pet_slime",
+            "ancient_prophecy"
+          ]
+        },
+        {
+          "seed": 211,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 6,
+            "boss_interrupts": 0,
+            "boss_releases": 2,
+            "damage_taken": 940,
+            "enemy_phases": 35,
+            "healing": 792,
+            "kills": 49,
+            "rolls": 104,
+            "skills": 34,
+            "tarots": 13
+          },
+          "final_relics": [
+            "magic_sword",
+            "bloodstone",
+            "mithril_blade",
+            "deluxe_meal",
+            "bracelet",
+            "armor",
+            "heart",
+            "fortune_cookie",
+            "five_leaf_clover",
+            "pet_slime"
+          ]
+        },
+        {
+          "seed": 307,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 6,
+            "boss_interrupts": 0,
+            "boss_releases": 1,
+            "damage_taken": 395,
+            "enemy_phases": 16,
+            "healing": 267,
+            "kills": 53,
+            "rolls": 65,
+            "skills": 35,
+            "tarots": 7
+          },
+          "final_relics": [
+            "happy_meal",
+            "magic_sword",
+            "pet_slime",
+            "yellow_stone",
+            "disguise_mask",
+            "contract",
+            "bracelet",
+            "green_stone",
+            "orange_stone",
+            "bloodstone"
+          ]
+        },
+        {
+          "seed": 401,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 3,
+            "boss_interrupts": 0,
+            "boss_releases": 1,
+            "damage_taken": 344,
+            "enemy_phases": 30,
+            "healing": 228,
+            "kills": 46,
+            "rolls": 96,
+            "skills": 37,
+            "tarots": 9
+          },
+          "final_relics": [
+            "bracelet",
+            "fortune_cookie",
+            "blue_stone",
+            "happy_meal",
+            "ancient_prophecy",
+            "bloodstone",
+            "mithril_blade",
+            "magic_sword",
+            "disguise_mask",
+            "runestone"
+          ]
+        },
+        {
+          "seed": 503,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 1,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 479,
+            "enemy_phases": 26,
+            "healing": 211,
+            "kills": 51,
+            "rolls": 93,
+            "skills": 42,
+            "tarots": 4
+          },
+          "final_relics": [
+            "magic_sword",
+            "armor",
+            "green_stone",
+            "orange_stone",
+            "pet_slime",
+            "deluxe_meal",
+            "blood_bag",
+            "pet_bat",
+            "gold_marble",
+            "bracelet"
+          ]
+        },
+        {
+          "seed": 601,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 2,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 130,
+            "enemy_phases": 11,
+            "healing": 0,
+            "kills": 46,
+            "rolls": 47,
+            "skills": 21,
+            "tarots": 3
+          },
+          "final_relics": [
+            "deluxe_meal",
+            "runestone",
+            "contract",
+            "purple_stone",
+            "heart",
+            "bracelet",
+            "ancient_tentacle",
+            "five_leaf_clover",
+            "blue_stone",
+            "pet_slime"
+          ]
+        },
+        {
+          "seed": 701,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 5,
+            "boss_interrupts": 0,
+            "boss_releases": 1,
+            "damage_taken": 298,
+            "enemy_phases": 33,
+            "healing": 165,
+            "kills": 44,
+            "rolls": 112,
+            "skills": 51,
+            "tarots": 3
+          },
+          "final_relics": [
+            "blue_stone",
+            "armor",
+            "magic_sword",
+            "deluxe_meal",
+            "pet_slime",
+            "green_stone",
+            "disguise_mask",
+            "pet_ghost",
+            "fortune_cookie",
+            "heart"
+          ]
+        }
+      ],
+      "probe_count": 1056,
+      "censored": 12
+    },
+    "after": {
+      "clears": 12,
+      "runs": 12,
+      "failures": 0,
+      "medians": {
+        "rolls": 121.5,
+        "skills": 58.0,
+        "enemy_phases": 42.0,
+        "damage_taken": 901.0,
+        "boss_releases": 1.5,
+        "tarots": 9.0
+      },
+      "first_full_inventory_median": 11.5,
+      "bosses": {
+        "10": {
+          "rolls": 21.0,
+          "enemy_phases": 7.0,
+          "boss_releases": 1.0,
+          "damage_taken": 50.5
+        },
+        "20": {
+          "rolls": 21.5,
+          "enemy_phases": 9.0,
+          "boss_releases": 1.0,
+          "damage_taken": 45.0
+        }
+      },
+      "controlled": [
+        {
+          "wave": 5,
+          "clears": 12,
+          "count": 12,
+          "median_rolls": 5.0,
+          "median_enemy_phases": 2.0,
+          "median_damage_taken": 29.0,
+          "median_boss_releases": 0.0
+        },
+        {
+          "wave": 10,
+          "clears": 12,
+          "count": 12,
+          "median_rolls": 36.5,
+          "median_enemy_phases": 12.5,
+          "median_damage_taken": 193.0,
+          "median_boss_releases": 2.0
+        },
+        {
+          "wave": 15,
+          "clears": 10,
+          "count": 12,
+          "median_rolls": 18.5,
+          "median_enemy_phases": 6.5,
+          "median_damage_taken": 217.0,
+          "median_boss_releases": 0.0
+        },
+        {
+          "wave": 20,
+          "clears": 12,
+          "count": 12,
+          "median_rolls": 56.5,
+          "median_enemy_phases": 20.0,
+          "median_damage_taken": 220.5,
+          "median_boss_releases": 3.5
+        }
+      ],
+      "runs_detail": [
+        {
+          "seed": 11,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 5,
+            "boss_interrupts": 2,
+            "boss_releases": 0,
+            "damage_taken": 1024,
+            "enemy_phases": 56,
+            "healing": 784,
+            "kills": 46,
+            "rolls": 169,
+            "skills": 66,
+            "tarots": 7
+          },
+          "final_relics": [
+            "budget_meal",
+            "five_leaf_clover",
+            "bloodstone",
+            "blue_stone",
+            "magic_sword",
+            "pet_slime",
+            "heart",
+            "purple_stone",
+            "contract",
+            "spiked_helmet"
+          ]
+        },
+        {
+          "seed": 29,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 12,
+            "boss_interrupts": 2,
+            "boss_releases": 3,
+            "damage_taken": 816,
+            "enemy_phases": 42,
+            "healing": 570,
+            "kills": 50,
+            "rolls": 113,
+            "skills": 51,
+            "tarots": 9
+          },
+          "final_relics": [
+            "magic_sword",
+            "black_stone",
+            "pet_slime",
+            "bloodstone",
+            "purple_stone",
+            "budget_meal",
+            "fortune_cookie",
+            "armor",
+            "disguise_mask",
+            "runestone"
+          ]
+        },
+        {
+          "seed": 47,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 13,
+            "boss_interrupts": 0,
+            "boss_releases": 4,
+            "damage_taken": 986,
+            "enemy_phases": 44,
+            "healing": 321,
+            "kills": 56,
+            "rolls": 140,
+            "skills": 61,
+            "tarots": 22
+          },
+          "final_relics": [
+            "bracelet",
+            "yellow_stone",
+            "deluxe_meal",
+            "pet_ghost",
+            "pet_slime",
+            "orange_stone",
+            "fortune_cookie",
+            "pet_dragon",
+            "crystal_ball",
+            "magic_sword"
+          ]
+        },
+        {
+          "seed": 83,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 9,
+            "boss_interrupts": 0,
+            "boss_releases": 2,
+            "damage_taken": 1126,
+            "enemy_phases": 35,
+            "healing": 777,
+            "kills": 48,
+            "rolls": 112,
+            "skills": 46,
+            "tarots": 12
+          },
+          "final_relics": [
+            "deluxe_meal",
+            "fortune_cookie",
+            "magic_sword",
+            "yellow_stone",
+            "pet_slime",
+            "bracelet",
+            "purple_stone",
+            "contract",
+            "bloodstone",
+            "five_leaf_clover"
+          ]
+        },
+        {
+          "seed": 109,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 18,
+            "boss_interrupts": 0,
+            "boss_releases": 6,
+            "damage_taken": 1506,
+            "enemy_phases": 67,
+            "healing": 862,
+            "kills": 50,
+            "rolls": 181,
+            "skills": 80,
+            "tarots": 10
+          },
+          "final_relics": [
+            "armor",
+            "bracelet",
+            "heart",
+            "fortune_cookie",
+            "tissue_pack",
+            "cross",
+            "happy_meal",
+            "pet_slime",
+            "magic_sword",
+            "green_stone"
+          ]
+        },
+        {
+          "seed": 157,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 6,
+            "boss_interrupts": 3,
+            "boss_releases": 1,
+            "damage_taken": 611,
+            "enemy_phases": 32,
+            "healing": 442,
+            "kills": 51,
+            "rolls": 120,
+            "skills": 59,
+            "tarots": 3
+          },
+          "final_relics": [
+            "contract",
+            "green_stone",
+            "deluxe_meal",
+            "pet_ghost",
+            "yellow_stone",
+            "bloodstone",
+            "pet_slime",
+            "coin",
+            "pet_bat",
+            "steel_marble"
+          ]
+        },
+        {
+          "seed": 211,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 7,
+            "boss_interrupts": 1,
+            "boss_releases": 1,
+            "damage_taken": 572,
+            "enemy_phases": 31,
+            "healing": 120,
+            "kills": 42,
+            "rolls": 97,
+            "skills": 39,
+            "tarots": 7
+          },
+          "final_relics": [
+            "bracelet",
+            "magic_sword",
+            "fortune_cookie",
+            "super_meal",
+            "green_stone",
+            "armor",
+            "yellow_stone",
+            "ice_rose",
+            "heart",
+            "piggy_bank"
+          ]
+        },
+        {
+          "seed": 307,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 12,
+            "boss_interrupts": 1,
+            "boss_releases": 4,
+            "damage_taken": 1385,
+            "enemy_phases": 48,
+            "healing": 598,
+            "kills": 51,
+            "rolls": 142,
+            "skills": 65,
+            "tarots": 14
+          },
+          "final_relics": [
+            "pet_slime",
+            "magic_sword",
+            "bracelet",
+            "mithril_blade",
+            "disguise_mask",
+            "contract",
+            "fortune_cookie",
+            "green_stone",
+            "runestone",
+            "lemon_soda"
+          ]
+        },
+        {
+          "seed": 401,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 422,
+            "enemy_phases": 48,
+            "healing": 161,
+            "kills": 54,
+            "rolls": 134,
+            "skills": 61,
+            "tarots": 9
+          },
+          "final_relics": [
+            "five_leaf_clover",
+            "fortune_cookie",
+            "blue_stone",
+            "deluxe_meal",
+            "heart",
+            "pet_ghost",
+            "pet_dragon",
+            "bracelet",
+            "yellow_stone",
+            "purple_stone"
+          ]
+        },
+        {
+          "seed": 503,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 14,
+            "boss_interrupts": 0,
+            "boss_releases": 5,
+            "damage_taken": 1095,
+            "enemy_phases": 42,
+            "healing": 459,
+            "kills": 54,
+            "rolls": 123,
+            "skills": 57,
+            "tarots": 7
+          },
+          "final_relics": [
+            "runestone",
+            "heart",
+            "green_stone",
+            "orange_stone",
+            "ancient_tentacle",
+            "bracelet",
+            "five_leaf_clover",
+            "worn_bow",
+            "happy_meal",
+            "armor"
+          ]
+        },
+        {
+          "seed": 601,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 117,
+            "enemy_phases": 10,
+            "healing": 13,
+            "kills": 46,
+            "rolls": 52,
+            "skills": 20,
+            "tarots": 9
+          },
+          "final_relics": [
+            "happy_meal",
+            "runestone",
+            "magic_sword",
+            "purple_stone",
+            "fortune_cookie",
+            "armor",
+            "mithril_blade",
+            "ancient_tentacle",
+            "bracelet",
+            "yellow_stone"
+          ]
+        },
+        {
+          "seed": 701,
+          "outcome": "victory",
+          "wave": 20,
+          "stats": {
+            "boss_charges": 5,
+            "boss_interrupts": 0,
+            "boss_releases": 1,
+            "damage_taken": 490,
+            "enemy_phases": 30,
+            "healing": 208,
+            "kills": 46,
+            "rolls": 98,
+            "skills": 40,
+            "tarots": 1
+          },
+          "final_relics": [
+            "five_leaf_clover",
+            "armor",
+            "super_meal",
+            "magic_sword",
+            "pet_slime",
+            "green_stone",
+            "spiked_helmet",
+            "bracelet",
+            "bloodstone",
+            "worn_bow"
+          ]
+        }
+      ],
+      "probe_count": 1056,
+      "censored": 12
+    }
+  },
+  "changes": [
+    [
+      "Spell Bracelet",
+      "+10 base",
+      "+5 base"
+    ],
+    [
+      "Worn Dagger",
+      "+1 combo hit",
+      "+2 base and +1 combo hit"
+    ],
+    [
+      "Lemon Soda",
+      "+10 auto base",
+      "+5 auto base"
+    ],
+    [
+      "Fries / Hamburger",
+      "+0.5 / +1 multiplier",
+      "+0.3 / +0.6 multiplier"
+    ],
+    [
+      "Royal Dagger, Last Contract, Runestone, six stones",
+      "+10 base each",
+      "+5 base each"
+    ],
+    [
+      "Budget Meal / Happy Trio",
+      "+5 / +10 base",
+      "+0.3 / +0.5 multiplier"
+    ],
+    [
+      "Deluxe Quartet",
+      "+15 base and +1 multiplier",
+      "+10 base and +0.5 multiplier"
+    ],
+    [
+      "Super Feast",
+      "+30 base, independent x2",
+      "+30 base, independent x1.5"
+    ],
+    [
+      "Light Sword, lone enemy",
+      "independent x1.5",
+      "+2 multiplier at inventory position"
+    ],
+    [
+      "Three-leaf Clover",
+      "absent",
+      "common; 20% guarantee of at least a three-straight with 3+ unused dice"
+    ],
+    [
+      "Name",
+      "Reaper’s Scythe",
+      "Cursed Scythe / 诅咒之镰"
+    ]
+  ]
+}

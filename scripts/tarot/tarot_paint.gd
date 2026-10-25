@@ -50,15 +50,15 @@ static func wrap(canvas: CanvasItem, font: Font, rect: Rect2, value: String, siz
 		y += size*1.3
 	return y
 
-static func sky(canvas: CanvasItem, size: Vector2, age: float, reduced: bool) -> void:
-	canvas.draw_rect(Rect2(Vector2.ZERO,size),Color("100f26"))
+static func sky(canvas: CanvasItem, size: Vector2, age: float, reduced: bool, opacity: float = 1.0) -> void:
+	canvas.draw_rect(Rect2(Vector2.ZERO,size),Color("100f26",opacity))
 	for i in range(14,0,-1):
-		canvas.draw_circle(Vector2(size.x*0.64,size.y*0.5),i*size.x*0.065,Color(0.22,0.12,0.36,0.023))
+		canvas.draw_circle(Vector2(size.x*0.64,size.y*0.5),i*size.x*0.065,Color(0.22,0.12,0.36,0.023*opacity))
 	# Deterministic placement keeps visual randomness separate from reward RNG.
 	for i in range(150):
 		var seed: float = float(i+1)
 		var at := Vector2(fposmod(seed*0.618033,1)*size.x,fposmod(seed*0.414214,1)*size.y)
-		var alpha: float = 0.3+0.55*(0.5 if reduced else sin(age*(0.6+fmod(seed,3)*0.2)+seed)*0.5+0.5)
+		var alpha: float = (0.3+0.55*(0.5 if reduced else sin(age*(0.6+fmod(seed,3)*0.2)+seed)*0.5+0.5))*opacity
 		var side: float = 2.0 if i%4 else 3.0
 		canvas.draw_rect(Rect2(at.round(),Vector2.ONE*side),Color(LILAC,alpha))
 		if i%13 == 0:

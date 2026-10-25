@@ -22,7 +22,8 @@ static func poses(battle) -> Array:
 	var spacing: float = battle.relic_ui.battle_icon_radius()*2.0
 	var sprite := Rect2(battle._player_world_feet()-Vector2(battle.monster_side*0.5,battle.monster_side),Vector2.ONE*battle.monster_side)
 	var visible: Rect2 = battle.evolution.visible_rect(sprite)
-	var center: Vector2 = visible.position+visible.size*Vector2(0.5,0.45)
+	# Side points sit one-third of the visible form's height above its feet.
+	var center: Vector2 = visible.position+visible.size*Vector2(0.5,2.0/3.0)
 	var edge_space: float = minf(center.x-battle.ARENA.position.x,battle.ARENA.end.x-center.x)-spacing-12
 	var horizontal: float = minf(maxf(visible.size.x*0.65+spacing*0.8,spacing*2.25),maxf(spacing,edge_space))
 	var vertical: float = maxf(visible.size.y*0.24,spacing*0.85)

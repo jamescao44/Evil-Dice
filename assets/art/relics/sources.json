@@ -112,7 +112,13 @@
         "lemon_soda.png": "Soda Can 4.png",
         "fried_chicken.png": "Chicken Drumstick.png"
       },
-      "other": "Oreo sundae uses the ice cream cell of existing CC0 Icons: Food by thekingphoenix; meals compose only collected ingredient sprites."
+      "other": "Cookie sundae uses the ice cream cell of existing CC0 Icons: Food by thekingphoenix; meals compose only collected ingredient sprites."
+    },
+    "three_leaf_clover.svg": {
+      "source": "Original project pixel-vector art; three-leaf variant of four_leaf_clover.svg",
+      "relics": [
+        "three_leaf_clover"
+      ]
     }
   },
   "files": {
@@ -158,6 +164,22 @@
     "disguise_mask": "item/armor/headgear/green_mask.png",
     "pet_ghost": "monster/undead/ghost_new.png",
     "ancient_tentacle": "monster/tentacles/eldritch_ends/eldritch_tentacle_1.png",
-    "pet_dragon": "gui/spells/summoning/summon_dragon.png"
+    "pet_dragon": "gui/spells/summoning/summon_dragon.png",
+    "glass_marble": "item/misc/misc_crystal_old.png",
+    "steel_marble": "item/weapon/ranged/sling_bullet_1_new.png",
+    "gold_marble": "item/weapon/ranged/sling_bullet_2_new.png",
+    "blood_bag": "item/potion/ruby_new.png",
+    "piggy_bank": "item/gold/gold_pile_7.png",
+    "bookmark": "item/book/book_dog_eared.png",
+    "cross": "item/amulet/celtic_yellow.png",
+    "light_sword": "item/weapon/rapier_1.png",
+    "perfectionist": "item/amulet/eye_cyan.png",
+    "overflow_prism": "item/amulet/crystal_white.png",
+    "powder_keg": "item/misc/misc_bottle.png",
+    "echo_bell": "item/misc/misc_horn.png",
+    "alternating_gears": "item/misc/misc_disc_new.png",
+    "enchanted_missile": "item/rod/rod_forked.png",
+    "royal_seal": "item/misc/runes/rune_vaults.png",
+    "magician_hat": "item/armor/headgear/hat_3.png"
   }
 }

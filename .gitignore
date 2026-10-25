@@ -3,6 +3,7 @@
 /android/
 .asset-cache/
 test-output/
+__pycache__/
 
 # Generated desktop/web builds and upload archives.
 /export/

@@ -1,0 +1,3182 @@
+{
+  "date": "2026-10-25",
+  "source_sha256": "08e25b4a9f8839e268907592a6a53ad5db8250a949e3ac1501fe90f874ffa753",
+  "health_curve": [
+    1,
+    1.1,
+    1.35,
+    1.25,
+    1.6,
+    1.5,
+    2.1,
+    2,
+    2.5,
+    2.6,
+    3.6,
+    4.6,
+    4.8,
+    5.6,
+    7.2,
+    6.4,
+    8,
+    9,
+    10.5,
+    10.5
+  ],
+  "damage_curve": [
+    1,
+    1,
+    1.05,
+    0.95,
+    1.1,
+    1,
+    1.15,
+    1.1,
+    1.2,
+    1.15,
+    1.25,
+    1.4,
+    1.25,
+    1.35,
+    1.5,
+    1.35,
+    1.5,
+    1.6,
+    1.55,
+    1.5
+  ],
+  "summaries": {
+    "before": {
+      "wins": 12,
+      "runs": 12,
+      "seeds": [
+        11,
+        29,
+        47,
+        83,
+        109,
+        157,
+        211,
+        307,
+        401,
+        503,
+        601,
+        701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 1056,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 2.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "damage_taken": 7.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            7
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "damage_taken": 5.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 4.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "4": {
+          "n": 9,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 3,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "5": {
+          "n": 11,
+          "median": {
+            "damage_taken": 27,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 2,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            13
+          ]
+        },
+        "6": {
+          "n": 7,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            3,
+            6
+          ]
+        },
+        "7": {
+          "n": 10,
+          "median": {
+            "damage_taken": 31.0,
+            "enemy_phases": 1.0,
+            "healing": 7.5,
+            "kills": 5.0,
+            "rolls": 5.0,
+            "skills": 2.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            3,
+            12
+          ]
+        },
+        "8": {
+          "n": 10,
+          "median": {
+            "damage_taken": 21.5,
+            "enemy_phases": 1.0,
+            "healing": 9.0,
+            "kills": 3.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            14
+          ]
+        },
+        "9": {
+          "n": 10,
+          "median": {
+            "damage_taken": 51.5,
+            "enemy_phases": 1.0,
+            "healing": 8.5,
+            "kills": 5.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 2.5,
+            "healing": 0.0,
+            "kills": 3.0,
+            "rolls": 7.0,
+            "skills": 4.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            3,
+            26
+          ]
+        },
+        "11": {
+          "n": 5,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 3,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            4
+          ]
+        },
+        "12": {
+          "n": 10,
+          "median": {
+            "damage_taken": 6.5,
+            "enemy_phases": 1.0,
+            "healing": 1.0,
+            "kills": 5.0,
+            "rolls": 3.5,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            6
+          ]
+        },
+        "13": {
+          "n": 9,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 2,
+            "skills": 1,
+            "tarots": 1
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "14": {
+          "n": 7,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 2,
+            "rolls": 3,
+            "skills": 1,
+            "tarots": 1
+          },
+          "roll_range": [
+            2,
+            9
+          ]
+        },
+        "15": {
+          "n": 11,
+          "median": {
+            "damage_taken": 38,
+            "enemy_phases": 2,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            7
+          ]
+        },
+        "16": {
+          "n": 12,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 0.5,
+            "healing": 0.0,
+            "kills": 4.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "17": {
+          "n": 6,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 0.5,
+            "healing": 0.0,
+            "kills": 3.0,
+            "rolls": 2.5,
+            "skills": 1.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            11
+          ]
+        },
+        "18": {
+          "n": 9,
+          "median": {
+            "damage_taken": 34,
+            "enemy_phases": 1,
+            "healing": 25,
+            "kills": 5,
+            "rolls": 6,
+            "skills": 2,
+            "tarots": 1
+          },
+          "roll_range": [
+            2,
+            10
+          ]
+        },
+        "19": {
+          "n": 10,
+          "median": {
+            "damage_taken": 49.0,
+            "enemy_phases": 1.0,
+            "healing": 13.5,
+            "kills": 3.0,
+            "rolls": 6.0,
+            "skills": 3.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "20": {
+          "n": 12,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 3.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 9.0,
+            "skills": 4.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            4,
+            13
+          ]
+        }
+      }
+    },
+    "revision1": {
+      "wins": 11,
+      "runs": 12,
+      "seeds": [
+        11,
+        29,
+        47,
+        83,
+        109,
+        157,
+        211,
+        307,
+        401,
+        503,
+        601,
+        701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 1056,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 2.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "damage_taken": 8.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "damage_taken": 5.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 5.0,
+            "skills": 1.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            8
+          ]
+        },
+        "4": {
+          "n": 9,
+          "median": {
+            "damage_taken": 24,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "5": {
+          "n": 11,
+          "median": {
+            "damage_taken": 22,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "6": {
+          "n": 8,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 2.5,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "7": {
+          "n": 9,
+          "median": {
+            "damage_taken": 23,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "8": {
+          "n": 9,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "9": {
+          "n": 9,
+          "median": {
+            "damage_taken": 38,
+            "enemy_phases": 2,
+            "healing": 9,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "damage_taken": 64.0,
+            "enemy_phases": 9.0,
+            "healing": 62.0,
+            "kills": 3.0,
+            "rolls": 21.0,
+            "skills": 10.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            10,
+            57
+          ]
+        },
+        "11": {
+          "n": 6,
+          "median": {
+            "damage_taken": 0.0,
+            "enemy_phases": 1.5,
+            "healing": 0.0,
+            "kills": 3.0,
+            "rolls": 5.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            12
+          ]
+        },
+        "12": {
+          "n": 9,
+          "median": {
+            "damage_taken": 81,
+            "enemy_phases": 2,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 1
+          },
+          "roll_range": [
+            1,
+            14
+          ]
+        },
+        "13": {
+          "n": 11,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 3,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "14": {
+          "n": 10,
+          "median": {
+            "damage_taken": 40.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "15": {
+          "n": 7,
+          "median": {
+            "damage_taken": 80,
+            "enemy_phases": 2,
+            "healing": 43,
+            "kills": 3,
+            "rolls": 7,
+            "skills": 3,
+            "tarots": 0
+          },
+          "roll_range": [
+            5,
+            12
+          ]
+        },
+        "16": {
+          "n": 11,
+          "median": {
+            "damage_taken": 20,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 1
+          },
+          "roll_range": [
+            1,
+            7
+          ]
+        },
+        "17": {
+          "n": 8,
+          "median": {
+            "damage_taken": 132.5,
+            "enemy_phases": 3.5,
+            "healing": 97.0,
+            "kills": 3.0,
+            "rolls": 12.0,
+            "skills": 4.5,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            2,
+            23
+          ]
+        },
+        "18": {
+          "n": 6,
+          "median": {
+            "damage_taken": 74.0,
+            "enemy_phases": 2.0,
+            "healing": 31.5,
+            "kills": 5.0,
+            "rolls": 6.5,
+            "skills": 3.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            2,
+            10
+          ]
+        },
+        "19": {
+          "n": 10,
+          "median": {
+            "damage_taken": 146.0,
+            "enemy_phases": 2.5,
+            "healing": 94.5,
+            "kills": 3.0,
+            "rolls": 9.0,
+            "skills": 3.5,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            2,
+            15
+          ]
+        },
+        "20": {
+          "n": 11,
+          "median": {
+            "damage_taken": 0,
+            "enemy_phases": 8,
+            "healing": 0,
+            "kills": 1,
+            "rolls": 24,
+            "skills": 11,
+            "tarots": 2
+          },
+          "roll_range": [
+            9,
+            42
+          ]
+        }
+      }
+    },
+    "revision2": {
+      "wins": 11,
+      "runs": 12,
+      "seeds": [
+        11,
+        29,
+        47,
+        83,
+        109,
+        157,
+        211,
+        307,
+        401,
+        503,
+        601,
+        701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 1056,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 2.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 8.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 5.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 5.0,
+            "skills": 1.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            8
+          ]
+        },
+        "4": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 24,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "5": {
+          "n": 11,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 22,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "6": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 2.5,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "7": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 23,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "8": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "9": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 38,
+            "enemy_phases": 2,
+            "healing": 9,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "boss_charges": 4.5,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 69.0,
+            "enemy_phases": 7.5,
+            "healing": 41.0,
+            "kills": 3.0,
+            "rolls": 18.0,
+            "skills": 10.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            9,
+            40
+          ]
+        },
+        "11": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 9.0,
+            "enemy_phases": 2.5,
+            "healing": 4.5,
+            "kills": 3.0,
+            "rolls": 6.5,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            16
+          ]
+        },
+        "12": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 137,
+            "enemy_phases": 2,
+            "healing": 52,
+            "kills": 5,
+            "rolls": 7,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            2,
+            11
+          ]
+        },
+        "13": {
+          "n": 6,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 19.0,
+            "enemy_phases": 1.0,
+            "healing": 10.5,
+            "kills": 3.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            1,
+            6
+          ]
+        },
+        "14": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 32.5,
+            "enemy_phases": 1.5,
+            "healing": 12.0,
+            "kills": 2.0,
+            "rolls": 6.0,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "15": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 60,
+            "enemy_phases": 4,
+            "healing": 23,
+            "kills": 3,
+            "rolls": 7,
+            "skills": 5,
+            "tarots": 0
+          },
+          "roll_range": [
+            4,
+            14
+          ]
+        },
+        "16": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 33.5,
+            "enemy_phases": 1.0,
+            "healing": 6.0,
+            "kills": 4.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            1,
+            6
+          ]
+        },
+        "17": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 97,
+            "enemy_phases": 3,
+            "healing": 76,
+            "kills": 3,
+            "rolls": 9,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            3,
+            13
+          ]
+        },
+        "18": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 171,
+            "enemy_phases": 3,
+            "healing": 153,
+            "kills": 5,
+            "rolls": 8,
+            "skills": 4,
+            "tarots": 2
+          },
+          "roll_range": [
+            5,
+            11
+          ]
+        },
+        "19": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 184,
+            "enemy_phases": 3,
+            "healing": 30,
+            "kills": 3,
+            "rolls": 6,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            3,
+            12
+          ]
+        },
+        "20": {
+          "n": 11,
+          "median": {
+            "boss_charges": 3,
+            "boss_interrupts": 0,
+            "boss_releases": 1,
+            "damage_taken": 54,
+            "enemy_phases": 7,
+            "healing": 0,
+            "kills": 1,
+            "rolls": 15,
+            "skills": 7,
+            "tarots": 1
+          },
+          "roll_range": [
+            7,
+            54
+          ]
+        }
+      }
+    },
+    "final": {
+      "wins": 12,
+      "runs": 12,
+      "seeds": [
+        11,
+        29,
+        47,
+        83,
+        109,
+        157,
+        211,
+        307,
+        401,
+        503,
+        601,
+        701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 1056,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 2.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 8.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 5.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 5.0,
+            "skills": 1.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            8
+          ]
+        },
+        "4": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 24,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "5": {
+          "n": 11,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 22,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "6": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 2.5,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "7": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 23,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "8": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "9": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 38,
+            "enemy_phases": 2,
+            "healing": 9,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "boss_charges": 4.5,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 69.0,
+            "enemy_phases": 7.5,
+            "healing": 41.0,
+            "kills": 3.0,
+            "rolls": 18.0,
+            "skills": 10.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            9,
+            40
+          ]
+        },
+        "11": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 9.0,
+            "enemy_phases": 2.5,
+            "healing": 4.5,
+            "kills": 3.0,
+            "rolls": 6.5,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            16
+          ]
+        },
+        "12": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 137,
+            "enemy_phases": 2,
+            "healing": 52,
+            "kills": 5,
+            "rolls": 7,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            2,
+            11
+          ]
+        },
+        "13": {
+          "n": 6,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 19.0,
+            "enemy_phases": 1.0,
+            "healing": 10.5,
+            "kills": 3.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            1,
+            6
+          ]
+        },
+        "14": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 32.5,
+            "enemy_phases": 1.5,
+            "healing": 12.0,
+            "kills": 2.0,
+            "rolls": 6.0,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "15": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 60,
+            "enemy_phases": 4,
+            "healing": 23,
+            "kills": 3,
+            "rolls": 7,
+            "skills": 5,
+            "tarots": 0
+          },
+          "roll_range": [
+            4,
+            14
+          ]
+        },
+        "16": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 33.5,
+            "enemy_phases": 1.0,
+            "healing": 6.0,
+            "kills": 4.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            1,
+            6
+          ]
+        },
+        "17": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 97,
+            "enemy_phases": 3,
+            "healing": 76,
+            "kills": 3,
+            "rolls": 9,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            3,
+            13
+          ]
+        },
+        "18": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 171,
+            "enemy_phases": 3,
+            "healing": 153,
+            "kills": 5,
+            "rolls": 8,
+            "skills": 4,
+            "tarots": 2
+          },
+          "roll_range": [
+            5,
+            11
+          ]
+        },
+        "19": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 168,
+            "enemy_phases": 3,
+            "healing": 14,
+            "kills": 3,
+            "rolls": 8,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            3,
+            12
+          ]
+        },
+        "20": {
+          "n": 12,
+          "median": {
+            "boss_charges": 3.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 40.5,
+            "enemy_phases": 6.5,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 15.0,
+            "skills": 7.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            7,
+            42
+          ]
+        }
+      }
+    },
+    "fusion-aware35": {
+      "wins": 11,
+      "runs": 12,
+      "seeds": [
+        10011,
+        10029,
+        10047,
+        10083,
+        10109,
+        10157,
+        10211,
+        10307,
+        10401,
+        10503,
+        10601,
+        10701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 0,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            4
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 10.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            3,
+            8
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 11.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "4": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "5": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 17.0,
+            "enemy_phases": 2.0,
+            "healing": 7.5,
+            "kills": 3.0,
+            "rolls": 5.0,
+            "skills": 2.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "6": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 26.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 5.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            11
+          ]
+        },
+        "7": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 48,
+            "enemy_phases": 2,
+            "healing": 7,
+            "kills": 5,
+            "rolls": 5,
+            "skills": 3,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            10
+          ]
+        },
+        "8": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 27,
+            "enemy_phases": 2,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 5,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            10
+          ]
+        },
+        "9": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 53.0,
+            "enemy_phases": 1.5,
+            "healing": 5.5,
+            "kills": 5.0,
+            "rolls": 5.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            12
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "boss_charges": 3.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 69.0,
+            "enemy_phases": 5.0,
+            "healing": 31.5,
+            "kills": 3.0,
+            "rolls": 16.5,
+            "skills": 8.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            9,
+            35
+          ]
+        },
+        "11": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 20.5,
+            "enemy_phases": 2.0,
+            "healing": 15.0,
+            "kills": 3.0,
+            "rolls": 7.5,
+            "skills": 2.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "12": {
+          "n": 6,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 120.0,
+            "enemy_phases": 3.0,
+            "healing": 33.0,
+            "kills": 5.0,
+            "rolls": 7.0,
+            "skills": 3.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            5,
+            12
+          ]
+        },
+        "13": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 2,
+            "skills": 1,
+            "tarots": 1
+          },
+          "roll_range": [
+            1,
+            3
+          ]
+        },
+        "14": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 27.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 5.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "15": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 47.0,
+            "enemy_phases": 2.0,
+            "healing": 24.0,
+            "kills": 3.0,
+            "rolls": 6.5,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            9
+          ]
+        },
+        "16": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.5,
+            "healing": 0.0,
+            "kills": 4.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "17": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 22.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 3.0,
+            "rolls": 6.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            3,
+            9
+          ]
+        },
+        "18": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 69,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 6,
+            "skills": 2,
+            "tarots": 1
+          },
+          "roll_range": [
+            3,
+            10
+          ]
+        },
+        "19": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 74,
+            "enemy_phases": 2,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 5,
+            "skills": 2,
+            "tarots": 1
+          },
+          "roll_range": [
+            2,
+            16
+          ]
+        },
+        "20": {
+          "n": 11,
+          "median": {
+            "boss_charges": 2,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 4,
+            "enemy_phases": 4,
+            "healing": 0,
+            "kills": 1,
+            "rolls": 11,
+            "skills": 5,
+            "tarots": 1
+          },
+          "roll_range": [
+            4,
+            33
+          ]
+        }
+      }
+    },
+    "controlled-final": {
+      "wins": 12,
+      "runs": 12,
+      "seeds": [
+        11,
+        29,
+        47,
+        83,
+        109,
+        157,
+        211,
+        307,
+        401,
+        503,
+        601,
+        701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 1056,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 2.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 8.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 5.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 5.0,
+            "skills": 1.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            8
+          ]
+        },
+        "4": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 24,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "5": {
+          "n": 11,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 22,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "6": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 2.5,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "7": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 23,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "8": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "9": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 38,
+            "enemy_phases": 2,
+            "healing": 9,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "boss_charges": 4.5,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 69.0,
+            "enemy_phases": 7.5,
+            "healing": 41.0,
+            "kills": 3.0,
+            "rolls": 18.0,
+            "skills": 10.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            9,
+            40
+          ]
+        },
+        "11": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 9.0,
+            "enemy_phases": 2.5,
+            "healing": 4.5,
+            "kills": 3.0,
+            "rolls": 6.5,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            16
+          ]
+        },
+        "12": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 100.0,
+            "enemy_phases": 2.0,
+            "healing": 54.0,
+            "kills": 5.0,
+            "rolls": 7.0,
+            "skills": 3.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            2,
+            11
+          ]
+        },
+        "13": {
+          "n": 6,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 8.0,
+            "enemy_phases": 1.0,
+            "healing": 6.5,
+            "kills": 3.0,
+            "rolls": 4.0,
+            "skills": 1.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            2,
+            6
+          ]
+        },
+        "14": {
+          "n": 11,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 35,
+            "enemy_phases": 2,
+            "healing": 15,
+            "kills": 2,
+            "rolls": 7,
+            "skills": 3,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            11
+          ]
+        },
+        "15": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 99,
+            "enemy_phases": 4,
+            "healing": 65,
+            "kills": 3,
+            "rolls": 14,
+            "skills": 6,
+            "tarots": 1
+          },
+          "roll_range": [
+            4,
+            21
+          ]
+        },
+        "16": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 82,
+            "enemy_phases": 2,
+            "healing": 12,
+            "kills": 4,
+            "rolls": 5,
+            "skills": 2,
+            "tarots": 1
+          },
+          "roll_range": [
+            2,
+            8
+          ]
+        },
+        "17": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 82.5,
+            "enemy_phases": 3.0,
+            "healing": 72.0,
+            "kills": 3.0,
+            "rolls": 9.5,
+            "skills": 4.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            4,
+            14
+          ]
+        },
+        "18": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 183.0,
+            "enemy_phases": 2.5,
+            "healing": 145.0,
+            "kills": 5.0,
+            "rolls": 8.0,
+            "skills": 3.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            4,
+            29
+          ]
+        },
+        "19": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 164,
+            "enemy_phases": 3,
+            "healing": 142,
+            "kills": 3,
+            "rolls": 11,
+            "skills": 4,
+            "tarots": 1
+          },
+          "roll_range": [
+            4,
+            18
+          ]
+        },
+        "20": {
+          "n": 12,
+          "median": {
+            "boss_charges": 4.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 62.5,
+            "enemy_phases": 9.5,
+            "healing": 32.5,
+            "kills": 1.0,
+            "rolls": 23.5,
+            "skills": 10.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            8,
+            74
+          ]
+        }
+      }
+    },
+    "audit35": {
+      "wins": 12,
+      "runs": 12,
+      "seeds": [
+        10011,
+        10029,
+        10047,
+        10083,
+        10109,
+        10157,
+        10211,
+        10307,
+        10401,
+        10503,
+        10601,
+        10701
+      ],
+      "perfect_rate": 0.35,
+      "failures": [],
+      "probe_count": 0,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 3.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            4
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 10.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            3,
+            8
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 11.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "4": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "5": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 17.0,
+            "enemy_phases": 2.0,
+            "healing": 7.5,
+            "kills": 3.0,
+            "rolls": 5.0,
+            "skills": 2.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "6": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 26.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 5.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            11
+          ]
+        },
+        "7": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 48,
+            "enemy_phases": 2,
+            "healing": 7,
+            "kills": 5,
+            "rolls": 5,
+            "skills": 3,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            10
+          ]
+        },
+        "8": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 27,
+            "enemy_phases": 2,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 5,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            10
+          ]
+        },
+        "9": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 53.0,
+            "enemy_phases": 1.5,
+            "healing": 5.5,
+            "kills": 5.0,
+            "rolls": 5.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            12
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "boss_charges": 3.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 1.0,
+            "damage_taken": 69.0,
+            "enemy_phases": 5.0,
+            "healing": 31.5,
+            "kills": 3.0,
+            "rolls": 16.5,
+            "skills": 8.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            9,
+            35
+          ]
+        },
+        "11": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 20.5,
+            "enemy_phases": 2.0,
+            "healing": 15.0,
+            "kills": 3.0,
+            "rolls": 7.5,
+            "skills": 2.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "12": {
+          "n": 6,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 120.0,
+            "enemy_phases": 3.0,
+            "healing": 33.0,
+            "kills": 5.0,
+            "rolls": 7.0,
+            "skills": 3.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            5,
+            12
+          ]
+        },
+        "13": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 3,
+            "skills": 1,
+            "tarots": 1
+          },
+          "roll_range": [
+            1,
+            5
+          ]
+        },
+        "14": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 27.0,
+            "enemy_phases": 1.5,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "15": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 60.5,
+            "enemy_phases": 2.5,
+            "healing": 38.0,
+            "kills": 3.0,
+            "rolls": 6.5,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            4,
+            10
+          ]
+        },
+        "16": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 14.0,
+            "enemy_phases": 0.5,
+            "healing": 6.0,
+            "kills": 4.0,
+            "rolls": 3.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            10
+          ]
+        },
+        "17": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 40,
+            "enemy_phases": 2,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 5,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "18": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 14,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 5,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            13
+          ]
+        },
+        "19": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 71.0,
+            "enemy_phases": 2.0,
+            "healing": 44.5,
+            "kills": 3.0,
+            "rolls": 7.5,
+            "skills": 3.5,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            4,
+            15
+          ]
+        },
+        "20": {
+          "n": 12,
+          "median": {
+            "boss_charges": 3.0,
+            "boss_interrupts": 1.0,
+            "boss_releases": 1.0,
+            "damage_taken": 16.0,
+            "enemy_phases": 5.5,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 15.0,
+            "skills": 7.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            5,
+            35
+          ]
+        }
+      }
+    },
+    "audit70": {
+      "wins": 11,
+      "runs": 12,
+      "seeds": [
+        10011,
+        10029,
+        10047,
+        10083,
+        10109,
+        10157,
+        10211,
+        10307,
+        10401,
+        10503,
+        10601,
+        10701
+      ],
+      "perfect_rate": 0.7,
+      "failures": [],
+      "probe_count": 0,
+      "waves": {
+        "1": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 0.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 2.5,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            4
+          ]
+        },
+        "2": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 7.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            3,
+            9
+          ]
+        },
+        "3": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 11.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 1.0,
+            "rolls": 4.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            7
+          ]
+        },
+        "4": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 3,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            9
+          ]
+        },
+        "5": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 5.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 3.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            7
+          ]
+        },
+        "6": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 13.5,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 5.0,
+            "rolls": 4.0,
+            "skills": 1.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            14
+          ]
+        },
+        "7": {
+          "n": 10,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 54.0,
+            "enemy_phases": 2.0,
+            "healing": 13.0,
+            "kills": 5.0,
+            "rolls": 4.0,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            9
+          ]
+        },
+        "8": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 1.5,
+            "healing": 0.0,
+            "kills": 3.0,
+            "rolls": 4.5,
+            "skills": 2.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "9": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 16.0,
+            "enemy_phases": 2.0,
+            "healing": 10.0,
+            "kills": 5.0,
+            "rolls": 6.0,
+            "skills": 2.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            2,
+            9
+          ]
+        },
+        "10": {
+          "n": 12,
+          "median": {
+            "boss_charges": 2.5,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 4.0,
+            "healing": 7.0,
+            "kills": 3.0,
+            "rolls": 15.0,
+            "skills": 6.0,
+            "tarots": 1.0
+          },
+          "roll_range": [
+            6,
+            37
+          ]
+        },
+        "11": {
+          "n": 12,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 9.0,
+            "enemy_phases": 2.0,
+            "healing": 5.5,
+            "kills": 3.0,
+            "rolls": 6.0,
+            "skills": 2.5,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            1,
+            11
+          ]
+        },
+        "12": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 106,
+            "enemy_phases": 3,
+            "healing": 65,
+            "kills": 5,
+            "rolls": 7,
+            "skills": 3,
+            "tarots": 1
+          },
+          "roll_range": [
+            4,
+            12
+          ]
+        },
+        "13": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 0,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 2,
+            "skills": 1,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            4
+          ]
+        },
+        "14": {
+          "n": 8,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 0.0,
+            "enemy_phases": 1.0,
+            "healing": 0.0,
+            "kills": 2.0,
+            "rolls": 4.0,
+            "skills": 1.0,
+            "tarots": 0.5
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "15": {
+          "n": 9,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 23,
+            "enemy_phases": 1,
+            "healing": 21,
+            "kills": 3,
+            "rolls": 6,
+            "skills": 3,
+            "tarots": 0
+          },
+          "roll_range": [
+            2,
+            9
+          ]
+        },
+        "16": {
+          "n": 7,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 30,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 4,
+            "rolls": 4,
+            "skills": 2,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            8
+          ]
+        },
+        "17": {
+          "n": 11,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 33,
+            "enemy_phases": 1,
+            "healing": 0,
+            "kills": 3,
+            "rolls": 4,
+            "skills": 3,
+            "tarots": 0
+          },
+          "roll_range": [
+            1,
+            13
+          ]
+        },
+        "18": {
+          "n": 6,
+          "median": {
+            "boss_charges": 0.0,
+            "boss_interrupts": 0.0,
+            "boss_releases": 0.0,
+            "damage_taken": 49.0,
+            "enemy_phases": 1.0,
+            "healing": 5.5,
+            "kills": 5.0,
+            "rolls": 7.0,
+            "skills": 3.0,
+            "tarots": 0.0
+          },
+          "roll_range": [
+            2,
+            8
+          ]
+        },
+        "19": {
+          "n": 5,
+          "median": {
+            "boss_charges": 0,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 188,
+            "enemy_phases": 3,
+            "healing": 71,
+            "kills": 3,
+            "rolls": 9,
+            "skills": 5,
+            "tarots": 0
+          },
+          "roll_range": [
+            4,
+            18
+          ]
+        },
+        "20": {
+          "n": 11,
+          "median": {
+            "boss_charges": 1,
+            "boss_interrupts": 0,
+            "boss_releases": 0,
+            "damage_taken": 0,
+            "enemy_phases": 5,
+            "healing": 0,
+            "kills": 1,
+            "rolls": 10,
+            "skills": 6,
+            "tarots": 1
+          },
+          "roll_range": [
+            4,
+            30
+          ]
+        }
+      }
+    }
+  },
+  "cli": {
+    "seed": 10011,
+    "commands": 357,
+    "state": {
+      "outcome": "victory",
+      "phase": "finished",
+      "totals": {
+        "boss_charges": 8,
+        "boss_interrupts": 0,
+        "boss_releases": 3,
+        "damage_taken": 1073,
+        "enemy_phases": 37,
+        "healing": 490,
+        "kills": 58,
+        "rolls": 134,
+        "skills": 56,
+        "tarots": 5
+      }
+    }
+  },
+  "caveats": [
+    "Scripted decisions, not a human win rate.",
+    "Perfect outcomes explicitly sampled; no phone timing or animations are tested.",
+    "Ultra prizes forfeited; normal opening currency still credited.",
+    "Before/controlled-final share the comparison policy. Audit runs retain fused food correctly, unlike the older policy.",
+    "Route and loot diverge naturally after combat changes. Shop waves excluded from encounter medians.",
+    "XP level-up full heals are not included in the explicit healing-event total."
+  ]
+}

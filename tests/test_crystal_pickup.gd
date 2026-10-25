@@ -16,11 +16,14 @@ func model_checks() -> void:
 			m.enemies = [Enemy.make(role,1,elite)]
 			var drops: Array = []
 			m.enemy_crystals_dropped.connect(func(target, amount): drops.append([target,amount]))
-			var expected: int = (15 if elite else 10) if role in Enemy.SPECIAL else (8 if elite else 5)
+			var expected: int = Enemy.crystal_reward(m.enemies[0])
 			m.enemies[0].shield = 10
 			m.hit_enemy(0,9999)
 			check(m.blood_gems == 0 and drops.is_empty(),"Shield break grants no crystals")
 			m.hit_enemy(0,9999)
+			if m.enemies[0].get("boss",false):
+				check(drops.is_empty(),"First boss bar grants no currency")
+				m.hit_enemy(0,9999,true)
 			check(m.blood_gems == expected and drops == [[0,expected]],"Kill awards the correct role/elite amount exactly once")
 			m.hit_enemy(0,9999,true)
 			check(m.blood_gems == expected and drops.size() == 1,"Corpse hits cannot duplicate drops")
@@ -28,7 +31,7 @@ func model_checks() -> void:
 	m.enemies = [Enemy.make(0),Enemy.make(1)]
 	m.acquire_relic("soul_vessel")
 	m.hit_enemy(0,9999,true); m.hit_enemy(1,9999,true)
-	check(m.blood_gems == 11 and is_equal_approx(m.blood_gem_remainder,0.5),"Soul Vessel applies with fractional carry across kills")
+	check(m.blood_gems == 10 and m.blood_gem_remainder == 0,"Soul Vessel affects enemy souls, not blood gems")
 	m = Run.new(53)
 	m.enemies = [Enemy.make(0),Enemy.make(1,1,true),Enemy.make(3),Enemy.make(4,1,true)]
 	m.begin_round(); m.set_test_roll([6,6,6]); m.apply_player()
@@ -46,7 +49,7 @@ func model_checks() -> void:
 	m.tarot_effects.cast(m,card.instance_id,{"target":0})
 	check(m.blood_gems == 5,"Tarot execution grants currency")
 	m = Run.new(56)
-	m.load_debug_wave(20); m.troops = 4
+	m.stage = m.Waves.CITY_STAGE; m._load_wave(); m.troops = 4
 	var drops: Array = []
 	m.enemy_crystals_dropped.connect(func(target, amount): drops.append([target,amount]))
 	m.begin_round(); m.set_test_roll([4,4,4]); m.apply_player()
@@ -94,8 +97,10 @@ func run() -> void:
 		check(g.view_phase == "collecting","Wave reward waits for the final enemy's receipt")
 		g._check_over() # Must not start a second transition while collection is pending.
 		p.advance(2)
-		await process_frame
-		check(g.view_phase == "wave_reward" and g.model.wave_chest_stage == g.model.stage,"Wave chest begins after arrivals without blocking combat before victory")
+		g.set_process(true); g.speed = 20
+		var deadline: int = Time.get_ticks_msec()+12000
+		while g.view_phase != "wave_reward" and Time.get_ticks_msec() < deadline: await process_frame
+		check(g.view_phase == "wave_reward" and g.model.wave_chest_stage == g.model.stage,"Wave chest begins after gems, XP and tarot receipts finish")
 		g._restart(); g.set_process(false)
 		check(p.pending_total == 0 and p.gems.is_empty(),"Restart clears pending cosmetic balance")
 		g.reduced = true

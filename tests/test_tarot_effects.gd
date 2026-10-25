@@ -85,8 +85,12 @@ func _initialize() -> void:
 	m = fresh(); roll(m,[1,1,2,4,4,6]); use(m,"judgement")
 	check(m.dice_turn.rolls_left == 4 and m.can_end_dice_turn(),"Judgement adds two rolls without losing rolled state")
 	use(m,"justice"); budget = m.dice_turn.rolls_left
+	m.perfect_combo = 5
 	roll(m,[1,2,3,4,5,6],true)
 	check(m.dice_turn.rolls_left == budget,"Justice uses the free-roll pathway")
+	check(m.perfect_combo == 5 and is_equal_approx(m.combo_multiplier(),1.7),"Justice preserves the Perfect streak and its damage factor")
+	roll(m)
+	check(m.perfect_combo == 0,"A subsequent missed manual throw still breaks the streak")
 	card = m.tarots.add("judgement")
 	check(m.tarot_effects.cast(m,card.instance_id).has("error"),"Judgement rejects playable unused straights")
 	m = fresh(); roll(m,[1,2,3,4,4,6]); spend(m,[0,1,2]); use(m,"judgement")
@@ -155,7 +159,11 @@ func _initialize() -> void:
 	check(m.tarot_effects.cast(m,card.instance_id).has("error") and m.tarots.find_instance(card.instance_id) < 0,"Offering a relic consumes Emperor immediately")
 	check(not m.tarot_effects.cast(m,card.instance_id,{"replace":4}).has("error") and m.relics.items[4].id == setup.relic,"Confirmed replacement consumes Emperor")
 	var owned: Array = m.relics.items.map(func(item): return item.id)
-	use(m,"fool"); check(m.relics.items.size() == 10 and m.relics.items.all(func(item): return item.id not in owned),"Fool excludes all former relics")
+	use(m,"fool")
+	# Rerolled foods can fuse into one meal slot while retaining every awarded item.
+	var rerolled: Array = []
+	for item in m.relics.items: rerolled.append_array(item.get("ingredients",[item.id]))
+	check(rerolled.size() == 10 and rerolled.all(func(id): return id not in owned),"Fool replaces every former relic, including fused meal ingredients")
 	m = fresh(); var counts: Dictionary = {}
 	for i in range(5000):
 		card = m.tarots.add("emperor")
@@ -164,7 +172,8 @@ func _initialize() -> void:
 		counts[id] = counts.get(id,0)+1
 		m.tarot_effects.locked_grants.erase(card.instance_id); m.tarot_effects.committed_grants.erase(card.instance_id); m.tarots.remove_instance(card.instance_id)
 	check(counts.keys().all(func(id): return id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false)),"Emperor eligibility excludes disabled/fusion items")
-	check(counts.values().min() > 70 and counts.values().max() < 190,"Emperor is uniform by item rather than rarity")
+	var expected: float = 5000.0/counts.size()
+	check(counts.values().all(func(count): return absf(count-expected) < 5.0*sqrt(expected)),"Emperor is uniform by item rather than rarity as the catalog grows")
 	m = fresh(); var wins := 0; var rares := 0
 	for i in range(4000):
 		card = m.tarots.add("wheel"); m.tarot_effects.cast(m,card.instance_id)

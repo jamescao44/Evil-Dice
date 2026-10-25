@@ -11,10 +11,11 @@ func _process(_delta: float) -> void:
 	queue_redraw()
 
 func focus_rect(index: int) -> Rect2:
-	var side: float = battle._enemy_side()*battle.battlefield_view.zoom
+	var side: float = battle._enemy_unit_side(index)*battle.battlefield_view.zoom
 	var feet: Vector2 = battle._enemy_feet(index)
 	var sprite := Rect2(feet-Vector2(side*0.64,side*1.25),Vector2(side*1.28,side*1.3))
 	var health: Rect2 = battle._enemy_health_rect(index)
+	if battle.model.enemies[index].get("boss",false): health = health.merge(battle.BossPresentation.hud_rect(battle,index))
 	if not status_rows(index).is_empty(): health.size.y += 36 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 26
 	return sprite.merge(battle._enemy_intent_rect(index)).merge(health).grow(6).intersection(Rect2(Vector2.ZERO,battle.fx.canvas_size))
 
@@ -28,7 +29,7 @@ func card_rect(index: int) -> Rect2:
 	var inset: float = 24 if portrait else 18
 	var data: Dictionary = battle._enemy_intent_data(index)
 	var lines := GameText.lines(data.get("description",""),battle.description_font,font_size,width-inset*2)
-	var size := Vector2(width,(96 if portrait else 77)+lines.size()*(font_size+8))
+	var size := Vector2(width,(136 if portrait else 107)+lines.size()*(font_size+8))
 	size.y += (56 if portrait else 42)+maxi(1,status_rows(index).size())*(52 if portrait else 38)
 	var focus: Rect2 = focus_rect(index)
 	var x: float = clampf(focus.get_center().x-size.x/2,20,battle.fx.canvas_size.x-size.x-20)
@@ -61,11 +62,19 @@ func _draw() -> void:
 	Paint.intent_icon(self,card.position+Vector2(inset+12,title_y-10),12,data.icon,data.color)
 	draw_string(battle.pixel_font,card.position+Vector2(inset+40,title_y),GameText.text(data.name),HORIZONTAL_ALIGNMENT_LEFT,-1,28 if portrait else 20,data.color)
 	var font_size: int = 30 if portrait else 22
-	var y: float = card.position.y+(86 if portrait else 67)
+	var y: float = card.position.y+(82 if portrait else 62)
+	draw_string(battle.description_font,Vector2(card.position.x+inset,y),level_summary(index),HORIZONTAL_ALIGNMENT_LEFT,-1,24 if portrait else 18,battle.MUTED)
+	y += 44 if portrait else 35
 	for line in GameText.lines(data.description,battle.description_font,font_size,card.size.x-inset*2):
 		draw_string(battle.description_font,Vector2(card.position.x+inset,y),line,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,battle.CREAM)
 		y += font_size+8
 	_draw_statuses(index,card,y+10,inset,portrait)
+
+## Expose the inspected enemy's own level and unmodified kill rewards.
+func level_summary(index: int) -> String:
+	var enemy: Dictionary = battle.model.enemies[index]
+	var catalog = battle.Rules.EnemyCatalog
+	return GameText.format("LV.%d · %d souls · %d blood gems",[enemy.get("level",1),catalog.soul_reward(enemy),catalog.crystal_reward(enemy)])
 
 func _draw_statuses(index: int, card: Rect2, top: float, inset: float, portrait: bool) -> void:
 	var left: float = card.position.x+inset

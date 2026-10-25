@@ -53,10 +53,9 @@ func _initialize() -> void:
 	m = fresh(); m.relics.add("tissue_pack"); m.roll_pool(false,[1,2,3,4,5,6])
 	form(m,[0,1,2]); check(m.roll_relic_actions.is_empty(),"Selection never farms formation relics")
 	m.cancel_formed_skill(); form(m,[0,1,2]); m.begin_player_cast()
-	check(m.roll_relic_actions.size() == 1,"Formation relic fires once at actual cast")
-	check("magic_slingshot" in Catalog.DISABLED,"Spare-die relic stays suspended")
-	for i in range(100): check(m.relics.draw_one(m.reward_rng) != "magic_slingshot","Suspended relic excluded from offers")
-	m = fresh(); m.load_debug_wave(19)
+	check(m.roll_relic_actions.is_empty(),"Tissue Pack does not trigger on a throw with a playable straight")
+	check("magic_slingshot" not in Catalog.DISABLED,"Roll-based Slingshot remains available")
+	m = fresh(); m.load_debug_wave(20)
 	for enemy in m.enemies: enemy.hp = 0
 	check(m.outcome() == "victory" and not m.advance_wave(),"City remains skipped")
 	print("Six dice transactions: %d checks, %d failures" % [checks,failures])

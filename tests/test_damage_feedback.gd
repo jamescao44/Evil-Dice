@@ -16,11 +16,13 @@ func check(ok: bool, label: String) -> void:
 func _initialize() -> void: call_deferred("run")
 
 func hit_display_checks() -> void:
+	check(Battle.DamageFeedback.number(5.01) == "6" and Battle.DamageFeedback.number(5.0) == "5", "Base display rounds upward without changing whole values")
+	check(Battle.DamageFeedback.number(1.25,true) == "1.25", "Multiplier display retains its decimal precision")
 	for sample in [[0,24],[1,24],[5,24],[10,24],[30,35],[100,48],[1000,72],[10000,96]]:
 		check(Battle.Effects.damage_font_size(sample[0]) == sample[1],"Damage font follows log10 with a regular-size floor")
-	for sample in [[0,0],[99,0],[100,0],[1000,2],[10000,4],[100000000,6]]:
+	for sample in [[0,0],[99,0],[100,0],[1000,4],[10000,8],[100000000,12]]:
 		check(is_equal_approx(Battle.DamageFeedback.damage_tremble_amplitude(sample[0]),sample[1]),"Damage tremble has a silent threshold, logarithmic growth, and readable cap")
-	check(Battle.DamageFeedback.damage_tremble_amplitude(101) > 0 and Battle.DamageFeedback.damage_tremble_amplitude(101) < 0.01,"Tremble starts smoothly just above 100 damage")
+	check(Battle.DamageFeedback.damage_tremble_amplitude(101) > 0 and Battle.DamageFeedback.damage_tremble_amplitude(101) < 0.02,"Tremble starts smoothly just above 100 damage")
 	for values in [[1,2,3],[1,1,2],[4,4,4],[5,5,5]]:
 		var m = Run.new(13)
 		m.begin_round()
@@ -89,7 +91,7 @@ func hit_display_checks() -> void:
 		m.acquire_relic("prismatic_stone")
 		m.perfect_relic_ready = true
 		hit = m.resolve_perfect_relic()[0]
-		check(hit.amount == 1 and Battle._damage_popup(hit) == "-100","Prismatic lethal strikes show their full damage in both fight types")
+		check(hit.amount == 1 and Battle._damage_popup(hit) == "-160","Prismatic lethal strikes show their full damage in both fight types")
 
 func model_checks() -> void:
 	for city in [false,true]:
@@ -123,15 +125,15 @@ func model_checks() -> void:
 				check(is_equal_approx(previous,m.cast_damage_multiplier(m.pending)),"Final animation value matches combat including critical and darkness")
 				check(is_equal_approx(previous_base,m.attack_base(m.pending)) and floori(previous_base*previous+0.000001) == m.unmitigated_damage(m.pending),"Animated base and multiplier reproduce numeric impact damage")
 				check(m.rng.state == state and m.relics.items == inventory,"Tracing does not roll effects or spend charges")
-	for example in [[[1,2,3],false,9.0,19.0],[[1,1,2],false,25.5,40.5],[[4,4,2],false,13.0,59.0/3.0],[[5,5,2],false,18.0,28.0],[[4,4,4],false,30.0,50.0],[[5,5,5],false,15.0,25.0],[[1,1,1],true,75.0,125.0],[[6,6,6],true,2000.0,2010.0]]:
+	for example in [[[1,2,3],false,9.0,14.0],[[1,1,2],false,25.5,33.0],[[4,4,2],false,13.0,49.0/3.0],[[5,5,2],false,18.0,23.0],[[4,4,4],false,30.0,40.0],[[5,5,5],false,15.0,20.0],[[1,1,1],true,75.0,100.0],[[6,6,6],true,2000.0,2005.0]]:
 		var trace_model = Run.new(901)
 		if example[1]: trace_model.load_debug_wave(Waves.COUNT)
 		trace_model.begin_round()
 		trace_model.acquire_relic("bracelet")
 		trace_model.set_test_roll(example[0]); trace_model.begin_player_cast()
 		var trace: Array = trace_model.attack_damage_steps(trace_model.pending)
-		check(trace[0].base_before == 15 and is_equal_approx(trace[0].base_after,example[2]),"Skill changes the regular base before relics")
-		check(trace[1].id == "bracelet" and is_equal_approx(trace[1].base_after,example[3]),"Flat relic reflects the skill's actual base scaling")
+		check(trace[0].id == "bracelet" and trace[0].base_before == 15 and trace[0].base_after == 20,"Flat relic adds its unscaled base before the skill")
+		check(trace[1].source == "skill" and is_equal_approx(trace[1].base_after,example[3]),"Skill applies only after the relic base has landed")
 		check(is_equal_approx(trace_model.attack_base(trace_model.pending),example[3]),"Shared base calculation preserves existing attack balance")
 	var executions = Run.new(902)
 	executions.begin_round()
@@ -157,9 +159,44 @@ func model_checks() -> void:
 	m.receive_damage(1000)
 	check(activated == ["contract"] and not m.relics.has("contract"),"Consumed revival activates before leaving inventory")
 
+## Check the current character's priority independently of the legacy three-die attacks.
+func character_priority_checks() -> void:
+	var m = Run.new(911)
+	m.character_level = 2
+	m.acquire_relic("bracelet")
+	var fireball: MultiHitSkill = m.Patterns.classify([1,2,3])
+	var trace: Array = m.attack_damage_steps(fireball)
+	check(trace.map(func(s): return s.source) == ["level","relic","skill"],"Character level precedes relics, which precede the skill")
+	check(is_equal_approx(trace[0].base_before,5) and is_equal_approx(trace[0].base_after,5.5),"Level two raises character base from five to five and a half")
+	check(is_equal_approx(trace[1].base_after,10.5) and is_equal_approx(trace[2].base_after,37.8),"Bracelet adds five before Fireball scales the full base by 3.6")
+	check(m.unmitigated_damage(fireball) == 37,"Combat rounds only after the entire ordered calculation")
+	m.acquire_relic("lemon_soda")
+	var auto: MultiHitSkill = m.Patterns.automatic_groups([2,2],[0,1])[0].skill
+	check(is_equal_approx(m.attack_base(auto),9.3),"Auto-only flat relic damage also enters before the pip multiplier")
+	for level in [1,2,5,10]:
+		m.character_level = level
+		for values in [[1,2,3],[2,3,4,5],[1,2,3,4,5]]:
+			for auto_face in [0,1,6]:
+				var skill: MultiHitSkill = m.Patterns.classify(values) if auto_face == 0 else m.Patterns.automatic_groups([auto_face,auto_face],[0,1])[0].skill
+				m.tarot_effects.strength = 2
+				m.perfect_combo = 3
+				m.statuses[Status.MIGHT].count = 2
+				m.statuses[Status.DARKNESS].count = 1
+				trace = m.attack_damage_steps(skill)
+				var combat_state: int = m.rng.state
+				var reward_state: int = m.reward_rng.state
+				check(is_equal_approx(trace.back().base_after,m.attack_base(skill)*skill.damage_ticks) and is_equal_approx(trace.back().after,m.damage_multiplier(skill)),"Current straight/automatic recipe matches real damage with levels, tarot, combo and statuses")
+				var prior: Dictionary = trace[0]
+				for step in trace.slice(1):
+					check(is_equal_approx(prior.base_after,step.base_before) and is_equal_approx(prior.after,step.before),"Current damage recipe is continuous across every stage")
+					prior = step
+				var standing: Vector2 = m.standing_damage_values()
+				check(is_equal_approx(standing.x,5*pow(1.1,level-1)+5) and is_equal_approx(standing.y,1.125),"Standing formula includes level, flat relics, boon, Perfect and darkness, without a skill")
+				check(m.rng.state == combat_state and m.reward_rng.state == reward_state and m.tarot_effects.strength == 2,"Reading standing and cast damage never consumes random state or buffs")
+
 func capture(g, name: String) -> void:
 	if "--visual" not in OS.get_cmdline_user_args(): return
-	g.queue_redraw(); g.damage_feedback.queue_redraw(); g.relic_ui.queue_redraw()
+	g.queue_redraw(); g.arena_actors.queue_redraw(); g.damage_feedback.queue_redraw(); g.relic_ui.queue_redraw()
 	await process_frame
 	await RenderingServer.frame_post_draw
 	DirAccess.make_dir_recursive_absolute("res://test-output")
@@ -179,7 +216,7 @@ func motion_checks(g) -> void:
 	var formula: String = panel.formula_label()
 	check(panel.formula_glyph_motion(0,formula.length()).y < 0 and panel.formula_glyph_motion(formula.find("x"),formula.length()).y < 0,"DMG letters and multiplication sign join the formula wave")
 	var tremble: Vector2 = panel.number_tremble(4)
-	check(tremble != Vector2.ZERO and tremble.abs().x <= 4 and tremble.abs().y <= 4,"Combined damage drives the number tremble even when base alone is 100")
+	check(tremble != Vector2.ZERO and tremble.abs().x <= 8 and tremble.abs().y <= 8,"Combined damage drives the number tremble even when base alone is 100")
 	await capture(g,"formula-wave-tremble")
 	g.menu_open = true
 	panel._process(1)
@@ -195,13 +232,33 @@ func motion_checks(g) -> void:
 	check(panel.tremble_age == 0,"New casts reset the tremble clock")
 
 func scene_checks(portrait: bool) -> void:
+	root.content_scale_size = Vector2i(804,1748) if portrait else Vector2i(1280,800)
+	root.size = Vector2i(402,874) if portrait else Vector2i(1280,800)
 	var g = Portrait.new() if portrait else Battle.new()
 	root.add_child(g)
 	g.muted = true
 	g.set_process(false)
 	g.damage_feedback.set_process(false)
 	g.relic_ui.set_process(false)
-	check(not g.damage_feedback.active and g._damage_multiplier_label().is_empty(),"Idle multiplier is hidden")
+	check(not g.damage_feedback.active and g.damage_feedback.visible and g._damage_multiplier_label() == "DMG 5 x 1.0","Idle formula is visible with current character base")
+	await capture(g,"idle")
+	for phase_name in ["ready","charging","rolling","skill","targeting","resolving","frozen","collecting","wave_reward","transition"]:
+		g.view_phase = phase_name; g.damage_feedback._process(0)
+		check(g.damage_feedback.visible,"Standing damage remains visible in battlefield phase: "+phase_name)
+	for phase_name in ["shop","reward","over"]:
+		g.view_phase = phase_name; g.damage_feedback._process(0)
+		check(not g.damage_feedback.visible,"Full-screen page covers the damage HUD: "+phase_name)
+	g.view_phase = "ready"
+	g.model.character_level = 2
+	g.damage_feedback._process(0)
+	check(g.damage_feedback.label() == "DMG 6 x 1.0" and g.damage_feedback.base_direction == 1,"Idle level changes update and animate the formula")
+	g._restart()
+	var auto: MultiHitSkill = g.model.Patterns.automatic_groups([6,6],[0,1])[0].skill
+	g.damage_feedback.show_attack(auto)
+	g.damage_feedback._process(0)
+	check(g.damage_feedback.visible and not g.damage_feedback.building and g.damage_feedback.label() == "DMG 4 x 1.0","Automatic attacks update the formula without waiting for a buildup")
+	g.damage_feedback.finish(); g.damage_feedback._process(0.21)
+	check(g.damage_feedback.label() == "DMG 5 x 1.0" and g.damage_feedback.visible,"Automatic volley restores the persistent baseline")
 	for id in ["bracelet","codex_page","cursed_skull","cursed_bow"]: g.model.acquire_relic(id)
 	g.model.relics.items[g.model.relics.index_of("cursed_bow")].waves = 1
 	g.model.set_test_roll([1,1,6])
@@ -229,14 +286,9 @@ func scene_checks(portrait: bool) -> void:
 	check(panel.age == 0 and not panel.visible,"Menus pause and hide the buildup")
 	g.menu_open = false
 	panel._process(panel.INTRO)
-	check(panel.steps[panel.cursor].source == "skill" and panel.base_value == 15,"Skill changes base before any relic activates")
+	check(panel.steps[panel.cursor].id == "bracelet" and panel.base_value == 15,"Relic begins from the level-adjusted base")
 	panel._process(0.27)
-	check(panel.base_value == 31.5 and panel.value == 1,"Heavy skill supplies its own base while multiplier stays one")
-	await capture(g,"skill-base")
-	panel._process(0.1)
-	check(panel.steps[panel.cursor].id == "bracelet","First relic starts only after the skill base lands")
-	panel._process(0.27)
-	check(panel.base_value == 46.5 and panel.value == 1 and panel.base_direction == 1,"Bracelet adds the heavy skill's scaled base contribution")
+	check(panel.base_value == 20 and panel.value == 1 and panel.base_direction == 1,"Bracelet adds five unscaled base before the heavy skill")
 	await capture(g,"base-relic")
 	panel._process(0.1)
 	check(panel.steps[panel.cursor].id == "codex_page" and g.relic_ui.activations.has("codex_page"),"First relic glows at the start of its flight")
@@ -260,10 +312,15 @@ func scene_checks(portrait: bool) -> void:
 	g.reduced = true
 	check(panel.motion() == Vector2.ZERO and g.relic_ui.activation_tilt("codex_page") == 0,"Reduced effects suppress motion without changing values")
 	panel._process(0.1)
-	check(panel.building and panel.phase == "combine" and panel.label() == "DMG 46.5 x 2.28","Base and multiplier combine only after all relic steps")
+	check(panel.steps[panel.cursor].source == "skill" and panel.base_value == 20,"Skill follows every ordered relic")
+	panel._process(0.27)
+	check(panel.base_value == 39.0 and is_equal_approx(panel.value,2.28),"Skill scales the accumulated base without changing relic multiplier")
+	await capture(g,"skill-base")
+	panel._process(0.1)
+	check(panel.building and panel.phase == "combine" and panel.label() == "DMG 39 x 2.28","Base and multiplier combine only after all relic steps")
 	await capture(g,"combine")
 	panel._process(panel.COMBINE_TIME)
-	check(not panel.building and panel.label() == "DMG 106","Combined per-hit damage uses the combat rounding rule")
+	check(not panel.building and panel.label() == "DMG 88","Combined per-hit damage uses the combat rounding rule")
 	g.reduced = false
 	panel._process(0.075)
 	var glyph_count: int = panel.label().length()
@@ -271,12 +328,33 @@ func scene_checks(portrait: bool) -> void:
 	check(panel.result_glyph_scale(0,glyph_count) > 1.2,"Final letters and numbers enlarge during their wave")
 	await capture(g,"final-wave")
 	g.reduced = true
-	check(panel.result_glyph_motion(0,3) == Vector2.ZERO and panel.result_glyph_scale(0,3) == 1.2,"Reduced effects keep the enlarged result without bobbing")
+	check(panel.result_glyph_motion(0,3) == Vector2.ZERO and is_equal_approx(panel.result_glyph_scale(0,3),1.2),"Reduced effects keep the enlarged result without bobbing")
 	check(g.model.rng.state == rng and g.model.reward_rng.state == reward_rng and g.model.enemies[0].hp == hp,"Presentation never executes the attack or consumes RNG")
 	panel.sync_hit(7.5,8)
 	check(panel.base_value == 7.5 and panel.label() == "DMG 8","A leftover die displays its own base and damage including fractional carry")
 	panel.finish(); panel._process(0.21)
-	check(not panel.active and g._damage_multiplier_label().is_empty(),"Multiplier fades away after the attack")
+	check(panel.active and panel.phase == "result","Final damage survives the old hold duration")
+	g._clear_skill()
+	check(panel.active and panel.phase == "result","Skill cleanup preserves the lingering result")
+	g.speed = 2
+	panel._process(1.9)
+	check(panel.active,"Battle speed does not shorten the 2.2-second result hold")
+	g.menu_open = true; panel._process(5); g.menu_open = false
+	check(panel.active,"Menus pause the final result hold")
+	panel._process(0.1); g.speed = 1; g.reduced = false
+	check(panel.active and panel.return_progress() > 0,"Held result begins a shrink instead of snapping back")
+	panel._process(0.13)
+	check(is_equal_approx(panel.result_glyph_scale(0,3),1.1),"Halfway through return the result has smoothly shrunk halfway to normal size")
+	var result_anchor: Vector2 = panel.anchor()
+	var origin: Vector2 = panel.result_glyph_origin(0,"D",1.2)
+	var ascent: float = g.pixel_font.get_ascent(panel.text_size())
+	check(is_equal_approx(origin.x-panel._width("D")*0.1,result_anchor.x) and is_equal_approx(origin.y-ascent*1.2,result_anchor.y-ascent),"Enlarged glyphs share the normal top-left origin")
+	await capture(g,"shrinking")
+	panel.phase = "idle"
+	check(panel.anchor() == result_anchor,"Result and normal state share the same anchor")
+	panel.phase = "result"
+	panel._process(0.15)
+	check(not panel.active and panel.visible and panel.label() == "DMG 10 x 1.2","Cast returns to standing stats without hiding the formula")
 	await motion_checks(g)
 	panel.start(g.model.attack_damage_steps(g.model.pending))
 	g._restart()
@@ -292,30 +370,31 @@ func scene_checks(portrait: bool) -> void:
 	check(panel.building and panel.steps[0].id == "reaper_scythe" and panel.value == 1,"A kill starts a new relic flight before the next combo hit")
 	g.model.hit_enemy(1,100)
 	panel._process(0.3)
-	check(is_equal_approx(panel.value,1.21),"Multiple kills feed the in-flight Reaper update before the next hit")
+	check(is_equal_approx(panel.value,1.10),"Multiple kills feed the in-flight Reaper update before the next hit")
 	g._restart()
 	g.set_process(true); panel.set_process(true); g.relic_ui.set_process(true)
 	g.speed = 30
 	g.reduced = false
-	g.model.enemies = [Rules.make_enemy(0,100)]
+	g.model.enemies = [Rules.make_enemy(0)]
+	g.model.enemies[0].hp = 7500; g.model.enemies[0].max_hp = 7500
 	g.model.enemies[0].intent = {"type":"attack","target":-1,"amount":1}
 	g.model.acquire_relic("codex_page")
 	g.result = g.model.set_test_roll([1,1,6])
 	g.skill_bubble.begin(g.result); g.skill_bubble.age = 1
 	g.view_phase = "skill"
-	check(not panel.active,"Holding an attack still hides DMG")
+	check(not panel.active and panel.visible,"Holding an attack keeps the standing formula visible")
 	hp = g.model.enemies[0].hp
 	var expected: int = g.model.attack_damage(g.result,0)
 	g._activate_skill(0)
 	check(panel.building and panel.value == 1 and g.model.enemies[0].hp == hp,"Actual cast waits for buildup before damaging its target")
 	await Driver.resolve_held(g)
-	check(g.model.enemies[0].hp == hp-expected and not panel.active,"Attack deals its original damage once and hides the display")
+	check(g.model.enemies[0].hp == hp-expected and panel.active and not panel.building,"Attack deals damage once and returns control while the result remains")
 	g._restart(Waves.COUNT)
 	g.result = g.model.set_test_roll([2,2,2])
 	g.skill_bubble.begin(g.result); g.skill_bubble.age = 1
 	g.view_phase = "skill"
 	g._activate_skill(-2)
-	check(not panel.active,"Support casts do not show a damage multiplier")
+	check(not panel.active,"Support casts keep standing stats without building a damage recipe")
 	await Driver.resolve_held(g)
 	if "--visual" in OS.get_cmdline_user_args():
 		g.set_process(false)
@@ -332,6 +411,17 @@ func scene_checks(portrait: bool) -> void:
 			g.fx.queue_redraw()
 			await capture(g,"callouts-"+language)
 		GameText.set_language(locale,false)
+		g.model.character_level = 5
+		g.evolution.reset()
+		g.model.acquire_relic("bracelet"); g.model.acquire_relic("fried_chicken")
+		g.model.perfect_combo = 3
+		g.fx.clear(); g._process(0)
+		panel.clear(); panel._process(0)
+		await capture(g,"standing-buffed")
+		g.view_phase = "resolving"
+		panel.start(g.model.attack_damage_steps(g.model.Patterns.classify([1,2,3])))
+		while panel.building: panel._process(0.05)
+		await capture(g,"fireball-final")
 	g.queue_free(); await process_frame
 
 func retrigger_speed_checks() -> void:
@@ -344,18 +434,18 @@ func retrigger_speed_checks() -> void:
 	for id in ["bracelet","disguise_mask","ancient_tentacle"]: g.model.acquire_relic(id)
 	var panel = g.damage_feedback
 	panel.start(g.model.attack_damage_steps(Rules.classify([1,2,3])))
-	panel.cursor = 0; panel._advance() # Original Bracelet.
+	panel.cursor = -1; panel._advance() # Original Bracelet.
 	panel._process(0.17)
 	check(not panel.landed,"Original relic flight keeps its normal timing")
-	panel.cursor = 1; panel._advance() # Mask copy.
+	panel.cursor = 0; panel._advance() # Mask copy.
 	panel._process(0.17)
 	check(panel.landed,"Retrigger flight lands in two-thirds of the original time")
 	g.relic_ui._process(0.2)
-	check(is_equal_approx(g.relic_ui.activations.disguise_mask.age,0.3),"Retrigger glow and tilt also run at 1.5x")
+	check(is_equal_approx(g.relic_ui.activations.disguise_mask.age,0.3*(1+panel.STEP_ACCELERATION)),"Retrigger glow and tilt combine 1.5x speed with buildup acceleration")
 	panel._process(0.07)
-	check(panel.cursor == 3,"Retrigger advances after 0.24 seconds rather than 0.36")
+	check(panel.cursor == 2,"Retrigger advances after 0.24 seconds rather than 0.36")
 	g.model.stage = Waves.CITY_STAGE; g.model._load_wave()
-	panel.cursor = 1; panel._advance()
+	panel.cursor = 0; panel._advance()
 	panel._process(0.085)
 	check(panel.landed,"Retrigger pacing composes with the city's double playback speed")
 	g.queue_free(); await process_frame
@@ -363,8 +453,43 @@ func retrigger_speed_checks() -> void:
 func run() -> void:
 	hit_display_checks()
 	model_checks()
+	character_priority_checks()
+	await sustained_total_checks()
 	await scene_checks(false)
 	await scene_checks(true)
 	await retrigger_speed_checks()
 	print("Cast damage feedback: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)
+
+## Whole-skill display totals keep per-pulse rounding while real damage still lands separately.
+func sustained_total_checks() -> void:
+	var g = Battle.new()
+	root.add_child(g); g.muted = true; g.set_process(false)
+	for length in [5,6]:
+		for level in [1,2]:
+			var m = Run.new(917)
+			m.character_level = level
+			m.enemies = [m.make_enemy(0)]
+			m.enemies[0].hp = 10000; m.enemies[0].max_hp = 10000; m.enemies[0].shield = 0
+			m.begin_round()
+			var skill: MultiHitSkill = m.Patterns.classify(range(1,length+1))
+			var ticks: int = 5 if length == 5 else 10
+			check(m.damage_caption(skill) == (("35 + 0 (x1)" if level == 1 else "40 + 0 (x1)") if length == 5 else ("100 + 0 (x1)" if level == 1 else "110 + 0 (x1)")),"Held sustained skill shows full damage without premature Storm ignition")
+			var total: int = m.skill_damage_total(skill,0)
+			var state: int = m.rng.state
+			g.model = m
+			var trace: Array = m.attack_damage_steps(skill)
+			var panel = g.damage_feedback
+			panel.start(trace)
+			panel.base_value = trace.back().base_after; panel.value = trace.back().after
+			panel.phase = "result"; panel.building = false
+			check(panel.label() == "DMG %d" % ((7 if level == 1 else 8)*ticks if length == 5 else (10 if level == 1 else 11)*ticks),"Calculated HUD shows all pulses, with per-tick rounding preserved")
+			check(m.rng.state == state and m.enemy_status_count(0,Status.BURNING) == 0,"Preview cannot apply Burning or draw RNG")
+			m.pending = skill; m.phase = "player"
+			m.begin_player_cast(0)
+			var events: Array = m.apply_player(0).filter(func(e): return e.type == "damage" and e.target == 0)
+			check(events.size() == ticks,"Whole-skill display keeps five or ten separate real damage events")
+			check(events.reduce(func(sum,e): return sum+e.display_amount,0) == total,"Held total matches the actual separate damage pulses")
+			panel.clear()
+			check(panel.damage_ticks == 1,"Returning to standing damage clears the sustained display factor")
+	g.queue_free(); await process_frame

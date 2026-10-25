@@ -90,6 +90,7 @@ func repeat_offer(g) -> void:
 	check(g.inventory_page.opened and g.tarot_cast.instance_id < 0,"A repeated grant opens its own replacement backpack")
 	check(g.model.relics.has("contract") and g.model.tarots.find_instance(card.instance_id) < 0,"First grant commits once before the repeat")
 	tap(g,g.inventory_page.close_rect().get_center())
+	await settle(g)
 	check(g.model.tarot_effects.pending_repeat.is_empty() and g.view_phase == "ready","Skipping a repeat finishes its transaction")
 	check(g.model.relics.has("contract") and g.model.tarots.find_instance(card.instance_id) < 0,"Skipping a repeat keeps the accepted gift without duplicating its card")
 

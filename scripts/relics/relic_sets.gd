@@ -1,16 +1,30 @@
 extends RefCounted
 ## Set recipes are data: ordered ingredients, replacement tier bonuses and composite art.
 const RECIPES := {
+	"marbles": {
+		"ingredients":["glass_marble","steel_marble","gold_marble","magic_slingshot"],
+		"retain_effects":false,
+		"composite_art":false,
+		"tiers":[{"id":"enchanted_missile","count":4,"stats":{"base_damage":10.0,"three_straight_bonus":1.0}}],
+	},
 	"meal": {
 		"ingredients":["lemon_soda","fries","hamburger","oreo_sundae","fried_chicken"],
 		"tiers":[
-			{"id":"budget_meal","count":2,"stats":{"base_damage":10.0}},
-			{"id":"happy_meal","count":3,"stats":{"base_damage":20.0}},
-			{"id":"deluxe_meal","count":4,"stats":{"base_damage":20.0,"damage_add":2.0}},
-			{"id":"super_meal","count":5,"stats":{"base_damage":50.0,"damage_factor":2.0}},
+			{"id":"budget_meal","count":2,"stats":{"damage_add":0.3}},
+			{"id":"happy_meal","count":3,"stats":{"damage_add":0.5}},
+			{"id":"deluxe_meal","count":4,"stats":{"base_damage":10.0,"damage_add":0.5}},
+			{"id":"super_meal","count":5,"stats":{"base_damage":30.0,"damage_factor":1.5}},
 		],
 	},
 }
+const COLLECTIONS := {"pets":["pet_bat","pet_lizard","pet_slime","pet_ghost","pet_dragon"]}
+
+## Collection bonuses require owned components and do not fuse or consume slots.
+static func collection_complete(items: Array, id: String) -> bool:
+	return COLLECTIONS.get(id,[]).all(func(part): return items.any(func(item): return item.id == part))
+
+static func uses_composite_art(id: String) -> bool:
+	return is_fused(id) and recipe_for(id).get("composite_art",true)
 
 ## Resolve a component or fused item's recipe without knowing a particular set.
 static func recipe_for(id: String) -> Dictionary:
@@ -30,7 +44,13 @@ static func ingredients(item: Dictionary) -> Array:
 ## A new component merges in place without needing an extra inventory slot.
 static func can_merge(items: Array, id: String) -> bool:
 	var recipe: Dictionary = recipe_for(id)
-	return not recipe.is_empty() and id in recipe.ingredients and items.any(func(item): return not ingredients(item).is_empty() and recipe_for(item.id) == recipe)
+	if recipe.is_empty() or id not in recipe.ingredients: return false
+	var gathered: Array = [id]
+	for item in items:
+		if recipe_for(item.id) == recipe:
+			for part in ingredients(item):
+				if part not in gathered: gathered.append(part)
+	return gathered.size() >= recipe.tiers[0].count
 
 ## Fuse each recipe independently, retaining component order and the earliest slot.
 static func fuse(items: Array) -> void:
@@ -49,14 +69,22 @@ static func fuse(items: Array) -> void:
 			if gathered.size() >= candidate.count: tier = candidate
 		if tier.is_empty(): continue
 		var first: int = slots[0]
+		if slots.size() == 1 and items[first].id == tier.id: continue
 		for i in range(slots.size()-1,-1,-1): items.remove_at(slots[i])
 		items.insert(first,{"id":tier.id,"ingredients":gathered,"count":1,"turns":0,"charges":0,"kills":0,"waves":0})
 
 ## Ingredients apply in their retained order; only the latest tier bonus follows them.
 static func modifiers(item: Dictionary, definitions: Dictionary) -> Array:
+	if item.id == "prismatic_stone":
+		var stones: Array = []
+		for id in ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]:
+			stones.append(definitions.get(id,{}))
+		stones.append(definitions.get("prismatic_stone",{}))
+		return stones
 	if not is_fused(item.id): return [definitions.get(item.id,{})]
 	var result: Array = []
-	for id in ingredients(item): result.append(definitions.get(id,{}))
+	if recipe_for(item.id).get("retain_effects",true):
+		for id in ingredients(item): result.append(definitions.get(id,{}))
 	for tier in recipe_for(item.id).tiers:
 		if tier.id == item.id: result.append(tier.stats)
 	return result

@@ -98,7 +98,9 @@ func prophecy_checks() -> void:
 	m = prophecy_model(); cast_first(m,"emperor"); cast_repeat(m)
 	check(m.relics.items.size() == 3,"Emperor grants two different unowned relics")
 	m = prophecy_model()
-	for id in ["ancient_tentacle","pet_dragon","twin_scythes"]: m.acquire_relic(id)
+	for id in m.Relics.Catalog.ITEMS:
+		var entry: Dictionary = m.Relics.Catalog.ITEMS[id]
+		if entry.rarity == 3 and not entry.get("fusion",false) and id not in ["mithril_blade","ancient_prophecy"]: m.acquire_relic(id)
 	# Put copying relics before Prophecy so this case still has one repeat.
 	m.relics.move(m.relics.index_of("ancient_tentacle"),0)
 	cast_first(m,"world")
@@ -132,16 +134,19 @@ func _initialize() -> void:
 	m._complete_relic_turn()
 	check(m.tarots.items.size() == 2,"Closing the same turn twice never generates again")
 	m.acquire_relic("crystal_ball")
-	check(m.tarots.items.size() == 2,"Crystal Ball waits for a completed turn")
+	check(m.tarots.items.size() == 2,"Crystal Ball waits for the next turn start")
 	var activated: Array = []
 	m.relic_activated.connect(func(id): activated.append(id))
-	for i in range(5): complete_turn(m)
-	check(m.tarots.items.size() == 8,"Both generators fire on the fifth turn")
-	check(activated == ["crystal_ball","crystal_ball","crystal_ball","crystal_ball","fortune_cookie","crystal_ball"],"Relic activations follow inventory order")
+	for i in range(5):
+		m.phase = "round_end"; m.begin_round()
+		check(m.tarots.items.filter(func(card): return card.get("projection",false)).size() == 1,"Each turn grants one temporary card")
+		complete_turn(m)
+	check(m.tarots.items.size() == 3,"Only Cookie accumulates permanent cards")
+	check(activated == ["crystal_ball","crystal_ball","crystal_ball","crystal_ball","crystal_ball","fortune_cookie"],"Start/end relic activations retain their lifecycle order")
 	check(m.tarots.items.all(func(card): return card.id == "strength"),"Every generator respects exclusions")
 	m.relics.remove(m.relics.index_of("fortune_cookie"))
-	complete_turn(m)
-	check(m.tarots.items.size() == 9,"Removing a generator stops future grants")
+	m.phase = "round_end"; m.begin_round(); complete_turn(m)
+	check(m.tarots.items.size() == 3,"Removing Cookie stops permanent grants; projections expire")
 	m.reset_run()
 	check(m.tarots.items.is_empty() and m.relics.items.is_empty(),"New run clears cards and generator counters")
 	m = fresh(); m.enemies[0].hp = 10000; m.enemies[0].shield = 0
@@ -153,8 +158,8 @@ func _initialize() -> void:
 		m.dice_turn.selected = indices; m.form_selected_skill(); m.apply_player(0)
 	check(m.bonus_turn_count == 1 and m.tarots.items.size() == count_before and m.relics.items[0].turns == 0,"Dice bonus turns do not advance tarot generators")
 	m = fresh(); m.load_debug_wave(Waves.COUNT); m.begin_round(); m.acquire_relic("crystal_ball")
-	m.set_test_roll([2,2,2]); m.apply_player(); m.end_round()
-	check(m.tarots.items.size() == 1,"City generates a card after a complete roll action")
+	m.set_test_roll([2,2,2]); m.apply_player(); m.end_round(); m.begin_round()
+	check(m.tarots.items.size() == 1 and m.tarots.items[0].get("projection",false),"City also generates a projection on the next turn start")
 	prophecy_checks()
 	print("Tarot relics: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

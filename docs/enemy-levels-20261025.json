@@ -1,0 +1,1036 @@
+{
+  "date": "2026-10-25",
+  "formulas": {
+    "hp": "base × 1.30^(L−1)",
+    "damage": "base × 1.04^(L−1)",
+    "souls": "base × [1 + 0.12 × (L−1)]",
+    "gems": "base × [1 + 0.10 × (L−1)]",
+    "rounding": "nearest integer, once after scaling"
+  },
+  "waves": [
+    {
+      "label": "1-1",
+      "required_combat": true,
+      "total_gems": 5,
+      "total_hp": 75,
+      "total_souls": 5,
+      "units": [
+        {
+          "damage": 7,
+          "elite": false,
+          "gems": 5,
+          "hp": 75,
+          "level": 1,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 5
+        }
+      ],
+      "wave": 1,
+      "focus": "先锋：攻击与举盾"
+    },
+    {
+      "label": "1-2",
+      "required_combat": true,
+      "total_gems": 10,
+      "total_hp": 125,
+      "total_souls": 10,
+      "units": [
+        {
+          "damage": 10,
+          "elite": false,
+          "gems": 5,
+          "hp": 50,
+          "level": 1,
+          "name": "Elf Archer",
+          "role": 1,
+          "souls": 5
+        },
+        {
+          "damage": 7,
+          "elite": false,
+          "gems": 5,
+          "hp": 75,
+          "level": 1,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 5
+        }
+      ],
+      "wave": 2,
+      "focus": "新敌：弓手；优先击杀与自疗"
+    },
+    {
+      "label": "1-3",
+      "required_combat": true,
+      "total_gems": 10,
+      "total_hp": 110,
+      "total_souls": 10,
+      "units": [
+        {
+          "damage": 15,
+          "elite": false,
+          "gems": 5,
+          "hp": 35,
+          "level": 1,
+          "name": "Mage",
+          "role": 2,
+          "souls": 5
+        },
+        {
+          "damage": 7,
+          "elite": false,
+          "gems": 5,
+          "hp": 75,
+          "level": 1,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 5
+        }
+      ],
+      "wave": 3,
+      "focus": "新敌：法师；支援与目标选择"
+    },
+    {
+      "label": "1-4",
+      "required_combat": false,
+      "total_gems": 17,
+      "total_hp": 198,
+      "total_souls": 17,
+      "units": [
+        {
+          "damage": 7,
+          "elite": false,
+          "gems": 6,
+          "hp": 98,
+          "level": 2,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 6
+        },
+        {
+          "damage": 10,
+          "elite": false,
+          "gems": 6,
+          "hp": 65,
+          "level": 2,
+          "name": "Elf Archer",
+          "role": 1,
+          "souls": 6
+        },
+        {
+          "damage": 15,
+          "elite": false,
+          "gems": 5,
+          "hp": 35,
+          "level": 1,
+          "name": "Mage",
+          "role": 2,
+          "souls": 5
+        }
+      ],
+      "wave": 4,
+      "focus": "熟悉组合／首次商店"
+    },
+    {
+      "label": "1-5",
+      "required_combat": true,
+      "total_gems": 15,
+      "total_hp": 240,
+      "total_souls": 19,
+      "units": [
+        {
+          "damage": 22,
+          "elite": true,
+          "gems": 10,
+          "hp": 165,
+          "level": 4,
+          "name": "Elite Mage",
+          "role": 2,
+          "souls": 14
+        },
+        {
+          "damage": 7,
+          "elite": false,
+          "gems": 5,
+          "hp": 75,
+          "level": 1,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 5
+        }
+      ],
+      "wave": 5,
+      "focus": "新敌：精英法师；燃烧"
+    },
+    {
+      "label": "1-6",
+      "required_combat": false,
+      "total_gems": 22,
+      "total_hp": 319,
+      "total_souls": 24,
+      "units": [
+        {
+          "damage": 22,
+          "elite": true,
+          "gems": 10,
+          "hp": 127,
+          "level": 3,
+          "name": "Elite Mage",
+          "role": 2,
+          "souls": 12
+        },
+        {
+          "damage": 8,
+          "elite": false,
+          "gems": 6,
+          "hp": 127,
+          "level": 3,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 6
+        },
+        {
+          "damage": 10,
+          "elite": false,
+          "gems": 6,
+          "hp": 65,
+          "level": 2,
+          "name": "Elf Archer",
+          "role": 1,
+          "souls": 6
+        }
+      ],
+      "wave": 6,
+      "focus": "练习：燃烧与混合等级"
+    },
+    {
+      "label": "1-7",
+      "required_combat": true,
+      "total_gems": 17,
+      "total_hp": 696,
+      "total_souls": 28,
+      "units": [
+        {
+          "damage": 19,
+          "elite": false,
+          "gems": 11,
+          "hp": 650,
+          "level": 2,
+          "name": "Paladin",
+          "role": 3,
+          "souls": 22
+        },
+        {
+          "damage": 16,
+          "elite": false,
+          "gems": 6,
+          "hp": 46,
+          "level": 2,
+          "name": "Mage",
+          "role": 2,
+          "souls": 6
+        }
+      ],
+      "wave": 7,
+      "focus": "新敌：圣骑士；嘲讽与护盾"
+    },
+    {
+      "label": "1-8",
+      "required_combat": false,
+      "total_gems": 19,
+      "total_hp": 309,
+      "total_souls": 19,
+      "units": [
+        {
+          "damage": 8,
+          "elite": false,
+          "gems": 7,
+          "hp": 165,
+          "level": 4,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 7
+        },
+        {
+          "damage": 11,
+          "elite": false,
+          "gems": 6,
+          "hp": 85,
+          "level": 3,
+          "name": "Elf Archer",
+          "role": 1,
+          "souls": 6
+        },
+        {
+          "damage": 16,
+          "elite": false,
+          "gems": 6,
+          "hp": 59,
+          "level": 3,
+          "name": "Mage",
+          "role": 2,
+          "souls": 6
+        }
+      ],
+      "wave": 8,
+      "focus": "缓冲：已知敌人与商店机会"
+    },
+    {
+      "label": "1-9",
+      "required_combat": true,
+      "total_gems": 29,
+      "total_hp": 1332,
+      "total_souls": 46,
+      "units": [
+        {
+          "damage": 12,
+          "elite": true,
+          "gems": 11,
+          "hp": 428,
+          "level": 5,
+          "name": "Elite Vanguard",
+          "role": 0,
+          "souls": 15
+        },
+        {
+          "damage": 19,
+          "elite": false,
+          "gems": 12,
+          "hp": 845,
+          "level": 3,
+          "name": "Paladin",
+          "role": 3,
+          "souls": 25
+        },
+        {
+          "damage": 16,
+          "elite": false,
+          "gems": 6,
+          "hp": 59,
+          "level": 3,
+          "name": "Mage",
+          "role": 2,
+          "souls": 6
+        }
+      ],
+      "wave": 9,
+      "focus": "新敌：精英先锋；晕眩与护卫"
+    },
+    {
+      "label": "1-10",
+      "required_combat": true,
+      "total_gems": 43,
+      "total_hp": 6584,
+      "total_souls": 118,
+      "units": [
+        {
+          "damage": 23,
+          "elite": true,
+          "gems": 21,
+          "hp": 2142,
+          "level": 5,
+          "name": "Knight Commander",
+          "phase_two_hp": 3142,
+          "reinforcements": {
+            "count": 2,
+            "damage": 19,
+            "gems": 11,
+            "hp": 650,
+            "level": 2,
+            "souls": 22
+          },
+          "role": 5,
+          "souls": 74
+        }
+      ],
+      "wave": 10,
+      "focus": "Boss：骑士团长；二阶段2名Lv.2圣骑士"
+    },
+    {
+      "label": "2-1",
+      "required_combat": true,
+      "total_gems": 29,
+      "total_hp": 701,
+      "total_souls": 37,
+      "units": [
+        {
+          "damage": 18,
+          "elite": true,
+          "gems": 12,
+          "hp": 371,
+          "level": 6,
+          "name": "Elite Elf Archer",
+          "role": 1,
+          "souls": 16
+        },
+        {
+          "damage": 22,
+          "elite": true,
+          "gems": 10,
+          "hp": 165,
+          "level": 4,
+          "name": "Elite Mage",
+          "role": 2,
+          "souls": 14
+        },
+        {
+          "damage": 8,
+          "elite": false,
+          "gems": 7,
+          "hp": 165,
+          "level": 4,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 7
+        }
+      ],
+      "wave": 11,
+      "focus": "新敌：精英弓手；冰冻与群疗"
+    },
+    {
+      "label": "2-2",
+      "required_combat": false,
+      "total_gems": 38,
+      "total_hp": 1637,
+      "total_souls": 56,
+      "units": [
+        {
+          "damage": 20,
+          "elite": false,
+          "gems": 13,
+          "hp": 1099,
+          "level": 4,
+          "name": "Paladin",
+          "role": 3,
+          "souls": 27
+        },
+        {
+          "damage": 23,
+          "elite": true,
+          "gems": 11,
+          "hp": 214,
+          "level": 5,
+          "name": "Elite Mage",
+          "role": 2,
+          "souls": 15
+        },
+        {
+          "damage": 8,
+          "elite": false,
+          "gems": 7,
+          "hp": 214,
+          "level": 5,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 7
+        },
+        {
+          "damage": 11,
+          "elite": false,
+          "gems": 7,
+          "hp": 110,
+          "level": 4,
+          "name": "Elf Archer",
+          "role": 1,
+          "souls": 7
+        }
+      ],
+      "wave": 12,
+      "focus": "练习：熟悉敌人的混合小队"
+    },
+    {
+      "label": "2-3",
+      "required_combat": true,
+      "total_gems": 34,
+      "total_hp": 988,
+      "total_souls": 56,
+      "units": [
+        {
+          "damage": 28,
+          "elite": false,
+          "gems": 16,
+          "hp": 483,
+          "level": 7,
+          "name": "High Priest",
+          "role": 4,
+          "souls": 34
+        },
+        {
+          "damage": 12,
+          "elite": true,
+          "gems": 11,
+          "hp": 428,
+          "level": 5,
+          "name": "Elite Vanguard",
+          "role": 0,
+          "souls": 15
+        },
+        {
+          "damage": 17,
+          "elite": false,
+          "gems": 7,
+          "hp": 77,
+          "level": 4,
+          "name": "Mage",
+          "role": 2,
+          "souls": 7
+        }
+      ],
+      "wave": 13,
+      "focus": "新敌：大祭祀；群体祝福与元素"
+    },
+    {
+      "label": "2-4",
+      "required_combat": false,
+      "total_gems": 33,
+      "total_hp": 1899,
+      "total_souls": 53,
+      "units": [
+        {
+          "damage": 21,
+          "elite": false,
+          "gems": 14,
+          "hp": 1428,
+          "level": 5,
+          "name": "Paladin",
+          "role": 3,
+          "souls": 30
+        },
+        {
+          "damage": 18,
+          "elite": true,
+          "gems": 12,
+          "hp": 371,
+          "level": 6,
+          "name": "Elite Elf Archer",
+          "role": 1,
+          "souls": 16
+        },
+        {
+          "damage": 18,
+          "elite": false,
+          "gems": 7,
+          "hp": 100,
+          "level": 5,
+          "name": "Mage",
+          "role": 2,
+          "souls": 7
+        }
+      ],
+      "wave": 14,
+      "focus": "缓冲：保护与远程支援"
+    },
+    {
+      "label": "2-5",
+      "required_combat": true,
+      "total_gems": 32,
+      "total_hp": 3509,
+      "total_souls": 94,
+      "units": [
+        {
+          "damage": 33,
+          "elite": true,
+          "gems": 24,
+          "hp": 3379,
+          "level": 7,
+          "name": "Elite Paladin",
+          "role": 3,
+          "souls": 86
+        },
+        {
+          "damage": 18,
+          "elite": false,
+          "gems": 8,
+          "hp": 130,
+          "level": 6,
+          "name": "Mage",
+          "role": 2,
+          "souls": 8
+        }
+      ],
+      "wave": 15,
+      "focus": "新敌：精英圣骑士；蓄力后下回合双击"
+    },
+    {
+      "label": "2-6",
+      "required_combat": false,
+      "total_gems": 49,
+      "total_hp": 1671,
+      "total_souls": 75,
+      "units": [
+        {
+          "damage": 28,
+          "elite": false,
+          "gems": 16,
+          "hp": 483,
+          "level": 7,
+          "name": "High Priest",
+          "role": 4,
+          "souls": 34
+        },
+        {
+          "damage": 13,
+          "elite": true,
+          "gems": 13,
+          "hp": 724,
+          "level": 7,
+          "name": "Elite Vanguard",
+          "role": 0,
+          "souls": 17
+        },
+        {
+          "damage": 24,
+          "elite": true,
+          "gems": 12,
+          "hp": 278,
+          "level": 6,
+          "name": "Elite Mage",
+          "role": 2,
+          "souls": 16
+        },
+        {
+          "damage": 12,
+          "elite": false,
+          "gems": 8,
+          "hp": 186,
+          "level": 6,
+          "name": "Elf Archer",
+          "role": 1,
+          "souls": 8
+        }
+      ],
+      "wave": 16,
+      "focus": "混合小队：支援与输出"
+    },
+    {
+      "label": "2-7",
+      "required_combat": true,
+      "total_gems": 35,
+      "total_hp": 1909,
+      "total_souls": 106,
+      "units": [
+        {
+          "damage": 41,
+          "elite": true,
+          "gems": 27,
+          "hp": 1631,
+          "level": 9,
+          "name": "Elite High Priest",
+          "role": 4,
+          "souls": 98
+        },
+        {
+          "damage": 9,
+          "elite": false,
+          "gems": 8,
+          "hp": 278,
+          "level": 6,
+          "name": "Vanguard",
+          "role": 0,
+          "souls": 8
+        }
+      ],
+      "wave": 17,
+      "focus": "新敌：精英大祭祀；蓄满即双击"
+    },
+    {
+      "label": "2-8",
+      "required_combat": false,
+      "total_gems": 55,
+      "total_hp": 4030,
+      "total_souls": 143,
+      "units": [
+        {
+          "damage": 23,
+          "elite": false,
+          "gems": 16,
+          "hp": 2413,
+          "level": 7,
+          "name": "Paladin",
+          "role": 3,
+          "souls": 34
+        },
+        {
+          "damage": 39,
+          "elite": true,
+          "gems": 26,
+          "hp": 1255,
+          "level": 8,
+          "name": "Elite High Priest",
+          "role": 4,
+          "souls": 92
+        },
+        {
+          "damage": 25,
+          "elite": true,
+          "gems": 13,
+          "hp": 362,
+          "level": 7,
+          "name": "Elite Mage",
+          "role": 2,
+          "souls": 17
+        }
+      ],
+      "wave": 18,
+      "focus": "练习：嘲讽保护蓄力者"
+    },
+    {
+      "label": "2-9",
+      "required_combat": false,
+      "total_gems": 66,
+      "total_hp": 7448,
+      "total_souls": 207,
+      "units": [
+        {
+          "damage": 36,
+          "elite": true,
+          "gems": 27,
+          "hp": 5710,
+          "level": 9,
+          "name": "Elite Paladin",
+          "role": 3,
+          "souls": 98
+        },
+        {
+          "damage": 39,
+          "elite": true,
+          "gems": 26,
+          "hp": 1255,
+          "level": 8,
+          "name": "Elite High Priest",
+          "role": 4,
+          "souls": 92
+        },
+        {
+          "damage": 19,
+          "elite": true,
+          "gems": 13,
+          "hp": 483,
+          "level": 7,
+          "name": "Elite Elf Archer",
+          "role": 1,
+          "souls": 17
+        }
+      ],
+      "wave": 19,
+      "focus": "Boss前压力：高等级前排与较弱支援"
+    },
+    {
+      "label": "2-10",
+      "required_combat": true,
+      "total_gems": 29,
+      "total_hp": 23329,
+      "total_souls": 104,
+      "units": [
+        {
+          "damage": 28,
+          "elite": true,
+          "gems": 29,
+          "hp": 10604,
+          "level": 10,
+          "name": "Elf Spellsword",
+          "phase_two_hp": 12725,
+          "role": 6,
+          "souls": 104
+        }
+      ],
+      "wave": 20,
+      "focus": "Boss：精灵魔剑士；双阶段"
+    }
+  ],
+  "summaries": {
+    "before": {
+      "runs": 12,
+      "cleared": 11,
+      "failures": 0,
+      "perfect_rate": 0.35,
+      "median_rolls": 109.0,
+      "median_enemy_phases": 35.0,
+      "median_damage_taken": 523.5,
+      "median_final_level": 15.0
+    },
+    "initial": {
+      "runs": 12,
+      "cleared": 12,
+      "failures": 0,
+      "perfect_rate": 0.35,
+      "median_rolls": 106.5,
+      "median_enemy_phases": 31.0,
+      "median_damage_taken": 383.5,
+      "median_final_level": 15.0
+    },
+    "tuned": {
+      "runs": 12,
+      "cleared": 12,
+      "failures": 0,
+      "perfect_rate": 0.35,
+      "median_rolls": 143.0,
+      "median_enemy_phases": 47.0,
+      "median_damage_taken": 621.5,
+      "median_final_level": 15.0
+    },
+    "held-out": {
+      "runs": 12,
+      "cleared": 12,
+      "failures": 0,
+      "perfect_rate": 0.35,
+      "median_rolls": 137.0,
+      "median_enemy_phases": 45.5,
+      "median_damage_taken": 618.5,
+      "median_final_level": 15.0
+    },
+    "lower-perfect": {
+      "runs": 12,
+      "cleared": 11,
+      "failures": 0,
+      "perfect_rate": 0.15,
+      "median_rolls": 145.5,
+      "median_enemy_phases": 49.0,
+      "median_damage_taken": 610.0,
+      "median_final_level": 15.0
+    }
+  },
+  "typical_probes": [
+    {
+      "wave": 3,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 3.5,
+        "enemy_phases": 1.0
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 4.0,
+        "enemy_phases": 1.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 4.0,
+        "enemy_phases": 1.0
+      }
+    },
+    {
+      "wave": 5,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.0,
+        "enemy_phases": 2.0
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 4.0,
+        "enemy_phases": 1.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 4.5,
+        "enemy_phases": 1.0
+      }
+    },
+    {
+      "wave": 7,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 6.0,
+        "enemy_phases": 2.5
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.0,
+        "enemy_phases": 1.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.5,
+        "enemy_phases": 1.0
+      }
+    },
+    {
+      "wave": 9,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.5,
+        "enemy_phases": 2.0
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 9.0,
+        "enemy_phases": 3.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 11.0,
+        "enemy_phases": 4.0
+      }
+    },
+    {
+      "wave": 10,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 36.5,
+        "enemy_phases": 12.5
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 36.5,
+        "enemy_phases": 12.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 36.5,
+        "enemy_phases": 12.0
+      }
+    },
+    {
+      "wave": 11,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 13.0,
+        "enemy_phases": 4.0
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 4.0,
+        "enemy_phases": 2.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.5,
+        "enemy_phases": 2.0
+      }
+    },
+    {
+      "wave": 13,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.5,
+        "enemy_phases": 1.5
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 6.0,
+        "enemy_phases": 2.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 6.0,
+        "enemy_phases": 2.0
+      }
+    },
+    {
+      "wave": 15,
+      "before": {
+        "cleared": 10,
+        "n": 12,
+        "rolls": 18.5,
+        "enemy_phases": 6.5
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 11.5,
+        "enemy_phases": 4.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 12.5,
+        "enemy_phases": 5.0
+      }
+    },
+    {
+      "wave": 17,
+      "before": {
+        "cleared": 11,
+        "n": 12,
+        "rolls": 17.0,
+        "enemy_phases": 6.0
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 5.0,
+        "enemy_phases": 2.0
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 6.5,
+        "enemy_phases": 2.0
+      }
+    },
+    {
+      "wave": 19,
+      "before": {
+        "cleared": 1,
+        "n": 12,
+        "rolls": 15.5,
+        "enemy_phases": 6.0
+      },
+      "initial": {
+        "cleared": 10,
+        "n": 12,
+        "rolls": 17.5,
+        "enemy_phases": 6.5
+      },
+      "tuned": {
+        "cleared": 10,
+        "n": 12,
+        "rolls": 17.5,
+        "enemy_phases": 6.5
+      }
+    },
+    {
+      "wave": 20,
+      "before": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 56.5,
+        "enemy_phases": 20.0
+      },
+      "initial": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 56.5,
+        "enemy_phases": 21.5
+      },
+      "tuned": {
+        "cleared": 12,
+        "n": 12,
+        "rolls": 59.0,
+        "enemy_phases": 21.5
+      }
+    }
+  ],
+  "raw_results": "test-output/enemy-levels-20261025/",
+  "assumptions": [
+    "Visible-state CLI policy, not human win rates.",
+    "35% Perfect in baseline/tuning/held-out; 15% in the separate lower-Perfect group.",
+    "All Ultra prizes skipped; Greed and lower eligible.",
+    "Fixed probes have prescribed gear, no tarot and conservative prior roster XP; natural runs choose gear, tarots, routes and shops.",
+    "Full-run RNG paths diverge after encounter and route changes; comparisons describe pacing, not an isolated causal win-rate estimate.",
+    "No phone timing, animation duration or frame-rate conclusions from CLI."
+  ]
+}

@@ -5,6 +5,7 @@ const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 var particles: Array = []
 var rings: Array = []
 var floats: Array = []
+var damage_lanes: Dictionary = {}
 var flashes: Array = []
 var spell: Dictionary = {}
 var enemy_spells: Array = []
@@ -51,6 +52,19 @@ static func damage_font_size(damage: int) -> int:
 
 func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE) -> void:
 	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size})
+
+## Alternate launch sides per actor, with cosmetic variation and a short ballistic arc.
+func damage_number(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE, actor: int = -1) -> void:
+	if text.is_empty(): return
+	var side: int = damage_lanes.get(actor,1 if cosmetic.randf() < 0.5 else -1)
+	damage_lanes[actor] = -side
+	if at.x < 120: side = 1
+	elif at.x > canvas_size.x-120: side = -1
+	var movement: float = 0.25 if reduced else 1.0
+	var spread: float = clampf(sqrt(float(size)/FLOAT_FONT_SIZE),1.0,1.6)
+	var velocity := Vector2(side*cosmetic.randf_range(150,250)*spread*0.65,cosmetic.randf_range(-380,-170))*movement
+	var offset := Vector2(cosmetic.randf_range(-9,9),cosmetic.randf_range(-5,4))*movement
+	floats.append({"p":at+offset,"text":text,"color":color,"life":1.15,"size":size,"velocity":velocity,"gravity":480.0*movement,"speed":1.2})
 
 func reveal_combo(label: String, at: Vector2, color: Color) -> void:
 	combo = {"label": label, "p": at, "color": color, "age": 0.0}
@@ -113,6 +127,7 @@ func clear() -> void:
 	particles.clear()
 	rings.clear()
 	floats.clear()
+	damage_lanes.clear()
 	flashes.clear()
 	spell.clear()
 	enemy_spells.clear()
@@ -153,14 +168,20 @@ func _process(delta: float) -> void:
 		r.life -= delta
 	rings = rings.filter(func(r): return r.life > 0)
 	for f in floats:
-		f.life -= delta
-		f.p.y -= 25 * delta
+		var float_delta: float = delta*f.get("speed",1.0)
+		f.life -= float_delta
+		if f.has("velocity"):
+			f.p += f.velocity*float_delta+Vector2(0,0.5*f.gravity*float_delta*float_delta)
+			f.velocity.y += f.gravity*float_delta
+		else: f.p.y -= 25 * float_delta
 	floats = floats.filter(func(f): return f.life > 0)
 	for f in flashes:
 		f.life -= real_delta
 	flashes = flashes.filter(func(f): return f.life > 0)
 	if not spell.is_empty():
 		spell.life -= delta
+		# Keep the damaging visual present if frame rounding delays a sustained spell's final tick.
+		if spell.get("hold_damage",false): spell.life = maxf(spell.life,spell.duration*0.1)
 		if spell.life <= 0:
 			spell = {}
 	queue_redraw()
@@ -333,7 +354,7 @@ func _draw_spell(cast_info: Dictionary) -> void:
 		var tint: Color = [Color("eee0b9"), Color("82dfff"), Color("ff9955"), Color("ffe388"), Color("c18ce8"), Color("8ad26a"), Color("93899e")][attribute]
 		var target: Vector2 = cast_info.targets[0]
 		var head: Vector2 = cast_info.from.lerp(target, minf(1, progress * 1.6))
-		if cast_info.role in [0,3]:
+		if cast_info.role in [0,3,5,6]:
 			Pixel.line(self, target + Vector2(-32, 46) * strength, target + Vector2(32, -46) * strength, tint, 6)
 		elif cast_info.role == 1:
 			Pixel.line(self, head, head + Vector2(42, -2), tint, 3)

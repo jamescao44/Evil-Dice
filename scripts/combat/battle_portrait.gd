@@ -5,7 +5,6 @@ const PORTRAIT_SIZE := Vector2i(804, 1748)
 const CITY_TRANSFORM := Transform2D(Vector2(0.9, 0), Vector2(0, 0.9), Vector2(-390, 336))
 const GUIDE_PAIRS := Rect2(40, 432, 226, 88)
 const GUIDE_TRIPLES := Rect2(289, 432, 226, 88)
-var guide_page: int = 0
 var selected_status: int = -1
 var status_until: float = 0
 
@@ -28,6 +27,7 @@ func _configure_layout() -> void:
 	MENU_RECT = Rect2(672, 124, 88, 88)
 	MENU_CLOSE = Rect2(660, 132, 104, 88)
 	MENU_RESUME = Rect2(88, 1164, 628, 112)
+	MENU_HOME = Rect2(88, 1300, 628, 112)
 	DEBUG_RECT = Rect2(88, 420, 628, 112)
 	SPEED_RECT = Rect2(476, 124, 88, 88)
 	AUDIO_RECT = Rect2(574, 124, 88, 88)
@@ -82,7 +82,7 @@ func _handle_click(point: Vector2) -> void:
 	selected_status = -1
 	super._handle_click(point)
 
-func _restart(wave_number: int = 1) -> void:
+func _restart(wave_number: int = 0) -> void:
 	selected_status = -1
 	super._restart(wave_number)
 
@@ -91,6 +91,7 @@ func _player_world_feet() -> Vector2:
 
 ## Keep front-row enemies beside the player with enough overhead for intent icons.
 func _enemy_layout_feet(index: int) -> Vector2:
+	if BossPresentation.present(model): return BossPresentation.feet(self,index)
 	return preload("res://scripts/enemies/enemy_formation.gd").feet(ARENA,index,model.enemies.size(),_enemy_side(),true)
 
 func _city_gate_point() -> Vector2:
@@ -125,7 +126,7 @@ func _button(rect: Rect2, value: String, enabled: bool = true, canvas: CanvasIte
 	_center(rect.get_center() + Vector2(0, 10), value, 28, GOLD if enabled else MUTED, canvas)
 
 func _draw_header() -> void:
-	_text(Vector2(48, 163), "%d / %d" % [model.stage + 1, Run.PLAYABLE_WAVES], 32, GOLD)
+	_text(Vector2(48, 163), "%d-%d / 10" % [model.level_number(),model.level_wave()], 32, GOLD)
 	_draw_currencies(_currency_point(),1.1)
 	_button(SPEED_RECT, "%.1fx" % _roll_speed() if model.is_city() else "2x" if speed == 2 else "1x")
 	_button(AUDIO_RECT, "")
@@ -141,8 +142,8 @@ func _draw_arena() -> void:
 		for i in range(model.enemies.size()): _draw_enemy_overlay(i)
 	draw_rect(ARENA, EDGE, false, 4)
 	draw_rect(ARENA.grow(-5), Color("d2c29a"), false, 2)
-	if view_phase in ["feeding", "transition"]:
-		_center(Vector2(402, 720), "THE FEAST" if view_phase == "feeding" else "ADVANCING", 42, GOLD)
+	if view_phase == "transition":
+		_center(Vector2(402, 720), "ADVANCING", 42, GOLD)
 
 ## Render city scenery and troops through the portrait coordinate transform.
 func _draw_city() -> void:
@@ -167,20 +168,19 @@ func _draw_city() -> void:
 
 func _draw_player() -> void:
 	if model.is_city(): _draw_player_actor(self)
-	_meter(Rect2(48, 910, 708, 34), model.hp / float(model.max_hp), TEAL)
-	_center(Vector2(402, 935), "%d / %d" % [model.hp, model.max_hp], 28)
-	if model.shield > 0:
-		_glyph(Vector2(625, 882), "shield", TEAL, 2)
-		_text(Vector2(654, 892), str(model.shield), 28, TEAL)
+	_draw_player_vitals()
+
+## Leave room at the left for the level and below for the thin XP strip.
+func player_health_rect() -> Rect2:
+	return Rect2(140,904,616,28)
 
 func _draw_enemy_health(index: int) -> void:
 	var human: Dictionary = model.enemies[index]
 	var bar: Rect2 = _enemy_health_rect(index)
-	_meter(bar, human.hp / float(human.max_hp), _elite_color(human.role) if human.elite else RED)
-	_center(bar.get_center() + Vector2(0, 8), str(human.hp), 22)
-	if human.shield > 0:
-		_glyph(bar.position + Vector2(3, -15), "shield", TEAL)
-		_text(bar.position + Vector2(16, -8), str(human.shield), 20, TEAL)
+	draw_rect(bar.grow(3),EDGE)
+	draw_rect(bar,INK)
+	_draw_health_fill(bar.grow(-2),human.hp,human.max_hp,human.shield,_elite_color(human.role) if human.elite else RED)
+	_draw_enemy_health_text(index,bar,16 if human.get("summoned",false) and not Rules.EnemyCatalog.ITEMS[human.role].get("interruptible",false) else 22 if model.enemies.size() < 4 else 20)
 
 func _meter(rect: Rect2, ratio: float, color: Color) -> void:
 	draw_rect(rect.grow(3), EDGE)
@@ -217,9 +217,9 @@ func _draw_ending() -> void:
 	var color: Color = GOLD if won else RED
 	_rune(Vector2(402, 662), 5, color, 8)
 	_center(Vector2(402, 790), "VICTORY" if won else "DEFEAT", 72, color)
-	_center(Vector2(402, 858), "THE INNER SANCTUM FALLS" if won else "BACK TO THE ABYSS", 26, CREAM)
-	_center(Vector2(402, 916), GameText.format("STAGE %d / %d   -   %d HP", [model.stage + 1, Run.PLAYABLE_WAVES, model.hp]), 26, MUTED)
-	_button(REPLAY_RECT, "RESTART")
+	_center(Vector2(402, 858), "LEVEL CLEARED" if won and model.has_next_level() else "THE INNER SANCTUM FALLS" if won else "BACK TO THE ABYSS", 26, CREAM)
+	_center(Vector2(402, 916), GameText.format("LEVEL %d   WAVE %d / 10", [model.level_number(),model.level_wave()]), 26, MUTED)
+	_button(REPLAY_RECT, "START LEVEL 2" if won and model.has_next_level() else "RESTART LEVEL" if not won else "RESTART", not won or model.level_rewards_complete())
 	if home_enabled: _button(_home_rect(), "HOME")
 
 func _home_rect() -> Rect2:
@@ -231,7 +231,7 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	_text(Vector2(40,188),"GRIMOIRE",42,GOLD,canvas)
 	_button(GUIDE_CLOSE,"X",true,canvas)
 	if home_enabled: _button(_home_rect(),"HOME",true,canvas)
-	_wrapped(Vector2(40,258),"Matching dice attack automatically. Connect 3-6 consecutive unique faces to summon a fire skill, or tap dice then OK. Three rolls per turn.",718,CREAM,26,canvas)
+	_wrapped(Vector2(40,258),"Matching dice auto-attack. Connect 3-6 consecutive faces for a fire skill. Three rolls per turn.",718,CREAM,26,canvas)
 	_wrapped(Vector2(40,350),Rules.Patterns.BONUS_TURN_HELP,718,MUTED,24,canvas)
 	_button(GUIDE_PAIRS,"AUTO ATTACKS",true,canvas)
 	_button(GUIDE_TRIPLES,"STRAIGHTS",true,canvas)
@@ -240,21 +240,22 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	if guide_status_page:
 		_draw_status_help(canvas)
 		return
-	var entries: Array = Rules.Patterns.help_entries(guide_page == 1)
+	character_guide.paint(canvas)
+	var entries: Array = character_guide.entries(guide_page == 1)
 	for i in range(entries.size()):
-		var y: float = 584+i*156
+		var y: float = 824+i*156
 		_text(Vector2(40,y),entries[i].name,28,TEAL if guide_page == 0 else PURPLE,canvas)
 		_wrapped(Vector2(40,y+42),entries[i].text,718,CREAM,28,canvas)
-		canvas.draw_rect(Rect2(40,y+120,724,2),EDGE.darkened(0.35))
-	_wrapped(Vector2(40,1400),"End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.",718,CREAM,26,canvas)
+		if i < entries.size()-1: canvas.draw_rect(Rect2(40,y+120,724,2),EDGE.darkened(0.35))
+	_wrapped(Vector2(40,1440 if guide_page == 0 else 1400),"End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.",718,CREAM,26,canvas)
 	_wrapped(Vector2(40,1550),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",718,MUTED,24,canvas)
-	_wrapped(Vector2(40,1680),"Reroll Treasure: after a throw, unused rolls add 1 each at turn end. Chests: 3 / 8 / 15.",718,MUTED,22,canvas)
+	_wrapped(Vector2(40,1640),"Reroll Treasure: bank 10 unused rolls for a Perfect Chest. It can upgrade when opened.",718,MUTED,22,canvas)
 
 func _debug_option_rect(choice: int) -> Rect2:
-	if choice == -1: return Rect2(40, 262, 724, 88)
-	if choice == 0: return Rect2(40, 370, 724, 88)
-	var item: int = (choice - 1) % 6
-	return Rect2(40 + (item % 3) * 248, (550 if choice <= 6 else 930) + floori(item / 3.0) * 146, 228, 128)
+	if choice == DebugDice.NATURAL: return Rect2(40, 262, 724, 88)
+	var item: int = DEBUG_DICE_PRESETS.keys().find(choice)
+	if item < 0: return Rect2()
+	return Rect2(40+(item%2)*374,414+floori(item/2.0)*242,350,222)
 
 func _draw_debug(canvas: CanvasItem = null) -> void:
 	if canvas == null: canvas = self
@@ -262,16 +263,9 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	_text(Vector2(40, 188), "调试", 42, GOLD, canvas)
 	_button(DEBUG_CLOSE, "X", true, canvas)
 	_button(_debug_option_rect(-1), "自然随机", true, canvas)
-	_button(_debug_option_rect(0), "顺子 1—6", true, canvas)
-	_text(Vector2(40, 516), "两个一样 / 技能", 28, TEAL, canvas)
-	_text(Vector2(40, 896), "六个一样 / 湮灭", 28, PURPLE, canvas)
-	for choice in range(1, 13):
-		var rect := _debug_option_rect(choice)
-		var face: int = choice if choice <= 6 else choice - 6
-		var color: Color = TEAL if choice <= 6 else GOLD if choice == 12 else PURPLE
-		_frame(rect, Color("53613d") if debug_choice == choice else PANEL, color if debug_choice == choice or rect.has_point(_pointer_position()) else EDGE, canvas)
-		for i in range(3): _mini_die(rect.position + Vector2(54 + i * 60, 48), 0 if choice <= 6 and i == 2 else face, CREAM, canvas)
-		_center(rect.get_center() + Vector2(0, 44), str(face).repeat(2 if choice <= 6 else 6), 30, color, canvas)
+	_text(Vector2(40, 390), "指定下一次掷骰结果", 26, MUTED, canvas)
+	_draw_debug_dice(canvas)
+	_text(Vector2(40, 1178), "仅重掷未用骰；数量不足时保留设置。", 24, MUTED, canvas)
 	_button(DEBUG_TAROTS,"获得全部22张塔罗牌", true, canvas)
 	_button(DEBUG_TAROT_DRAW,"抽取塔罗牌", true, canvas)
 	_button(DEBUG_CHEST,"生成普通宝箱",_can_debug_chest(),canvas)
@@ -281,4 +275,4 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 3)
 	_text(Vector2(40,1634),"关卡",28,GOLD, canvas)
 	_button(DEBUG_WAVE_LOAD,"载入", true, canvas)
-	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "从第1–19关重新开始；城市狂热暂时跳过。",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)
+	_text(Vector2(40,1706),debug_wave_error if not debug_wave_error.is_empty() else "从第1–20关重新开始；城市狂热暂时跳过。",24,RED if not debug_wave_error.is_empty() else MUTED, canvas)

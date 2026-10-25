@@ -28,6 +28,7 @@ func layout(portrait: bool) -> void:
 	g.set_process_input(false)
 	var label: String = "portrait" if portrait else "landscape"
 	for wave in range(1,20):
+		if wave == 10: continue # Giant boss framing is covered by test_commander_scene.
 		g._restart(wave)
 		g._update_battlefield_view(0)
 		g.model.statuses[g.Status.DARKNESS].count = 3
@@ -41,7 +42,7 @@ func layout(portrait: bool) -> void:
 			formation = rect if not formation.has_area() else formation.merge(rect)
 		var player: Rect2 = g._player_sprite_rect()
 		var dice_at: Vector2 = g.dice[0].global_position
-		g.result = g.Rules.Patterns.classify([6,6])
+		g.result = g.Rules.Patterns.classify([4,5,6])
 		g.skill_bubble.begin(g.result)
 		g.skill_bubble.age = 2
 		g.view_phase = "targeting"
@@ -85,7 +86,7 @@ func layout(portrait: bool) -> void:
 		g._update_battlefield_view(0.09)
 		check(g.battlefield_view.transform.is_equal_approx(Transform2D.IDENTITY),"Camera returns exactly to normal")
 	g._restart(14)
-	g.result = g.Rules.Patterns.classify([4,4])
+	g.result = g.Rules.Patterns.classify([2,3,4])
 	g.view_phase = "targeting"
 	g._update_battlefield_view(0.05)
 	var quick_release: Transform2D = g.battlefield_view.transform
@@ -111,7 +112,7 @@ func layout(portrait: bool) -> void:
 	var arriving: Vector2 = g._enemy_feet(0)
 	g.view_phase = "ready"
 	check(arriving.is_equal_approx(g._enemy_feet(0)),"Wave entry joins the ready pose without a jump")
-	g.result = g.Rules.Patterns.classify([1,2,3])
+	g.result = g.Rules.Patterns.cleanup([1,2,3])
 	g.view_phase = "targeting"
 	g._update_battlefield_view(1)
 	check(not g.battlefield_view.focused,"Shield and support skills do not pull focus to enemies")
@@ -132,7 +133,10 @@ func layout(portrait: bool) -> void:
 	g.tarot_ui.pointer = g._enemy_point(0)
 	g.tarot_ui.drag_feedback.amount = 1
 	await capture(label+"-tarot-inside",g)
-	g._restart(17)
+	g._restart(18)
+	g.model.enemies = [g.model.make_enemy(3),g.model.make_enemy(3),g.model.make_enemy(4)]
+	g.model.phase = "new"; g.model.begin_round()
+	g.view_phase = "ready"
 	g.model.acquire_relic("ancient_prophecy")
 	g.speed = 10
 	var death: Dictionary = g.model.tarots.add("death")

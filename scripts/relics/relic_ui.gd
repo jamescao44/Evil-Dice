@@ -43,7 +43,7 @@ func portrait() -> bool:
 func strip_visible() -> bool:
 	return battle.view_phase == "shop"
 
-## Land acquisitions in the visible backpack when the battle rail is absent.
+## Rewards land in the persistent bottom-right backpack; shop purchases use their owned-item rail.
 func pickup_target() -> Vector2:
 	return slot_rect(pickup.slot).get_center() if strip_visible() else battle.inventory_page.button_rect().get_center()
 
@@ -286,6 +286,7 @@ func _draw_chest_replacement() -> void:
 	_center(Vector2(mid,1290 if portrait() else 565),"CHOOSE A RELIC TO REPLACE",24 if portrait() else 18,Color("dfb866"))
 	_frame(skip_rect(),Color("dd7e6b"))
 	_center(skip_rect().get_center()+Vector2(0,10),"LEAVE RELIC",28 if portrait() else 22,Color("e998a4"))
+	battle.chest.draw_gem_quote(self,Vector2(skip_rect().get_center().x,skip_rect().end.y+(32 if portrait() else 24)),battle.model.relic_forfeit_preview(item.relic_id),28 if portrait() else 20)
 	battle.chest.draw_skip_button(self)
 
 func _draw_tooltip() -> void:

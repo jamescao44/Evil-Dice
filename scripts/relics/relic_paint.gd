@@ -3,7 +3,7 @@ extends RefCounted
 ## All magic stones use one neutral gem with data-driven element colors.
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
-const VECTOR_ICONS := ["four_leaf_clover", "five_leaf_clover", "ice_rose", "cursed_die_1", "cursed_die_2", "cursed_die_3", "cursed_die_4", "cursed_die_5", "cursed_die"]
+const VECTOR_ICONS := ["three_leaf_clover", "four_leaf_clover", "five_leaf_clover", "ice_rose", "cursed_die_1", "cursed_die_2", "cursed_die_3", "cursed_die_4", "cursed_die_5", "cursed_die"]
 const SPRITE_FILES := {"fries":"fries.tres","hamburger":"hamburger.tres","oreo_sundae":"oreo_sundae.tres"}
 static var textures: Dictionary = {}
 static var regions: Dictionary = {}
@@ -11,7 +11,7 @@ static var silhouettes: Dictionary = {}
 
 static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow: bool = true, item: Dictionary = {}) -> void:
 	if glow: Glow.paint(node,at,radius,Catalog.rarity_color(id))
-	if Catalog.Sets.is_fused(id):
+	if Catalog.Sets.uses_composite_art(id):
 		for part in _set_parts(id,item,at,radius): paint(node,part.id,part.at,part.radius,false)
 		return
 	var stone: bool = id in Catalog.STONES or id == "prismatic_stone"
@@ -49,7 +49,7 @@ static func _load_sprite(id: String) -> String:
 
 ## Cache white alpha masks, then layer narrow offsets for a silhouette-shaped glow.
 static func silhouette_glow(node: CanvasItem, id: String, at: Vector2, radius: float, color: Color, item: Dictionary = {}, strength: float = 0.0) -> void:
-	if Catalog.Sets.is_fused(id):
+	if Catalog.Sets.uses_composite_art(id):
 		for part in _set_parts(id,item,at,radius): silhouette_glow(node,part.id,part.at,part.radius,color,{},strength)
 		return
 	var sprite: String = _load_sprite(id)

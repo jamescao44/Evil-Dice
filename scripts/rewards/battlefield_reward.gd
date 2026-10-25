@@ -151,6 +151,22 @@ func _draw_route(index: int) -> void:
 	Icons.paint(self,battle.chest.art,icon_key(options[index]),Rect2(icon_at-Vector2.ONE*icon_side/2,Vector2.ONE*icon_side))
 	_text(Vector2(at.x,rect.end.y+24),Rewards.LABELS[options[index]],24 if portrait() else 18,color)
 
+## Show the actual credited amount before its currency icon, with amount-based sizing.
+func _draw_amount(rect: Rect2) -> void:
+	var size: int = roundi((36 if portrait() else 26)*Rewards.amount_scale(kind,paid_amount,battle.model.stage))
+	var label: String = "+%d" % paid_amount
+	var font: Font = battle.description_font
+	var width: float = font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
+	var icon_side: float = size*1.12
+	var gap: float = size*0.22
+	var at: Vector2 = Vector2(rect.get_center().x,rect.position.y-(42 if portrait() else 30))
+	if not battle.reduced: at.y -= smoothstep(0,0.5,age)*10
+	var left: float = at.x-(width+gap+icon_side)/2
+	var baseline := Vector2(left,at.y+size*0.34)
+	draw_string_outline(font,baseline,label,HORIZONTAL_ALIGNMENT_LEFT,-1,size,4,Color("101418"))
+	draw_string(font,baseline,label,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Rewards.COLORS[kind].lightened(0.4))
+	Icons.paint(self,battle.chest.art,icon_key(kind),Rect2(Vector2(left+width+gap,at.y-icon_side/2),Vector2.ONE*icon_side))
+
 ## Keep the battlefield visible until the relic chest reaches the full-screen reel position.
 func _draw() -> void:
 	if not visible: return
@@ -175,8 +191,5 @@ func _draw() -> void:
 	var opening: bool = phase == "paid"
 	draw_texture_rect(battle.chest.art.chest_open if opening else battle.chest.art.chest_closed,rect,false)
 	if phase == "lift": return
-	var icon_side: float = 48 if portrait() else 34
-	var at := rect.get_center()-Vector2(0,rect.size.y*0.66)
-	Icons.paint(self,battle.chest.art,icon_key(kind),Rect2(at-Vector2.ONE*icon_side/2,Vector2.ONE*icon_side))
-	var label: String = "" if phase == "opening" else "TAP TO OPEN" if not opening else GameText.format("+%d souls" if kind == Rewards.SOULS else "+%d blood gems",paid_amount)
-	_text(Vector2(rect.get_center().x,rect.end.y+30),label,26 if portrait() else 19,color)
+	if opening: _draw_amount(rect)
+	elif phase == "closed": _text(Vector2(rect.get_center().x,rect.end.y+30),"TAP TO OPEN",26 if portrait() else 19,color)

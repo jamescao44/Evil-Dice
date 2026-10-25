@@ -87,13 +87,21 @@ func modify_pool(model, indices: Array) -> void:
 func usable(model) -> bool:
 	return pending_steps.is_empty() and (model.phase in ["roll","player","frozen"] or (model.is_city() and model.phase == "round_end")) and model.outcome().is_empty() and model.tarot_source.is_empty() and model.open_rewards.is_empty()
 
+## Share valid tarot targets between casting, drag indicators and repeated effects.
+func targets(model, id: String) -> Array:
+	if model.is_city(): return []
+	return model.attack_targets().filter(func(index): return id != "death" or not model.enemies[index].get("boss",false))
+
 func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) -> String:
 	if not model.outcome().is_empty() or (not repeating and not usable(model)): return "Use tarot between actions, before or after rolling."
 	if not Catalog.ITEMS.has(id): return "Unknown tarot card."
 	if model.phase == "frozen" and id != "hierophant": return "Use Hierophant to clear freezing first."
 	if id in Catalog.DISABLED: return "Temporarily disabled for six-dice turns."
 	if id == "death" and model.is_city(): return "This card cannot affect the city."
-	if id == "death" and choice.get("target",-1) not in model.attack_targets(): return "Drag Death onto an eligible enemy. Paladins protect their allies."
+	if id == "death":
+		var target: int = choice.get("target",-1)
+		if model.is_enemy_alive(target) and model.enemies[target].get("boss",false): return "Death cannot affect bosses."
+		if target not in targets(model,id): return "Drag Death onto an eligible enemy. Paladins protect their allies."
 	if id == "magician" and (not model.dice_turn.has_rolled() or model.dice_turn.unused().is_empty()): return "Roll first, then choose an unused die."
 	if id == "lovers" and model.dice_turn.unused().size() < 4: return "Lovers needs at least four unused dice."
 	if id == "devil" and model.dice_turn.unused().size() < 3: return "Devil needs at least three unused dice."
@@ -130,6 +138,8 @@ func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		if not repeating and not committed_grants.has(instance_id):
 			committed_grants[instance_id] = card.duplicate(true)
 			model.tarots.remove_instance(instance_id)
+			model.RelicEffects.tarot_used(model)
+			committed_grants[instance_id]["bookmark_paid"] = true
 		if model.relics.items.size() >= Relics.MAX_SLOTS and model.relics.needs_slot(reward):
 			return {"choice":"replace","relic":reward}
 	return {}
@@ -154,6 +164,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	# Siege opens its next turn lazily. A committed tarot can begin that turn,
 	# while inspecting/canceling a choice must not grant another regen tick.
 	var events: Array = model.begin_round() if model.phase == "round_end" and not repeating else []
+	if not committed_grants.get(instance_id,{}).get("bookmark_paid",false): events.append_array(model.RelicEffects.tarot_used(model))
 	var reward: String = ""
 	var carry: int = pending_repeat.get("carry",0) if repeating else model.dice_turn.rolls_left
 	match id:
@@ -186,6 +197,8 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			if not choice.get("discard",false):
 				reward = locked_grants[instance_id]
 				if not model.acquire_relic(reward,choice.get("replace",-1)): return {"error":"Choose a relic to replace."}
+			else:
+				model.forfeit_relic(locked_grants[instance_id])
 			locked_grants.erase(instance_id)
 			committed_grants.erase(instance_id)
 		"hierophant":
@@ -270,6 +283,7 @@ func _status(model, target: int, status: int, count: int) -> Array:
 	return model.apply_affliction(status,count) if target == -1 else model.apply_enemy_status(target,status,count)
 
 func _execute(model, target: int) -> Array:
+	if target not in targets(model,"death"): return []
 	var loss: int = model.hit_enemy(target,model.enemies[target].hp,true)
 	return [model.damage_event(target,loss,loss,"damage",true)]
 
@@ -283,10 +297,8 @@ func _tower(model) -> Array:
 			enemy.shield = 0
 			events.append(model.event(target,shield,"shield_break","SHIELD BREAK"))
 			if not enemy.elite: events.append_array(model.apply_enemy_status(target,Status.IMMOBILIZED,1))
-		var loss: int = mini(enemy.hp,50)
-		enemy.hp -= loss
+		var loss: int = model.direct_enemy_hp_damage(target,50)
 		events.append(model.damage_event(target,loss,50))
-		if enemy.hp == 0: model.RelicEffects.enemy_killed(model)
 	var loss: int = mini(model.hp,30)
 	model.hp -= loss
 	events.append(model.damage_event(-1,loss,30))

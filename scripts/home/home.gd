@@ -35,6 +35,8 @@ var press_at := Vector2.ZERO
 var pointer := Vector2.ZERO
 var drag_distance: float = 0
 var battle: Node2D
+var campaign = Run.Campaign.new()
+var campaign_path: String = "user://campaign_checkpoint.dat"
 var muted: bool = false
 var reduced: bool = false
 var speed: float = 1
@@ -44,12 +46,13 @@ var preview_die: Node2D
 var click_audio: AudioStreamPlayer
 
 func _ready() -> void:
+	campaign.configure(campaign_path)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	pixel_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 	pixel_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	GameText.prepare_font(pixel_font)
 	pixel_font.oversampling = 1
-	for key in ["eldritch", "stone", "arch", "column", "floor0", "book", "crown", "fx", "attack", "vanguard", "archer", "mage"]:
+	for key in ["eldritch", "stone", "arch", "column", "floor0", "book", "crown", "fx", "attack", "vanguard", "archer", "mage", "paladin", "high_priest", "spellsword", "fanatic", "octopus", "tentacle", "bound_demon"]:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
 	# Match the opening portrait and collection thumbnails to the run's level-one form.
 	art.flameling = preload("res://assets/art/player/flamelings/level-2.png")
@@ -85,7 +88,7 @@ func stage_rect() -> Rect2:
 	return Rect2(40, 260, 724, 680) if portrait else Rect2(48, 132, 550, 520)
 
 func play_rect() -> Rect2:
-	return Rect2(88, 1336, 628, 112) if portrait else Rect2(680, 530, 500, 88)
+	return Rect2(88, 1372, 628, 112) if portrait else Rect2(680, 530, 500, 88)
 
 func skills_rect() -> Rect2:
 	return Rect2(48, 1268, 708, 96) if portrait else Rect2(656, 493, 560, 70)
@@ -279,6 +282,8 @@ func start_battle() -> void:
 	pointer_down = false
 	active_touch = -1
 	battle = (PortraitBattle if portrait else LandscapeBattle).instantiate()
+	battle.campaign = campaign
+	campaign.start(battle.model)
 	battle.home_enabled = true
 	battle.selected_ancient_id = ancients[ancient_index].id
 	battle.selected_dice_id = dices[dice_index].id
@@ -389,14 +394,16 @@ func _draw_play() -> void:
 	var start: float = 78 if portrait else 702
 	var step: float = 72 if portrait else 52
 	for i in range(Run.PLAYABLE_WAVES):
-		var p := Vector2(start+(i%10)*step,y+floori(i/10.0)*(84 if portrait else 74))
+		var p := Vector2(start+(i%10)*step,y+floori(i/10.0)*(64 if portrait else 52))
 		if i%10 < 9: Pixel.line(self,p,p+Vector2(step,0),EDGE.darkened(0.4),3)
-		var special: bool = i == Run.Waves.CITY_STAGE or not Run.Waves.SQUADS[i].special.is_empty() or Run.Waves.SQUADS[i].general[1] > 0
-		var key: String = "crown" if i == Run.Waves.CITY_STAGE else Run.EnemyCatalog.ITEMS[Run.Waves.SQUADS[i].special[0][0]].art if not Run.Waves.SQUADS[i].special.is_empty() else ["vanguard","archer","mage"][i%3]
+		var marker: Dictionary = Run.Waves.map_marker(i)
+		var special: bool = marker.highlight
+		var key: String = marker.art
 		Pixel.disc(self,p,23 if portrait else 19,INK,4)
-		_art(key,Rect2(p-Vector2.ONE*18,Vector2.ONE*36),GOLD if special else MUTED)
-		_center(p+Vector2(0,43),str(i+1),20 if portrait else 16,GOLD if special else MUTED)
-	_center(Vector2(at.x, 1290 if portrait else 482), dices[dice_index].name, 24 if portrait else 20, MUTED)
+		var active_level: bool = floori(i/10.0)+1 == campaign.next_level()
+		_art(key,Rect2(p-Vector2.ONE*18,Vector2.ONE*36),(GOLD if special else CREAM) if active_level else MUTED.darkened(0.5))
+		_center(p+Vector2(0,43),str(i%10+1),20 if portrait else 16,(GOLD if special else MUTED) if active_level else MUTED.darkened(0.5))
+	_center(Vector2(at.x, 1340 if portrait else 518), GameText.format("LEVEL %d / %d",[campaign.next_level(),Run.Campaign.LEVEL_COUNT]), 26 if portrait else 20, GOLD)
 	var button := play_rect()
 	_button(button, "", true, GREEN)
 	_mini_die(button.get_center() + Vector2(-92, 0), dices[dice_index].face, 48 if portrait else 38)

@@ -54,7 +54,7 @@ func request(card: int, point: Vector2, from: Vector2) -> void:
 ## Cancel choices; already-consumed relic cards decline their pending reward.
 func cancel_choice() -> void:
 	if busy or choice_type.is_empty(): return
-	if choice_type == "replace" and battle.model.tarot_effects.committed_grants.has(instance_id):
+	if choice_type == "replace" and (instance_id < 0 or battle.model.tarot_effects.committed_grants.has(instance_id)):
 		_cast({"discard":true})
 		return
 	var cancelled_id: int = instance_id
@@ -117,7 +117,7 @@ func click(point: Vector2) -> bool:
 	match choice_type:
 		"repeat_target":
 			var target: int = battle._enemy_inspect_at(point)
-			if target in battle.model.attack_targets(): _cast({"target":target})
+			if target in battle.model.tarot_effects.targets(battle.model,"death"): _cast({"target":target})
 		"hanged_man":
 			var ids: Array = options()
 			var columns: int = 4 if portrait() else 6
@@ -194,6 +194,9 @@ func _continue_repeat() -> bool:
 		return false
 	instance_id = rules.pending_repeat.instance_id
 	if rules.pending_repeat.id == "death":
+		if rules.targets(battle.model,"death").is_empty():
+			rules.dismiss_repeat()
+			return false
 		choice_type = "repeat_target"
 	else:
 		prepared = rules.prepare(battle.model,instance_id)
@@ -288,7 +291,7 @@ func _draw() -> void:
 		var prompt := Rect2(62,1040,680,110) if portrait() else Rect2(340,560,600,80)
 		Paint.panel(self,prompt,Color("211f29"),Paint.GOLD)
 		Paint.wrap(self,battle.description_font,prompt.grow(-12),"Ancient Prophecy: choose another enemy.",26 if portrait() else 20,Paint.GOLD,true)
-		for target in battle.model.attack_targets():
+		for target in battle.model.tarot_effects.targets(battle.model,"death"):
 			battle._draw_target_indicator(self,target,battle._target_at(battle._pointer_position()) == target,Paint.GOLD)
 		_label(cancel_rect(),"Skip repeat")
 		return

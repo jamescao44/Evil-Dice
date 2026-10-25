@@ -15,10 +15,10 @@ func configure(path: String) -> void:
 			if value is int: misses[tier] = clampi(value,0,Rules.PITY_ATTEMPTS-1)
 	last_misses = misses.duplicate()
 
-func roll(rng: RandomNumberGenerator) -> int:
+func roll(rng: RandomNumberGenerator, starting_tier: int = 0) -> int:
 	# Save at commitment, never on presentation clicks or reward collection.
 	last_misses = misses.duplicate()
-	var tier: int = Rules.roll_wave_tier(rng,misses)
+	var tier: int = Rules.roll_wave_tier(rng,misses,starting_tier)
 	if not save_path.is_empty():
 		var data := ConfigFile.new()
 		for i in range(3): data.set_value("chest_upgrades",str(i),misses[i])

@@ -27,6 +27,7 @@ func tap(point: Vector2) -> void:
 func run() -> void:
 	for portrait in [true, false]:
 		home = Home.new()
+		home.campaign_path = ""
 		home.portrait = portrait
 		home.muted = true
 		root.add_child(home)

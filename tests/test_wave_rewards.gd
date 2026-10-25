@@ -18,24 +18,30 @@ func economy() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 391
 	for kind in [Rewards.BLOOD_GEMS,Rewards.SOULS]:
-		var scale: int = 10 if kind == Rewards.BLOOD_GEMS else 1
+		var bands: Array = [Vector2i(333,443),Vector2i(444,554),Vector2i(555,666)] if kind == Rewards.BLOOD_GEMS else [Vector2i(10,19),Vector2i(20,29),Vector2i(30,40)]
 		var tails := [0,0]
 		var halves := [0,0]
+		var seen_min: int = 10000
+		var seen_max: int = 0
 		for i in range(100000):
 			var amount: int = Rewards.amount(rng,kind)
-			check(amount >= 10*scale and amount <= 40*scale,"Direct reward stays in its inclusive range")
-			if amount >= 20*scale: tails[0] += 1
-			if amount >= 30*scale: tails[1] += 1
-			if amount < 20*scale: halves[0 if amount < 15*scale else 1] += 1
+			check(amount >= bands[0].x and amount <= bands[2].y,"Direct reward stays in its inclusive range")
+			seen_min = mini(seen_min,amount); seen_max = maxi(seen_max,amount)
+			if amount >= bands[1].x: tails[0] += 1
+			if amount >= bands[2].x: tails[1] += 1
+			if amount <= bands[0].y: halves[0 if amount < (bands[0].x+bands[1].x)/2 else 1] += 1
 		check(abs(tails[0]-10000) < 600 and abs(tails[1]-1000) < 190,"Cumulative 10% and 1% tails hold")
 		check(halves[0] > halves[1],"Larger payouts within a band are logarithmically rarer")
+		check(seen_min == bands[0].x and seen_max == bands[2].y,"Both payout endpoints are obtainable")
+		check(Rewards.amount_scale(kind,bands[0].x) == 1.0 and Rewards.amount_scale(kind,bands[2].y) == 2.0,"Maximum receipt is exactly twice the minimum size")
+		check(Rewards.amount_scale(kind,bands[2].y*2) == 2.0,"Relic-boosted grants keep the receipt within the maximum size")
 	var m = Run.new(14)
 	m.acquire_relic("soul_vessel")
 	m.gain_souls(20)
 	m.gain_blood_gems(100)
-	check(m.souls == 20 and m.blood_gems == 115,"Souls are separate from blood gems and their relic bonus")
+	check(m.souls == 10 and m.character_level == 2 and m.blood_gems == 100,"Soul Vessel does not amplify direct souls or blood gems")
 	m.gain_souls(-5)
-	check(m.souls == 20,"Negative grants cannot spend souls")
+	check(m.souls == 10 and m.character_level == 2,"Negative grants cannot spend souls")
 	for i in range(150):
 		m._roll_chest(i%4)
 		check(m.open_rewards.all(func(c): return c in [m.Rewards.Category.RELIC,m.Rewards.Category.CURSE]),"Every chest prize is a real relic")
@@ -75,6 +81,12 @@ func progression() -> void:
 			if stage == Run.PLAYABLE_WAVES-1:
 				check(m.outcome() == "victory" and m.offer_routes().is_empty(),"Final destination ends run without extra routes")
 				continue
+			if (stage+1)%Run.Campaign.WAVES_PER_LEVEL == 0:
+				if m.auto_claim_victory_chest() > 0: m.discard_unclaimed_rewards(); m.close_chest()
+				var campaign = Run.Campaign.new()
+				check(campaign.complete(m),"Completed level commits after all rewards")
+				campaign.start(m)
+				continue
 			var choices: Array = m.offer_routes()
 			var rng_state: int = m.reward_rng.state
 			check(choices.size() == 2 and choices[0] != choices[1],"Two distinct route choices")
@@ -84,11 +96,12 @@ func progression() -> void:
 			if m.route_history.size() >= 2 and m.route_history[-1] == m.route_history[-2]: check(m.route_history[-1] not in choices,"No third consecutive reward of the same type")
 			var index: int = choices.find(Rewards.SHOP) if Rewards.SHOP in choices else seed_value%2
 			var hp_capacity: int = m.max_hp
+			m.hp = 12
 			check(m.choose_route(index) and not m.choose_route(1-index),"Route selection commits once")
 			check(m.advance_wave() and not m.advance_wave(),"Advance requires a fresh committed route")
-			check(m.max_hp == hp_capacity,"Waves no longer grant maximum health")
+			check(m.max_hp == hp_capacity and m.hp == 12,"Advancing grants neither Feast healing nor maximum health")
 
-## Automatic soul thresholds preserve leftovers, fill new HP capacity and scale only character base.
+## XP thresholds compound base stats, fully heal and preserve surplus beyond old caps.
 func leveling() -> void:
 	var m = Run.new(83)
 	var skill = m.Patterns.classify([1,2,3])
@@ -96,17 +109,19 @@ func leveling() -> void:
 	var events: Array = []
 	m.character_leveled.connect(func(level): events.append(level))
 	m.hp = 70
-	m.gain_souls(29)
-	check(m.character_level == 1 and m.level_cost() == 30,"Below threshold does not level")
+	m.gain_souls(9)
+	check(m.character_level == 1 and m.level_cost() == 10 and m.hp == 70,"Below threshold does not level or heal")
 	m.gain_souls(1)
-	check(m.character_level == 2 and m.souls == 0 and m.max_hp == 150 and m.hp == 120,"First upgrade is automatic and fills only added capacity")
-	check(is_equal_approx(m.attack_base_with_bonus(skill,7),base*1.5+7*3.6),"Leveling scales character base by 1.5 without scaling flat relic bonuses")
+	check(m.character_level == 2 and m.souls == 0 and m.max_hp == 110 and m.hp == 110,"First level costs ten, increases HP ten percent and fully heals")
+	check(is_equal_approx(m.attack_base_with_bonus(skill,7),base*1.1+7*3.6),"Levels multiply character base without scaling flat relic bonuses")
+	m.hp = 1
+	m.statuses[m.Status.DARKNESS].apply(1)
 	m.gain_souls(55)
-	check(m.character_level == 3 and m.souls == 5 and m.level_cost() == 0,"Final upgrade spends fifty and retains spare souls")
-	check(m.max_hp == 225 and m.hp == 195 and is_equal_approx(m.attack_base_with_bonus(skill,0),base*2.25),"Two upgrades compound health and damage")
-	check(events == [2,3],"Every evolution emits one ordered visual notification")
+	check(m.character_level == 4 and m.souls == 5 and m.level_cost() == 40,"A grant crosses costs twenty and thirty, preserving five XP")
+	check(m.max_hp == 133 and m.hp == 133 and is_equal_approx(m.attack_base_with_bonus(skill,0),base*1.331),"Levels compound and full healing also works under Darkness")
+	check(events == [2,3,4],"Each crossed threshold emits one ordered level notification")
 	m.gain_souls(500)
-	check(m.character_level == 3 and m.souls == 505,"Maximum level keeps excess souls")
+	check(m.character_level == 11 and m.souls == 15 and m.level_cost() == 110,"XP has no old three-level cap")
 	m.reset_run()
 	check(m.character_level == 1 and m.max_hp == 100 and m.souls == 0,"Run restart resets all leveling")
 

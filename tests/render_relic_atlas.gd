@@ -20,6 +20,6 @@ func render() -> void:
 			i += 1)
 	canvas.queue_redraw()
 	await process_frame
-	await RenderingServer.frame_post_draw
+	RenderingServer.force_draw()
 	viewport.get_texture().get_image().save_png("res://assets/art/relic_atlas.png")
 	quit()

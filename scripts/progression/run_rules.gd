@@ -6,11 +6,15 @@ var chest_pity = ChestPity.new() # Meta progression: deliberately survives reset
 const Rewards = preload("res://scripts/rewards/reward_catalog.gd")
 const Tarot = preload("res://scripts/tarot/tarot_catalog.gd")
 const TarotInventory = preload("res://scripts/tarot/tarot_inventory.gd")
+const ENEMY_TAROT_DROP_ONE_IN := 8
+signal reroll_progress_changed(previous: int, current: int)
 signal tarot_granted(item: Dictionary)
+signal tarot_expired(instances: Array)
 signal character_leveled(level: int)
 ## Already credited; the view animates a receipt, never owns the reward transaction.
 ## Nonnegative targets are enemies; -3-index identifies a defeated city troop.
 signal enemy_crystals_dropped(target: int, amount: int)
+signal enemy_souls_dropped(target: int, amount: int)
 var tarots = TarotInventory.new()
 var wave_tarots: Array = []
 var chest_tarots: Dictionary = {}
@@ -18,11 +22,12 @@ var tarot_choices: Array = []
 var tarot_source: String = ""
 var tarot_slot: int = -1
 const Waves = preload("res://scripts/progression/wave_catalog.gd")
-const WAVE_NAMES := ["OUTSKIRTS","OLD ROAD","THE CHAMPION","CROSSROADS","WATCH POST","WAR CAMP","CITY ROAD","ELITE GUARD","LAST STAND","THE PALADIN","HOLY ESCORT","ELITE COMPANY","THE HIGH PRIEST","SACRED ALLIANCE","GOLDEN GUARD","RITUAL PROCESSION","TWIN SENTINELS","CATHEDRAL GUARD","THE INNER SANCTUM","THE CITY"]
+const WAVE_NAMES := ["OUTSKIRTS","OLD ROAD","MAGE PATROL","CROSSROADS","WATCH POST","WAR CAMP","HOLY ESCORT","CITY ROAD","THE CHAMPION","THE COMMANDER","FROST WATCH","ELITE COMPANY","THE HIGH PRIEST","SACRED ALLIANCE","GOLDEN GUARD","RITUAL PROCESSION","FORBIDDEN RITE","CATHEDRAL GUARD","THE INNER SANCTUM","THE SPELLSWORD","ASHEN GATE","BURNING ROAD","COVEN ESCORT","OBSIDIAN WATCH","FROST AND FLAME","DARK PROCESSION","ABYSSAL GUARD","RUINED HALL","THE LAST WATCH","THE FANATIC","THE CITY"]
 static var WAVE_COUNTS: Array = Waves.counts()
-const WAVE_BOOSTS := [1.0,1.0,1.5,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25,2.25]
+static var WAVE_BOOSTS: Array = range(Waves.COUNT).map(func(stage): return 1.0 if stage < 2 else 1.5 if stage == 2 else 2.25)
 const CITY_FEVER_ENABLED := false
 const LAST_PLAYABLE_STAGE := Waves.CITY_STAGE - 1
+const Campaign = preload("res://scripts/progression/campaign_progress.gd")
 const PLAYABLE_WAVES := Waves.COUNT if CITY_FEVER_ENABLED else LAST_PLAYABLE_STAGE + 1
 const CITY_MAX_HP := Waves.CITY_HP
 const CITY_ULTIMATE_DAMAGE := 2000
@@ -41,6 +46,7 @@ var perfect_total: int = 0
 const CHEST_THRESHOLDS := Chests.THRESHOLDS
 const CHEST_COUNTS := Chests.COUNTS
 var opened_chest_tier: int = -1
+var chest_start_tier: int = -1
 var chest_crystals_claimed: bool = false
 var chest_crystals: int = 0
 var chest_crystal_base_paid: int = 0
@@ -56,10 +62,12 @@ var chest_relics: Dictionary = {}
 var reward_history: Array = []
 var blood_gems: int = 0
 var souls: int = 0
+var enemy_soul_remainder: float = 0.0
 const WaveRewards = preload("res://scripts/progression/wave_rewards.gd")
-const LEVEL_COSTS := [30,50]
-const MAX_CHARACTER_LEVEL := 3
-const LEVEL_DAMAGE_FACTOR := 1.5
+const LEVEL_COST_STEP := 10
+const LEVEL_DAMAGE_FACTOR := 1.1
+const LEVEL_HEALTH_FACTOR := 1.1
+const EVOLUTION_INTERVAL := 5
 var character_level: int = 1
 var wave_kind: String = WaveRewards.RELIC
 var wave_amount: int = 0
@@ -79,7 +87,7 @@ var shop = ShopStock.new()
 func blood_gem_gain_preview(amount: int) -> int:
 	return floori(amount*RelicEffects.currency_factor(relics.items)+blood_gem_remainder+0.000001)
 
-## Grant currency with Soul Vessel bonuses and fractional carry.
+## Grant blood gems independently of soul-only relic bonuses.
 func gain_blood_gems(amount: int) -> int:
 	if amount <= 0: return 0
 	var total: float = RelicEffects.currency_bonus(self,amount)+blood_gem_remainder
@@ -87,6 +95,49 @@ func gain_blood_gems(amount: int) -> int:
 	blood_gem_remainder = maxf(0,total-gained)
 	blood_gems += gained
 	return gained
+
+## Convert a forfeited item once at its committing reward transaction.
+func forfeit_relic(id: String, count: int = 1) -> int:
+	return gain_blood_gems(Relics.Catalog.forfeit_value(id,count))
+
+## Quote discarded rewards without touching inventory, currency carry or RNG.
+func relic_forfeit_preview(id: String, count: int = 1) -> int:
+	var amount: int = Relics.Catalog.forfeit_value(id,count)
+	return blood_gem_gain_preview(amount) if amount > 0 else 0
+
+## Salvage a replaced item only after acquisition succeeds; fusion is not a discard.
+func acquire_relic(id: String, replace_index: int = -1) -> bool:
+	var removed: Dictionary = {}
+	if replace_index >= 0 and replace_index < relics.items.size() and relics.needs_slot(id):
+		removed = relics.items[replace_index].duplicate(true)
+	if not super.acquire_relic(id,replace_index): return false
+	if not removed.is_empty(): gain_blood_gems(Relics.Catalog.sale_value(removed))
+	return true
+
+## Quote the whole selected slot after removing its own currency effects.
+func relic_sale_preview(index: int) -> int:
+	if index < 0 or index >= relics.items.size(): return 0
+	var remaining: Array = relics.items.duplicate(true)
+	var removed: Dictionary = remaining.pop_at(index)
+	var amount: int = Relics.Catalog.sale_value(removed)
+	return floori(amount*RelicEffects.currency_factor(remaining)+blood_gem_remainder+0.000001)
+
+## Sell one inventory slot; clamp health without granting removal-based healing.
+func sell_relic(index: int) -> int:
+	var removed: Dictionary = relics.remove(index)
+	if removed.is_empty(): return 0
+	hp = mini(hp,max_hp)
+	return gain_blood_gems(Relics.Catalog.sale_value(removed))
+
+## Match replacement proceeds to the resulting inventory's currency bonuses.
+func replacement_gem_preview(id: String, replace_index: int) -> int:
+	if replace_index < 0 or replace_index >= relics.items.size() or not relics.needs_slot(id): return 0
+	var candidate = Relics.new()
+	candidate.items = relics.items.duplicate(true)
+	if not candidate.add(id,replace_index): return 0
+	var removed: Dictionary = relics.items[replace_index]
+	var amount: int = Relics.Catalog.sale_value(removed)
+	return floori(amount*RelicEffects.currency_factor(candidate.items)+blood_gem_remainder+0.000001)
 
 ## Keep run-leveling souls separate from shop currency and currency-boosting relics.
 func gain_souls(amount: int) -> int:
@@ -96,38 +147,62 @@ func gain_souls(amount: int) -> int:
 		if not level_up(): break
 	return gained
 
-## Award enemy-drop crystals exactly once when a hit causes a death.
+## Award currency, XP and one tarot-drop roll exactly once when a hit causes a death.
 func hit_enemy(index: int, damage: int, ignore: bool = false) -> int:
 	var alive_before: bool = is_enemy_alive(index)
 	var loss: int = super.hit_enemy(index,damage,ignore)
-	if alive_before and not is_enemy_alive(index):
+	if alive_before and not is_enemy_alive(index) and not enemies[index].get("summoned",false):
 		var amount: int = gain_blood_gems(EnemyCatalog.crystal_reward(enemies[index]))
+		RelicEffects.enemy_gems_dropped(self,amount)
 		enemy_crystals_dropped.emit(index,amount)
+		enemy_souls_dropped.emit(index,gain_souls(RelicEffects.enemy_soul_bonus(self,EnemyCatalog.soul_reward(enemies[index]))))
+		_roll_enemy_tarot_drop(index)
 	return loss
 
 func _crush_troops(count: int) -> Dictionary:
 	var crushed: int = clampi(count,0,troops)
 	troops -= crushed
 	for i in range(troops,troops+crushed):
-		enemy_crystals_dropped.emit(-3-i,gain_blood_gems(EnemyCatalog.crystal_reward({"role":i%3,"elite":false})))
+		var gems: int = gain_blood_gems(EnemyCatalog.crystal_reward({"role":i%3,"elite":false}))
+		RelicEffects.enemy_gems_dropped(self,gems)
+		enemy_crystals_dropped.emit(-3-i,gems)
+		enemy_souls_dropped.emit(-3-i,gain_souls(RelicEffects.enemy_soul_bonus(self,EnemyCatalog.soul_reward({"role":i%3,"elite":false}))))
+		_roll_enemy_tarot_drop(-3-i)
 	var sweep: Dictionary = event(-2,crushed,"sweep","TROOPS CRUSHED")
 	sweep["first"] = troops
 	return sweep
 
+## Roll each defeated enemy independently, then use the existing weighted eligible card pool.
+func _roll_enemy_tarot_drop(enemy_index: int = -1) -> void:
+	var sources: Array = RelicEffects.repeat_sources(relics.items,"cross")
+	var success: bool = reward_rng.randi_range(1,ENEMY_TAROT_DROP_ONE_IN) == 1 if sources.is_empty() else reward_rng.randf() < RelicEffects.tarot_drop_chance(relics.items)
+	if success:
+		for entry in sources: RelicEffects.Sequence.activate(self,entry)
+		var id: String = Tarot.draw_one(reward_rng,tarot_effects.banned)
+		if not id.is_empty(): grant_tarot(id,enemy_index)
+
 ## Draw eligible tarot rewards with reward RNG and announce each granted card.
-func grant_random_tarots(count: int) -> Array:
+func grant_random_tarots(count: int, projection: bool = false) -> Array:
 	var granted: Array = []
 	for i in range(count):
 		var id: String = Tarot.draw_one(reward_rng,tarot_effects.banned)
 		if id.is_empty(): break
-		granted.append(grant_tarot(id))
+		granted.append(grant_tarot(id,-1,projection))
 	return granted
 
 ## Add one tarot instance and emit its inventory-pickup notification.
-func grant_tarot(id: String) -> Dictionary:
-	var item: Dictionary = tarots.add(id)
-	if not item.is_empty(): tarot_granted.emit(item.duplicate())
+func grant_tarot(id: String, enemy_index: int = -1, projection: bool = false) -> Dictionary:
+	var item: Dictionary = tarots.add(id,projection)
+	if not item.is_empty():
+		var receipt: Dictionary = item.duplicate()
+		if enemy_index != -1: receipt.enemy_index = enemy_index
+		tarot_granted.emit(receipt)
 	return item
+
+## Clear unused turn-only cards and notify views to discard stale inspections/receipts.
+func expire_tarot_projections() -> void:
+	var expired: Array = tarots.expire_projections()
+	if not expired.is_empty(): tarot_expired.emit(expired)
 
 func _init(seed_value: int = -1) -> void:
 	super(seed_value)
@@ -148,9 +223,11 @@ func reset_run() -> void:
 	volley_warned = false
 	city_immunity_clock = 0.0
 	reroll_progress = 0
+	reroll_progress_changed.emit(0,0)
 	treasure_settled_turn = -1
 	perfect_total = 0
 	opened_chest_tier = -1
+	chest_start_tier = -1
 	chest_crystals_claimed = false
 	chest_crystals = 0
 	chest_crystal_base_paid = 0
@@ -166,6 +243,7 @@ func reset_run() -> void:
 	reward_history.clear()
 	blood_gems = 0
 	souls = 0
+	enemy_soul_remainder = 0.0
 	character_level = 1
 	wave_kind = WaveRewards.BATTLE_TYPES[reward_rng.randi_range(0,WaveRewards.BATTLE_TYPES.size()-1)]
 	wave_amount = 0
@@ -185,25 +263,35 @@ func reset_run() -> void:
 	_load_wave()
 
 ## Keep Perfect statistics and combat bonuses independent of treasure earnings.
-func record_perfect(perfect: bool) -> void:
-	super.record_perfect(perfect)
+func record_perfect(perfect: bool, preserve_combo: bool = false) -> void:
+	super.record_perfect(perfect,preserve_combo)
 	if perfect: perfect_total += 1
 
-## Bank unused throws once per completed turn; untouched or frozen turns earn none.
+## Bank unused throws once when the player commits End Turn or finishes the pool.
 func _bank_unused_rolls() -> void:
 	if treasure_settled_turn == dice_turn.turn_id or not dice_turn.has_rolled(): return
 	treasure_settled_turn = dice_turn.turn_id
 	if hp <= 0 or RelicEffects.has_flag(relics.items,"no_treasure"): return
+	var previous: int = reroll_progress
 	reroll_progress = mini(CHEST_THRESHOLDS[-1],reroll_progress + maxi(0,dice_turn.rolls_left))
+	if reroll_progress > previous: reroll_progress_changed.emit(previous,reroll_progress)
+
+## Start treasure receipts immediately, before leftover healing and enemy actions.
+func end_dice_turn() -> bool:
+	if not can_end_dice_turn(): return false
+	_bank_unused_rolls()
+	return super.end_dice_turn()
 
 ## Bank this completed pool before a bonus turn restores its three throws.
 func _grant_dice_bonus_turn() -> void:
 	_bank_unused_rolls()
 	super._grant_dice_bonus_turn()
 
-## Settle treasure after enemy/status resolution, or when a player action clears the wave.
+## Fallback for wave clears and legacy actions; the settlement guard prevents double credit.
 func _complete_relic_turn() -> Array:
-	if not relic_turn_closed: _bank_unused_rolls()
+	if not relic_turn_closed:
+		_bank_unused_rolls()
+		expire_tarot_projections()
 	return super._complete_relic_turn()
 
 ## Reset combat and progression to a validated wave number.
@@ -223,11 +311,12 @@ func chest_tier() -> int:
 
 func open_chest(requested_tier: int = 0) -> Array:
 	if not open_rewards.is_empty(): return open_rewards.duplicate()
-	var tier: int = chest_tier() if requested_tier == 0 else requested_tier
-	if tier < 1 or tier > 3 or tier > chest_tier(): return []
-	# Any claimed milestone empties the bank, including extra unspent diamonds.
+	if chest_tier() == 0 or requested_tier not in [0,Chests.REROLL_TIER]: return []
 	reroll_progress = 0
-	return _roll_chest(tier)
+	reroll_progress_changed.emit(0,0)
+	var rewards: Array = _roll_chest(chest_pity.roll(reward_rng,Chests.REROLL_TIER))
+	chest_start_tier = Chests.REROLL_TIER
+	return rewards
 
 func open_bonus_chest() -> Array:
 	if not open_rewards.is_empty() or tarot_effects.bonus_chests.is_empty(): return []
@@ -242,6 +331,7 @@ func open_debug_chest() -> Array:
 func _roll_chest(tier: int) -> Array:
 	if not open_rewards.is_empty(): return open_rewards.duplicate()
 	opened_chest_tier = clampi(tier,0,3)
+	chest_start_tier = -1
 	chest_crystals_claimed = false
 	chest_crystals = 0
 	chest_crystal_base_paid = 0
@@ -303,7 +393,8 @@ func claim_reward(slot: int, replace_index: int = -1, discard: bool = false) -> 
 	if discard:
 		item.id = "discard"
 		item.name = "LEFT BEHIND"
-		item.text = "Relic discarded."
+		item.text = "+%d blood gems"
+		item.text_values = [forfeit_relic(item.get("relic_id",""))]
 		return item
 	match item.id:
 		"ruby":
@@ -313,10 +404,17 @@ func claim_reward(slot: int, replace_index: int = -1, discard: bool = false) -> 
 	reward_history.append(index)
 	return item.duplicate()
 
+## Preview exactly the remaining relic salvage, including currency bonuses and carry.
+func unclaimed_relic_gems() -> int:
+	var total := 0
+	for slot in range(open_rewards.size()):
+		if slot not in claimed_slots: total += Relics.Catalog.forfeit_value(reward_item(slot).get("relic_id",""))
+	return blood_gem_gain_preview(total) if total > 0 else 0
+
 ## Skip remaining prizes while preserving already collected rewards.
 func discard_unclaimed_rewards() -> int:
 	if not tarot_source.is_empty(): return 0
-	# Resolve remaining slots without applying rewards, history entries or RNG.
+	# Convert only unresolved relics; never grant history entries or reroll prizes.
 	var discarded: int = 0
 	for slot in range(open_rewards.size()):
 		if slot not in claimed_slots:
@@ -335,6 +433,7 @@ func close_chest() -> bool:
 	chest_tarots.clear()
 	claimed_slots.clear()
 	opened_chest_tier = -1
+	chest_start_tier = -1
 	guaranteed_slot = -1
 	return true
 
@@ -362,6 +461,10 @@ func damage_cap(kind: int, target: int) -> int:
 	return maxi(1, floori(enemies[target].max_hp * numerator * WAVE_BOOSTS[stage] / 3.0))
 
 func _load_wave() -> void:
+	relic_skills.wave_started()
+	expire_tarot_projections()
+	relic_skills.queued.clear()
+	relic_skills.resume_phase = ""
 	shield = 0 # Straight shields last within this wave only.
 	city_immunity_clock = 0.0
 	enemies = [] if wave_kind == WaveRewards.SHOP else Waves.create(stage,rng)
@@ -376,17 +479,31 @@ func outcome() -> String:
 	if is_city():
 		return "victory" if city_hp <= 0 else ""
 	if not has_living_enemies():
-		return "victory" if not CITY_FEVER_ENABLED and stage >= LAST_PLAYABLE_STAGE else "wave_clear"
+		return "victory" if not CITY_FEVER_ENABLED and (stage+1)%Campaign.WAVES_PER_LEVEL == 0 else "wave_clear"
 	return ""
+
+## Authored wave indices stay global; each level displays its own ten-wave progress.
+func level_number() -> int:
+	return mini(Campaign.LEVEL_COUNT,stage/Campaign.WAVES_PER_LEVEL+1)
+
+func level_wave() -> int:
+	return stage%Campaign.WAVES_PER_LEVEL+1
+
+func has_next_level() -> bool:
+	return level_number() < Campaign.LEVEL_COUNT
+
+## Do not carry a build forward until field and automatic treasure prizes are settled.
+func level_rewards_complete() -> bool:
+	return outcome() == "victory" and wave_chest_stage == stage and wave_reward_resolved and open_rewards.is_empty() and tarot_source.is_empty() and chest_tier() == 0
 
 ## Lock two distinct, uniformly sampled eligible destinations once per cleared wave.
 func offer_routes() -> Array:
 	if outcome() != "wave_clear" or not wave_reward_resolved: return []
 	if not route_choices.is_empty(): return route_choices.duplicate()
 	var eligible: Array = WaveRewards.TYPES.duplicate()
-	if stage < 2 or battles_since_shop < 2: eligible.erase(WaveRewards.SHOP)
+	if stage < 2 or battles_since_shop < 2 or Waves.requires_combat(stage+1): eligible.erase(WaveRewards.SHOP)
 	if route_history.size() >= 2 and route_history[-1] == route_history[-2]: eligible.erase(route_history[-1])
-	if stage == 2 and not first_shop_offered:
+	if stage >= 2 and not first_shop_offered and WaveRewards.SHOP in eligible:
 		route_choices.append(WaveRewards.SHOP)
 		eligible.erase(WaveRewards.SHOP)
 		first_shop_offered = true
@@ -407,7 +524,6 @@ func advance_wave() -> bool:
 	if outcome() != "wave_clear" or not wave_reward_resolved or shop.active or next_route.is_empty(): return false
 	if wave_kind != WaveRewards.SHOP:
 		_end_buff_turn()
-		heal(25)
 	stage += 1
 	wave_kind = next_route
 	route_history.append(wave_kind)
@@ -422,22 +538,26 @@ func advance_wave() -> bool:
 func character_damage_factor() -> float:
 	return pow(LEVEL_DAMAGE_FACTOR,character_level-1)
 
-func level_cost() -> int:
-	return LEVEL_COSTS[character_level-1] if character_level <= LEVEL_COSTS.size() else 0
+## Character abilities evolve at levels five, ten and each later milestone.
+func character_evolution_stage() -> int:
+	return floori(character_level/float(EVOLUTION_INTERVAL))
 
-## Buy one level, restoring only the newly added health capacity.
+func level_cost() -> int:
+	return LEVEL_COST_STEP*character_level
+
+## Spend XP on an uncapped level, compound character stats and fully heal.
 func level_up() -> bool:
 	var cost: int = level_cost()
 	if cost <= 0 or souls < cost or hp <= 0: return false
 	souls -= cost
-	var previous: int = max_hp
 	character_level += 1
-	base_max_hp = roundi(MAX_HP*pow(1.5,character_level-1))
-	hp = mini(max_hp,hp+maxi(0,max_hp-previous))
+	base_max_hp = roundi(MAX_HP*pow(LEVEL_HEALTH_FACTOR,character_level-1))
+	hp = max_hp
 	character_leveled.emit(character_level)
 	return true
 
 func _record_relic_wave_clear() -> void:
+	expire_tarot_projections()
 	_bank_unused_rolls() # Tarot and other immediate kills may bypass the normal turn-end path.
 	if relic_reward_stage == stage: return
 	relic_reward_stage = stage
@@ -452,18 +572,19 @@ func begin_wave_reward() -> bool:
 	_record_relic_wave_clear()
 	wave_chest_stage = stage
 	wave_chest_tier = chest_pity.roll(reward_rng) if wave_kind == WaveRewards.RELIC else -1
-	wave_amount = WaveRewards.amount(reward_rng,wave_kind)
+	wave_amount = WaveRewards.amount(reward_rng,wave_kind,stage)
 	wave_chest_opened = false
 	wave_tarot_bought = false
 	wave_reward_resolved = false
-	if wave_kind == WaveRewards.RELIC: _roll_chest(wave_chest_tier)
 	wave_tarots.clear()
 	return true
 
 func open_wave_chest() -> Array:
 	if wave_chest_stage != stage or wave_reward_resolved or wave_chest_opened: return []
+	if not open_rewards.is_empty(): return []
 	wave_chest_opened = true
-	return open_rewards.duplicate()
+	# Reserve prizes before the reels begin, leaving unopened wave chests independent of reroll treasure.
+	return _roll_chest(wave_chest_tier)
 
 ## Opening a resource chest credits its pre-rolled amount exactly once.
 func claim_wave_resource() -> int:
@@ -480,7 +601,7 @@ func finish_wave_reward() -> bool:
 	wave_tarots.clear()
 	return true
 
-## Reserve the three tarot candidates for a chest or paid wave draw.
+## Reserve tarot candidates once, including the keeper's free draw for this visit.
 func begin_tarot_reward(source: String, slot: int = -1) -> Array:
 	# A transaction stays pending until a revealed card is chosen. All candidates
 	# were locked when the parent reward opened; taps never consume reward RNG.
@@ -495,6 +616,9 @@ func begin_tarot_reward(source: String, slot: int = -1) -> Array:
 		tarot_choices = chest_tarots[slot].duplicate()
 	elif source == "debug":
 		tarot_choices = Tarot.draw_choices(reward_rng,tarot_effects.banned)
+		if tarot_choices.is_empty(): return []
+	elif source == "shop":
+		tarot_choices = shop.begin_divination(self)
 		if tarot_choices.is_empty(): return []
 	else: return []
 	tarot_source = source
@@ -521,7 +645,10 @@ func _clear_tarot_draw() -> void:
 
 func begin_round() -> Array:
 	if not is_city():
-		return super.begin_round()
+		var previous_round: int = round_number
+		var events: Array = super.begin_round()
+		if round_number > previous_round: events.append_array(RelicEffects.turn_started(self))
+		return events
 	if not outcome().is_empty() or phase not in ["new", "round_end"]:
 		return []
 	tarot_effects.begin_round()
@@ -532,6 +659,7 @@ func begin_round() -> Array:
 		buff_ticks[2] = true
 		events.append(event(-1, heal(roundi(5*statuses[2].potency)), "heal", "REGROWTH"))
 	_prepare_player_turn()
+	events.append_array(RelicEffects.turn_started(self))
 	return events
 
 func is_instant_kill(result: MultiHitSkill) -> bool:

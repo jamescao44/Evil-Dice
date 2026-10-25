@@ -7,6 +7,7 @@ signal finished
 const SHUFFLE_LEAD := 0.16
 const SHUFFLE_STEP := 0.027
 const SHUFFLE_TRAVEL := 0.18
+const ARRIVAL_TIME := 0.55
 const Paint = preload("res://scripts/tarot/tarot_paint.gd")
 const Swipe = preload("res://scripts/tarot/card_swipe.gd")
 var swipe = Swipe.new()
@@ -29,6 +30,8 @@ var last_at := Vector2.ZERO
 var pressed_card: int = -1
 var collection_target := Vector2.ZERO
 var shuffled_cards: int = 0
+var arrival_origin := Vector2.ZERO
+var arrival_size := Vector2.ZERO
 
 func _ready() -> void:
 	z_index = 160
@@ -40,7 +43,7 @@ func active() -> bool:
 func portrait() -> bool:
 	return canvas_size.y > canvas_size.x
 
-func start(ids: Array, size: Vector2, text_font: Font, target: Vector2, reduce: bool) -> void:
+func start(ids: Array, size: Vector2, text_font: Font, target: Vector2, reduce: bool, from: Vector2 = Vector2.INF, deck_size: Vector2 = Vector2.ZERO) -> void:
 	reset()
 	if ids.size() != 3: return
 	choices = ids.duplicate()
@@ -48,7 +51,9 @@ func start(ids: Array, size: Vector2, text_font: Font, target: Vector2, reduce: 
 	font = text_font
 	collection_target = target
 	reduced = reduce
-	state = "shuffle"
+	state = "shuffle" if from == Vector2.INF else "arrive"
+	arrival_origin = from if from != Vector2.INF else Vector2.ZERO
+	arrival_size = deck_size if deck_size != Vector2.ZERO else fan_size()
 	queue_redraw()
 
 func reset() -> void:
@@ -161,7 +166,7 @@ func release(point: Vector2) -> bool:
 	return true
 
 func skip_preparation() -> bool:
-	if state in ["shuffle","drop"] or (state == "fan" and age < 0.55):
+	if state in ["arrive","shuffle","drop"] or (state == "fan" and age < 0.55):
 		shuffled_cards = 22
 		state = "fan"
 		age = 0.55
@@ -186,7 +191,8 @@ func advance(delta: float) -> void:
 		swipe.advance(delta)
 		offset = swipe.position
 	for d in draws: d.age += delta*(3 if reduced else 1)
-	if state == "shuffle" and age >= shuffle_duration(): state = "drop"; age = 0
+	if state == "arrive" and age >= (0.18 if reduced else ARRIVAL_TIME): state = "shuffle"; age = 0
+	elif state == "shuffle" and age >= shuffle_duration(): state = "drop"; age = 0
 	elif state == "drop" and age >= (0.18 if reduced else 0.48): state = "fan"; age = 0
 	elif state == "drawing" and draws[-1].age >= 0.55: state = "reveal"; age = 0
 	elif state == "reveal" and age >= (0.25 if reduced else 1.05): state = "choose"; age = 0
@@ -197,6 +203,9 @@ func advance(delta: float) -> void:
 
 func _draw() -> void:
 	if not active() or font == null: return
+	if state == "arrive":
+		_draw_arrival()
+		return
 	Paint.sky(self,canvas_size,sky_age,reduced)
 	var mid: float = canvas_size.x/2
 	Paint.text(self,font,Vector2(mid,230 if portrait() else 90),"TAROT",44 if portrait() else 32)
@@ -250,13 +259,28 @@ func _draw() -> void:
 func _deck_left() -> Vector2:
 	return Vector2(canvas_size.x*0.28,870 if portrait() else 370)
 
+## Reuse the exact shuffle starting point for decks arriving from another interface.
+func _deck_right() -> Vector2:
+	return Vector2(canvas_size.x*0.72,_deck_left().y)
+
+## Carry the keeper's visible deck into the star field before the normal shuffle.
+func _draw_arrival() -> void:
+	var t: float = smoothstep(0,0.18 if reduced else ARRIVAL_TIME,age)
+	Paint.sky(self,canvas_size,sky_age,reduced,t)
+	var at: Vector2 = arrival_origin.lerp(_deck_right(),t)
+	if not reduced: at.y -= sin(t*PI)*60
+	for i in range(21,-1,-1):
+		var from_offset := Vector2((i/7)*3,-(i/7)*2)
+		var to_offset := Vector2(0,-(21-i)*1.5)
+		Paint.card(self,"",at+from_offset.lerp(to_offset,t),arrival_size.lerp(fan_size(),t),0 if reduced else sin(t*PI)*0.06,1,0.35*(1-t))
+
 func shuffle_duration() -> float:
 	return 0.35 if reduced else 1.00
 
 func shuffle_pose(index: int) -> Dictionary:
 	var progress: float = age/shuffle_duration()
 	var t: float = clampf((progress-SHUFFLE_LEAD-index*SHUFFLE_STEP)/SHUFFLE_TRAVEL,0,1)
-	var right := Vector2(canvas_size.x*0.72,_deck_left().y)-Vector2(0,(21-index)*1.5)
+	var right := _deck_right()-Vector2(0,(21-index)*1.5)
 	var left: Vector2 = _deck_left()-Vector2(0,index*1.5)
 	return {"at":right.lerp(left,smoothstep(0,1,t)),"t":t}
 

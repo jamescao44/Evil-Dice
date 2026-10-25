@@ -57,7 +57,7 @@ func _draw_landscape() -> void:
 			for i in range(12):
 				var x: float = 42 + i * 113 - fposmod(battle.background_offset * 0.2, 113)
 				_draw_building(Rect2(x, row-building_height, building_height*0.7, building_height), Color(0.7, 0.7, 0.55, minf(0.8, battle.visual_stage * 0.35)), false)
-	draw_rect(battle.ARENA.grow(512), Color(0.84, 0.85, 0.67, 0.13))
+	draw_rect(battle.ARENA.grow(maxf(512,battle.ARENA.size.x)), Color(0.84, 0.85, 0.67, 0.13))
 
 ## Paint the portrait paving and compact skyline above the Horror.
 func _draw_portrait() -> void:
@@ -81,7 +81,7 @@ func _draw_portrait() -> void:
 			for i in range(9):
 				var x: float = 42 + i * 113 - fposmod(battle.background_offset * 0.2, 113)
 				_draw_building(Rect2(x, row - height, height * 0.7, height), Color("a1a184"), false)
-	draw_rect(battle.ARENA.grow(512), Color(0.84, 0.85, 0.67, 0.13))
+	draw_rect(battle.ARENA.grow(maxf(512,battle.ARENA.size.x)), Color(0.84, 0.85, 0.67, 0.13))
 
 ## Tile both axes so diagonal travel never exposes a blank strip or resets at arrival.
 func _draw_paving(tile: int, tint: Color, field: float) -> void:
@@ -127,7 +127,7 @@ func _draw_building(rect: Rect2, tint: Color, ruined: bool) -> void:
 ## Extend the paving under the camera pan with one repeated texture, avoiding blank edges.
 func _draw_extended_ground(tile: float, tint: Color) -> void:
 	var scale_factor: float = tile/32.0
-	var bounds: Rect2 = battle.ARENA.grow(512)
+	var bounds: Rect2 = battle.ARENA.grow(maxf(512,battle.ARENA.size.x))
 	var origin: Vector2 = battle.ARENA.position-Vector2(fposmod(battle.background_offset,tile),fposmod(battle.background_vertical_offset,tile))
 	var tiled := Rect2((bounds.position-origin)/scale_factor,bounds.size/scale_factor)
 	var field: float = clampf((battle.visual_stage/float(battle.Run.WAVE_NAMES.size()-1)*4-1)/2,0,1)

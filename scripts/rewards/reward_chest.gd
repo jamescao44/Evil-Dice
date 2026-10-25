@@ -79,12 +79,12 @@ func _ready() -> void:
 	hide()
 
 ## Present locked prizes in a closed chest and reset all reel and audio state.
-func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false, prizes: Array = [], chest_tier: int = -1, wave_roll: bool = false, pity_misses: Array = [0,0,0]) -> void:
+func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = false, prizes: Array = [], chest_tier: int = -1, wave_roll: bool = false, pity_misses: Array = [0,0,0], starting_tier: int = 0) -> void:
 	tier = clampi(chest_tier,0,3) if chest_tier >= 0 else 3 if values.size() == 5 else 2 if values.size() == 3 else 0
 	upgrade_mode = wave_roll
 	upgrade_misses = pity_misses.duplicate()
 	final_tier = tier
-	if upgrade_mode: tier = 0
+	if upgrade_mode: tier = clampi(starting_tier,0,final_tier)
 	roll_phase = "closed"
 	roll_scroll = 0
 	settle_from = 0
@@ -336,7 +336,7 @@ func pickup_at(point: Vector2) -> int:
 	return -1
 
 func skip_rect() -> Rect2:
-	return Rect2(152,130,500,88) if size.y > size.x else Rect2(944,64,304,56)
+	return Rect2(152,130,500,88) if size.y > size.x else Rect2(944,112,304,56)
 
 ## Check whether the player may leave the remaining chest rewards.
 func can_skip() -> bool:
@@ -360,6 +360,16 @@ func draw_skip_button(canvas: CanvasItem) -> void:
 	var point_size: int = 28 if size.y > size.x else 20
 	var width: float = font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size).x
 	canvas.draw_string(font,rect.get_center()+Vector2(-width/2,point_size*0.35),text,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size,Color("eee0b9"))
+	if is_instance_valid(battle): draw_gem_quote(canvas,Vector2(rect.get_center().x,rect.end.y+point_size),battle.model.unclaimed_relic_gems(),point_size)
+
+## Draw a currency preview under an action, aligned consistently on both layouts.
+func draw_gem_quote(canvas: CanvasItem, center: Vector2, amount: int, point_size: int) -> void:
+	var label := "+%d" % amount
+	var width: float = font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size).x
+	var side: float = point_size*1.1
+	var start := center-Vector2((width+8+side)/2,0)
+	canvas.draw_string(font,start+Vector2(0,point_size*0.35),label,HORIZONTAL_ALIGNMENT_LEFT,-1,point_size,Color("ffd9dd"))
+	Icons.paint(canvas,art,"ruby",Rect2(start+Vector2(width+8,-side/2),Vector2.ONE*side))
 
 func chest_point() -> Vector2:
 	var destination := Vector2(size.x/2,1440 if size.y > size.x else 680)
@@ -427,9 +437,6 @@ func draw_currency(canvas: CanvasItem) -> void:
 	Icons.paint(canvas,art,"ruby",Rect2(point-Vector2.ONE*side/2,Vector2.ONE*side))
 	var pending: int = battle.crystal_pickup.pending_total
 	canvas.draw_string(battle.description_font,point+Vector2(side*0.75,8),str(maxi(0,battle.model.blood_gems-pending)),HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("ffd0de"))
-	var soul_at: Vector2 = battle._soul_currency_point()
-	Icons.paint(canvas,art,"soul",Rect2(soul_at-Vector2.ONE*side/2,Vector2.ONE*side))
-	canvas.draw_string(battle.description_font,soul_at+Vector2(side*0.75,8),battle.soul_pickup.counter_text(),HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("a5e4ef"))
 
 func _text(at: Vector2, text: String, point_size: int, color: Color) -> void:
 	text = GameText.text(text)

@@ -19,6 +19,8 @@ var press_at := Vector2.ZERO
 var pointer := Vector2.ZERO
 var held_layer: Node2D
 var keeper_sprite: Sprite2D
+var keeper_overlay: Node2D
+var dialogue_time: float = 0.0
 
 ## Keep merchandise below pickups, held relics and settings pages.
 func _ready() -> void:
@@ -31,6 +33,10 @@ func _ready() -> void:
 	keeper_ink.shader = preload("res://scripts/rewards/shop_keeper.gdshader")
 	keeper_sprite.material = keeper_ink
 	add_child(keeper_sprite)
+	keeper_overlay = Node2D.new()
+	keeper_overlay.z_index = 1
+	keeper_overlay.draw.connect(_draw_divination)
+	add_child(keeper_overlay)
 	held_layer = Node2D.new()
 	held_layer.z_as_relative = false
 	held_layer.z_index = battle.HELD_ITEM_Z
@@ -44,19 +50,57 @@ func open() -> void:
 	selected = -1
 	replacing = false
 	age = 0
+	dialogue_time = 0
 	show()
 	queue_redraw()
 
 ## Clear presentation when leaving or restarting a run.
 func cancel() -> void:
+	cancel_purchase()
+	hide()
+
+## Abandon a pending purchase completely without changing stock, funds or owned items.
+func cancel_purchase() -> void:
 	cancel_drag()
 	selected = -1
 	replacing = false
-	hide()
+	queue_redraw()
 
 ## Share layout decisions between painting and pointer hit areas.
 func portrait() -> bool:
 	return battle.fx.canvas_size.y > battle.fx.canvas_size.x
+
+## Use the whole keeper illustration as a generous touch target.
+func keeper_rect() -> Rect2:
+	return Rect2(Vector2(0,514) if portrait() else Vector2(42,190),Vector2.ONE*252)
+
+## Keep the floating deck in front of the keeper's hands, clear of the bottle shelf.
+func divination_deck_position() -> Vector2:
+	var bob: float = 0 if battle.reduced else sin(age*TAU/2.4)*5
+	return keeper_rect().get_center()+Vector2(0,52+bob)
+
+func divination_deck_size() -> Vector2:
+	return (Vector2(80,124) if portrait() else Vector2(66,102))*0.8
+
+## Place the speech bubble above the keeper without covering merchandise or the tarot shortcut.
+func dialogue_rect() -> Rect2:
+	return Rect2(24,424,224,84) if portrait() else Rect2(148,98,180,86)
+
+## The invitation persists; the completed reading answers only when tapped again.
+func dialogue_text() -> String:
+	if not battle.model.shop.divination_used: return "Would you like a divination?"
+	return "Fate has spoken." if dialogue_time > 0 else ""
+
+## Lock the free draw before animating, so repeated taps cannot create extra readings.
+func _divine() -> void:
+	if battle.model.shop.divination_used:
+		dialogue_time = 3.0
+		battle._sound("ui/book",0.9,-20)
+	else:
+		selected = -1
+		cancel_drag()
+		battle.tarot_ui.begin_reward("shop",-1,divination_deck_position(),divination_deck_size())
+	keeper_overlay.queue_redraw()
 
 ## Keep six relics and two face-up cards, with a bottle shelf beneath the keeper.
 func offer_rect(slot: int) -> Rect2:
@@ -120,7 +164,7 @@ func busy() -> bool:
 
 ## Identify useful pointer targets without including empty shelf space.
 func hit(at: Vector2) -> bool:
-	return refresh_rect().has_point(at) or leave_rect().has_point(at) or buy_rect().has_point(at) or inventory_rect().has_point(at) or range(battle.model.shop.offers.size()).any(func(i): return offer_rect(i).has_point(at))
+	return keeper_rect().has_point(at) or refresh_rect().has_point(at) or leave_rect().has_point(at) or buy_rect().has_point(at) or inventory_rect().has_point(at) or range(battle.model.shop.offers.size()).any(func(i): return offer_rect(i).has_point(at))
 
 ## Route purchases and replacements before allowing normal inventory dragging.
 func click(at: Vector2) -> bool:
@@ -131,7 +175,10 @@ func click(at: Vector2) -> bool:
 	if replacing:
 		var index: int = battle.relic_ui.at_slot(at)
 		if index >= 0: _buy(index)
-		elif buy_rect().has_point(at): replacing = false
+		elif buy_rect().has_point(at): cancel_purchase()
+		return true
+	if keeper_rect().has_point(at):
+		_divine()
 		return true
 	if inventory_rect().grow(6).has_point(at): return false
 	if leave_rect().has_point(at):
@@ -188,6 +235,7 @@ func cancel_drag() -> void:
 
 ## Play the existing inventory landing after a successful model transaction.
 func _buy(replace_index: int = -1) -> void:
+	if replace_index >= 0 and not replacing: return
 	var previous: Array = battle.model.relics.items.map(func(item): return item.id)
 	var bought: Dictionary = battle.model.shop.buy(battle.model,selected,replace_index)
 	if bought.is_empty(): return
@@ -202,8 +250,10 @@ func _process(delta: float) -> void:
 	if not visible: return
 	held_layer.visible = dragging and not battle._menus_open()
 	held_layer.queue_redraw()
+	keeper_overlay.queue_redraw()
 	if battle._menus_open(): return
 	age += delta
+	dialogue_time = maxf(0,dialogue_time-delta)
 	refresh_flash = maxf(0,refresh_flash-delta)
 	queue_redraw()
 
@@ -241,8 +291,8 @@ func _shelf(at: Vector2, width: float) -> void:
 
 ## Stage the hooded keeper alongside the two relic shelves and tarot shelf.
 func _draw_stall() -> void:
-	var at := Vector2(0,514) if portrait() else Vector2(42,190)
-	var side: float = 252
+	var at: Vector2 = keeper_rect().position
+	var side: float = keeper_rect().size.x
 	var bob: float = 0 if battle.reduced else sin(age*1.7)*2
 	for i in range(7,0,-1): draw_circle(at+Vector2(side/2,side*0.65),side*(0.4+i*0.025),Color(0.34,0.27,0.44,0.025))
 	keeper_sprite.position = at+Vector2(side/2,side/2+bob)
@@ -255,6 +305,28 @@ func _draw_stall() -> void:
 		for y in [288,452]: _shelf(Vector2(346,y),584)
 		_shelf(Vector2(954,452),278)
 		_shelf(Vector2(68,632),200)
+
+## Draw the deck and speech above the keeper sprite, below every modal ceremony.
+func _draw_divination() -> void:
+	if not visible or battle.tarot_ui.ceremony.active(): return
+	if not battle.model.shop.divination_used:
+		for i in range(3,-1,-1):
+			Cards.card(keeper_overlay,"",divination_deck_position()+Vector2(i*3,-i*2),divination_deck_size(),0,1,0.35 if i == 0 else 0)
+	var message: String = dialogue_text()
+	if message.is_empty(): return
+	var rect: Rect2 = dialogue_rect()
+	var color := Color("ede0be")
+	Cards.panel(keeper_overlay,rect,Color("2c2930"),color,12)
+	var tip: Vector2 = Vector2(keeper_rect().get_center().x,rect.end.y+14)
+	var base: Vector2 = Vector2(clampf(tip.x,rect.position.x+20,rect.end.x-20),rect.end.y-2)
+	keeper_overlay.draw_colored_polygon(PackedVector2Array([base-Vector2(9,0),base+Vector2(9,0),tip]),Color("2c2930"))
+	keeper_overlay.draw_polyline(PackedVector2Array([base-Vector2(9,0),tip,base+Vector2(9,0)]),color,2)
+	var size: int = 24 if portrait() else 20
+	var label: String = GameText.text(message)
+	while size > 16 and GameText.lines(label,battle.description_font,size,rect.size.x-20).size()*size*1.3 > rect.size.y-12: size -= 1
+	var lines: PackedStringArray = GameText.lines(label,battle.description_font,size,rect.size.x-20)
+	var height: float = lines.size()*size*1.3
+	Cards.wrap(keeper_overlay,battle.description_font,Rect2(rect.position+Vector2(10,maxf(2,(rect.size.y-height)/2)),rect.size-Vector2(20,4)),label,size,color,true)
 
 ## Show the shelf, a readable description, and one large purchase/drop target.
 func _draw() -> void:

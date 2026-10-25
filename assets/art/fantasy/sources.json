@@ -23,5 +23,10 @@
   "crown": "gui/skills/invocations.png",
   "fx": "gui/skills/spellcasting.png",
   "paladin": "monster/holy/paladin.png",
-  "high_priest": "monster/deep_elf_high_priest.png"
+  "high_priest": "monster/deep_elf_high_priest.png",
+  "spellsword": "Dungeon Crawl Stone Soup Full/monster/deep_elf_blademaster.png",
+  "fanatic": "Dungeon Crawl Stone Soup Full/monster/deep_elf_demonologist.png",
+  "octopus": "Dungeon Crawl Stone Soup Full/monster/undead/zombies/zombie_octopode.png",
+  "tentacle": "Dungeon Crawl Stone Soup Full/monster/tentacles/eldritch_ends/eldritch_tentacle_1.png",
+  "bound_demon": "Dungeon Crawl Stone Soup Full/monster/demons/balrug_new.png"
 }

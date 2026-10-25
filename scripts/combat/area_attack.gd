@@ -24,6 +24,7 @@ static func _resolve(model, damage: int, skill: MultiHitSkill, fixed: bool) -> A
 			var amount: int = damage if fixed else model._target_damage(skill,damage,target)
 			amount = floori(amount*model.area_damage_factor(target,guards))
 			var shield_before: int = model.enemies[target].shield
+			var hp_before: int = model.enemies[target].hp
 			var shielded: bool = shield_before > 0 and model.enemy_status_count(target,Status.CORROSION) == 0
 			var loss: int = model.hit_enemy(target,amount)
 			var actual: int = shield_before-model.enemies[target].shield if shielded else loss
@@ -31,5 +32,6 @@ static func _resolve(model, damage: int, skill: MultiHitSkill, fixed: bool) -> A
 			if shielded: hit.text = "SHIELD BREAK" if model.enemies[target].shield == 0 else "BLOCKED"
 			events.append(hit)
 			if loss > 0: events.append_array(model._attack_relic_effects(target,loss,skill))
+			events.append_array(model.RelicCombat.overflow(model,target,amount,hp_before,shielded))
 	events.append_array(model.RelicEffects.attack_used(model))
 	return events

@@ -16,6 +16,7 @@ The treasure chest and seven reward category icons are copied unchanged from the
 | Elite mage / legacy mage | `monster/deep_elf_mage.png` |
 | Paladin | `monster/holy/paladin.png` |
 | High Priest | `monster/deep_elf_high_priest.png` |
+| Elf Spellsword | `monster/deep_elf_blademaster.png` |
 | Fleeing civilians | `monster/human_new.png`, `monster/human_old.png` |
 | Fleeing aristocrats | `monster/enchantress_human.png` |
 | Courtyard paving | `dungeon/floor/limestone_0.png` through `_3.png` |
@@ -121,4 +122,8 @@ All three active levels use [Flamelings by surt](https://opengameart.org/content
 
 ### Meal ingredient additions
 - Lemon soda and fried chicken: **KARSIORI STUDIO**, [Food Pack 2](https://karsiori.itch.io/free-pixel-art-food-pack-2), CC0. Original Soda Can 4 and Chicken Drumstick PNGs.
-- Oreo sundae placeholder: ice cream from **thekingphoenix**, [Icons: Food](https://opengameart.org/content/icons-food), CC0; same sheet as fries and hamburger. Meal icons combine only foods actually collected.
+- Cookie sundae placeholder: ice cream from **thekingphoenix**, [Icons: Food](https://opengameart.org/content/icons-food), CC0; same sheet as fries and hamburger. Meal icons combine only foods actually collected.
+
+New relic placeholder icons (2026-10-25): reused unmodified CC0 Dungeon Crawl tiles; per-file sources are recorded in `assets/art/relics/sources.json`.
+
+Third-level boss and summons (2026-10-25): unmodified CC0 Dungeon Crawl tiles from the same archived pack: deep elf demonologist, zombie octopode, eldritch tentacle and balrug. Exact paths are recorded in `art/fantasy/sources.json`.

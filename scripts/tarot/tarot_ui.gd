@@ -42,6 +42,7 @@ func _ready() -> void:
 	pickup.ui = self
 	add_child(pickup)
 	battle.model.tarot_granted.connect(pickup.enqueue)
+	battle.model.tarot_expired.connect(_expire_projections)
 	ceremony.picked.connect(_collect)
 	ceremony.card_drawn.connect(func(): battle._sound("item/card_draw",1.0,-5))
 	ceremony.card_shuffled.connect(func(): battle._sound("item/deck_flip" if audio_rng.randi_range(0,1) == 0 else "item/deck_flip2",1.0,-13 if ceremony.reduced else -7))
@@ -79,7 +80,7 @@ func dice_transform() -> Transform2D:
 	return Transform2D(0,Vector2.ONE*scale_factor,0,center-battle.DICE_CENTER*scale_factor)
 
 ## Open a three-card ceremony using the model’s already committed tarot candidates.
-func begin_reward(source: String, slot: int = -1) -> bool:
+func begin_reward(source: String, slot: int = -1, from: Vector2 = Vector2.INF, deck_size: Vector2 = Vector2.ZERO) -> bool:
 	if ceremony.active(): return false
 	var choices: Array = battle.model.begin_tarot_reward(source,slot)
 	if choices.is_empty(): return false
@@ -90,7 +91,7 @@ func begin_reward(source: String, slot: int = -1) -> bool:
 	reward_slot = slot
 	battle._cancel_enemy_hold()
 	battle.relic_ui.cancel_hold()
-	ceremony.start(choices,battle.fx.canvas_size,battle.description_font,icon_rect().get_center(),battle.reduced)
+	ceremony.start(choices,battle.fx.canvas_size,battle.description_font,icon_rect().get_center(),battle.reduced,from,deck_size)
 	return true
 
 ## Keep the chosen tarot and acknowledge its chest reward slot when applicable.
@@ -123,6 +124,18 @@ func reset() -> void:
 	reward_slot = -1
 	cancel_gesture()
 	if is_instance_valid(battle.dice_group): battle.dice_group.transform = Transform2D.IDENTITY
+	queue_redraw()
+
+## Remove expired receipts and release stale card gestures after inventory changes.
+func _expire_projections(instances: Array) -> void:
+	inspected = -1
+	cancel_gesture()
+	for instance_id in instances: float_levels.erase(instance_id)
+	pickup.pending = pickup.pending.filter(func(item): return item.instance_id not in instances)
+	pickup.cards = pickup.cards.filter(func(card): return card.item.instance_id not in instances)
+	scroll = minf(scroll,maxi(0,battle.model.tarots.items.size()-1))
+	scroll_target = roundf(scroll)
+	swipe.reset(scroll*card_angle())
 	queue_redraw()
 
 ## Release held cards and swipe inertia without consuming a tarot.
@@ -340,6 +353,8 @@ func _draw() -> void:
 			if gesture == "card" and pressed_card == i: continue
 			var pose: Dictionary = carousel_pose(i)
 			Paint.card(self,battle.model.tarots.items[i].id,pose.at,pose.size,0,1,0.65 if i == front_index() else 0,expansion*lerpf(0.55,1,pose.depth))
+			if battle.model.tarots.items[i].get("projection",false):
+				Paint.text(self,battle.description_font,pose.at+Vector2(0,pose.size.y*0.34),"PROJECTION",20 if portrait() else 14,Color("a5e6ff",expansion))
 		var front: int = front_index()
 		if front >= 0:
 			var id: String = battle.model.tarots.items[front].id
@@ -360,7 +375,7 @@ func _draw() -> void:
 		drag_feedback.paint(self,at,size*0.56,Paint.GOLD,battle.reduced)
 		if Catalog.ITEMS[battle.model.tarots.items[pressed_card].id].target == "enemy" and not battle.model.is_city():
 			var target: int = battle._enemy_inspect_at(pointer)
-			for index in battle.model.attack_targets():
+			for index in battle.model.tarot_effects.targets(battle.model,battle.model.tarots.items[pressed_card].id):
 				battle._draw_target_indicator(self,index,index == target,Paint.GOLD)
 	if not cast_visual.is_empty():
 		var t: float = cast_visual.age/0.4
@@ -394,13 +409,29 @@ func _draw_icon() -> void:
 		Paint.panel(self,rect,Color(0.06,0.06,0.07,0.58),Color.TRANSPARENT,14)
 
 ## Show the selected floating card and its effect over a dimmed battlefield.
+func inspection_description(item: Dictionary) -> String:
+	var description: String = GameText.text(Catalog.description(item.id))
+	if item.get("projection",false): description = GameText.text("Projection: expires at turn end.")+"\n"+description
+	return description
+
+## Fit the projection reminder and effect without clipping longer card descriptions.
+func inspection_rect(item: Dictionary) -> Rect2:
+	var rect := Rect2(62,battle.DICE_CENTER.y-370,680,236) if portrait() else Rect2(372,battle.DICE_CENTER.y-290,536,180)
+	var size: int = 26 if portrait() else 19
+	var height: float = (92 if portrait() else 74)+GameText.lines(inspection_description(item),battle.description_font,size,rect.size.x-44).size()*size*1.3
+	if height > rect.size.y:
+		rect.position.y -= height-rect.size.y
+		rect.size.y = height
+	return rect
+
+## Show the selected floating card and its effect over a dimmed battlefield.
 func _draw_inspection() -> void:
 	var item: Dictionary = battle.model.tarots.items[inspected]
 	var lift: float = float_levels.get(item.instance_id,0.0)
 	draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.02,0.05,0.62*lift))
 	var pose: Dictionary = carousel_pose(inspected)
 	Paint.card(self,item.id,pose.at,pose.size,0,1,0.8)
-	var rect := Rect2(62,battle.DICE_CENTER.y-370,680,236) if portrait() else Rect2(372,battle.DICE_CENTER.y-290,536,180)
+	var rect: Rect2 = inspection_rect(item)
 	Paint.panel(self,rect,Color("211a38",0.94),Color("75628d"))
 	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,12),Vector2(rect.size.x-44,76)),Catalog.ITEMS[item.id].name,30 if portrait() else 23,Paint.GOLD)
-	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),Catalog.description(item.id),26 if portrait() else 19)
+	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),inspection_description(item),26 if portrait() else 19)

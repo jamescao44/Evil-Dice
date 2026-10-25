@@ -114,17 +114,7 @@ func layout_checks(portrait: bool) -> void:
 	game.model.discard_unclaimed_rewards()
 	game.model.close_chest()
 	game.model.blood_gems = 30
-	game.wave_chest.after_chest(0)
-	check(game.model.can_buy_wave_tarot(),"A Normal chest's 30 crystals afford the tarot deck")
-	check(not game.wave_chest.tarot_rect().intersects(game.wave_chest.action_rect()),"Large deck hit area leaves Continue separate")
-	check(not game.wave_chest.action_rect().intersects(game.tarot_ui.icon_rect()),"Continue never overlaps the persistent tarot inventory icon")
-	check(Rect2(Vector2.ZERO,game.fx.canvas_size).encloses(game.wave_chest.tarot_rect()),"Deck and price fit the screen")
-	check(game.wave_chest.tarot_card_size().x >= (180 if portrait else 100),"Tarot deck stays large in both layouts")
-	for language in ["zh_CN","en"]:
-		GameText.set_language(language,false)
-		await capture(game,layout+"-deck-"+language)
-	game.wave_chest.click(game.wave_chest.tarot_rect().get_center())
-	check(game.model.blood_gems == 0 and game.tarot_ui.ceremony.active(),"Tapping the deck spends exactly 30 and opens the draw")
+	check(not game.model.can_buy_wave_tarot(),"Paid post-wave tarot draws stay retired; divination belongs to the shop")
 	game.free()
 	await process_frame
 

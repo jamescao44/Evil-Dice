@@ -1,0 +1,24 @@
+[gd_resource type="AudioBusLayout" load_steps=3 format=3]
+
+[sub_resource type="AudioEffectEQ10" id="EQ"]
+resource_name = "Gentle high-end EQ"
+band_db/8000_hz = -4.0
+band_db/16000_hz = -9.0
+
+[sub_resource type="AudioEffectLowPassFilter" id="LowPass"]
+resource_name = "High-frequency rolloff"
+cutoff_hz = 10000.0
+resonance = 0.5
+filter_db = 1
+
+[resource]
+bus/0/name = &"Master"
+bus/0/solo = false
+bus/0/mute = false
+bus/0/bypass_fx = false
+bus/0/volume_db = 0.0
+bus/0/send = &""
+bus/0/effect/0/effect = SubResource("EQ")
+bus/0/effect/0/enabled = true
+bus/0/effect/1/effect = SubResource("LowPass")
+bus/0/effect/1/enabled = true

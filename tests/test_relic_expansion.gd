@@ -25,38 +25,34 @@ func losses(events: Array) -> Array:
 	return events.filter(func(e): return e.type in ["damage","shield_hit"] and e.target != -1)
 
 func roll_proc_checks() -> void:
-	for city in [false,true]:
-		for row in [["worn_bow",[1,2,3],false,1,5],["tissue_pack",[1,2,3],false,1,10],["magic_slingshot",[4,4,3],false,1,3],["pet_ghost",[2,2,3],false,1 if city else 3,50],["pet_dragon",[3,3,3],false,2,50],["spiked_helmet",[2,2,2],true,1,11]]:
-			var m = fresh([row[0]],city)
-			m.set_test_roll(row[1],row[2])
-			var pending = m.pending.duplicate()
-			var events: Array = m.resolve_perfect_relic()
-			var hits: Array = losses(events)
-			check(hits.size() == row[3],"Roll proc hit count: "+row[0])
-			check(hits.all(func(hit): return hit.display_amount == row[4]),"Roll proc damage: "+row[0])
-			check(m.pending.same_as(pending) and m.phase == "player","Roll proc preserves pending skill: "+row[0])
-			check(m.resolve_perfect_relic().is_empty(),"Roll proc only resolves once: "+row[0])
-	var m = fresh(["tissue_pack","magic_slingshot","spiked_helmet"])
-	m.set_test_roll([3,3,3]); check(m.resolve_perfect_relic().is_empty(),"Conditional procs reject unmatched rolls")
-	m = fresh(["worn_bow","bracelet","ancient_codex","cursed_skull"])
+	for row in [["worn_bow",[1,2,3,4,5,6],false,1,5],["tissue_pack",[1,1,2,4,4,6],false,1,10],["magic_slingshot",[1,2,3,4,5,6],false,1,15],["pet_ghost",[1,2,3,4,5,6],false,3,20],["pet_dragon",[1,2,3,4,5,6],false,2,15],["spiked_helmet",[1,2,3,4,5,6],true,1,13]]:
+		var m = fresh([row[0]])
+		m.roll_pool(row[2],row[1])
+		var before: Array = m.dice_turn.values.duplicate()
+		var hits: Array = losses(m.resolve_perfect_relic())
+		check(hits.size() == row[3],"Roll proc hit count: "+row[0])
+		check(hits.all(func(hit): return hit.display_amount == row[4]),"Roll proc damage: "+row[0])
+		check(m.dice_turn.values == before and m.pending.is_empty(),"Roll proc preserves the six-die pool: "+row[0])
+		check(m.resolve_perfect_relic().is_empty(),"Roll proc only resolves once: "+row[0])
+	var m = fresh(["tissue_pack","spiked_helmet"])
+	m.roll_pool(false,[1,2,3,4,5,6]); check(m.resolve_perfect_relic().is_empty(),"Conditional procs reject unmatched rolls")
+	m = fresh(["pet_ghost","bracelet","ancient_codex","cursed_skull"])
 	m.statuses[Status.MIGHT].apply(3)
 	m.tarot_effects.strength = 2; m.tarot_effects.extra_uses = 3
-	m.set_test_roll([1,2,6])
+	m.roll_pool(false,[1,2,3,4,5,6])
 	m.apply_enemy_status(0,Status.CORROSION,3)
-	check(losses(m.resolve_perfect_relic())[0].display_amount == 5,"Fixed item damage ignores damage relics, boons and corrosion")
+	check(losses(m.resolve_perfect_relic()).all(func(e): return e.display_amount == 20),"Incomplete-set Ghost fixed damage ignores other damage bonuses")
 	check(m.status_count(Status.MIGHT) == 3 and m.tarot_effects.strength == 2 and m.tarot_effects.extra_uses == 3,"Item attacks preserve all next-skill charges")
 	m = fresh(["pet_dragon","bracelet","ancient_codex"])
-	m.set_test_roll([2,2,3])
-	check(losses(m.resolve_perfect_relic()).all(func(e): return e.display_amount == 120),"Base-damage pets receive flat and multiplier bonuses")
+	m.roll_pool(false,[1,2,3,4,5,6])
+	check(losses(m.resolve_perfect_relic()).all(func(e): return e.display_amount == 40),"Base-damage pets receive flat and multiplier bonuses")
 	m = fresh(["pet_ghost"])
 	for e in m.enemies: e.hp = 1
-	m.set_test_roll([4,4,4])
-	m.resolve_perfect_relic()
-	check(m.outcome() == "wave_clear" and m.phase == "finished" and m.pending.is_empty() and m.saved_skill.face == 4,"Proc clearing a wave saves the new skill and finishes cleanly")
-	m = fresh(["pet_dragon"])
-	m.enemies.resize(1); m.enemies[0].hp = 1
-	m.set_test_roll([1,2,3]); var hits: Array = losses(m.resolve_perfect_relic())
-	check(hits.size() == 1 and m.roll_relic_actions.is_empty(),"Roll pets stop when no living targets remain")
+	m.roll_pool(false,[1,2,3,4,5,6]); m.resolve_perfect_relic()
+	check(m.outcome() == "wave_clear" and m.phase == "finished" and m.pending.is_empty(),"Proc clearing a wave finishes before a skill is formed")
+	m = fresh(["pet_dragon"]); m.enemies.resize(1); m.enemies[0].hp = 1
+	m.roll_pool(false,[1,2,3,4,5,6])
+	check(losses(m.resolve_perfect_relic()).size() == 1 and m.roll_relic_actions.is_empty(),"Roll pets stop when no living targets remain")
 
 func status_checks() -> void:
 	for stone in ["purple_stone","green_stone","prismatic_stone"]:
@@ -75,20 +71,20 @@ func status_checks() -> void:
 		check(model.enemy_status_count(0,status) == 3,"Explicit multi-stack applications still lose one stack per turn")
 	var m = fresh(["pet_lizard","runestone"])
 	m.apply_enemy_status(0,Status.BURNING,1)
-	check(m.enemy_status_count(0,Status.BURNING) == 3,"Lizard and Runestone boost direct status applications")
+	check(m.enemy_status_count(0,Status.BURNING) == 4,"Lizard and Runestone boost direct status applications")
 	m.apply_affliction(Status.BURNING,1)
 	check(m.status_count(Status.BURNING) == 1,"Enemy status modifiers do not amplify player afflictions")
 	m.apply_enemy_status(0,Status.BURNING,50)
 	check(m.enemy_status_count(0,Status.BURNING) == 10,"Extra burning retains ten-stack cap")
 	m = fresh(["pet_lizard","orange_stone"])
 	m._attack_relic_effects(0,10,Rules.classify([1,2,3]))
-	check(m.enemy_status_count(0,Status.BURNING) == 2,"Lizard boosts later stone in inventory order")
+	check(m.enemy_status_count(0,Status.BURNING) == 3,"Lizard boosts later stone in inventory order")
 	m = fresh(["pet_slime"])
 	m.apply_enemy_status(0,Status.CORROSION,3)
 	for i in range(5): m._tick_enemy_statuses()
 	check(m.enemy_status_count(0,Status.CORROSION) == 3 and m.enemies[0].statuses[Status.CORROSION].permanent,"Slime corrosion does not decay")
 	m = fresh(["ice_rose","bracelet"])
-	check(losses(m.apply_enemy_status(0,Status.FROZEN,1))[0].display_amount == 20,"Ice Rose deals modified base damage to the frozen target")
+	check(losses(m.apply_enemy_status(0,Status.FROZEN,1))[0].display_amount == 15,"Ice Rose deals modified base damage to the frozen target")
 	m.acquire_relic("blue_stone")
 	for i in range(30):
 		var events: Array = m.apply_enemy_status(0,Status.FROZEN,1)
@@ -102,10 +98,10 @@ func status_checks() -> void:
 func attack_checks() -> void:
 	var m = fresh(["pet_bat"])
 	m.hp = 10; m.set_test_roll([4,4,4]); m.apply_player_step(0)
-	check(m.hp == 15,"Bat heals once for an area attack, not per target")
+	check(m.hp == 11,"Bat heals once for an area attack, not per target")
 	m = fresh(["pet_bat"])
 	m.hp = 10; m.set_test_roll([5,5,5]); m.apply_player()
-	check(m.hp == 40,"Bat heals separately for all six combo attacks")
+	check(m.hp == 16,"Bat heals separately for all six combo attacks")
 	m = fresh(["pet_bat"])
 	m.hp = 10; m.set_test_roll([2,2,3]); m.apply_player_step()
 	check(m.hp == 10,"Freeze support does not trigger attack healing")
@@ -125,7 +121,7 @@ func attack_checks() -> void:
 
 func passive_checks() -> void:
 	var m = fresh(["fries","hamburger"])
-	check(is_equal_approx(m.damage_multiplier(),2.5),"Food damage bonuses add")
+	check(is_equal_approx(m.damage_multiplier(),2.2),"Food damage bonuses add")
 	m = fresh(["worn_dagger","royal_dagger","twin_scythes"])
 	check(m.skill_use_count(Rules.classify([5,5,5])) == 20,"Daggers add hits before Scythes multiply")
 	m.relics.move(2,0)
@@ -145,7 +141,7 @@ func passive_checks() -> void:
 
 func copy_checks() -> void:
 	var m = fresh(["bracelet","disguise_mask","ancient_tentacle"])
-	check(m.relic_base_damage() == 40,"Bracelet + Mask + Tentacle activates base damage four times")
+	check(m.relic_base_damage() == 20,"Bracelet + Mask + Tentacle activates base damage four times")
 	var sequence: Array = m.RelicEffects.Sequence.entries(m.relics.items)
 	check(sequence.map(func(e): return e.activators) == [["bracelet"],["disguise_mask","bracelet"],["ancient_tentacle","bracelet"],["ancient_tentacle","disguise_mask","bracelet"]],"Tentacle replays both original and Mask in order")
 	check(sequence.map(func(e): return m.RelicEffects.Sequence.animation_speed(e)) == [1.0,1.5,1.5,1.5],"Only copied activations receive 1.5x playback")
@@ -158,9 +154,9 @@ func copy_checks() -> void:
 	var damage_steps: Array = m.attack_damage_steps(Rules.classify([1,2,3])).filter(func(step): return step.source == "relic")
 	check(damage_steps.map(func(step): return step.speed) == [1.0,1.5,1.5,1.5],"Damage feedback uses the same retrigger pacing")
 	m = fresh(["ancient_tentacle","disguise_mask","fries"])
-	check(is_equal_approx(m.damage_multiplier(),1.5),"Mask cannot copy Tentacle; empty-left copies do nothing")
+	check(is_equal_approx(m.damage_multiplier(),1.3),"Mask cannot copy Tentacle; empty-left copies do nothing")
 	m = fresh(["fries","disguise_mask","ancient_tentacle"])
-	check(is_equal_approx(m.damage_multiplier(),3.0),"Copies repeat additive multiplier bonuses")
+	check(is_equal_approx(m.damage_multiplier(),2.2),"Copies repeat additive multiplier bonuses")
 	m = fresh(["worn_dagger","disguise_mask","ancient_tentacle"])
 	check(m.skill_use_count(Rules.classify([5,5,5])) == 10,"Copies do not overwrite repeated hit-modifier keys")
 	m = fresh(["worn_bow","disguise_mask","ancient_tentacle"])
@@ -171,7 +167,7 @@ func copy_checks() -> void:
 	m.relic_turn_closed = false; m._complete_relic_turn()
 	check(m.relics.items[0].turns == 0 and m.relics.items[0].charges == 4,"Sixth-turn payout grants four stored shields")
 	m = fresh(["crystal_ball","disguise_mask","ancient_tentacle"])
-	m._complete_relic_turn()
+	m.phase = "round_end"; m.begin_round()
 	check(m.tarots.items.size() == 4,"Copied generators repeat their payout")
 	m = fresh(["heart","disguise_mask","ancient_tentacle"])
 	check(m.max_hp == 146,"Copied health multipliers apply in sequence")
@@ -203,12 +199,9 @@ func copy_checks() -> void:
 func curse_and_currency_checks() -> void:
 	for id in Catalog.CURSED_DICE:
 		var m = fresh([id,"disguise_mask","ancient_tentacle"])
-		var face: int = Catalog.CURSED_DICE[id]
-		for perfect in [false,true]:
-			for i in range(80):
-				m.phase = "roll"
-				var skill = m.roll(0.4,perfect)
-				check((face in skill.dice) == perfect,"Cursed face inclusion/exclusion: "+id)
+		check(id in Catalog.DISABLED,"Cursed face modifiers remain temporarily disabled")
+		m.roll_pool(false,[1,2,3,4,5,6])
+		check(m.dice_turn.values == [1,2,3,4,5,6],"Disabled curses cannot rewrite the six-die pool")
 		for other in Catalog.CURSED_DICE:
 			if other != id: check(not m.acquire_relic(other),"Only one Cursed Die can be held")
 		for i in range(30): check(not Catalog.CURSED_DICE.has(m.relics.draw_one(m.reward_rng)),"Owned Cursed Die excludes the whole family from drops")
@@ -220,22 +213,22 @@ func curse_and_currency_checks() -> void:
 		for j in range(5): reserved.append(m.relics.draw_one(m.reward_rng,reserved))
 		check(reserved.filter(func(id): return Catalog.CURSED_DICE.has(id)).size() <= 1,"A treasure never reserves two incompatible Cursed Dice")
 	m = fresh(["soul_vessel"])
-	check(m.gain_blood_gems(100) == 115 and m.blood_gems == 115,"Soul Vessel increases currency by fifteen percent")
-	check(m.gain_blood_gems(10) == 11 and m.blood_gem_gain_preview(10) == 12,"Fractional currency bonus carries to the next grant")
-	check(m.gain_blood_gems(10) == 12 and is_zero_approx(m.blood_gem_remainder),"Two ten-crystal grants pay twenty-three exactly")
+	check(m.gain_blood_gems(100) == 100,"Soul Vessel no longer boosts blood gems")
+	var gained: int = 0
+	for i in range(4): gained += m.RelicEffects.enemy_soul_bonus(m,5)
+	check(gained == 23 and is_zero_approx(m.enemy_soul_remainder),"Fractional enemy-soul bonuses carry forward")
+	check(m.gain_souls(10) == 10,"Direct chest and shop soul grants remain unchanged")
 	m = fresh(["soul_vessel","disguise_mask","ancient_tentacle"])
-	check(m.gain_blood_gems(100) == 160,"Four vessel activations add sixty percent")
-	m = fresh(["coin","soul_vessel"])
+	check(m.RelicEffects.enemy_soul_bonus(m,100) == 160,"Four vessel activations add sixty percent enemy souls")
+	m = fresh(["coin","soul_vessel"]); m.wave_kind = m.WaveRewards.RELIC
 	for e in m.enemies: e.hp = 0
 	m.begin_wave_reward()
-	check(m.blood_gems == 11,"Wave coin receives Soul Vessel bonus")
-	var base: int = m.Chests.CRYSTALS[m.wave_chest_tier]
-	var expected: int = m.blood_gem_gain_preview(base)
+	check(m.blood_gems == 10,"Wave coin is unaffected by Soul Vessel")
 	m.open_wave_chest()
-	check(m.release_chest_crystals() == expected and m.blood_gems == 11+expected,"Separate chest payout includes Soul Vessel")
-	check(m.release_chest_crystals() == 0,"Chest currency bonus cannot repeat")
+	var expected: int = m.Chests.CRYSTALS[m.opened_chest_tier]
+	check(m.release_chest_crystals() == expected and m.blood_gems == 10+expected and m.release_chest_crystals() == 0,"Chest pays base gems once without Soul Vessel")
 	m.reset_run()
-	check(m.blood_gems == 0 and m.blood_gem_remainder == 0,"New run clears currency fractions")
+	check(m.blood_gems == 0 and m.enemy_soul_remainder == 0,"New run clears currency and enemy-soul carry")
 
 func _initialize() -> void:
 	roll_proc_checks()

@@ -11,15 +11,25 @@ var sum: int = 0
 var spare: int = 0
 var dice: Array = []
 var base_uses: int = 1
+var damage_ticks: int = 1 # Damage pulses within one use, never extra uses or combo orbs.
+var damage_ticks_spent: int = 0
 var use_modifiers: Dictionary = {}
 var target: int = -1
 var uses_spent: int = 0
-var bonus_random_from: int = -1
+var grants_bonus_fireballs: bool = false
+var calculated_damage_total: int = -1 # Last resolved use, before target defenses.
+var inherited_damage: int = -1 # Generated Fireballs reuse this total without modifiers.
 var _cast_uses: int = 0
 var perfect: bool = false
 var critical: bool = false
 var effect_multiplier: float = 1.0
 var amplifier_locked: bool = false
+var source_dice: Array = [] # Physical dice spent before a skill-tier upgrade.
+var cast_source: String = "manual"
+var relic_cast_locked: bool = false
+var alternating_bonus: bool = false
+var relic_effect_scale: float = 1.0
+var royal_activations: Array = []
 
 func _init(skill_kind: int = -1, skill_face: int = 0, values: Array = [], uses: int = 1) -> void:
 	kind = skill_kind
@@ -41,7 +51,7 @@ func is_freeze() -> bool:
 	return pattern.is_empty() and kind == Kind.PAIR and face == 2
 
 func hits_all() -> bool:
-	if not pattern.is_empty(): return pattern == "annihilation" or (pattern == "straight" and dice.size() >= 4)
+	if not pattern.is_empty(): return pattern == "annihilation" or (pattern == "straight" and dice.size() >= 4) or (pattern == "match_auto" and dice.size() == 6)
 	return kind == Kind.ULTIMATE or (kind in [Kind.PAIR,Kind.SPECIAL] and face == 4)
 
 func set_use_multiplier(source: String, multiplier: int) -> void:
@@ -69,6 +79,7 @@ func consume_use() -> bool:
 	begin_cast()
 	if uses_left() == 0: return false
 	uses_spent += 1
+	damage_ticks_spent = 0
 	return true
 
 func has_use_orbs(additional_modifiers: Dictionary = {}) -> bool:
@@ -79,7 +90,7 @@ func is_combo_attack() -> bool:
 	return pattern == "match" or (pattern.is_empty() and random_target_per_use())
 
 func random_target_per_use() -> bool:
-	if bonus_random_from >= 0 and uses_spent >= bonus_random_from: return true
+	if cast_source == "character_bonus": return true
 	if not pattern.is_empty(): return pattern == "match_auto"
 	return face == 5 and kind in [Kind.PAIR, Kind.SPECIAL]
 
@@ -90,16 +101,27 @@ func keeps_selected_target() -> bool:
 func duplicate(_deep: bool = true) -> MultiHitSkill:
 	var copy := MultiHitSkill.new(kind, face, dice, base_uses)
 	copy.pattern = pattern
+	copy.damage_ticks = damage_ticks
+	copy.damage_ticks_spent = damage_ticks_spent
 	copy.use_modifiers = use_modifiers.duplicate()
 	copy.target = target
 	copy.uses_spent = uses_spent
-	copy.bonus_random_from = bonus_random_from
+	copy.grants_bonus_fireballs = grants_bonus_fireballs
+	copy.calculated_damage_total = calculated_damage_total
+	copy.inherited_damage = inherited_damage
 	copy._cast_uses = _cast_uses
 	copy.perfect = perfect
 	copy.critical = critical
 	copy.effect_multiplier = effect_multiplier
 	copy.amplifier_locked = amplifier_locked
+	copy.source_dice = source_dice.duplicate()
+	copy.cast_source = cast_source
+	copy.relic_cast_locked = relic_cast_locked
+	copy.alternating_bonus = alternating_bonus
+	copy.relic_effect_scale = relic_effect_scale
+	copy.royal_activations = royal_activations.duplicate(true)
 	return copy
 
 func same_as(other: MultiHitSkill) -> bool:
-	return other != null and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and bonus_random_from == other.bonus_random_from and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked
+	if other == null or calculated_damage_total != other.calculated_damage_total or inherited_damage != other.inherited_damage or source_dice != other.source_dice or cast_source != other.cast_source or relic_effect_scale != other.relic_effect_scale or relic_cast_locked != other.relic_cast_locked or alternating_bonus != other.alternating_bonus: return false
+	return other != null and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and damage_ticks == other.damage_ticks and damage_ticks_spent == other.damage_ticks_spent and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and grants_bonus_fireballs == other.grants_bonus_fireballs and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked

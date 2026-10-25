@@ -64,6 +64,8 @@ func catalog_checks() -> void:
 			check(rows.size() > 1,"Paragraph wraps in "+locale)
 			for line in rows: check(font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,22).x <= 181,"Wrapped line fits in "+locale+": "+line)
 	GameText.set_language("zh_CN",false)
+	check(GameText.text("Your first manual skill each turn casts one tier higher, up to a six-straight.") == "每波首次手动施放的技能提升一级，最高六连顺子。","Running inventory sessions retain Chinese after Royal Seal's source key changes")
+	check(Relics.description({"id":"royal_seal"},GameText.text) == "每波首次手动施放的技能提升一级，最高六连顺子。","Current Royal Seal inventory description uses the wave rule in Chinese")
 	check(GameText.remaining(2) == "剩余2回合。","Chinese grammar handles count templates")
 	check(GameText.format("POWER %d%%",70) == "力量 70%","Percent placeholders render correctly")
 	check("残页：3 / 10。" in Relics.description({"id":"codex_page","count":3},GameText.text),"Relic counters translate with their description")

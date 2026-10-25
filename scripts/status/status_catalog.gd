@@ -14,7 +14,7 @@ const ENTRIES := {
 	Status.DARKNESS: {"name":"Darkness", "icon":"dark", "text":"Attack damage x0.5. Cannot heal. Lose 1 stack each turn.", "color":Color("c18ce8")},
 	Status.CORROSION: {"name":"Corrosion", "icon":"acid", "text":"Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.", "color":Color("8ad26a")},
 	Status.PLAGUE: {"name":"Plague", "icon":"plague", "text":"Max HP -10 per stack, minimum 1. Gains 1 stack and spreads 1 stack to a random uninfected ally each turn.", "color":Color("93899e")},
-	Status.IMMOBILIZED: {"name":"Immobilized", "icon":"broken_shield", "text":"Shield broken. Cannot act for one turn.", "color":Color("dcbf86")},
+	Status.IMMOBILIZED: {"name":"Immobilized", "icon":"broken_shield", "text":"Cannot act for one turn.", "color":Color("dcbf86")},
 }
 const HELP_TEXT := {
 	Status.FROZEN:"Player: tap the ice 3 times to end the turn. Enemies: skip one turn.",
@@ -23,7 +23,7 @@ const HELP_TEXT := {
 	Status.DARKNESS:"Attack damage x0.5; cannot heal. Lose 1 stack per turn.",
 	Status.CORROSION:"No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",
 	Status.PLAGUE:"Enemies only. Max HP -10/stack (min 1). Gains 1 stack and spreads 1 to a random uninfected ally each turn.",
-	Status.IMMOBILIZED:"Non-elite shield broken: skip the next action, then recover. Elites are unaffected.",
+	Status.IMMOBILIZED:"Skip the next action, then recover. Normal enemies suffer this when their shield breaks; bosses suffer it when their charge is interrupted.",
 	Status.HIDDEN:"Untargetable for 3 turns. Using an attack skill breaks invisibility.",
 }
 
