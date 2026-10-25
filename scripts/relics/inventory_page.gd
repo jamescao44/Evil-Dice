@@ -301,7 +301,7 @@ func _draw_incoming(compact: bool) -> void:
 	var center := rect.position+Vector2(82,88 if portrait() else 58)
 	Paint.paint(self,id,center,54 if portrait() else 42,true)
 	var text_rect := Rect2(rect.position+Vector2(162,16),rect.size-Vector2(180 if portrait() else 376,32))
-	var description: String = label+"\n"+GameText.text(Catalog.ITEMS[id].text)
+	var description: String = label+"\n"+Catalog.short_description(id,GameText.text)
 	var size: int = 28 if portrait() else 22
 	while size > 18 and GameText.lines(description,battle.description_font,size,text_rect.size.x).size()*size*1.3 > text_rect.size.y: size -= 1
 	Panels.wrap(self,battle.description_font,text_rect,description,size,Color("eee4d2"),false)

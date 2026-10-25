@@ -19,6 +19,7 @@ var dice_power: Dictionary = {}
 var font: Font
 var cosmetic = RandomNumberGenerator.new()
 var reduced: bool = false
+var damage_stage: int = 0
 var time_factor: float = 1.0
 var world_transform := Transform2D.IDENTITY
 var canvas_size := Vector2(1280, 800)
@@ -43,12 +44,18 @@ func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160, si
 func ring(at: Vector2, color: Color, radius: float = 90.0, clip: Rect2 = Rect2()) -> void:
 	rings.append({"p": at, "color": color, "life": 0.55, "radius": radius, "clip":clip})
 
-## Share logarithmic sizing between damage numbers, projectiles and impact effects.
-static func damage_scale(damage: int) -> float:
-	return maxf(1.0,log(maxi(1,damage))/log(10.0))
+## Fixed level baselines give each chapter segment room to grow without tracking gear.
+const DAMAGE_REFERENCES := [20.0,100.0,300.0]
+const DAMAGE_GROWTH := 0.25
+const ATTACK_SIZE_CAP := 1.4
+const NUMBER_SIZE_CAP := 1.6
 
-static func damage_font_size(damage: int) -> int:
-	return roundi(FLOAT_FONT_SIZE*damage_scale(damage))
+static func damage_scale(damage: int, stage: int = 0, cap: float = ATTACK_SIZE_CAP) -> float:
+	var reference: float = DAMAGE_REFERENCES[clampi(floori(stage/10.0),0,DAMAGE_REFERENCES.size()-1)]
+	return clampf(1.0+DAMAGE_GROWTH*log(maxf(1.0,damage/reference))/log(10.0),1.0,cap)
+
+static func damage_font_size(damage: int, stage: int = 0) -> int:
+	return roundi(FLOAT_FONT_SIZE*damage_scale(damage,stage,NUMBER_SIZE_CAP))
 
 func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE) -> void:
 	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size})
@@ -100,15 +107,15 @@ func cast(face: int, from: Vector2, targets: Array, duration: float, track_targe
 ## Fire attacks reuse world tracking so camera zoom cannot detach their endpoints.
 func flame_cast(tier: int, from: Vector2, targets: Array, duration: float, damages: Array = []) -> void:
 	spell = {"face":0,"flame_tier":clampi(tier,0,4),"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"scales":targets.map(func(_point): return 1.0)}
-	for i in range(mini(damages.size(),targets.size())): spell.scales[i] = damage_scale(damages[i])
+	for i in range(mini(damages.size(),targets.size())): spell.scales[i] = damage_scale(damages[i],damage_stage)
 
 ## Enlarge sparks and their spread without multiplying particle counts or changing timing.
 func attack_burst(at: Vector2, color: Color, damage: int, count: int, strength: float) -> void:
-	var size_scale: float = damage_scale(damage)
+	var size_scale: float = damage_scale(damage,damage_stage)
 	burst(at,color,count,strength*size_scale,size_scale)
 
 func slash(at: Vector2, heavy: bool = false, damage: int = 0) -> void:
-	slashes.append({"p": at, "life": 0.38, "heavy": heavy, "flip": cosmetic.randi_range(0, 1) * 2 - 1,"scale":damage_scale(damage)})
+	slashes.append({"p": at, "life": 0.38, "heavy": heavy, "flip": cosmetic.randi_range(0, 1) * 2 - 1,"scale":damage_scale(damage,damage_stage)})
 	attack_burst(at, Color("efc1ab"),damage,22 if heavy else 10,180)
 
 func activate_circle(at: Vector2, color: Color, radius: float = 90, duration: float = 0.8, track_world: bool = false) -> void:

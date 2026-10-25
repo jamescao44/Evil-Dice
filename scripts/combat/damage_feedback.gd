@@ -7,7 +7,7 @@ const INTRO := 0.12
 const STEP_TIME := 0.36
 const STEP_ACCELERATION := 0.12
 const MAX_STEP_SPEED := 2.5
-const MAX_ADDITION_PITCH := 1.5
+const MAX_ADDITION_PITCH := 1.15
 const FLIGHT_TIME := 0.25
 const IMPACT_TIME := 0.38
 const COMBINE_TIME := 0.28
@@ -268,7 +268,7 @@ func _process(delta: float) -> void:
 				var increased: bool = step.base_after > base_value or step.after > value
 				_impact(step.base_after,step.after,step_color(step))
 				if increased:
-					battle._sound("item/pluck_001",minf(MAX_ADDITION_PITCH,0.9+addition_count*0.06),-22)
+					battle._sound("item/damage_knock",minf(MAX_ADDITION_PITCH,0.85+addition_count*0.03),-22)
 					addition_count += 1
 			if age >= STEP_TIME: _advance()
 	queue_redraw()

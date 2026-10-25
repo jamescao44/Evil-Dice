@@ -119,7 +119,7 @@ func pet_checks() -> void:
 	m.apply_enemy_status(0,m.Status.BURNING,1)
 	check(m.enemy_status_count(0,m.Status.BURNING) == 3,"Lizard adds two Burning stacks")
 	for id in ["pet_slime","pet_ghost","pet_dragon"]: m.acquire_relic(id)
-	check(m.relics.items.size() == 5 and m.RelicEffects.Sets.collection_complete(m.relics.items,"pets"),"Pet set retains five inventory slots")
+	check(m.relics.items.size() == 1 and m.RelicEffects.Sets.collection_complete(m.relics.items,"pets"),"Pet set fuses into one inventory slot")
 	m.hp = 1; m.RelicEffects.attack_used(m)
 	check(m.hp == 3,"Complete pets double Bat's heal")
 	m.apply_enemy_status(1,m.Status.BURNING,1)
@@ -132,7 +132,7 @@ func pet_checks() -> void:
 	m.sell_relic(m.relics.index_of("pet_ghost"))
 	check(not m.RelicEffects.Sets.collection_complete(m.relics.items,"pets"),"Selling a pet disables collection upgrades")
 	m.hp = 1; m.RelicEffects.attack_used(m)
-	check(m.hp == 2,"Bat returns to its normal effect after a pet is sold")
+	check(m.hp == 1,"Selling the pet fusion removes the Bat effect")
 
 func secondary_damage_checks() -> void:
 	var m = fresh(); m.acquire_relic("overflow_prism")

@@ -21,6 +21,12 @@ func form(m, indices: Array) -> void:
 	for index in indices: m.dice_turn.select(index)
 	check(not m.form_selected_skill().is_empty(),"Valid group forms")
 
+## Automatically generated bonuses finish before another manual combination can be formed.
+func cast(m) -> Array:
+	var events: Array = m.apply_player(0)
+	while m.phase == "player" and m.pending.cast_source != "manual": events.append_array(m.apply_player())
+	return events
+
 func _initialize() -> void:
 	var m = fresh()
 	m.relics.add("magic_sword")
@@ -32,9 +38,9 @@ func _initialize() -> void:
 	var previous_id: int = m.dice_turn.turn_id
 	for chain in range(3):
 		m.roll_pool(false,[1,2,3,4,5,6])
-		form(m,[0,1,2]); m.apply_player(0)
+		form(m,[0,1,2]); cast(m)
 		form(m,[3,4,5])
-		var events: Array = m.apply_player(0)
+		var events: Array = cast(m)
 		check(m.phase == "roll" and m.dice_turn.rolls_left == 3 and m.dice_turn.committed.is_empty(),"Bonus restores the full pool")
 		check(m.bonus_turn_count == chain+1 and m.dice_turn.turn_id > previous_id,"Each bonus gets a new settlement identity")
 		previous_id = m.dice_turn.turn_id
@@ -53,7 +59,7 @@ func _initialize() -> void:
 	m.end_round(); m._complete_relic_turn()
 	check(m.reroll_progress == 8 and m.relics.items[0].turns == 1,"Repeated settlement cannot duplicate rewards or counters")
 	m = fresh(); m.roll_pool(false,[1,2,3,4,5,6])
-	form(m,[0,1,2]); m.apply_player(0)
+	form(m,[0,1,2]); cast(m)
 	form(m,[3,4,5]); m.cancel_formed_skill()
 	check(m.bonus_turn_count == 0 and m.dice_turn.committed.size() == 3,"Cancelling the last straight cannot earn a bonus")
 	m.tarot_effects.extra_uses = 2

@@ -199,7 +199,7 @@ func copy_checks() -> void:
 func curse_and_currency_checks() -> void:
 	for id in Catalog.CURSED_DICE:
 		var m = fresh([id,"disguise_mask","ancient_tentacle"])
-		check(id in Catalog.DISABLED,"Cursed face modifiers remain temporarily disabled")
+		check((id in Catalog.DISABLED) == (id != "cursed_die"),"Only the redesigned six-face curse is enabled")
 		m.roll_pool(false,[1,2,3,4,5,6])
 		check(m.dice_turn.values == [1,2,3,4,5,6],"Disabled curses cannot rewrite the six-die pool")
 		for other in Catalog.CURSED_DICE:

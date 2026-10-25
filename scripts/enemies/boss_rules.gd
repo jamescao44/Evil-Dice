@@ -58,6 +58,7 @@ static func enter_second_phase(model, index: int) -> bool:
 	enemy.attack_boost = false
 	enemy.erase("healthy_max_hp")
 	enemy.erase("statuses")
+	enemy.erase("potion_x_phase")
 	enemy.intent = {"skill":"rest","type":"rest","target":index,"amount":0,"name":"PHASE II"}
 	match enemy.role:
 		Catalog.Role.COMMANDER: Commander.enter_phase_two(model,index)

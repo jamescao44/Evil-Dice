@@ -1,6 +1,7 @@
 extends RefCounted
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Drops = preload("res://scripts/relics/relic_drop_table.gd")
+const Conditions = preload("res://scripts/relics/relic_conditions.gd")
 const Sets = preload("res://scripts/relics/relic_sets.gd")
 var items: Array = []
 
@@ -27,6 +28,7 @@ func move(from: int, to: int) -> bool:
 	return true
 
 func can_add(id: String, replace_index: int = -1) -> bool:
+	if not Conditions.loot_allowed(self,id): return false
 	if Catalog.CURSED_DICE.has(id):
 		for slot in range(items.size()):
 			if slot != replace_index and Catalog.CURSED_DICE.has(items[slot].id): return false
@@ -83,3 +85,7 @@ func offers(rng: RandomNumberGenerator, count: int = 3, rarity_weights: Array = 
 		if id.is_empty(): break
 		choices.append(id)
 	return choices
+
+## The curse checks every visible die, including spent dice that remain on screen.
+func allows_dice_skill(values: Array) -> bool:
+	return not has("cursed_die") or 6 in values

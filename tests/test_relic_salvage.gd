@@ -83,7 +83,7 @@ func upgrade_rules() -> void:
 	for progress in range(10):
 		m.reroll_progress = progress
 		check(m.chest_tier() == 0 and m.open_chest().is_empty(),"No milestone below ten")
-	m.reroll_progress = 10; m.chest_pity.misses = [2,3,3]
+	m.reroll_progress = 10; m.chest_pity.misses = [2,4,4]
 	check(m.open_chest(2).is_empty() and m.reroll_progress == 10,"Higher starting tiers cannot be requested")
 	var prizes: Array = m.open_chest()
 	check(m.reroll_progress == 0 and m.chest_start_tier == 1 and m.opened_chest_tier == 3,"Ten points starts Perfect with normal upgrades")
@@ -93,7 +93,7 @@ func upgrade_rules() -> void:
 	var rng := RandomNumberGenerator.new(); rng.seed = 20261024
 	var counts := [0,0,0,0]
 	for n in range(20000): counts[m.Chests.roll_wave_tier(rng,[0,0,0],1)] += 1
-	check(counts[0] == 0 and absf(counts[1]/20000.0-0.75) < 0.015 and absf(counts[2]/20000.0-0.1875) < 0.015 and absf(counts[3]/20000.0-0.0625) < 0.015,"Starting Perfect preserves 25 percent per-step natural odds")
+	check(counts[0] == 0 and absf(counts[1]/20000.0-0.80) < 0.015 and absf(counts[2]/20000.0-0.16) < 0.015 and absf(counts[3]/20000.0-0.04) < 0.015,"Starting Perfect preserves 20 percent per-step natural odds")
 
 func capture(g, label: String) -> void:
 	if "--capture" not in OS.get_cmdline_user_args() or DisplayServer.get_name() == "headless": return
@@ -108,7 +108,7 @@ func layout(portrait: bool) -> void:
 	root.add_child(g); g.muted = true; g.speed = 2
 	g.model.reroll_progress = 10
 	await capture(g,"meter")
-	g.model.chest_pity.misses = [0,3,3]
+	g.model.chest_pity.misses = [0,4,4]
 	g._reward_sequence()
 	check(g.chest.tier == 1 and g.chest.final_tier == 3 and g.chest.upgrade_mode,"Real reroll presentation begins at Perfect, hiding locked upgrades")
 	g.run_id += 1 # End the asynchronous fixture without collecting its prizes.

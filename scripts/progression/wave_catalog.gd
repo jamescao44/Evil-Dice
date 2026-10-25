@@ -42,26 +42,26 @@ const SQUADS := [
 	{"introduction":false,"units":[{"role":Enemy.Role.PALADIN,"level":13,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":12,"elite":true},{"role":Enemy.Role.ARCHER,"level":13}]},
 	# 2-10: Boss：精灵魔剑士；双阶段
 	{"introduction":true,"units":[{"role":Enemy.Role.SPELLSWORD,"level":11,"elite":true}]},
-	# 3-1: 断层：重甲与火力
-	{"introduction":true,"units":[{"role":Enemy.Role.PALADIN,"level":14,"elite":true},{"role":Enemy.Role.MAGE,"level":13,"elite":true},{"role":Enemy.Role.ARCHER,"level":14}]},
-	# 3-2: 缓冲：已知远程小队
-	{"introduction":false,"units":[{"role":Enemy.Role.VANGUARD,"level":14,"elite":true},{"role":Enemy.Role.ARCHER,"level":14,"elite":true},{"role":Enemy.Role.MAGE,"level":13,"elite":true}]},
+	# 3-1: 重甲压力
+	{"introduction":true,"units":[{"role":Enemy.Role.PALADIN,"level":12,"elite":true},{"role":Enemy.Role.MAGE,"level":12,"elite":true},{"role":Enemy.Role.ARCHER,"level":12}]},
+	# 3-2: 缓冲：远程小队
+	{"introduction":false,"units":[{"role":Enemy.Role.VANGUARD,"level":13,"elite":true},{"role":Enemy.Role.ARCHER,"level":12,"elite":true},{"role":Enemy.Role.MAGE,"level":12,"elite":true}]},
 	# 3-3: 熟悉：祝福与保护
-	{"introduction":false,"units":[{"role":Enemy.Role.PALADIN,"level":14},{"role":Enemy.Role.HIGH_PRIEST,"level":14},{"role":Enemy.Role.VANGUARD,"level":14,"elite":true}]},
-	# 3-4: 断层：双线压力
-	{"introduction":true,"units":[{"role":Enemy.Role.PALADIN,"level":16,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":15,"elite":true},{"role":Enemy.Role.MAGE,"level":14,"elite":true}]},
-	# 3-5: 缓冲：远程与群疗
-	{"introduction":false,"units":[{"role":Enemy.Role.VANGUARD,"level":16,"elite":true},{"role":Enemy.Role.ARCHER,"level":16,"elite":true},{"role":Enemy.Role.MAGE,"level":15,"elite":true}]},
+	{"introduction":false,"units":[{"role":Enemy.Role.PALADIN,"level":12},{"role":Enemy.Role.HIGH_PRIEST,"level":13},{"role":Enemy.Role.VANGUARD,"level":13,"elite":true}]},
+	# 3-4: 跃升：双线压力
+	{"introduction":true,"units":[{"role":Enemy.Role.PALADIN,"level":13,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":13,"elite":true},{"role":Enemy.Role.MAGE,"level":13}]},
+	# 3-5: 缓冲：远程火力
+	{"introduction":false,"units":[{"role":Enemy.Role.VANGUARD,"level":14,"elite":true},{"role":Enemy.Role.ARCHER,"level":13,"elite":true},{"role":Enemy.Role.MAGE,"level":13,"elite":true}]},
 	# 3-6: 熟悉：蓄力与支援
-	{"introduction":false,"units":[{"role":Enemy.Role.HIGH_PRIEST,"level":16,"elite":true},{"role":Enemy.Role.VANGUARD,"level":16,"elite":true},{"role":Enemy.Role.MAGE,"level":15,"elite":true}]},
-	# 3-7: 断层：内殿卫队
-	{"introduction":true,"units":[{"role":Enemy.Role.PALADIN,"level":18,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":17,"elite":true},{"role":Enemy.Role.ARCHER,"level":18}]},
+	{"introduction":false,"units":[{"role":Enemy.Role.HIGH_PRIEST,"level":14,"elite":true},{"role":Enemy.Role.VANGUARD,"level":14,"elite":true},{"role":Enemy.Role.MAGE,"level":13,"elite":true}]},
+	# 3-7: 跃升：内殿卫队
+	{"introduction":true,"units":[{"role":Enemy.Role.PALADIN,"level":14,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":14,"elite":true},{"role":Enemy.Role.ARCHER,"level":14}]},
 	# 3-8: 缓冲：破阵后的火力
-	{"introduction":false,"units":[{"role":Enemy.Role.VANGUARD,"level":17,"elite":true},{"role":Enemy.Role.MAGE,"level":18,"elite":true},{"role":Enemy.Role.ARCHER,"level":17,"elite":true}]},
+	{"introduction":false,"units":[{"role":Enemy.Role.VANGUARD,"level":15,"elite":true},{"role":Enemy.Role.MAGE,"level":14,"elite":true},{"role":Enemy.Role.ARCHER,"level":14,"elite":true}]},
 	# 3-9: Boss前压力：最终护卫
-	{"introduction":false,"units":[{"role":Enemy.Role.PALADIN,"level":17,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":18,"elite":true},{"role":Enemy.Role.MAGE,"level":17,"elite":true}]},
+	{"introduction":false,"units":[{"role":Enemy.Role.PALADIN,"level":14,"elite":true},{"role":Enemy.Role.HIGH_PRIEST,"level":15,"elite":true},{"role":Enemy.Role.MAGE,"level":14,"elite":true}]},
 	# 3-10: Boss：狂热法师与恶魔契约
-	{"introduction":true,"units":[{"role":Enemy.Role.FANATIC,"level":13,"elite":true}]},
+	{"introduction":true,"units":[{"role":Enemy.Role.FANATIC,"level":11,"elite":true}]},
 ]
 const COUNT := 31
 const CITY_STAGE := COUNT-1
@@ -96,6 +96,7 @@ static func create(stage: int, rng: RandomNumberGenerator) -> Array:
 	var result: Array = []
 	for entry in SQUADS[stage].units:
 		var unit: Dictionary = Enemy.make(entry.role,entry.level,entry.get("elite",false))
+		if stage >= 20: unit.soul_reward_factor = 1.5
 		if entry.has("reinforcement_level"): unit.reinforcement_level = entry.reinforcement_level
 		result.append(unit)
 	for i in range(result.size()-1,0,-1):

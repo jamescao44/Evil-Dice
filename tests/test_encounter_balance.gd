@@ -60,7 +60,7 @@ func _initialize() -> void:
 		check(actions.size() == (2 if id == "pet_dragon" else 1) and actions.all(func(a): return a.amount == (15 if id == "pet_dragon" else 20)),"Pets preserve trigger counts with revised amounts")
 	var session = Session.new(42)
 	session.model.reroll_progress = 10
-	session.model.chest_pity.misses = [0,3,3]
+	session.model.chest_pity.misses = [0,4,4]
 	var claimed: Dictionary = session.command({"action":"treasure"})
 	check(claimed.ok and claimed.state.chest_tier == 3 and claimed.state.rewards.size() == 5,"CLI uses the shared reroll chest upgrade chain")
 	print("Encounter balance: %d checks, %d failures" % [checks,failures])

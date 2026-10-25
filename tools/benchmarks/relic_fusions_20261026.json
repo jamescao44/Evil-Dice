@@ -1,0 +1,69 @@
+{
+  "samples": 40,
+  "conditions": {
+    "notes": [
+      "Supplemental fusion comparisons: acquisition budgets deliberately differ and are reported explicitly.",
+      "Identical supporting relics; ten turns, LV20, same seeds and policies as primary benchmark.",
+      "No free tarot, charges, loot or XP."
+    ]
+  },
+  "builds": [
+    {
+      "id": "five_bones",
+      "family": "items",
+      "items": [
+        "unknown_arm",
+        "unknown_pelvis",
+        "unknown_leg",
+        "unknown_sternum",
+        "unknown_skull",
+        "magic_slingshot",
+        "steel_sword",
+        "holy_grail"
+      ],
+      "budget": [
+        3,
+        3,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "completed_witch",
+      "family": "items",
+      "items": [
+        "unknown_arm",
+        "unknown_pelvis",
+        "unknown_leg",
+        "unknown_sternum",
+        "unknown_skull",
+        "unidentified_ring",
+        "magic_slingshot",
+        "steel_sword",
+        "holy_grail"
+      ],
+      "budget": [
+        3,
+        3,
+        2,
+        1
+      ]
+    },
+    {
+      "id": "dragon_same_support",
+      "family": "items",
+      "items": [
+        "pet_dragon",
+        "magic_slingshot",
+        "steel_sword",
+        "holy_grail"
+      ],
+      "budget": [
+        0,
+        1,
+        1,
+        2
+      ]
+    }
+  ]
+}

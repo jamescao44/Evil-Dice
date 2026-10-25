@@ -3,6 +3,7 @@ extends "res://scripts/combat/battle_rules.gd"
 const Chests = preload("res://scripts/rewards/chest_rules.gd")
 const ChestPity = preload("res://scripts/rewards/chest_pity.gd")
 var chest_pity = ChestPity.new() # Meta progression: deliberately survives reset_run().
+var run_generation: int = 0 # Transient identity for repeated runs using the same model.
 const Rewards = preload("res://scripts/rewards/reward_catalog.gd")
 const Tarot = preload("res://scripts/tarot/tarot_catalog.gd")
 const TarotInventory = preload("res://scripts/tarot/tarot_inventory.gd")
@@ -212,6 +213,7 @@ func _init(seed_value: int = -1) -> void:
 
 ## Start a fresh run while retaining persistent chest pity.
 func reset_run() -> void:
+	run_generation += 1
 	super.reset()
 	shop.reset()
 	stage = 0
@@ -273,7 +275,7 @@ func _bank_unused_rolls() -> void:
 	treasure_settled_turn = dice_turn.turn_id
 	if hp <= 0 or RelicEffects.has_flag(relics.items,"no_treasure"): return
 	var previous: int = reroll_progress
-	reroll_progress = mini(CHEST_THRESHOLDS[-1],reroll_progress + maxi(0,dice_turn.rolls_left))
+	reroll_progress = mini(CHEST_THRESHOLDS[-1],reroll_progress + dice_turn.rewardable_rolls())
 	if reroll_progress > previous: reroll_progress_changed.emit(previous,reroll_progress)
 
 ## Start treasure receipts immediately, before leftover healing and enemy actions.
@@ -462,6 +464,7 @@ func damage_cap(kind: int, target: int) -> int:
 
 func _load_wave() -> void:
 	relic_skills.wave_started()
+	roll_chip_casts.clear()
 	expire_tarot_projections()
 	relic_skills.queued.clear()
 	relic_skills.resume_phase = ""

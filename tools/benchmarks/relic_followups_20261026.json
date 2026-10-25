@@ -1,0 +1,80 @@
+{
+  "samples": 40,
+  "conditions": {
+    "turns": 10,
+    "level": 20,
+    "incoming_attempt": 30,
+    "perfect_probability": 0.35,
+    "targets": [
+      1,
+      3
+    ],
+    "budget": "1 common, 3 rare, 2 epic, 1 legendary/cursed, counted before fusion",
+    "notes": [
+      "Reference replaces now-Epic Magic Sword with Rare Cookie Sundae; any new food fusion is retained.",
+      "No tarot, loot, XP, precharged counters or kills.",
+      "One-roll policy permits generated chip casts but no manual skills.",
+      "Same seed and decision policy as original benchmark; all seven relic inputs are ordered.",
+      "Candidates are illustrative loadouts, not an exhaustive search.",
+      "Follow-up ablations isolate Ticket and check direct bone attacks with Holy Grail."
+    ]
+  },
+  "builds": [
+    {
+      "id": "items_steel_no_ticket",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "worn_bow",
+        "magic_slingshot",
+        "oreo_sundae",
+        "hamburger",
+        "steel_sword",
+        "pet_dragon",
+        "disguise_mask"
+      ]
+    },
+    {
+      "id": "items_grail_bones",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "worn_bow",
+        "magic_slingshot",
+        "unknown_skull",
+        "unknown_sternum",
+        "steel_sword",
+        "disguise_mask",
+        "holy_grail"
+      ]
+    },
+    {
+      "id": "items_grail_bones_ticket",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "magic_slingshot",
+        "unknown_skull",
+        "unknown_sternum",
+        "steel_sword",
+        "disguise_mask",
+        "holy_grail"
+      ]
+    },
+    {
+      "id": "burst_sword_no_ticket",
+      "family": "burst",
+      "kind": "candidate",
+      "items": [
+        "glass_marble",
+        "oreo_sundae",
+        "steel_marble",
+        "light_sword",
+        "black_chip",
+        "magic_sword",
+        "royal_seal"
+      ]
+    }
+  ]
+}

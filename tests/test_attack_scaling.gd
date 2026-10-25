@@ -11,23 +11,26 @@ func check(ok: bool, label: String) -> void:
 
 ## Cover logarithmic sizing, per-target modifiers, overkill, instant kills and level caps.
 func _initialize() -> void:
-	for damage in [0,1,5,10,100,1000]:
-		var expected: float = 1 if damage <= 10 else 2 if damage == 100 else 3
-		check(is_equal_approx(Effects.damage_scale(damage),expected),"Attack scale uses the number's log10 ratio")
-		check(Effects.damage_font_size(damage) == roundi(24*expected),"Number size uses the identical scale")
+	for stage in [0,10,20]:
+		var reference: int = [20,100,300][stage/10]
+		check(Effects.damage_scale(reference,stage) == 1.0,"Level reference starts at regular size")
+		check(is_equal_approx(Effects.damage_scale(reference*10,stage),1.25),"Tenfold damage grows effects only 25 percent")
+		check(Effects.damage_scale(1000000000,stage) == 1.4,"Impact size has a hard ceiling")
+		check(Effects.damage_font_size(1000000000,stage) == 38,"Damage numbers have an independent readable ceiling")
+	check(Effects.damage_scale(1000,20) < Effects.damage_scale(1000,0),"The next level normalizes the same absolute damage")
 	var fx = Effects.new()
 	root.add_child(fx)
 	fx.set_process(false)
 	fx.world_transform = Transform2D(0,Vector2(40,20)).scaled(Vector2.ONE*1.2)
 	var targets := [Vector2(400,200),Vector2(600,200)]
-	fx.flame_cast(3,Vector2(120,300),targets,0.78,[10,1000])
-	check(is_equal_approx(fx.spell.scales[0],1.0) and is_equal_approx(fx.spell.scales[1],3.0),"Area targets have separate scales instead of sharing the largest hit")
+	fx.flame_cast(3,Vector2(120,300),targets,0.78,[20,200])
+	check(is_equal_approx(fx.spell.scales[0],1.0) and is_equal_approx(fx.spell.scales[1],1.25),"Area targets have separate scales instead of sharing the largest hit")
 	var projected: Dictionary = fx.projected_spell(fx.spell)
 	for i in range(targets.size()): check(projected.targets[i].is_equal_approx(targets[i]),"Size scaling does not shift targets")
 	check(projected.from.is_equal_approx(Vector2(120,300)),"Size scaling does not shift the origin")
-	fx.slash(Vector2.ZERO,false,100)
-	check(is_equal_approx(fx.slashes[-1].scale,2.0) and fx.particles.size() == 10,"Impact grows while particle count stays bounded")
-	check(fx.particles.all(func(p): return p.size >= 6 and p.size <= 14),"Impact sparks grow with damage")
+	fx.slash(Vector2.ZERO,false,200)
+	check(is_equal_approx(fx.slashes[-1].scale,1.25) and fx.particles.size() == 10,"Impact grows while particle count stays bounded")
+	check(fx.particles.all(func(p): return p.size >= 3.75 and p.size <= 8.75),"Impact sparks grow with damage")
 	var model = Run.new(98)
 	model.enemies = [model.make_enemy(3),model.make_enemy(2)]
 	model.enemies[0].hp = 1

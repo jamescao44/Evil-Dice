@@ -18,7 +18,7 @@ func _initialize() -> void: call_deferred("run")
 func hit_display_checks() -> void:
 	check(Battle.DamageFeedback.number(5.01) == "6" and Battle.DamageFeedback.number(5.0) == "5", "Base display rounds upward without changing whole values")
 	check(Battle.DamageFeedback.number(1.25,true) == "1.25", "Multiplier display retains its decimal precision")
-	for sample in [[0,24],[1,24],[5,24],[10,24],[30,35],[100,48],[1000,72],[10000,96]]:
+	for sample in [[0,24],[1,24],[20,24],[200,30],[2000,36],[20000,38]]:
 		check(Battle.Effects.damage_font_size(sample[0]) == sample[1],"Damage font follows log10 with a regular-size floor")
 	for sample in [[0,0],[99,0],[100,0],[1000,4],[10000,8],[100000000,12]]:
 		check(is_equal_approx(Battle.DamageFeedback.damage_tremble_amplitude(sample[0]),sample[1]),"Damage tremble has a silent threshold, logarithmic growth, and readable cap")
@@ -91,7 +91,7 @@ func hit_display_checks() -> void:
 		m.acquire_relic("prismatic_stone")
 		m.perfect_relic_ready = true
 		hit = m.resolve_perfect_relic()[0]
-		check(hit.amount == 1 and Battle._damage_popup(hit) == "-160","Prismatic lethal strikes show their full damage in both fight types")
+		check(hit.amount == 1 and Battle._damage_popup(hit) == "-130","Prismatic lethal strikes show their full damage in both fight types")
 
 func model_checks() -> void:
 	for city in [false,true]:
@@ -149,7 +149,7 @@ func model_checks() -> void:
 	m._attack_relic_effects(0,20,Rules.classify([1,2,3]))
 	check(activated == ["bloodstone","orange_stone"],"Actual heal and status procs emit activation notifications")
 	activated.clear()
-	m.apply_affliction(Status.FROZEN,1)
+	m.apply_affliction(Status.BURNING,1)
 	check(activated == ["orange_stone"],"A stone glows when its immunity blocks an effect")
 	activated.clear()
 	m.relics.items[m.relics.index_of("magic_shield")].charges = 1
@@ -266,7 +266,7 @@ func scene_checks(portrait: bool) -> void:
 	g.view_phase = "resolving"
 	var panel = g.damage_feedback
 	g._show_events([Rules.damage_event(0,1,1234)])
-	check(g.fx.floats.back().text == "-1234" and g.fx.floats.back().size == 74,"Battle renderer uses full hit damage for both the number and its logarithmic size")
+	check(g.fx.floats.back().text == "-1234" and g.fx.floats.back().size == 35,"Battle renderer uses full hit damage for both the number and its logarithmic size")
 	if "--visual" in OS.get_cmdline_user_args():
 		g.fx.floating(g._player_point()-Vector2(0,45),"-10",g.RED,g.fx.damage_font_size(10))
 		await capture(g,"hit-sizes")

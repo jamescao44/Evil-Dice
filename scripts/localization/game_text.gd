@@ -101,14 +101,19 @@ static func lines(source: String, font: Font, size: int, width: float) -> Packed
 	var key: Array = [translated,font.get_instance_id(),size,width,language]
 	if _line_cache.has(key): return _line_cache[key].duplicate()
 	if not font.changed.is_connected(clear_line_cache): font.changed.connect(clear_line_cache)
-	var paragraph := TextParagraph.new()
-	paragraph.width = width
-	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
-	paragraph.add_string(translated, font, size, language)
 	var result := PackedStringArray()
-	for i in range(paragraph.get_line_count()):
-		var span := paragraph.get_line_range(i)
-		result.append(translated.substr(span.x, span.y - span.x).strip_edges())
+	# TextParagraph shapes one paragraph; shape each explicit newline separately.
+	for block in translated.split("\n"):
+		if block.is_empty():
+			result.append("")
+			continue
+		var paragraph := TextParagraph.new()
+		paragraph.width = width
+		paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+		paragraph.add_string(block, font, size, language)
+		for i in range(paragraph.get_line_count()):
+			var span := paragraph.get_line_range(i)
+			result.append(block.substr(span.x, span.y - span.x).strip_edges())
 	if _line_cache.size() >= LINE_CACHE_LIMIT: _line_cache.clear()
 	_line_cache[key] = result.duplicate()
 	return result

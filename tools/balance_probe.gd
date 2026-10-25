@@ -214,16 +214,17 @@ func _initialize() -> void:
 	if args.size() > 1: perfect_rate = float(args[1])
 	if args.size() > 4: last_wave = int(args[4])
 	var probes: Array = []; var runs: Array = []
+	var third_probes: bool = args.size() > 2 and args[2] == "third"
 	var meal_probes: bool = args.size() > 2 and args[2] == "meals"
-	var selected_waves: Array = range(11,30) if meal_probes else [] if args.size() > 2 and args[2] == "runs" else WAVES
+	var selected_waves: Array = range(21,31) if third_probes else range(11,30) if meal_probes else [] if args.size() > 2 and args[2] == "runs" else WAVES
 	var offset: int = int(args[3]) if args.size() > 3 else 0
 	for wave in selected_waves:
-		for build in (["meal_core","meal_synergy"] if meal_probes else ["bare","typical","dragon_only","dragon_build","mithril_only","reaper_only","copy_build"]):
+		for build in (["typical","meal_core","meal_synergy"] if third_probes else ["meal_core","meal_synergy"] if meal_probes else ["bare","typical","dragon_only","dragon_build","mithril_only","reaper_only","copy_build"]):
 			for seed_value in SEEDS: probes.append(encounter(wave,build,seed_value))
 		if wave in [5,10,15,20]:
 			for seed_value in SEEDS: probes.append(encounter(wave,"dragon_only",seed_value,true))
 		print("Probed wave ",wave)
-	for seed_value in ([] if meal_probes else SEEDS):
+	for seed_value in ([] if meal_probes or third_probes else SEEDS):
 		runs.append(full_run(seed_value+offset)); print("Run ",seed_value+offset,": ",runs[-1].outcome," wave ",runs[-1].wave)
 	var file := FileAccess.open(output,FileAccess.WRITE)
 	file.store_string(JSON.stringify({"perfect_rate":perfect_rate,"probes":probes,"runs":runs,"failures":failures},"\t"))

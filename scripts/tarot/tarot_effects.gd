@@ -164,18 +164,20 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	# Siege opens its next turn lazily. A committed tarot can begin that turn,
 	# while inspecting/canceling a choice must not grant another regen tick.
 	var events: Array = model.begin_round() if model.phase == "round_end" and not repeating else []
-	if not committed_grants.get(instance_id,{}).get("bookmark_paid",false): events.append_array(model.RelicEffects.tarot_used(model))
+	if not committed_grants.get(instance_id,{}).get("bookmark_paid",false): events.append_array(model.RelicEffects.tarot_used(model,not repeating))
 	var reward: String = ""
-	var carry: int = pending_repeat.get("carry",0) if repeating else model.dice_turn.rolls_left
+	var carry: int = pending_repeat.get("carry",0) if repeating else model.dice_turn.rewardable_rolls()
 	match id:
 		"fool":
 			var original: Array = model.relics.items.map(func(item): return item.id)
 			var pool: Array = Relics.ITEMS.keys().filter(func(key): return key not in original)
 			var replacements: Array = []
+			var rerolled = model.Relics.new()
 			for i in range(original.size()):
-				var replacement: String = Drops.draw(model.reward_rng,pool,model.relic_drop_weights())
+				var replacement: String = Drops.draw(model.reward_rng,pool.filter(func(key): return model.RelicEffects.Conditions.loot_allowed(rerolled,key)),model.relic_drop_weights())
 				if replacement.is_empty(): return {"error":"No eligible relic is available."}
 				replacements.append(model.relics._new_item(replacement))
+				rerolled.items = replacements
 				pool.erase(replacement)
 				if Relics.CURSED_DICE.has(replacement): pool = pool.filter(func(key): return not Relics.CURSED_DICE.has(key))
 			var old_max: int = model.max_hp

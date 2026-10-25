@@ -8,8 +8,8 @@ const REROLL_COST := 10
 const REROLL_TIER := 1
 const THRESHOLDS := [0, REROLL_COST]
 const MIN_RARITY := [0, 1, 2, 3]
-const UPGRADE_CHANCE := 0.25
-const PITY_ATTEMPTS := 4
+const UPGRADE_CHANCE := 0.20
+const PITY_ATTEMPTS := 5
 const TAROT_PRICE := 30
 
 static func tier_for_progress(progress: int) -> int:

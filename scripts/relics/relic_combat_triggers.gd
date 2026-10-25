@@ -12,7 +12,7 @@ static func overflow(model, target: int, damage: int, hp_before: int, blocked: b
 	for entry in Effects.repeat_sources(model.relics.items,"overflow_prism"):
 		if model.attack_targets().is_empty(): break
 		Effects.Sequence.activate(model,entry)
-		events.append_array(Effects.Attack.apply(model,"overflow_prism",floori((damage-hp_before)*0.5),true))
+		events.append_array(Effects.Attack.apply(model,"overflow_prism",floori((damage-hp_before)*0.5),true,false,-1,{"no_damage_modifiers":true}))
 	return events
 
 ## Consume five stacks once at the threshold; explosions cannot ignite another explosion.

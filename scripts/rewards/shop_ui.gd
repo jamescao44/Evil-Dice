@@ -150,7 +150,7 @@ func detail_rect() -> Rect2:
 func buy_rect() -> Rect2:
 	return Rect2(48,1480,708,108) if portrait() else Rect2(396,710,490,68)
 
-## Refresh stays separate from purchasing and always costs fifty crystals.
+## Keep refresh separate from purchasing; the stock owns its escalating fee.
 func refresh_rect() -> Rect2:
 	return Rect2(48,1612,340,76) if portrait() else Rect2(52,715,290,58)
 
@@ -336,7 +336,7 @@ func _draw() -> void:
 	for i in range(8):
 		draw_line(Vector2(i*screen.x/7,0),Vector2(i*screen.x/7,screen.y),Color("33302a",0.18),2)
 	_text(Vector2(screen.x/2,180 if portrait() else 69),"Shop",58 if portrait() else 44)
-	_text(Vector2(screen.x/2,234 if portrait() else 108),GameText.format("WAVE %d",battle.model.shop.wave),26 if portrait() else 19,Color("a9a39c"))
+	_text(Vector2(screen.x/2,234 if portrait() else 108),"调试 · 无限血宝石" if battle.model.shop.debug_unlimited else GameText.format("WAVE %d",battle.model.shop.wave),26 if portrait() else 19,Color("a9a39c"))
 	battle.chest.draw_currency(self)
 	_draw_stall()
 	for i in range(battle.model.shop.offers.size()): _draw_offer(i)
@@ -347,7 +347,8 @@ func _draw() -> void:
 		for i in range(4,0,-1): Cards.panel(self,buy_rect().grow(i*5),Color(GOLD,0.04))
 	_button(buy_rect(),"CANCEL" if replacing else "DROP TO BUY" if dragging else "BUY",valid or replacing)
 	if over: draw_rect(buy_rect().grow(-6),Color(GOLD,0.8),false,3)
-	_button(refresh_rect(),GameText.format("REFRESH ALL · %d",Stock.REFRESH_PRICE),battle.model.blood_gems >= Stock.REFRESH_PRICE and not busy() and not replacing)
+	var refresh_price: int = battle.model.shop.refresh_price
+	_button(refresh_rect(),"刷新全部" if battle.model.shop.debug_unlimited else GameText.format("REFRESH ALL · %d",refresh_price),battle.model.shop.can_afford(battle.model,refresh_price) and not busy() and not replacing)
 	_button(leave_rect(),"LEAVE SHOP",not busy() and not replacing)
 	if refresh_flash > 0: draw_rect(Rect2(Vector2.ZERO,screen),Color(GOLD,refresh_flash*0.14))
 
@@ -368,7 +369,7 @@ func offer_name(offer: Dictionary) -> String:
 
 ## Reveal the exact soul amount only after this bottle has been purchased.
 func offer_description(offer: Dictionary) -> String:
-	if offer.kind == "relic": return GameText.text(Relics.ITEMS[offer.id].text)
+	if offer.kind == "relic": return Relics.short_description(offer.id,GameText.text)
 	if offer.kind == "tarot": return Cards.Catalog.description(offer.id)
 	if offer.sold: return GameText.format("Opened: +%d souls.",offer.souls)
 	return GameText.text("A sealed bottle of souls. Opens on purchase. Its contents are a mystery.")
@@ -399,7 +400,7 @@ func _draw_offer(slot: int) -> void:
 			Icons.paint(self,battle.chest.art,"soul_bottle",artwork)
 	var label := offer_name(offer)
 	_wrap(offer_name_rect(slot),label,offer_name_size(slot,label),color,true)
-	_price(Vector2(rect.get_center().x,rect.end.y-(10 if portrait() else 14)),offer.price,battle.model.blood_gems >= offer.price)
+	_price(Vector2(rect.get_center().x,rect.end.y-(10 if portrait() else 14)),offer.price,battle.model.shop.can_afford(battle.model,offer.price))
 
 ## Keep inspection on the shop page, with explicit buy or replacement cancellation.
 func _draw_detail() -> void:
@@ -418,4 +419,4 @@ func _draw_detail() -> void:
 	var size: int = 28 if portrait() else 23
 	while size > 18 and GameText.lines(description,battle.description_font,size,body.size.x).size()*size*1.3 > body.size.y: size -= 1
 	_wrap(body,description,size,Color("e7dfd1"))
-	_price(Vector2(rect.get_center().x,rect.end.y-14),offer.price,battle.model.blood_gems >= offer.price)
+	_price(Vector2(rect.get_center().x,rect.end.y-14),offer.price,battle.model.shop.can_afford(battle.model,offer.price))

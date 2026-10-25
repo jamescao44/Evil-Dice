@@ -48,8 +48,10 @@ func economy() -> void:
 			prepare_shop(m,[5,8,15][visit-1]) # Wave ten is now a boss, never a shop.
 			m.shop.number = visit-1
 			m.reward_rng.seed = seed_value
+			m.shop.refresh_price = 800
 			check(not m.advance_wave(),"Unvisited shop cannot advance")
 			check(m.shop.open(m) and m.shop.active,"Chosen shop opens once")
+			check(m.shop.refresh_price == 50,"A new shop visit resets the refresh fee")
 			check(m.shop.offers.size() == Stock.OFFER_COUNT,"Six relics, two tarot offers and one soul bottle")
 			var ids: Array = []
 			for i in range(Stock.OFFER_COUNT):
@@ -83,11 +85,16 @@ func economy() -> void:
 	balance = m.blood_gems
 	var snapshot: Array = m.shop.offers.duplicate(true)
 	check(m.shop.refresh(m) and m.blood_gems == balance-50 and m.shop.offers != snapshot and m.shop.offers.all(func(x): return not x.sold),"Fifty gems refresh all nine listings including the bottle")
+	check(m.shop.refresh_price == 100 and not m.shop.open(m) and m.shop.refresh_price == 100,"Successful refresh doubles its fee; reopening cannot reset it")
 	check(m.shop.offers.slice(0,6).all(func(x): return x.id != o.id or x.id == "codex_page"),"Refresh excludes owned unique relics")
 	m.blood_gems = 49; snapshot = m.shop.offers.duplicate(true)
 	var rng_state: int = m.reward_rng.state
-	check(not m.shop.refresh(m) and m.blood_gems == 49 and snapshot == m.shop.offers and rng_state == m.reward_rng.state,"Unaffordable refresh changes neither stock nor RNG")
+	check(not m.shop.refresh(m) and m.blood_gems == 49 and snapshot == m.shop.offers and rng_state == m.reward_rng.state and m.shop.refresh_price == 100,"Unaffordable refresh changes neither fee, stock nor RNG")
 	check(m.shop.buy(m,0).is_empty() and m.blood_gems == 49,"Unaffordable purchase has no side effects")
+	m.blood_gems = 10000
+	for price in [100,200,400]:
+		balance = m.blood_gems
+		check(m.shop.refresh(m) and m.blood_gems == balance-price and m.shop.refresh_price == price*2,"Successive refreshes charge the displayed fee and double the next")
 	m.blood_gems = 10000
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","bloodstone","contract","worn_dagger","worn_bow"]:
 		if m.relics.items.size() < 10: m.acquire_relic(id)
@@ -109,7 +116,7 @@ func economy() -> void:
 	check(rng_state == m.reward_rng.state and m.relics.items.size() == 10,"Purchase never rerolls contents or occupies inventory")
 	check(m.shop.buy(m,8).is_empty() and m.souls+5*m.character_level*(m.character_level-1) == 9+bottle.souls,"Repeated bottle purchase cannot duplicate souls")
 	m.reset_run()
-	check(not m.shop.active and m.shop.wave == -1 and m.shop.offers.is_empty(),"Restart clears visit and stock")
+	check(not m.shop.active and m.shop.wave == -1 and m.shop.offers.is_empty() and m.shop.refresh_price == 50,"Restart clears visit, stock and refresh fee")
 
 ## Verify store controls, layering, banner duration and return-to-battle in both layouts.
 func scene(portrait: bool) -> void:

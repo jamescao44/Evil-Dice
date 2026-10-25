@@ -27,7 +27,7 @@ func _initialize() -> void:
 		for id in chosen: check(inv.has(id) and not inv.can_add(id),"Fused ingredients stay unique")
 		if chosen.size()>1:
 			check(inv.items[1].ingredients==chosen,"Exact collected graphics and order retained")
-			var bonus: float = [0,0,0,0,10,30][chosen.size()]
+			var bonus: float = [0,0,0,0,8,15][chosen.size()]
 			check(is_equal_approx(Effects.base_damage(inv.items),bonus+(10 if "oreo_sundae" in chosen else 0)),"Only current tier bonus")
 	var m = fresh()
 	for id in ["fries","heart","armor","coin","worn_dagger","worn_bow","tissue_pack","pet_bat","bloodstone","runestone"]: check(m.acquire_relic(id),"Fill inventory")
@@ -36,8 +36,8 @@ func _initialize() -> void:
 	for id in ["lemon_soda","oreo_sundae","fried_chicken"]: check(m.acquire_relic(id),"Upgrade full inventory")
 	check(m.relics.items[0].id=="super_meal","All five form final meal")
 	var skill = m.Patterns.classify([1,2,3])
-	check(is_equal_approx(m.damage_multiplier(skill),3.135),"(1+.3+.6)*1.1*1.5; no earlier tier multiplier")
-	check(is_equal_approx(m.relic_base_damage(),47),"Sundae10 + final bonus30 + Runestone5 + Dagger2")
+	check(is_equal_approx(m.damage_multiplier(skill),2.717),"(1+.3+.6)*1.1*1.3; no earlier tier multiplier")
+	check(is_equal_approx(m.relic_base_damage(),32),"Sundae10 + final bonus15 + Runestone5 + Dagger2")
 	for i in range(50): check(m.relics.draw_one(m.reward_rng) not in foods,"Owned set ingredients excluded from rewards")
 	m = fresh(); m.acquire_relic("fried_chicken"); m.acquire_relic("codex_page")
 	check(is_equal_approx(m.damage_multiplier(skill),1.3),"Factor then addition")
@@ -69,11 +69,11 @@ func _initialize() -> void:
 	for id in ["lemon_soda","fries","hamburger","oreo_sundae"]: m.acquire_relic(id)
 	m.pending = m.Patterns.classify([1,2,3]); m.phase = "player"
 	m.apply_player(0)
-	check(m.enemies[0].hp == 9784,"Four-piece Fireball deals (5+10+10)*3.6*(1+.3+.6+.5) = 216")
+	check(m.enemies[0].hp == 9802,"Four-piece Fireball deals floor((5+10+8)*3.6*2.4) = 198")
 	m.acquire_relic("fried_chicken")
 	m.pending = m.Patterns.classify([1,2,3]); m.phase = "player"
 	m.apply_player(0)
-	check(m.enemies[0].hp == 9277,"Five-piece Fireball deals (5+10+30)*3.6*((1+.3+.6)*1.1*1.5) = 507")
+	check(m.enemies[0].hp == 9509,"Five-piece Fireball deals floor((5+10+15)*3.6*2.717) = 293")
 	m = fresh(); m.acquire_relic("lucky_die")
 	for i in range(10): Rolls.apply(m,range(6))
 	check(m.relics.items[0].throws==10,"Ready after ten throws")

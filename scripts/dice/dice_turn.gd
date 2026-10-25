@@ -3,6 +3,7 @@ extends RefCounted
 const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 const COUNT := 6
 const ROLLS := 3
+var selection_rules: RefCounted
 var active: bool = false
 var values: Array = [1, 2, 3, 4, 5, 6]
 var locked: Array = []
@@ -10,6 +11,7 @@ var selected: Array = []
 var groups: Array = []
 var committed: Array = []
 var rolls_left: int = ROLLS
+var ticket_rolls_left: int = 0
 var rolls_made: int = 0
 var last_perfect: bool = false
 var turn_id: int = 0
@@ -22,7 +24,7 @@ func reset() -> void:
 	selected.clear()
 	groups.clear()
 	committed.clear()
-	rolls_left = ROLLS
+	rolls_left = ROLLS+ticket_rolls_left
 	rolls_made = 0
 	last_perfect = false
 
@@ -47,7 +49,9 @@ func roll(rng: RandomNumberGenerator, perfect: bool, forced: Array = [], free: b
 	if not forced.is_empty() and (forced.size() != indices.size() or forced.any(func(face): return not face is int or face < 1 or face > 6)): return []
 	for offset in range(indices.size()):
 		values[indices[offset]] = rng.randi_range(1, 6) if forced.is_empty() else forced[offset]
-	if not free: rolls_left -= 1
+	if not free:
+		if rolls_left <= ticket_rolls_left: ticket_rolls_left = maxi(0,ticket_rolls_left-1)
+		rolls_left -= 1
 	rolls_made += 1
 	last_perfect = perfect
 	selected.clear()
@@ -63,6 +67,7 @@ func select(index: int) -> bool:
 
 ## Check a potential selection against patterns still possible in this pool.
 func can_select(index: int) -> bool:
+	if not skills_allowed(): return false
 	if index in locked or index < 0 or index >= COUNT: return false
 	return Patterns.can_extend(selection_values()+[values[index]],unused().map(func(i): return values[i]))
 
@@ -71,6 +76,7 @@ func selection_values() -> Array:
 
 ## Reserve a valid variable-length combination until it is used or cancelled.
 func form() -> Array:
+	if not skills_allowed(): return []
 	if not active or not has_rolled() or has_pending_group() or Patterns.classify(selection_values()).is_empty(): return []
 	var faces: Array = selection_values()
 	groups.append(selected.duplicate())
@@ -92,3 +98,11 @@ func commit_group(indices: Array) -> bool:
 	if not active or indices.is_empty() or not groups.has(indices) or indices.any(func(index): return index in committed): return false
 	committed.append_array(indices)
 	return true
+
+## Shared selection restrictions keep tap, drag, previews and CLI consistent.
+func skills_allowed() -> bool:
+	return selection_rules == null or selection_rules.allows_dice_skill(values)
+
+## Only ordinary unspent rolls contribute to reroll treasure or Temperance banking.
+func rewardable_rolls() -> int:
+	return maxi(0,rolls_left-ticket_rolls_left)

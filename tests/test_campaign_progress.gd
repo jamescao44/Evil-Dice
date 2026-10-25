@@ -21,6 +21,27 @@ func capture(view, name: String) -> void:
 	view.queue_redraw(); await process_frame; RenderingServer.force_draw()
 	root.get_texture().get_image().save_png("res://test-output/levels-20261025/"+name+".png")
 
+## An earlier completed level must not replace a replay's new relics or tarot inventory.
+func check_replayed_level(saved: Dictionary) -> void:
+	var campaign = Run.Campaign.new()
+	campaign.checkpoint = saved.duplicate(true); campaign.cleared_level = 1
+	var replay = Run.new(72)
+	replay.acquire_relic("witch_ghost"); replay.grant_tarot("magician"); replay.grant_tarot("strength")
+	finish_level(replay)
+	var items: Array = replay.relics.items.duplicate(true)
+	var cards: Array = replay.tarots.items.duplicate(true)
+	check(campaign.complete(replay),"Replayed level can commit its completed build")
+	check(campaign.checkpoint.relics == items and campaign.checkpoint.tarots == cards,"Earlier clear cannot suppress new relic and tarot checkpoint")
+	var latest: Dictionary = campaign.checkpoint.duplicate(true)
+	replay.acquire_relic("armor")
+	check(campaign.complete(replay) and campaign.checkpoint == latest,"Same completion remains idempotent")
+	campaign.start(replay)
+	check(replay.relics.items == items and replay.tarots.items == cards,"Continuation uses the latest replay build")
+	replay.reset_run(); replay.acquire_relic("steel_sword"); replay.grant_tarot("world")
+	finish_level(replay)
+	items = replay.relics.items.duplicate(true); cards = replay.tarots.items.duplicate(true)
+	check(campaign.complete(replay) and campaign.checkpoint.relics == items and campaign.checkpoint.tarots == cards,"Reusing a model for a fresh run can save the same level again")
+
 func run() -> void:
 	var m = Run.new(451)
 	for stage in range(30):
@@ -53,6 +74,7 @@ func run() -> void:
 	reopened.start(second)
 	check(second.stage == 10 and second.relics.items == saved.relics and second.character_level == saved.run.character_level,"Level-two defeat retries the entry build, not wave one or a farmed build")
 	check(campaign.checkpoint == saved,"Restored nested inventories never mutate the original save")
+	check_replayed_level(saved)
 	finish_level(second,19); check(reopened.complete(second) and reopened.next_level() == 3,"Level two unlocks level three")
 	reopened.start(second)
 	check(second.stage == 20 and second.hp == second.max_hp,"Third level restores its entry build")

@@ -31,12 +31,20 @@ func preview_upgrade(model, skill: MultiHitSkill) -> MultiHitSkill:
 		values.sort()
 		if values.back() < 6: values.append(values.back()+1)
 		else: values.push_front(values.front()-1)
-		var next: MultiHitSkill = Patterns.classify(values)
+		var next: MultiHitSkill = model.make_straight_skill(values)
 		next.source_dice = skill.dice.duplicate()
 		next.perfect = skill.perfect
 		next.royal_activations = upgraded.royal_activations+[entry]
 		upgraded = next
 	return upgraded
+
+## Split each eligible skill once; repeats retain the already configured hit budget.
+func configure_split(model, skill: MultiHitSkill) -> void:
+	if skill.split_attack or skill.cast_source in ["echo","relic"] or skill.pattern in ["cleanup","match_auto"]: return
+	if not skill.is_attack() or skill.hits_all() or model.is_instant_kill(skill): return
+	if not model.relics.has("split_arrow"): return
+	skill.split_attack = true
+	skill.base_uses *= 2
 
 ## Refresh the first-manual-skill upgrade only when entering a new wave.
 func wave_started() -> void:
@@ -48,7 +56,7 @@ func turn_started(model) -> void:
 	resume_phase = ""
 	for entry in Sequence.entries(model.relics.items):
 		if entry.item.id != "enchanted_missile": continue
-		var skill: MultiHitSkill = Patterns.classify([3,4,5])
+		var skill: MultiHitSkill = model.make_straight_skill([3,4,5])
 		skill.cast_source = "missile"
 		queued.append({"skill":skill,"activation":entry})
 	if not queued.is_empty():
@@ -57,6 +65,9 @@ func turn_started(model) -> void:
 
 ## Commit counters once per manual or missile cast, regardless of damage pulses.
 func cast_started(model, skill: MultiHitSkill) -> void:
+	if skill.split_attack:
+		for entry in Sequence.entries(model.relics.items):
+			if entry.item.id == "split_arrow": Sequence.activate(model,entry)
 	if not counts_as_cast(skill): return
 	skill.alternating_bonus = alternates(skill)
 	skill.relic_cast_locked = true
@@ -73,6 +84,7 @@ func cast_started(model, skill: MultiHitSkill) -> void:
 		if entry.item.id not in due: continue
 		var echo: MultiHitSkill = Skill.new(skill.kind,skill.face,skill.dice,skill.use_count())
 		echo.pattern = skill.pattern
+		echo.split_attack = skill.split_attack
 		echo.damage_ticks = skill.damage_ticks
 		echo.target = skill.target
 		echo.cast_source = "echo"
@@ -90,13 +102,12 @@ func queue_character_fireballs(source: MultiHitSkill) -> void:
 	for i in range(2):
 		var fireball: MultiHitSkill = Patterns.classify([3,4,5])
 		fireball.cast_source = "character_bonus"
-		fireball.inherited_damage = source.calculated_damage_total
+		fireball.inherited_damage = source.calculated_damage_total*(2 if source.split_attack else 1)
 		fireball.effect_multiplier = source.effect_multiplier
 		fireball.critical = source.critical
 		fireball.perfect = source.perfect
 		fireball.amplifier_locked = true
 		fireball.relic_cast_locked = true
-		fireball.begin_cast() # Each bonus has one use, even when the original has extra uses.
 		queued.push_front({"skill":fireball})
 
 ## Generated casts use normal model/presentation steps and never reserve extra dice.

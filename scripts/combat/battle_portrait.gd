@@ -37,6 +37,7 @@ func _configure_layout() -> void:
 	GUIDE_CLOSE = Rect2(660, 132, 104, 88)
 	GUIDE_STATUSES = Rect2(538,432,226,88)
 	DEBUG_CLOSE = GUIDE_CLOSE
+	DEBUG_SHOP = Rect2(414,262,350,88)
 	DEBUG_TAROTS = Rect2(40,1240,350,88)
 	DEBUG_TAROT_DRAW = Rect2(414,1240,350,88)
 	DEBUG_CHEST = Rect2(40,1350,350,88)
@@ -252,7 +253,7 @@ func _draw_guide(canvas: CanvasItem = null) -> void:
 	_wrapped(Vector2(40,1640),"Reroll Treasure: bank 10 unused rolls for a Perfect Chest. It can upgrade when opened.",718,MUTED,22,canvas)
 
 func _debug_option_rect(choice: int) -> Rect2:
-	if choice == DebugDice.NATURAL: return Rect2(40, 262, 724, 88)
+	if choice == DebugDice.NATURAL: return Rect2(40, 262, 350, 88)
 	var item: int = DEBUG_DICE_PRESETS.keys().find(choice)
 	if item < 0: return Rect2()
 	return Rect2(40+(item%2)*374,414+floori(item/2.0)*242,350,222)
@@ -263,6 +264,7 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	_text(Vector2(40, 188), "调试", 42, GOLD, canvas)
 	_button(DEBUG_CLOSE, "X", true, canvas)
 	_button(_debug_option_rect(-1), "自然随机", true, canvas)
+	_button(DEBUG_SHOP,"商店 · 无限血宝石",_can_debug_shop(),canvas)
 	_text(Vector2(40, 390), "指定下一次掷骰结果", 26, MUTED, canvas)
 	_draw_debug_dice(canvas)
 	_text(Vector2(40, 1178), "仅重掷未用骰；数量不足时保留设置。", 24, MUTED, canvas)

@@ -7,9 +7,15 @@ const Skill = preload("res://scripts/combat/multi_hit_skill.gd")
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 const Attack = preload("res://scripts/relics/relic_attack.gd")
+const Conditions = preload("res://scripts/relics/relic_conditions.gd")
 const EMPTY := {}
 const Sets = preload("res://scripts/relics/relic_sets.gd")
 const STATS := {
+	"banana":{"damage_add":0.5},
+	"magic_banana":{"damage_factor":1.5},
+	"broken_blade":{"damage_add":0.3},
+	"steel_sword": {"damage_add":3.0},
+	"book_of_dead": {"max_hp_factor":3.0},
 	"glass_marble": {"three_straight_bonus":0.1},
 	"steel_marble": {"three_straight_bonus":0.2},
 	"gold_marble": {"three_straight_bonus":0.3},
@@ -20,10 +26,10 @@ const STATS := {
 	"fried_chicken": {"damage_factor":1.1},
 	"hamburger": {"damage_add":0.6},
 	"worn_dagger": {"combo_uses_add":1,"base_damage":2.0},
-	"royal_dagger": {"combo_uses_add":3,"base_damage":5.0},
+	"royal_dagger": {"combo_uses_add":3,"base_damage":10.0},
 	"magic_sword": {"base_damage":10.0},
 	"magic_slingshot": {"base_damage":5.0},
-	"contract": {"base_damage":5.0},
+	"contract": {"base_factor":1.2},
 	"runestone": {"base_damage":5.0},
 	"orange_stone": {"base_damage":5.0},
 	"blue_stone": {"base_damage":5.0},
@@ -31,7 +37,7 @@ const STATS := {
 	"yellow_stone": {"base_damage":5.0},
 	"green_stone": {"base_damage":5.0},
 	"black_stone": {"base_damage":5.0},
-	"prismatic_stone": {"base_damage":30.0}, # Fusion adds 30 beyond its six five-point stones.
+	"prismatic_stone": {}, # Retain six five-point stones: 30 total, no extra flat bonus.
 	"heart": {"max_hp_factor":1.1},
 	"bracelet": {"base_damage":5.0},
 	"mithril_blade": {"damage_factor":2.0},
@@ -45,8 +51,8 @@ const STATS := {
 	"cursed_watch": {"always_perfect":true,"no_ultimate":true,"no_treasure":true},
 }
 const STONES := {
-	"orange_stone": {"immune":Status.FROZEN,"status":Status.BURNING,"stacks":1,"chance":1.0},
-	"blue_stone": {"immune":Status.BURNING,"status":Status.FROZEN,"stacks":1,"chance":0.3},
+	"orange_stone": {"immune":Status.BURNING,"status":Status.BURNING,"stacks":1,"chance":1.0},
+	"blue_stone": {"immune":Status.FROZEN,"status":Status.FROZEN,"stacks":1,"chance":0.3},
 	"purple_stone": {"immune":Status.DARKNESS,"status":Status.DARKNESS,"stacks":1,"chance":0.3},
 	"yellow_stone": {"immune":Status.STUNNED,"combo_gain":1},
 	"green_stone": {"immune":Status.CORROSION,"status":Status.CORROSION,"stacks":1,"chance":0.5},
@@ -107,7 +113,8 @@ static func _grant_generator_tarot(model, id: String) -> bool:
 	return not model.grant_random_tarots(1).is_empty()
 
 ## Tarot activation grants shields only on a committed card effect.
-static func tarot_used(model) -> Array:
+static func tarot_used(model, grow_eye: bool = true) -> Array:
+	if grow_eye: Conditions.tarot_used(model)
 	var events: Array = []
 	for entry in repeat_sources(model.relics.items,"bookmark"):
 		model.shield += 10
@@ -143,10 +150,12 @@ static func max_health(items: Array, base: int) -> float:
 	for entry in Sequence.entries(items): value *= Sets.stats(entry.item,STATS).get("max_hp_factor",1.0)
 	return value
 
-static func base_damage(items: Array) -> float:
-	var value: float = 0
-	for entry in Sequence.entries(items): value += Sets.stats(entry.item,STATS).get("base_damage",0.0)
-	return value
+static func base_damage(items: Array, starting_base: float = 0.0) -> float:
+	var value: float = starting_base
+	for entry in Sequence.entries(items):
+		for part in Sets.modifiers(entry.item,STATS):
+			value = (value+part.get("base_damage",0.0))*part.get("base_factor",1.0)
+	return value-starting_base
 
 ## Soda adds to automatic attack base before its pip coefficient and ordered multiplier.
 static func auto_damage(items: Array, skill: MultiHitSkill) -> float:
@@ -168,6 +177,7 @@ static func apply_damage_modifier(item: Dictionary, value: float, skill: MultiHi
 	for part in Sets.modifiers(item,STATS):
 		value += part.get("damage_add",0.0)*item.count
 		value *= part.get("damage_factor",1.0)
+	value = Conditions.damage_modifier(item,value,skill)
 	if item.id == "magic_sword" and skill.critical: value *= CRITICAL_FACTOR
 	if stats.has("damage_per_kill"): value *= 1.0+minf(stats.kill_damage_cap,stats.damage_per_kill*item.kills)
 	if not skill.is_empty():
@@ -198,6 +208,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill, model
 		var stats: Dictionary = Sets.stats(item,STATS)
 		var extra: String = ""
 		var extra_values: Array = []
+		if stats.get("base_factor",1.0) != 1.0: extra = "BASE DAMAGE"
 		if stats.get("base_damage",0) != 0 or (skill.pattern == "match_auto" and stats.get("auto_damage",0) != 0):
 			extra = "+%d BASE"
 			extra_values = [stats.get("base_damage",0)+ (stats.get("auto_damage",0) if skill.pattern == "match_auto" else 0)]
@@ -205,7 +216,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill, model
 			extra = "EXTRA HITS"
 			extra_values.clear()
 		if not is_equal_approx(before,value) or not extra.is_empty():
-			steps.append({"source":"relic","id":entry.source,"slot":slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0)),"auto_bonus":float(stats.get("auto_damage",0.0)) if skill.pattern == "match_auto" else 0.0})
+			steps.append({"source":"relic","id":entry.source,"slot":slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0)),"base_factor":float(stats.get("base_factor",1.0)),"auto_bonus":float(stats.get("auto_damage",0.0)) if skill.pattern == "match_auto" else 0.0})
 	var marble: float = 1.0
 	if skill.pattern == "straight" and skill.dice.size() == 3:
 		for entry in Sequence.entries(items):
@@ -279,14 +290,16 @@ static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> 
 		if item.id == "bloodstone":
 			var cap: int = floori(model.max_hp*(0.05 if skill.is_combo_attack() or skill.pattern == "cleanup" else 0.1))
 			var budget: String = str(entry.activators)
-			var restored: int = model.heal(mini(maxi(0,cap-model.lifesteal_budgets.get(budget,0)),healing_amount(model.relics.items,damage*0.2)),false)
-			model.lifesteal_budgets[budget] = model.lifesteal_budgets.get(budget,0)+restored
-			model.lifesteal_used += restored
+			var attempted: int = mini(maxi(0,cap-model.lifesteal_budgets.get(budget,0)),model.modified_healing(damage*0.2))
+			var restored: int = model.heal(attempted,false)
+			# Overhealing spends the same capped recovery budget as restored HP.
+			model.lifesteal_budgets[budget] = model.lifesteal_budgets.get(budget,0)+(attempted if model.status_count(Status.DARKNESS) == 0 else 0)
 			if restored > 0:
+				model.lifesteal_used += restored
 				events.append(model.event(-1,restored,"heal","LIFESTEAL"))
 				Sequence.activate(model,entry)
 		if not model.is_enemy_alive(target): continue
-		var applied: Array = []
+		var applied: Array = Conditions.after_hit(model,target,entry)
 		if item.id == "pet_slime" and skill.pattern == "straight" and Sets.collection_complete(model.relics.items,"pets"):
 			applied.append_array(model.apply_enemy_status(target,Status.CORROSION,1))
 		if item.id == "prismatic_stone":
@@ -361,6 +374,8 @@ static func turn_finished(model) -> Array:
 			item.charges += 1
 			Sequence.activate(model,entry)
 			events.append(model.event(-1,1,"relic",TURN_CHARGES[item.id].message))
+	events.append_array(model.relic_recovery.full_turn_finished(model))
+	events.append_array(Conditions.turn_finished(model))
 	return events
 
 static func enemy_killed(model) -> void:
@@ -390,7 +405,7 @@ static func modify_dice(model, values: Array, perfect: bool, rates: Dictionary) 
 		if item.id == "lucky_die":
 			if 6 not in values and model.rng.randf() < minf(1,0.05/maxf(0.0001,1-six_chance)): values = _include_face(model,values,6)
 			six_chance = minf(1.0,six_chance+0.05)
-		elif Catalog.CURSED_DICE.has(item.id):
+		elif Catalog.CURSED_DICE.has(item.id) and item.id != "cursed_die":
 			var face: int = Catalog.CURSED_DICE[item.id]
 			if perfect and face not in values: values = _include_face(model,values,face)
 			elif not perfect and face in values:
@@ -462,6 +477,7 @@ static func status_applied(model, target: int, status: int) -> Array:
 			Sequence.activate(model,entry)
 			events.append_array(Attack.apply(model,item.id,10,false,false,target))
 	if status == Status.BURNING: events.append_array(model.RelicCombat.burning_applied(model,target))
+	if status == Status.PLAGUE: events.append_array(Conditions.plague_applied(model,target))
 	return events
 
 static func retaliation(model, target: int) -> Array:
@@ -477,7 +493,7 @@ static func roll_actions(model, perfect: bool) -> Array:
 	var actions: Array = []
 	for entry in Sequence.entries(model.relics.items):
 		var item: Dictionary = entry.item
-		var amount: float = 0
+		var amount: float = Conditions.ROLL_DAMAGE.get(item.id,0)
 		var fixed: bool = false
 		var area: bool = false
 		var count: int = 1

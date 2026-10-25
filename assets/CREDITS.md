@@ -127,3 +127,13 @@ All three active levels use [Flamelings by surt](https://opengameart.org/content
 New relic placeholder icons (2026-10-25): reused unmodified CC0 Dungeon Crawl tiles; per-file sources are recorded in `assets/art/relics/sources.json`.
 
 Third-level boss and summons (2026-10-25): unmodified CC0 Dungeon Crawl tiles from the same archived pack: deep elf demonologist, zombie octopode, eldritch tentacle and balrug. Exact paths are recorded in `art/fantasy/sources.json`.
+
+Damage-calculation knock (`audio/item/damage_knock.wav`): original procedural synthesis for this project; short damped wooden-block resonances and a soft noise transient, no sampled recording.
+
+The October build relic icons (Vodka, Seed, Bandage, Steel Sword, Split Arrow, Book of the Dead) reuse the CC0 DCSS supplemental tiles listed in `assets/art/relics/sources.json`. Pet Orb composes the five existing pet sprites.
+
+Pet food bowls and the Super Pet Ball are original project pixel-vector SVG icons. Companion creatures reuse the credited CC0 Dungeon Crawl Stone Soup tiles; the full dragon uses `monster/dragons/dragon.png` from the same archive. Source tiles are unchanged.
+
+Remains and broken-sword parts, Ticket, enchanted chips and Nightmare Totem are original project pixel-vector icons. Other new relic placeholders reuse the unchanged CC0 DCSS tiles recorded in `art/relics/sources.json`. Ghost of the Witch shares Unidentified Ring artwork with a runtime violet magic glow.
+
+Ghost of the Witch companion: unchanged `monster/enchantress_human.png` from the credited CC0 DCSS archive, rendered with a spectral tint and transparency.

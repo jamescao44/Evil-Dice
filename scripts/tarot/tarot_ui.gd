@@ -192,6 +192,30 @@ func front_index() -> int:
 	var count: int = battle.model.tarots.items.size()
 	return posmod(roundi(scroll),count) if count > 0 else -1
 
+## Place the sort control clear of the cards in each screen layout.
+func sort_rect() -> Rect2:
+	var extent := Vector2(220,52) if portrait() else Vector2(166,40)
+	var center: Vector2 = battle.DICE_CENTER+Vector2(0,326) if portrait() else battle.DICE_CENTER+Vector2(272,-142)
+	return Rect2(center-extent/2,extent)
+
+## Group cards by their displayed names without changing identities or effects.
+func sort_by_name() -> void:
+	cancel_gesture()
+	inspected = -1
+	float_levels.clear()
+	var names: Dictionary = {}
+	for item in battle.model.tarots.items:
+		names[item.id] = GameText.text(Catalog.ITEMS[item.id].name)
+	battle.model.tarots.items.sort_custom(func(a,b):
+		var comparison: int = str(names[a.id]).naturalnocasecmp_to(str(names[b.id]))
+		return a.instance_id < b.instance_id if comparison == 0 else comparison < 0)
+	scroll = 0
+	scroll_target = 0
+	swipe.reset()
+	swallow_release = true
+	battle._sound("ui/click_001",1,-18)
+	queue_redraw()
+
 ## Hit-test overlapping cards from front to back.
 func card_at(point: Vector2) -> int:
 	var order: Array = carousel_order()
@@ -224,6 +248,9 @@ func click(point: Vector2) -> bool:
 		return true
 	if not blocks_battle(): return false
 	if expansion < 0.98 or not opened: swallow_release = true; return true
+	if sort_rect().has_point(point):
+		sort_by_name()
+		return true
 	held = true
 	moved = false
 	gesture = ""
@@ -365,6 +392,10 @@ func _draw() -> void:
 			Paint.wrap(self,battle.description_font,Rect2(center+Vector2(-220,28),Vector2(440,140)),"Find cards in wave rewards and treasures.",24 if portrait() else 17,Paint.LILAC,true)
 	_draw_icon()
 	if inspected >= 0 and inspected < battle.model.tarots.items.size() and gesture != "card": _draw_inspection()
+	if opened and expansion >= 0.98 and gesture != "card":
+		var rect: Rect2 = sort_rect()
+		Paint.panel(self,rect,Color("252431"),Paint.LILAC,10)
+		Paint.text(self,battle.description_font,rect.get_center()+Vector2(0,9 if portrait() else 6),"SORT BY NAME",24 if portrait() else 17,Paint.GOLD)
 	if gesture == "card" and pressed_card >= 0 and pressed_card < battle.model.tarots.items.size():
 		_draw_drag_backdrop()
 		var valid: bool = battle.ARENA.has_point(pointer) and available()

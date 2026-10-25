@@ -164,7 +164,7 @@ func skill_color() -> Color:
 ## Prompt the first throw, or a usable reroll when the remaining pool has no straight.
 func should_prompt_roll() -> bool:
 	var pool = battle.model.dice_turn
-	return available() and pool.selected.is_empty() and pool.can_roll() and (not pool.has_rolled() or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i])))
+	return available() and pool.selected.is_empty() and pool.can_roll() and (not pool.has_rolled() or (not pool.skills_allowed() or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i]))))
 
 ## Animate a bounded stream of sparks while the valid pattern is selected.
 func _process(delta: float) -> void:
@@ -177,7 +177,7 @@ func _process(delta: float) -> void:
 		roll_prompt_age = 0
 	if should_prompt_roll(): roll_prompt_age += delta
 	else: roll_prompt_age = 0
-	if battle._can_end_turn() and pool.rolls_left == 0 and not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i])): end_turn_prompt_age += delta
+	if battle._can_end_turn() and pool.rolls_left == 0 and (not pool.skills_allowed() or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i]))): end_turn_prompt_age += delta
 	else: end_turn_prompt_age = 0
 	idle_feedback.advance(delta,pool,available(),battle.reduced)
 	for index in range(battle.dice.size()):

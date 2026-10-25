@@ -1,0 +1,359 @@
+{
+  "samples": 40,
+  "conditions": {
+    "turns": 10,
+    "level": 20,
+    "incoming_attempt": 30,
+    "perfect_probability": 0.35,
+    "targets": [
+      1,
+      3
+    ],
+    "budget": "1 common, 3 rare, 2 epic, 1 legendary/cursed, counted before fusion",
+    "notes": [
+      "Reference replaces now-Epic Magic Sword with Rare Cookie Sundae; any new food fusion is retained.",
+      "No tarot, loot, XP, precharged counters or kills.",
+      "One-roll policy permits generated chip casts but no manual skills.",
+      "Same seed and decision policy as original benchmark; all seven relic inputs are ordered.",
+      "Candidates are illustrative loadouts, not an exhaustive search."
+    ]
+  },
+  "builds": [
+    {
+      "id": "raw_reference",
+      "family": "raw",
+      "kind": "reference",
+      "items": [
+        "bracelet",
+        "oreo_sundae",
+        "hamburger",
+        "fried_chicken",
+        "steel_sword",
+        "contract",
+        "mithril_blade"
+      ]
+    },
+    {
+      "id": "items_reference",
+      "family": "items",
+      "kind": "reference",
+      "items": [
+        "worn_bow",
+        "magic_slingshot",
+        "oreo_sundae",
+        "hamburger",
+        "pet_ghost",
+        "pet_dragon",
+        "disguise_mask"
+      ]
+    },
+    {
+      "id": "status_reference",
+      "family": "status",
+      "kind": "reference",
+      "items": [
+        "bracelet",
+        "pet_lizard",
+        "vodka",
+        "oreo_sundae",
+        "orange_stone",
+        "powder_keg",
+        "pet_dragon"
+      ]
+    },
+    {
+      "id": "recovery_reference",
+      "family": "recovery",
+      "kind": "reference",
+      "items": [
+        "pet_bat",
+        "mysterious_seed",
+        "magic_bandage",
+        "bloodstone",
+        "contract",
+        "disguise_mask",
+        "book_of_dead"
+      ]
+    },
+    {
+      "id": "single_target_reference",
+      "family": "single_target",
+      "kind": "reference",
+      "items": [
+        "worn_dagger",
+        "light_sword",
+        "steel_marble",
+        "oreo_sundae",
+        "split_arrow",
+        "royal_dagger",
+        "twin_scythes"
+      ]
+    },
+    {
+      "id": "burst_reference",
+      "family": "burst",
+      "kind": "reference",
+      "items": [
+        "glass_marble",
+        "oreo_sundae",
+        "steel_marble",
+        "light_sword",
+        "echo_bell",
+        "alternating_gears",
+        "royal_seal"
+      ]
+    },
+    {
+      "id": "one_roll_auto_reference",
+      "family": "one_roll_auto",
+      "kind": "reference",
+      "items": [
+        "lemon_soda",
+        "magic_slingshot",
+        "oreo_sundae",
+        "fried_chicken",
+        "steel_sword",
+        "pet_dragon",
+        "disguise_mask"
+      ]
+    },
+    {
+      "id": "raw_magic_banana",
+      "family": "raw",
+      "kind": "candidate",
+      "items": [
+        "bracelet",
+        "oreo_sundae",
+        "hamburger",
+        "fried_chicken",
+        "steel_sword",
+        "magic_banana",
+        "mithril_blade"
+      ]
+    },
+    {
+      "id": "items_chip_grail",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "magic_slingshot",
+        "hamburger",
+        "frozen_tilapia",
+        "steel_sword",
+        "red_chip",
+        "holy_grail"
+      ]
+    },
+    {
+      "id": "items_blue_grail",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "magic_slingshot",
+        "hamburger",
+        "frozen_tilapia",
+        "steel_sword",
+        "blue_chip",
+        "holy_grail"
+      ]
+    },
+    {
+      "id": "items_black_grail",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "magic_slingshot",
+        "hamburger",
+        "frozen_tilapia",
+        "steel_sword",
+        "black_chip",
+        "holy_grail"
+      ]
+    },
+    {
+      "id": "items_ticket_dragon",
+      "family": "items",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "magic_slingshot",
+        "oreo_sundae",
+        "hamburger",
+        "steel_sword",
+        "pet_dragon",
+        "disguise_mask"
+      ]
+    },
+    {
+      "id": "status_hellfire",
+      "family": "status",
+      "kind": "candidate",
+      "items": [
+        "bracelet",
+        "pet_lizard",
+        "vodka",
+        "oreo_sundae",
+        "orange_stone",
+        "powder_keg",
+        "hellfire"
+      ]
+    },
+    {
+      "id": "status_potion_hellfire",
+      "family": "status",
+      "kind": "candidate",
+      "items": [
+        "mystery_potion",
+        "pet_lizard",
+        "vodka",
+        "oreo_sundae",
+        "orange_stone",
+        "powder_keg",
+        "hellfire"
+      ]
+    },
+    {
+      "id": "status_corrosion",
+      "family": "status",
+      "kind": "candidate",
+      "items": [
+        "mystery_potion",
+        "pet_lizard",
+        "vodka",
+        "oreo_sundae",
+        "green_stone",
+        "powder_keg",
+        "corrupt_crystal"
+      ]
+    },
+    {
+      "id": "recovery_steel",
+      "family": "recovery",
+      "kind": "candidate",
+      "items": [
+        "pet_bat",
+        "mysterious_seed",
+        "magic_bandage",
+        "bloodstone",
+        "steel_sword",
+        "disguise_mask",
+        "book_of_dead"
+      ]
+    },
+    {
+      "id": "recovery_grail",
+      "family": "recovery",
+      "kind": "candidate",
+      "items": [
+        "pet_bat",
+        "mysterious_seed",
+        "magic_bandage",
+        "bloodstone",
+        "steel_sword",
+        "disguise_mask",
+        "holy_grail"
+      ]
+    },
+    {
+      "id": "single_ticket",
+      "family": "single_target",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "light_sword",
+        "steel_marble",
+        "oreo_sundae",
+        "split_arrow",
+        "royal_dagger",
+        "twin_scythes"
+      ]
+    },
+    {
+      "id": "burst_black_sword",
+      "family": "burst",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "oreo_sundae",
+        "steel_marble",
+        "light_sword",
+        "black_chip",
+        "magic_sword",
+        "royal_seal"
+      ]
+    },
+    {
+      "id": "burst_black_gears",
+      "family": "burst",
+      "kind": "candidate",
+      "items": [
+        "ticket",
+        "oreo_sundae",
+        "steel_marble",
+        "light_sword",
+        "black_chip",
+        "alternating_gears",
+        "royal_seal"
+      ]
+    },
+    {
+      "id": "auto_black",
+      "family": "one_roll_auto",
+      "kind": "candidate",
+      "items": [
+        "lemon_soda",
+        "magic_slingshot",
+        "oreo_sundae",
+        "fried_chicken",
+        "steel_sword",
+        "black_chip",
+        "pet_dragon"
+      ]
+    },
+    {
+      "id": "auto_red",
+      "family": "one_roll_auto",
+      "kind": "candidate",
+      "items": [
+        "lemon_soda",
+        "magic_slingshot",
+        "oreo_sundae",
+        "fried_chicken",
+        "steel_sword",
+        "red_chip",
+        "pet_dragon"
+      ]
+    },
+    {
+      "id": "auto_blue",
+      "family": "one_roll_auto",
+      "kind": "candidate",
+      "items": [
+        "lemon_soda",
+        "magic_slingshot",
+        "oreo_sundae",
+        "fried_chicken",
+        "steel_sword",
+        "blue_chip",
+        "pet_dragon"
+      ]
+    },
+    {
+      "id": "auto_fish_grail",
+      "family": "one_roll_auto",
+      "kind": "candidate",
+      "items": [
+        "lemon_soda",
+        "magic_slingshot",
+        "frozen_tilapia",
+        "fried_chicken",
+        "steel_sword",
+        "red_chip",
+        "holy_grail"
+      ]
+    }
+  ]
+}

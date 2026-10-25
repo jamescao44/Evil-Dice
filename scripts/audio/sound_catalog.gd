@@ -1,7 +1,7 @@
 extends RefCounted
 ## Audio IDs are source/clip; shared recordings have independent per-source files.
 const FILES := {
-	"item": ["arcade_slot_roll.wav", "arcade_slot_roll2.wav", "reward_level1.wav", "reward_level2.wav", "reward_level3.wav", "crystal_collect.wav", "bell.ogg", "bong_001.ogg", "book.ogg", "card_draw.wav", "click_001.ogg", "confirmation_002.ogg", "crash.ogg", "deck_flip.wav", "deck_flip2.wav", "drop_001.ogg", "pluck_001.ogg", "rumble.ogg"],
+	"item": ["arcade_slot_roll.wav", "arcade_slot_roll2.wav", "reward_level1.wav", "reward_level2.wav", "reward_level3.wav", "crystal_collect.wav", "damage_knock.wav", "bell.ogg", "bong_001.ogg", "book.ogg", "card_draw.wav", "click_001.ogg", "confirmation_002.ogg", "crash.ogg", "deck_flip.wav", "deck_flip2.wav", "drop_001.ogg", "pluck_001.ogg", "rumble.ogg"],
 	"dice": ["bell.ogg", "bong_001.ogg", "click_001.ogg", "confirmation_002.ogg", "drop_001.ogg", "land.ogg", "magic_leak_loop.wav", "perfect.wav", "pluck_001.ogg", "roll.ogg", "rumble.ogg", "soft_sweep.wav"],
 	"player": ["bell.ogg", "book.ogg", "confirmation_002.ogg", "crash.ogg", "drop_001.ogg", "hit.ogg", "rumble.ogg", "slash.ogg"],
 	"enemy": ["crystal_drop.wav", "bell.ogg", "chop.ogg", "crash.ogg", "slash.ogg"],

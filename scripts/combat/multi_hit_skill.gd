@@ -10,6 +10,7 @@ var face: int = 0
 var sum: int = 0
 var spare: int = 0
 var dice: Array = []
+var split_attack: bool = false
 var base_uses: int = 1
 var damage_ticks: int = 1 # Damage pulses within one use, never extra uses or combo orbs.
 var damage_ticks_spent: int = 0
@@ -87,10 +88,10 @@ func has_use_orbs(additional_modifiers: Dictionary = {}) -> bool:
 
 ## Rolled auto-attacks are separate from skills eligible for multi-hit relics.
 func is_combo_attack() -> bool:
-	return pattern == "match" or (pattern.is_empty() and random_target_per_use())
+	return split_attack or pattern == "match" or (pattern.is_empty() and random_target_per_use())
 
 func random_target_per_use() -> bool:
-	if cast_source == "character_bonus": return true
+	if split_attack or cast_source == "character_bonus": return true
 	if not pattern.is_empty(): return pattern == "match_auto"
 	return face == 5 and kind in [Kind.PAIR, Kind.SPECIAL]
 
@@ -101,6 +102,7 @@ func keeps_selected_target() -> bool:
 func duplicate(_deep: bool = true) -> MultiHitSkill:
 	var copy := MultiHitSkill.new(kind, face, dice, base_uses)
 	copy.pattern = pattern
+	copy.split_attack = split_attack
 	copy.damage_ticks = damage_ticks
 	copy.damage_ticks_spent = damage_ticks_spent
 	copy.use_modifiers = use_modifiers.duplicate()
@@ -124,4 +126,4 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 
 func same_as(other: MultiHitSkill) -> bool:
 	if other == null or calculated_damage_total != other.calculated_damage_total or inherited_damage != other.inherited_damage or source_dice != other.source_dice or cast_source != other.cast_source or relic_effect_scale != other.relic_effect_scale or relic_cast_locked != other.relic_cast_locked or alternating_bonus != other.alternating_bonus: return false
-	return other != null and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and damage_ticks == other.damage_ticks and damage_ticks_spent == other.damage_ticks_spent and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and grants_bonus_fireballs == other.grants_bonus_fireballs and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked
+	return other != null and split_attack == other.split_attack and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and damage_ticks == other.damage_ticks and damage_ticks_spent == other.damage_ticks_spent and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and grants_bonus_fireballs == other.grants_bonus_fireballs and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked

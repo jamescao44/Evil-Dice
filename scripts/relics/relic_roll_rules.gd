@@ -26,3 +26,12 @@ static func apply(model, indices: Array) -> void:
 	for face in range(first,first+length):
 		model.dice_turn.values[slots.pop_at(model.rng.randi_range(0,slots.size()-1))] = face
 	for entry in activated: Sequence.activate(model,entry)
+
+## Three visible sixes transform all faces without unlocking spent dice.
+static func apply_curse(model) -> bool:
+	if not model.relics.has("cursed_die"): return false
+	if model.dice_turn.values.count(6) >= 3:
+		model.dice_turn.values.fill(6)
+		model.relic_activated.emit("cursed_die")
+		return true
+	return false

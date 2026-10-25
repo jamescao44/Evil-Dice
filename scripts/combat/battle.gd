@@ -40,6 +40,8 @@ const SkillBubble = preload("res://scripts/combat/skill_bubble.gd")
 const ScreenRipple = preload("res://scripts/effects/screen_ripple.gd")
 var screen_ripple: CanvasLayer
 const RelicOrbit = preload("res://scripts/relics/relic_orbit.gd")
+var witch_companion = preload("res://scripts/relics/witch_companion.gd").new()
+var pet_companions = preload("res://scripts/relics/pet_companions.gd").new()
 const RelicUI = preload("res://scripts/relics/relic_ui.gd")
 var relic_ui: Node2D
 var inventory_page: Node2D
@@ -123,6 +125,7 @@ var DEBUG_TAROTS := Rect2(808,568,332,44)
 var DEBUG_TAROT_DRAW := Rect2(808,626,332,40)
 var DEBUG_CHEST := Rect2(136,568,300,44)
 var DEBUG_TREASURE := Rect2(456,568,332,44)
+var DEBUG_SHOP := Rect2(516,176,352,40)
 var REWARD_CENTER := Vector2(195, 613)
 var CITY_POINT := Vector2(925, 282)
 static var HORROR_SIZES: Array = range(Run.Waves.COUNT).map(Run.Waves.player_size)
@@ -290,6 +293,7 @@ func _ready() -> void:
 	relic_ui.battle = self
 	add_child(relic_ui)
 	model.relic_activated.connect(relic_ui.activate)
+	model.relic_effect_activated.connect(_pet_effect_activated)
 	model.boss_changed.connect(_boss_changed)
 	model.damage_redirected.connect(_damage_redirected)
 	damage_feedback = DamageFeedback.new()
@@ -387,6 +391,7 @@ func _ready() -> void:
 
 ## Advance battle presentation, city activity, charge audio and pointer feedback.
 func _process(delta: float) -> void:
+	fx.damage_stage = model.stage
 	_update_battlefield_view(delta)
 	_update_enemy_hold(delta)
 	if not _menus_open() and inspecting_enemy < 0:
@@ -396,6 +401,9 @@ func _process(delta: float) -> void:
 	var world_delta: float = delta * _world_time_scale()
 	if not _menus_open(): enemy_debris.advance(world_delta*speed,reduced)
 	if not _menus_open() and inspecting_enemy < 0: combat_motion.advance(world_delta)
+	if not _menus_open() and inspecting_enemy < 0:
+		pet_companions.advance(world_delta,model,view_phase == "transition",travel_direction,reduced)
+		witch_companion.advance(world_delta,model)
 	clock_time += world_delta
 	_update_charge()
 	shake = maxf(0, shake - delta * 24)
@@ -451,6 +459,7 @@ func _process(delta: float) -> void:
 		interactive = GUIDE_CLOSE.has_point(mouse) or GUIDE_STATUSES.has_point(mouse) or (home_enabled and _home_rect().has_point(mouse)) or (not guide_status_page and character_guide.hit(mouse)) or (fx.canvas_size.x > fx.canvas_size.y and GUIDE_MODE.has_point(mouse))
 	elif debug_open:
 		interactive = DEBUG_TREASURE.has_point(mouse) or DEBUG_CLOSE.has_point(mouse) or DEBUG_REPEAT.has_point(mouse) or DEBUG_PERFECT.has_point(mouse) or DEBUG_WAVE_LOAD.has_point(mouse) or DEBUG_TAROTS.has_point(mouse) or DEBUG_TAROT_DRAW.has_point(mouse) or (_can_debug_chest() and DEBUG_CHEST.has_point(mouse))
+		interactive = interactive or (_can_debug_shop() and DEBUG_SHOP.has_point(mouse))
 		for i in [DebugDice.NATURAL] + DEBUG_DICE_PRESETS.keys():
 			interactive = interactive or _debug_option_rect(i).has_point(mouse)
 	elif menu_open:
@@ -651,6 +660,36 @@ func _debug_spawn_chest() -> void:
 	_close_debug(false)
 	_show_chest(outcomes,true)
 
+## Wait for a stable battle state before opening the shop shortcut.
+func _can_debug_shop() -> bool:
+	return debug_open and view_phase in ["ready","charging","skill","targeting","frozen","over"] and model.open_rewards.is_empty() and model.tarot_source.is_empty() and not model.shop.active
+
+## Visit a free shop, keeping this wave and its normal shop state for the return.
+func _debug_open_shop() -> void:
+	if not _can_debug_shop(): return
+	if view_phase == "charging": _cancel_charge()
+	if view_phase == "targeting": _cancel_targeting()
+	var previous_phase: String = view_phase
+	var previous_shop = model.shop
+	var debug_shop = Run.ShopStock.new()
+	var token: int = run_id
+	model.shop = debug_shop
+	debug_shop.open_debug(model)
+	_close_debug(false)
+	tarot_ui.close_inventory()
+	relic_ui.cancel_hold()
+	_cancel_enemy_hold()
+	view_phase = "shop"
+	shop_ui.modulate.a = 1
+	shop_ui.open()
+	while debug_shop.active or relic_ui.pickup.active:
+		await get_tree().process_frame
+		if token != run_id or not is_inside_tree(): return
+	shop_ui.cancel()
+	model.shop = previous_shop
+	view_phase = previous_phase
+	queue_redraw()
+
 ## Use the active touch location or mouse position for shared pointer input.
 func _pointer_position() -> Vector2:
 	return touch_position if active_touch >= 0 else get_global_mouse_position()
@@ -744,6 +783,7 @@ func _handle_click(mouse: Vector2) -> void:
 		elif DEBUG_TAROT_DRAW.has_point(mouse): _debug_draw_tarot()
 		elif DEBUG_CHEST.has_point(mouse): _debug_spawn_chest()
 		elif DEBUG_TREASURE.has_point(mouse): _debug_charge_treasure()
+		elif DEBUG_SHOP.has_point(mouse): _debug_open_shop()
 		elif DEBUG_WAVE_LOAD.has_point(mouse): _debug_load_wave(debug_wave_input.text)
 		else:
 			for i in [DebugDice.NATURAL] + DEBUG_DICE_PRESETS.keys():
@@ -1255,6 +1295,13 @@ func _enemy_impact_point(index: int) -> Vector2:
 func _player_world_feet() -> Vector2:
 	return Vector2(259, 414)
 
+## Synchronize new ownership before effects that can fire on the acquisition frame.
+func _pet_effect_activated(id: String) -> void:
+	witch_companion.activate(id)
+	if not pet_companions.PETS.has(id): return
+	pet_companions.sync(model)
+	pet_companions.activate(id)
+
 func _player_feet() -> Vector2:
 	return battlefield_view.transform*_player_world_feet()
 
@@ -1424,6 +1471,7 @@ func _resolve_roll_triggers(token: int) -> bool:
 		if _check_over(): return false
 		if not await _wait(AUTO_ATTACK_RECOVERY/hit_speed,token): return false
 	if damage_feedback.phase == "attack": damage_feedback.finish()
+	model.start_roll_chip_casts()
 	return not _check_over()
 
 ## Summon the selected pattern without spending the remaining dice.
@@ -1446,7 +1494,7 @@ func _show_pending_skill(animate: bool = true) -> void:
 		status_title = "READY" if not model.dice_turn.has_rolled() else "SELECT DICE"
 		return
 	# Counter bonuses fire directly; they never summon another selectable bubble.
-	if result.cast_source == "character_bonus":
+	if result.cast_source in ["character_bonus","chip"]:
 		skill_bubble.clear()
 		view_phase = "forming"
 		call_deferred("_resolve_player",model.player_target())
@@ -1520,7 +1568,7 @@ func _resolve_player(target: int, source: String = "current") -> void:
 	if not model.begin_player_cast(target): return
 	var roll: MultiHitSkill = model.pending.duplicate()
 	var bubble: Node2D = _source_bubble(source)
-	var direct_bonus: bool = roll.cast_source == "character_bonus"
+	var direct_bonus: bool = roll.cast_source in ["character_bonus","chip"]
 	if not direct_bonus: bubble.roll = roll.duplicate()
 	# Automatic relic casts have no drag release to establish their visual origin.
 	casting_source = source
@@ -1534,14 +1582,14 @@ func _resolve_player(target: int, source: String = "current") -> void:
 	# waits for the modifier buildup and impact animation below.
 	if not direct_bonus: bubble.consume_use()
 	if direct_bonus:
-		damage_feedback.retain_result(roll.inherited_damage)
+		damage_feedback.retain_result(model.unmitigated_damage(roll))
 	elif attacking and not model.is_instant_kill(roll):
 		damage_feedback.start(model.attack_damage_steps(roll))
 		while damage_feedback.building:
 			await get_tree().process_frame
 			if not _valid_turn(token): return
 	_begin_cast_cinematic(kind)
-	if kind == Rules.Kind.ULTIMATE:
+	if kind == Rules.Kind.ULTIMATE and not direct_bonus:
 		bubble.begin_slam()
 		# Presentation time keeps the slam readable during fever and fast-forward.
 		while bubble.slam_age < SkillBubble.SLAM_IMPACT_TIME:
@@ -1986,6 +2034,8 @@ func _restart(wave_number: int = 0) -> void:
 	enemy_debris.clear()
 	monster_side = HORROR_SIZES[model.stage]
 	evolution.reset()
+	pet_companions.clear()
+	witch_companion.clear()
 	background_offset = model.stage * 960
 	background_vertical_offset = 0
 	travel_direction = Vector2.RIGHT
@@ -2021,8 +2071,8 @@ func _restart(wave_number: int = 0) -> void:
 static func _damage_popup(event: Dictionary) -> String:
 	return "" if event.get("instant_kill",false) else "-%d" % event.get("display_amount",event.amount)
 
-static func _event_font_size(event: Dictionary) -> int:
-	return Effects.damage_font_size(event.get("display_amount",event.amount)) if event.type in ["damage","burn","shield_hit"] else Effects.FLOAT_FONT_SIZE
+static func _event_font_size(event: Dictionary, stage: int = 0) -> int:
+	return Effects.damage_font_size(event.get("display_amount",event.amount),stage) if event.type in ["damage","burn","shield_hit"] else Effects.FLOAT_FONT_SIZE
 
 ## Show redirected HP loss on the servant that absorbed it, with a short protection link.
 func _damage_redirected(source: int, target: int, damage: int, loss: int) -> void:
@@ -2110,7 +2160,7 @@ func _show_events(events: Array) -> void:
 			while city_corpses.size() > 24: city_corpses.pop_front()
 			continue
 		if event.type in ["shield_hit","shield_break"]:
-			fx.damage_number(point-Vector2(0,18), _damage_popup(event), PURPLE,_event_font_size(event),event.target)
+			fx.damage_number(point-Vector2(0,18), _damage_popup(event), PURPLE,_event_font_size(event,model.stage),event.target)
 			fx.floating(point-Vector2(0,41), event.text, PURPLE)
 			fx.activate_circle(point, PURPLE, maxf(18,_enemy_side()*0.3), 0.3)
 			_sound("player/bell" if event.target == -1 else "enemy/bell", 0.7, -14)
@@ -2124,8 +2174,8 @@ func _show_events(events: Array) -> void:
 			var status_text: String = event.text
 			if event.type == "burn": status_text = _damage_popup(event)
 			elif event.has("status"): status_text = GameText.format("%s +%d",[GameText.text(Statuses.ENTRIES[event.status].name),event.amount])
-			if event.type == "burn": fx.damage_number(point-Vector2(0,18),status_text,tint,_event_font_size(event),event.target)
-			else: fx.floating(point-Vector2(0,45),status_text,tint,_event_font_size(event))
+			if event.type == "burn": fx.damage_number(point-Vector2(0,18),status_text,tint,_event_font_size(event,model.stage),event.target)
+			else: fx.floating(point-Vector2(0,45),status_text,tint,_event_font_size(event,model.stage))
 			if event.type == "burn":
 				if event.target >= -1: hit_times[event.target+1] = 0.35
 				fx.burst(point, tint, 3, 35)
@@ -2136,9 +2186,9 @@ func _show_events(events: Array) -> void:
 		var label: String = event.text if event.type == "immune" else _damage_popup(event) if event.type == "damage" else GameText.format("+%d SHIELD",event.amount) if event.type == "shield" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "+ BOON"
 		var offset: int = offsets.get(event.target, 0)
 		if not label.is_empty():
-			if event.type == "damage": fx.damage_number(point-Vector2(0,18),label,color,_event_font_size(event),event.target)
-			else: fx.floating(point - Vector2(0, 45 + offset), label, color,_event_font_size(event))
-			offsets[event.target] = offset + _event_font_size(event)
+			if event.type == "damage": fx.damage_number(point-Vector2(0,18),label,color,_event_font_size(event,model.stage),event.target)
+			else: fx.floating(point - Vector2(0, 45 + offset), label, color,_event_font_size(event,model.stage))
+			offsets[event.target] = offset + _event_font_size(event,model.stage)
 		if event.type == "damage":
 			if event.target >= -1: hit_times[event.target + 1] = 1.0
 			if event.amount > 0 or event.get("corpse_hit",false):
@@ -2391,12 +2441,16 @@ func _draw_player_actor(canvas: CanvasItem) -> void:
 	bob += combat_motion.attack_bob(-1,monster_side,reduced)
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	var orbit: Array = RelicOrbit.poses(self)
+	var pets: Array = pet_companions.poses(self)
+	witch_companion.paint(canvas,self)
+	pet_companions.paint(canvas,self,pets,false)
 	RelicOrbit.paint(canvas,self,orbit,false)
 	_shadow(_player_world_feet(),monster_side*_player_growth_scale().x*0.48,0.27,canvas)
 	if model.shield > 0 or model.statuses[6].count > 0:
 		Pixel.circle(canvas,_player_world_feet()-Vector2(0,monster_side*0.48),monster_side*0.47,Color(TEAL,0.45),4)
 	evolution.draw_actor(canvas,_player_world_sprite_rect(dx,bob),Color(Color.WHITE.lerp(RED,hurt*0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0))
 	RelicOrbit.paint(canvas,self,orbit,true)
+	pet_companions.paint(canvas,self,pets,true)
 	_draw_player_afflictions(canvas)
 	_draw_character_skill_counter(canvas)
 
@@ -3168,6 +3222,7 @@ func _draw_debug(canvas: CanvasItem = null) -> void:
 	_text(Vector2(136, 148), "调试", 32, GOLD, canvas)
 	_button(DEBUG_CLOSE, "X", true, canvas)
 	_button(_debug_option_rect(-1), "自然随机", true, canvas)
+	_button(DEBUG_SHOP,"商店 · 无限血宝石",_can_debug_shop(),canvas)
 	_button(DEBUG_REPEAT, "重复：" + ("开" if debug_repeat else "关"), true, canvas)
 	_button(DEBUG_PERFECT, "完美投掷：" + ("开" if debug_perfect else "关"), true, canvas)
 	if debug_perfect: canvas.draw_rect(DEBUG_PERFECT.grow(-3), GOLD, false, 2)

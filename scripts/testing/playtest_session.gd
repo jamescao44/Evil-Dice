@@ -13,6 +13,7 @@ var chest_source := ""
 var events: Array = []
 var history: Array = []
 var stats := {"rolls":0,"skills":0,"tarots":0,"enemy_phases":0,"damage_taken":0,"healing":0,"kills":0,"boss_charges":0,"boss_releases":0,"boss_interrupts":0}
+var stop_after_enemy_phases: int = 0 # Optional bounded encounter probe; zero plays normally.
 var completed: Dictionary = {}
 var campaign = Run.Campaign.new()
 
@@ -217,6 +218,7 @@ func _settle() -> void:
 		if model.phase == "turn_end": _record(model.end_round()); continue
 		if model.perfect_relic_ready: _record(model.resolve_roll_relic_step()); continue
 		if model.phase == "roll_attacks": _record(model.resolve_roll_attack_step()); continue
+		if model.start_roll_chip_casts(): continue
 		if model.phase == "player" and model.pending.cast_source != "manual": _record(model.apply_player()); continue
 		if not model.tarot_effects.pending_repeat.is_empty():
 			if not model.outcome().is_empty(): model.tarot_effects.dismiss_repeat(); continue
@@ -251,7 +253,9 @@ func _settle() -> void:
 			for index in model.living(): _record(model.enemy_act(index))
 			_record(model.end_round())
 			continue
-		if model.phase in ["new","round_end"]: _record(model.begin_round()); continue
+		if model.phase in ["new","round_end"]:
+			if stop_after_enemy_phases > 0 and stats.enemy_phases >= stop_after_enemy_phases: return
+			_record(model.begin_round()); continue
 		if not model.tarot_effects.bonus_chests.is_empty():
 			model.open_bonus_chest(); model.release_chest_crystals(); chest_source = "bonus"
 		return
@@ -310,6 +314,7 @@ func snapshot() -> Dictionary:
 			item.merge({"slot":i+1,"kind":offer.kind,"price":offer.price,"sold":offer.sold,"can_buy":model.shop.can_buy(model,i)},true)
 			state.shop.append(item)
 		state.free_divination = not model.shop.divination_used
+		state.shop_refresh_price = model.shop.refresh_price
 		state.actions = ["buy","refresh","leave"]
 		if state.free_divination: state.actions.append("divination")
 	elif not model.route_choices.is_empty(): state.phase = "routes"; state.routes = model.route_choices.duplicate(); state.actions = ["route"]
@@ -331,6 +336,7 @@ func snapshot() -> Dictionary:
 
 ## List each pip-distinct straight once, using concrete available physical dice.
 func _combinations() -> Array:
+	if not model.dice_turn.skills_allowed(): return []
 	var result: Array = []
 	if not model.dice_turn.has_rolled(): return result
 	for length in range(6,2,-1):

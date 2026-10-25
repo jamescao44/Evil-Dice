@@ -147,7 +147,7 @@ func rewards_and_shop() -> void:
 	var full = Session.new(8)
 	for id in ["bracelet","heart","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","twin_scythes"]: full.model.acquire_relic(id)
 	full.model.reroll_progress = 10
-	full.model.chest_pity.misses = [0,3,3]
+	full.model.chest_pity.misses = [0,4,4]
 	check(full.command({"action":"treasure"}).state.rewards.size() == 5,"An upgraded reroll chest exposes five separately claimable prizes")
 	check(not full.command({"action":"take","slot":1}).ok,"A full chest inventory requires a replacement decision")
 	check(full.command({"action":"take","slot":1,"replace":4}).ok,"Chest replacement preserves ten-slot capacity")

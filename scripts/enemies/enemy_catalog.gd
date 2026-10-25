@@ -15,7 +15,7 @@ static func crystal_reward(enemy: Dictionary) -> int:
 static func soul_reward(enemy: Dictionary) -> int:
 	if enemy.get("summoned",false): return 0
 	var base: int = (50 if enemy.get("elite",false) else 20) if enemy.role in SPECIAL else (10 if enemy.get("elite",false) else 5)
-	return Level.scaled(base,Level.soul_scale(enemy.get("level",1)))
+	return Level.scaled(base,Level.soul_scale(enemy.get("level",1))*enemy.get("soul_reward_factor",1.0))
 
 const ITEMS := [
 	{"name":"Vanguard","art":"vanguard","hp":[75,150],"damage":[7,10],"shield_cap":20,"color":Color("ffe388"),"attribute":Status.Attribute.SHOCK,"skills":[["attack",5],["shield",5]],"elite_skills":[["guard",3],["stun",3]]},
@@ -25,7 +25,7 @@ const ITEMS := [
 	{"name":"High Priest","art":"high_priest","hp":[100,200],"damage":[22,30],"shield_cap":20,"color":Color("c9a5ff"),"attribute":Status.Attribute.DARK,"skills":[["attack",3],["team_empower",3],["elemental",3]],"elite_skills":[["charge",3]],"charge_turns":2,"release":"forbidden_rite","release_hits":2,"release_on_full_charge":true},
 	{"name":"Knight Commander","art":"paladin","boss":true,"break_casts":5,"phase_two_hp":1100,"hp":[750,750],"damage":[20,20],"shield_cap":200,"color":Color("ffcc68"),"attribute":Status.Attribute.NONE,"skills":[["shield",3],["charge",5]],"elite_skills":[],"charge_turns":3,"release":"commander_slam","release_hits":1,"size_multiplier":2.0,"release_on_full_charge":true},
 	{"name":"Elf Spellsword","art":"spellsword","boss":true,"break_casts":3,"phase_two_hp":1200,"hp":[1000,1000],"damage":[20,20],"shield_cap":0,"color":Color("b9a0ff"),"attribute":Status.Attribute.NONE,"skills":[["charge",5],["frost_bind",2],["spellsword_mend",2]],"phase_two_skills":[["charge",5],["frost_bind",2],["corrosive_heal",2]],"elite_skills":[],"charge_turns":2,"release":"dark_slash","release_hits":1,"size_multiplier":2.0,"release_on_full_charge":true},
-	{"name":"Fanatical Mage","art":"fanatic","boss":true,"break_casts":0,"phase_two_hp":1500,"hp":[1500,1500],"damage":[30,30],"shield_cap":0,"color":Color("d290ff"),"attribute":Status.Attribute.NONE,"skills":[["summon_minions",2],["abyss_gaze",3],["split_minions",3]],"elite_skills":[],"size_multiplier":2.0},
+	{"name":"Fanatical Mage","art":"fanatic","boss":true,"break_casts":0,"phase_two_hp":1500,"hp":[900,900],"damage":[30,30],"shield_cap":0,"color":Color("d290ff"),"attribute":Status.Attribute.NONE,"skills":[["summon_minions",2],["abyss_gaze",3],["split_minions",3]],"elite_skills":[],"size_multiplier":2.0},
 	{"name":"Octopus Minion","art":"octopus","hp":[50,50],"damage":[5,5],"shield_cap":0,"color":Color("b090df"),"attribute":Status.Attribute.NONE,"skills":[["attack",1]],"elite_skills":[],"size_multiplier":0.8},
 	{"name":"Abyssal Tentacle","art":"tentacle","hp":[10,10],"damage":[5,5],"shield_cap":0,"color":Color("c785e2"),"attribute":Status.Attribute.NONE,"skills":[["attack",1]],"elite_skills":[],"size_multiplier":0.65},
 	{"name":"Bound Demon","art":"bound_demon","hp":[10000,10000],"damage":[30,30],"shield_cap":0,"color":Color("ff8775"),"attribute":Status.Attribute.NONE,"skills":[["charge",1]],"elite_skills":[],"charge_turns":2,"release":"demon_slam","release_hits":1,"break_casts":3,"interruptible":true,"size_multiplier":1.8,"release_on_full_charge":true,"taunt":true},

@@ -4,7 +4,7 @@ extends RefCounted
 const Status = preload("res://scripts/status/status_effect.gd")
 
 static func apply(model, base_damage: float, skill: MultiHitSkill) -> Array:
-	var damage: int = floori((base_damage+model.relic_base_damage())*model.damage_multiplier(skill)+0.000001)
+	var damage: int = floori((base_damage+model.RelicEffects.base_damage(model.relics.items,base_damage))*model.damage_multiplier(skill)+0.000001)
 	return _resolve(model,damage,skill,false)
 
 static func apply_fixed(model, damage: int, skill: MultiHitSkill) -> Array:

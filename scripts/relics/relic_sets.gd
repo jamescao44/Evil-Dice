@@ -1,27 +1,48 @@
 extends RefCounted
 ## Set recipes are data: ordered ingredients, replacement tier bonuses and composite art.
 const RECIPES := {
+	"remains": {
+		"name":"Remains",
+		"ingredients":["unknown_arm","unknown_pelvis","unknown_leg","unknown_sternum","unknown_skull","unidentified_ring"],
+		"retain_effects":false, "composite_art":false,
+		"tiers":[{"id":"witch_ghost","count":6,"stats":{}}],
+	},
+	"broken_sword": {
+		"name":"Broken Sword",
+		"ingredients":["broken_blade","broken_hilt"],
+		"retain_effects":false, "composite_art":false,
+		"tiers":[{"id":"general_sword","count":2,"stats":{"damage_add":2.0}}],
+	},
+	"pets": {
+		"name":"Pets",
+		"ingredients":["pet_bat","pet_lizard","pet_slime","pet_ghost","pet_dragon"],
+		"retain_effects":false,
+		"composite_art":false,
+		"tiers":[{"id":"pet_orb","count":5,"stats":{}}],
+	},
 	"marbles": {
+		"name":"Marbles",
 		"ingredients":["glass_marble","steel_marble","gold_marble","magic_slingshot"],
 		"retain_effects":false,
 		"composite_art":false,
 		"tiers":[{"id":"enchanted_missile","count":4,"stats":{"base_damage":10.0,"three_straight_bonus":1.0}}],
 	},
 	"meal": {
+		"name":"Meal",
 		"ingredients":["lemon_soda","fries","hamburger","oreo_sundae","fried_chicken"],
 		"tiers":[
 			{"id":"budget_meal","count":2,"stats":{"damage_add":0.3}},
 			{"id":"happy_meal","count":3,"stats":{"damage_add":0.5}},
-			{"id":"deluxe_meal","count":4,"stats":{"base_damage":10.0,"damage_add":0.5}},
-			{"id":"super_meal","count":5,"stats":{"base_damage":30.0,"damage_factor":1.5}},
+			{"id":"deluxe_meal","count":4,"stats":{"base_damage":8.0,"damage_add":0.5}},
+			{"id":"super_meal","count":5,"stats":{"base_damage":15.0,"damage_factor":1.3}},
 		],
 	},
 }
 const COLLECTIONS := {"pets":["pet_bat","pet_lizard","pet_slime","pet_ghost","pet_dragon"]}
 
-## Collection bonuses require owned components and do not fuse or consume slots.
+## Collection bonuses survive fusion and disappear when the fused item is sold.
 static func collection_complete(items: Array, id: String) -> bool:
-	return COLLECTIONS.get(id,[]).all(func(part): return items.any(func(item): return item.id == part))
+	return COLLECTIONS.get(id,[]).all(func(part): return items.any(func(item): return item.id == part or part in ingredients(item)))
 
 static func uses_composite_art(id: String) -> bool:
 	return is_fused(id) and recipe_for(id).get("composite_art",true)
@@ -39,7 +60,11 @@ static func is_fused(id: String) -> bool:
 static func ingredients(item: Dictionary) -> Array:
 	var recipe: Dictionary = recipe_for(item.id)
 	if recipe.is_empty(): return []
-	return item.get("ingredients",[]) if is_fused(item.id) else [item.id]
+	if not is_fused(item.id): return [item.id]
+	if item.has("ingredients"): return item.ingredients
+	for tier in recipe.tiers:
+		if tier.id == item.id: return recipe.ingredients.slice(0,tier.count)
+	return []
 
 ## A new component merges in place without needing an extra inventory slot.
 static func can_merge(items: Array, id: String) -> bool:
@@ -106,3 +131,10 @@ static func display_parts(id: String, item: Dictionary) -> Array:
 	for tier in recipe.tiers:
 		if tier.id == id: return recipe.ingredients.slice(0,tier.count)
 	return []
+
+## Resolve a localized set hint for components and their final fusion alike.
+static func set_label(id: String) -> String:
+	if id in ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone","prismatic_stone"]: return "Magic Stones"
+	if id in ["codex_page","ancient_codex"]: return "Codex"
+	var recipe: Dictionary = recipe_for(id)
+	return recipe.get("name", "")

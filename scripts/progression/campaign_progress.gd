@@ -7,12 +7,14 @@ const RUN_FIELDS := ["character_level","souls","base_max_hp","blood_gems","blood
 var checkpoint: Dictionary = {}
 var save_path: String = ""
 var cleared_level: int = 0
+var _last_completion: String = ""
 
 ## Disk persistence is opt-in, so headless sessions and standalone scenes stay isolated.
 func configure(path: String) -> void:
 	save_path = path
 	checkpoint = {}
 	cleared_level = 0
+	_last_completion = ""
 	if path.is_empty() or not FileAccess.file_exists(path): return
 	var file := FileAccess.open(path,FileAccess.READ)
 	if file == null: return
@@ -56,14 +58,16 @@ static func restore(model, data: Dictionary) -> bool:
 	model._load_wave()
 	return true
 
-## Record once per completed level; repeating a victory callback cannot overwrite entry loot.
+## Deduplicate callbacks for this run, not future runs that finish the same level.
 func complete(model) -> bool:
 	if not model.level_rewards_complete(): return false
 	var level: int = model.level_number()
-	if cleared_level == level: return true
+	var completion := "%d:%d:%d" % [model.get_instance_id(),model.run_generation,level]
+	if _last_completion == completion: return true
 	if level < LEVEL_COUNT: checkpoint = capture(model)
 	else: checkpoint.clear()
 	cleared_level = level
+	_last_completion = completion
 	_save()
 	return true
 

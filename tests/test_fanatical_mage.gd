@@ -15,16 +15,16 @@ func fresh(level: int = 1):
 	return m
 func _initialize() -> void:
 	var m = fresh()
-	check(m.enemies[0].hp == 1500,"Mage uses authored phase-one base health")
+	check(m.enemies[0].hp == 900,"Mage uses authored phase-one base health")
 	check(not m.EnemyActions.options(m,0).any(func(o): return o[0] == "split_minions"),"Splitting requires two octopuses")
 	Fanatic.summon(m,0)
 	check(Fanatic.servants(m,0).size() == 2 and m.enemies[1].acted,"Two servants spawn and wait until the next turn")
 	var before: int = m.enemies[1].hp+m.enemies[2].hp
-	check(m.hit_enemy(0,100) == 0 and m.enemies[0].hp == 1500,"Servant absorbs the mage's damage")
+	check(m.hit_enemy(0,100) == 0 and m.enemies[0].hp == 900,"Servant absorbs the mage's damage")
 	check(before-m.enemies[1].hp-m.enemies[2].hp == 50,"Overkill does not spill through a servant")
 	check(m.souls == 0 and m.blood_gems == 0,"Summons cannot farm leveling or treasure")
 	m = fresh(); Fanatic.summon(m,0); m.tarot_effects._tower(m)
-	check(m.enemies[0].hp == 1450 and Fanatic.servants(m,0).is_empty(),"Tower keeps its exact HP loss on every target despite servants")
+	check(m.enemies[0].hp == 850 and Fanatic.servants(m,0).is_empty(),"Tower keeps its exact HP loss on every target despite servants")
 	m = fresh(); Fanatic.summon(m,0); Fanatic.split(m,0)
 	check(Fanatic.servants(m,0).size() == 6 and Fanatic.servants(m,0,true).is_empty(),"Two octopuses split into six tentacles")
 	check(not m.EnemyActions.options(m,0).any(func(o): return o[0] in ["split_minions","summon_minions"]),"Full tentacle formation cannot split or grow again")

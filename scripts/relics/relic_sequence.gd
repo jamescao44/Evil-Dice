@@ -21,10 +21,19 @@ static func _copy(items: Array, index: int, slot: int, chain: Array) -> Array:
 	if item.id == TENTACLE or item.id in Catalog.DISABLED: return []
 	var activators: Array = chain + [item.id]
 	if item.id == MASK: return _copy(items,index-1,slot,activators)
+	if item.id == "pet_orb":
+		var pets: Array = []
+		for id in Catalog.Sets.ingredients(item):
+			var component: Dictionary = item.duplicate()
+			component.id = id
+			pets.append({"item":component,"origin":index,"slot":slot,"source":items[slot].id,"activators":activators})
+		return pets
 	return [{"item":item,"origin":index,"slot":slot,"source":items[slot].id,"activators":activators}]
 
 static func activate(model, entry: Dictionary) -> void:
 	activate_ids(model,entry.activators,animation_speed(entry))
+	# The effect's identity survives fusion and copying; companion visuals use this signal.
+	model.relic_effect_activated.emit(entry.item.id)
 
 ## Notify presentation without applying effects or advancing counters a second time.
 static func activate_ids(model, ids: Array, speed: float = 1.0) -> void:

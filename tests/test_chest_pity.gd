@@ -30,18 +30,18 @@ func run() -> void:
 	var partial_seed: int = seed_for([true,false])
 	check(fail_seed >= 0 and partial_seed >= 0,"Deterministic random success/failure fixtures exist")
 	var pity = Pity.new()
-	# Even if every random chance fails, each fourth tier attempt must advance.
-	for number in range(1,129):
+	# Even if every random chance fails, each fifth tier attempt must advance.
+	for number in range(1,251):
 		rng.seed = fail_seed
 		var tier: int = pity.roll(rng)
-		var expected: int = 3 if number%64 == 0 else 2 if number%16 == 0 else 1 if number%4 == 0 else 0
-		check(tier == expected,"Worst-case chest %d follows the 4/16/64 bound" % number)
+		var expected: int = 3 if number%125 == 0 else 2 if number%25 == 0 else 1 if number%5 == 0 else 0
+		check(tier == expected,"Worst-case chest %d follows the 5/25/125 bound" % number)
 	check(pity.misses == [0,0,0],"Ultra resets all three successful tier counters")
 	pity.misses = [2,1,2]
 	rng.seed = partial_seed
 	check(pity.roll(rng) == 1 and pity.misses == [0,2,2],"Natural success resets only its tier; one failure advances; unreached tier stays")
 	check(pity.last_misses == [2,1,2],"Presentation keeps the counters from before the committed outcome")
-	pity.misses = [3,3,3]
+	pity.misses = [4,4,4]
 	var before_rng: int = rng.state
 	check(pity.roll(rng) == 3 and rng.state == before_rng,"Ready pity guarantees the full chain without random rerolls")
 
@@ -51,27 +51,30 @@ func run() -> void:
 	check(model.chest_pity.misses == [2,2,2],"Restart keeps accumulated pity")
 	model.load_debug_wave(20)
 	check(model.chest_pity.misses == [2,2,2],"Debug wave changes also keep pity")
-	model.chest_pity.misses = [3,3,3]
+	model.chest_pity.misses = [4,4,4]
 	model.open_debug_chest()
 	check(model.opened_chest_tier == 3 and model.chest_pity.misses == [0,0,0],"Debug chest uses the real shared guarantee")
 	before_rng = model.reward_rng.state
 	check(model.open_debug_chest().is_empty() and model.chest_pity.misses == [0,0,0] and model.reward_rng.state == before_rng,"A pending chest cannot consume another pity attempt")
 	model.discard_unclaimed_rewards()
 	model.close_chest()
-	model.chest_pity.misses = [2,3,3]
+	model.chest_pity.misses = [2,4,4]
 	model.reroll_progress = 10
 	model.open_chest()
 	check(model.chest_pity.misses == [2,0,0] and model.opened_chest_tier == 3 and model.chest_start_tier == 1,"Reroll chest upgrades from Perfect without touching Normal pity")
 	model.discard_unclaimed_rewards()
 	model.close_chest()
 	model.reset_run()
-	model.chest_pity.misses = [3,3,3]
+	model.chest_pity.misses = [4,4,4]
 	model.wave_kind = model.WaveRewards.RELIC
 	for enemy in model.enemies: enemy.hp = 0
 	check(model.begin_wave_reward() and model.wave_chest_tier == 3,"Wave chest uses all ready tier guarantees")
-	check(model.chest_pity.misses == [0,0,0] and model.chest_pity.last_misses == [3,3,3],"Wave outcome commits counters before presentation")
+	check(model.chest_pity.misses == [0,0,0] and model.chest_pity.last_misses == [4,4,4],"Wave outcome commits counters before presentation")
 	before_rng = model.reward_rng.state
 	model.begin_wave_reward()
+	check(model.reward_rng.state == before_rng,"Repeated wave reward entry never rerolls upgrades")
+	model.open_wave_chest()
+	before_rng = model.reward_rng.state # Opening draws prizes for the already committed tier.
 	model.open_wave_chest()
 	model.release_chest_crystals()
 	model.discard_unclaimed_rewards()
@@ -97,7 +100,7 @@ func run() -> void:
 	invalid.set_value("chest_upgrades","2","invalid")
 	invalid.save(path)
 	pity.configure(path)
-	check(pity.misses == [0,3,0],"Malformed counter entries are bounded or safely defaulted")
+	check(pity.misses == [0,4,0],"Malformed counter entries are bounded or safely defaulted")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	for scene_path in ["res://scenes/battle.tscn","res://scenes/battle_portrait.tscn"]:
 		var scene = load(scene_path).instantiate()
@@ -114,15 +117,15 @@ func run() -> void:
 		for language in ["en","zh_CN"]:
 			GameText.set_language(language,false)
 			chest.start([6,6,6,6,6],canvas,GameText.description_font(),false,[],3,true,[1,3,2])
-			check(chest.upgrade_hint() == GameText.text("25% CHANCE TO UPGRADE"),"Closed chest hides the attempt count")
+			check(chest.upgrade_hint() == GameText.text("20% CHANCE TO UPGRADE"),"Closed chest hides the attempt count")
 			var hint_width: float = chest.font.get_string_size(chest.upgrade_hint(),HORIZONTAL_ALIGNMENT_LEFT,-1,24 if canvas.y > canvas.x else 18).x
 			check(hint_width < canvas.x-64,"Attempt caption fits in both layouts and languages")
 			await capture(chest,language+"-"+str(int(canvas.x))+"-attempt")
 			chest.tier = 1
-			check(chest.upgrade_hint() == GameText.text("25% CHANCE TO UPGRADE"),"Ready pity stays hidden")
+			check(chest.upgrade_hint() == GameText.text("20% CHANCE TO UPGRADE"),"Ready pity stays hidden")
 			await capture(chest,language+"-"+str(int(canvas.x))+"-guaranteed")
 			chest.tier = 2
-			check(chest.upgrade_hint() == GameText.text("25% CHANCE TO UPGRADE"),"Reached tiers keep pity hidden")
+			check(chest.upgrade_hint() == GameText.text("20% CHANCE TO UPGRADE"),"Reached tiers keep pity hidden")
 			chest.tier = 3
 			check(chest.upgrade_hint().is_empty(),"Ultra never advertises a further upgrade")
 			chest.cancel()

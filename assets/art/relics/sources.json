@@ -119,6 +119,126 @@
       "relics": [
         "three_leaf_clover"
       ]
+    },
+    "pet_food_bat.svg": {
+      "source": "Original project pixel-vector pet food bowl",
+      "relics": [
+        "pet_bat"
+      ]
+    },
+    "pet_food_lizard.svg": {
+      "source": "Original project pixel-vector pet food bowl",
+      "relics": [
+        "pet_lizard"
+      ]
+    },
+    "pet_food_slime.svg": {
+      "source": "Original project pixel-vector pet food bowl",
+      "relics": [
+        "pet_slime"
+      ]
+    },
+    "pet_food_ghost.svg": {
+      "source": "Original project pixel-vector pet food bowl",
+      "relics": [
+        "pet_ghost"
+      ]
+    },
+    "pet_food_dragon.svg": {
+      "source": "Original project pixel-vector pet food bowl",
+      "relics": [
+        "pet_dragon"
+      ]
+    },
+    "pet_ball.svg": {
+      "source": "Original project pixel-vector red-and-ivory pet ball with gold star clasp",
+      "relics": [
+        "pet_orb"
+      ]
+    },
+    "ticket.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "ticket"
+      ]
+    },
+    "unknown_arm.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "unknown_arm"
+      ]
+    },
+    "unknown_leg.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "unknown_leg"
+      ]
+    },
+    "unknown_pelvis.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "unknown_pelvis"
+      ]
+    },
+    "unknown_sternum.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "unknown_sternum"
+      ]
+    },
+    "unknown_skull.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "unknown_skull"
+      ]
+    },
+    "broken_blade.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "broken_blade"
+      ]
+    },
+    "broken_hilt.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "broken_hilt"
+      ]
+    },
+    "nightmare_totem.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "nightmare_totem"
+      ]
+    },
+    "red_chip.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "red_chip"
+      ]
+    },
+    "blue_chip.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "blue_chip"
+      ]
+    },
+    "black_chip.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "black_chip"
+      ]
+    },
+    "witch_ghost": {
+      "source": "unidentified_ring.png with runtime magic glow",
+      "relics": [
+        "witch_ghost"
+      ]
+    },
+    "holy_grail.svg": {
+      "source": "Original project pixel-vector art",
+      "relics": [
+        "holy_grail"
+      ]
     }
   },
   "files": {
@@ -180,6 +300,35 @@
     "alternating_gears": "item/misc/misc_disc_new.png",
     "enchanted_missile": "item/rod/rod_forked.png",
     "royal_seal": "item/misc/runes/rune_vaults.png",
-    "magician_hat": "item/armor/headgear/hat_3.png"
+    "magician_hat": "item/armor/headgear/hat_3.png",
+    "mystery_potion": "item/potion/unknown.png",
+    "banana": "item/food/banana_new.png",
+    "magic_banana": "item/food/banana_old.png",
+    "precognition_eye": "item/amulet/eye_magenta.png",
+    "frozen_tilapia": "monster/undead/simulacra/simulacrum_fish.png",
+    "general_sword": "item/weapon/golden_sword.png",
+    "unidentified_ring": "item/ring/ring_gold_magenta.png",
+    "hellfire": "gui/spells/fire/fireball_new.png",
+    "corrupt_crystal": "item/amulet/crystal_green.png",
+    "potion_x": "item/potion/purple_red.png"
+  },
+  "new_build_items": {
+    "vodka.png": "item/potion/clear.png",
+    "mysterious_seed.png": "item/food/sultana.png",
+    "magic_bandage.png": "item/scroll/scroll_new.png",
+    "steel_sword.png": "item/weapon/long_sword_2.png",
+    "split_arrow.png": "gui/spells/components/arrow.png",
+    "book_of_dead.png": "item/book/book_of_the_dead_new.png"
+  },
+  "pet_companions": {
+    "source": "Same CC0 Dungeon Crawl Stone Soup archive",
+    "dragon.png": "monster/dragons/dragon.png",
+    "other_sprites": "Existing unmodified pet_bat, pet_lizard, pet_slime and pet_ghost sprites are now also used as world companions."
+  },
+  "witch_companion": {
+    "file": "../pets/witch_ghost.png",
+    "source": "monster/enchantress_human.png",
+    "license": "CC0 / public domain",
+    "rendering": "Unchanged source; runtime spectral tint, opacity and glow"
   }
 }

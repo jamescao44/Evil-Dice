@@ -614,7 +614,8 @@ Perfect,Perfect,完美
 Greed,Greed,贪婪
 Ultra,Ultra,究极
 UPGRADED!,UPGRADED!,升级成功！
-25% CHANCE TO UPGRADE,25% CHANCE TO UPGRADE,25%概率升级
+20% CHANCE TO UPGRADE,20% CHANCE TO UPGRADE,20%概率升级
+SORT BY NAME,SORT BY NAME,按名称排序
 YOUR CHEST IS READY,YOUR CHEST IS READY,宝箱已就绪
 %d rewards + %d blood gems,%d rewards + %d blood gems,%d份奖励＋%d血宝石
 TAROT DRAW PURCHASED,TAROT DRAW PURCHASED,已购买塔罗抽取
@@ -784,7 +785,6 @@ No spent dice to restore.,No spent dice to restore.,没有已消耗的骰子。
 Choose an unused die and a different face.,Choose an unused die and a different face.,请选择未使用的骰子及不同点数。
 Choose a different face.,Choose a different face.,请选择不同点数。
 Choose a face. Tap the die to go back.,Choose a face. Tap the die to go back.,选择点数；再点中间骰子可返回。
-
 DISCARD,DISCARD,放弃
 "Cancel any formed skill, then immediately reroll all unused dice for free.","Cancel any formed skill, then immediately reroll all unused dice for free.",取消已形成的技能，解锁其骰子，然后免费重掷所有未使用骰子。
 Extra Skill,Extra Skill,额外技能
@@ -828,9 +828,7 @@ All: 10 hits; 2x vs Burning.,All: 10 hits; 2x vs Burning.,全体10次攻击；�
 All enemies: 10 hits at 2x base damage each. Double against Burning enemies.,All enemies: 10 hits at 2x base damage each. Double against Burning enemies.,攻击全体10次，每次基础伤害×2；对燃烧敌人伤害翻倍。
 All enemies: 5 hits at 1.5x base damage each. Double against Burning; apply 2 Burning after all hits.,All enemies: 5 hits at 1.5x base damage each. Double against Burning; apply 2 Burning after all hits.,攻击全体5次，每次基础伤害×1.5；对燃烧敌人伤害翻倍，全部命中结束后施加2层燃烧。
 All enemies: 5 hits at 1.5x base damage each. Double against Burning; apply 3 Burning after all hits.,All enemies: 5 hits at 1.5x base damage each. Double against Burning; apply 3 Burning after all hits.,攻击全体5次，每次基础伤害×1.5；对燃烧敌人伤害翻倍，全部命中结束后施加3层燃烧。
-
 EXIT TO HOME,EXIT TO HOME,返回主界面
-
 2+ matching dice: one random-target hit per die. Each hit = base x (0.5 + 0.05 x pip).,2+ matching dice: one random-target hit per die. Each hit = base x (0.5 + 0.05 x pip).,至少2枚同点骰：每枚随机攻击一次。每击＝基础伤害×(0.5＋0.05×点数)。
 Six Alike,Six Alike,六个一样
 "Five linked dice form a pentagon and fire 5 random-target laser hits, each dealing 4x auto-attack damage.","Five linked dice form a pentagon and fire 5 random-target laser hits, each dealing 4x auto-attack damage.",五枚同点骰连接成五芒法阵，向随机敌人发射5次激光，每击自动攻击伤害×4。
@@ -895,7 +893,7 @@ Transfer 50% of excess killing damage to a random enemy.,Transfer 50% of excess 
 "At 10 Burning, consume 5 stacks and explode for 3x base damage to all enemies.","At 10 Burning, consume 5 stacks and explode for 3x base damage to all enemies.",敌人燃烧达到10层时消耗5层，引爆造成全体3倍基础伤害。
 Every third skill repeats at 50% effect. The repeat does not count as a skill cast.,Every third skill repeats at 50% effect. The repeat does not count as a skill cast.,每第三次技能以50%效果额外释放一次；额外释放不计施法。
 Skill damage +50% when its type differs from the previous skill.,Skill damage +50% when its type differs from the previous skill.,使用不同于上一次的技能时，技能伤害+50%。
-Fuse three marbles and Magic Slingshot. Base damage +10; three-straight damage +100%. Fire a half-pip-sum attack after each throw and a 3-4-5 skill at turn start.,Fuse three marbles and Magic Slingshot. Base damage +10; three-straight damage +100%. Fire a half-pip-sum attack after each throw and a 3-4-5 skill at turn start.,由三种弹珠与魔法弹弓合成。基础伤害+10，三连顺子伤害+100%。投掷后以点数和的一半攻击；回合开始释放一次345技能。
+"Fuse three marbles and Magic Slingshot. Base damage +10; three-straight damage +100%. Fire a half-pip-sum attack after each throw. At turn start, cast your character's 3-4-5 straight skill.","Fuse three marbles and Magic Slingshot. Base damage +10; three-straight damage +100%. Fire a half-pip-sum attack after each throw. At turn start, cast your character's 3-4-5 straight skill.",由三种弹珠与魔法弹弓合成。基础伤害+10，三骰顺子伤害+100%。投掷后以点数和的一半攻击；回合开始释放当前角色的3-4-5三骰顺子技能。
 "Your first manual skill each wave casts one tier higher, up to a six-straight.","Your first manual skill each wave casts one tier higher, up to a six-straight.",每波首次手动施放的技能提升一级，最高六连顺子。
 "Receive a Magician tarot immediately, then another every 4 completed turns.","Receive a Magician tarot immediately, then another every 4 completed turns.",立即获得一张法师塔罗，此后每四个完整回合再获得一张。
 Heal 1% max HP per attack. With all five pets: 2%.,Heal 1% max HP per attack. With all five pets: 2%.,每次攻击恢复1%最大生命。集齐五只宠物：改为2%。
@@ -947,3 +945,86 @@ ABYSSAL GUARD,ABYSSAL GUARD,深渊卫队
 RUINED HALL,RUINED HALL,残破殿堂
 THE LAST WATCH,THE LAST WATCH,最后守望
 THE FANATIC,THE FANATIC,狂热法师
+Vodka,Vodka,伏特加
+Enemy Burning damage x2.,Enemy Burning damage x2.,敌人燃烧伤害×2。
+Mysterious Seed,Mysterious Seed,神秘种子
+Store twice your overhealing as base damage. Fire at a random enemy at player-turn end.,Store twice your overhealing as base damage. Fire at a random enemy at player-turn end.,储存过量恢复的两倍作为基础伤害，玩家回合结束时攻击随机敌人。
+Magic Bandage,Magic Bandage,魔法绷带
+"If a turn starts below full HP, healing is doubled for that turn.","If a turn starts below full HP, healing is doubled for that turn.",回合开始时未满血，本回合恢复量翻倍。
+Steel Sword,Steel Sword,精钢剑
+Damage multiplier +5.,Damage multiplier +5.,伤害乘数+5。
+Split Arrow,Split Arrow,分裂箭
+Single-target skills split into two random hits at 50% damage each.,Single-target skills split into two random hits at 50% damage each.,单体技能分裂为两次随机攻击，每次造成50%伤害。
+Super Pet Ball,Super Pet Ball,超级宠物球
+"Fuse all five pets, keeping their upgraded effects.","Fuse all five pets, keeping their upgraded effects.",五种宠物合成，保留全部宠物的升级效果。
+Book of the Dead,Book of the Dead,亡灵之书
+Maximum HP x3. Lose 30% of current HP at turn end; cannot kill you.,Maximum HP x3. Lose 30% of current HP at turn end; cannot kill you.,生命上限×3。回合结束失去当前生命的30%，至少保留1生命。
+Base damage +20%. Prevent death once and restore 60% max HP. Consumed on use.,Base damage +20%. Prevent death once and restore 60% max HP. Consumed on use.,基础伤害+20%。濒死时恢复60%最大生命并消耗本法具。
+Base damage +10. Combo skills gain 3 extra hits.,Base damage +10. Combo skills gain 3 extra hits.,基础伤害+10。连击技能额外攻击3次。
+Base damage +5. Immune to burning. Every attack applies 1 burning stack.,Base damage +5. Immune to burning. Every attack applies 1 burning stack.,基础伤害+5。免疫燃烧，攻击施加1层燃烧。
+Base damage +5. Immune to freeze. Attacks have a 30% chance to freeze.,Base damage +5. Immune to freeze. Attacks have a 30% chance to freeze.,基础伤害+5。免疫冰冻，攻击有30%概率施加冰冻。
+Three visible sixes turn all dice into sixes. No skills while no six is visible.,Three visible sixes turn all dice into sixes. No skills while no six is visible.,场上至少三个六时，全部骰子变为六；场上没有六时无法使用技能。
+Cursed Die,Cursed Die,诅咒骰子
+Fire Stone,Fire Stone,火焰魔石
+Ice Stone,Ice Stone,寒冰魔石
+Dark Stone,Dark Stone,黑暗魔石
+Mind Stone,Mind Stone,精神魔石
+Corruption Stone,Corruption Stone,腐化魔石
+Plague Stone,Plague Stone,瘟疫魔石
+"Combines four food effects, then adds 8 base damage and +0.5 damage multiplier.","Combines four food effects, then adds 8 base damage and +0.5 damage multiplier.",保留四种食材效果，额外+8基础伤害、+0.5伤害乘数。
+"Combines five food effects, then adds 15 base damage and multiplies damage by 1.3.","Combines five food effects, then adds 15 base damage and multiplies damage by 1.3.",保留五种食材效果，额外+15基础伤害、伤害乘数×1.3。
+Base damage +30. All six stone effects. Each Perfect fires a 100-base-damage attack at a random foe.,Base damage +30. All six stone effects. Each Perfect fires a 100-base-damage attack at a random foe.,基础伤害合计+30，保留六种魔石效果。每次Perfect向随机敌人追加100基础伤害攻击。
+Damage multiplier +3.,Damage multiplier +3.,伤害乘数+3。
+Mysterious Potion,Mysterious Potion,神秘药水
+Ticket,Ticket,门票
+Banana,Banana,香蕉
+Unidentified Arm,Unidentified Arm,不明手臂
+Unidentified Pelvis,Unidentified Pelvis,不明盆骨
+Unidentified Leg Bone,Unidentified Leg Bone,不明腿骨
+Broken Blade,Broken Blade,断剑刀刃
+Broken Hilt,Broken Hilt,断剑握把
+Precognition Eye,Precognition Eye,预知魔眼
+Frozen Tilapia,Frozen Tilapia,冷冻罗非鱼
+Unidentified Sternum,Unidentified Sternum,不明胸骨
+Unidentified Skull,Unidentified Skull,不明头骨
+Magic Banana,Magic Banana,魔法香蕉
+General's Sword,General's Sword,将军之剑
+Enchanted Chip - Red,Enchanted Chip - Red,附魔筹码-红
+Enchanted Chip - Blue,Enchanted Chip - Blue,附魔筹码-蓝
+Enchanted Chip - Black,Enchanted Chip - Black,附魔筹码-黑
+Unidentified Ring,Unidentified Ring,不明戒指
+Hellfire,Hellfire,地狱火焰
+Nightmare Totem,Nightmare Totem,噩梦图腾
+Corrupted Crystal,Corrupted Crystal,腐化水晶
+Potion X,Potion X,药剂“X”
+Ghost of the Witch,Ghost of the Witch,魔女的亡魂
+Holy Grail,Holy Grail,圣杯
+Attacks have a 10% chance to apply 1 random status stack.,Attacks have a 10% chance to apply 1 random status stack.,攻击有10%概率附加1层随机异常状态。
+Gain 1 extra roll each turn. Spent last; does not earn treasure progress.,Gain 1 extra roll each turn. Spent last; does not earn treasure progress.,每回合额外投掷1次，最后消耗，不计入宝箱进度。
+Damage multiplier +0.5. 20% chance to disappear at turn end.,Damage multiplier +0.5. 20% chance to disappear at turn end.,伤害乘数+0.5；回合结束时有20%概率消失。
+A broken sword handle.,A broken sword handle.,一把断剑的握把。
+Each tarot used while held permanently adds +0.05 damage multiplier to this relic.,Each tarot used while held permanently adds +0.05 damage multiplier to this relic.,持有时每使用一张塔罗，本物品永久增加0.05伤害乘数。
+"At player-turn end, attack a random enemy for the leftover pip sum as base damage.","At player-turn end, attack a random enemy for the leftover pip sum as base damage.",玩家回合结束时，以剩余骰子点数之和为基础伤害攻击随机敌人。
+"After each throw, deal 10 base damage to a random enemy.","After each throw, deal 10 base damage to a random enemy.",每次投掷后，对随机敌人造成10基础伤害。
+Damage multiplier x1.5. 1% chance to disappear at turn end.,Damage multiplier x1.5. 1% chance to disappear at turn end.,伤害乘数×1.5；回合结束时有1%概率消失。
+Fuse both broken sword parts. Damage multiplier +2.,Fuse both broken sword parts. Damage multiplier +2.,集齐两个断剑部分合成，伤害乘数+2。
+"After a throw, cast its longest straight at 30% base damage without spending dice.","After a throw, cast its longest straight at 30% base damage without spending dice.",投掷后，以30%基础伤害释放可组成的最大顺子技能，不消耗骰子。
+"After a throw, cast its shortest straight at 30% base damage without spending dice.","After a throw, cast its shortest straight at 30% base damage without spending dice.",投掷后，以30%基础伤害释放可组成的最小顺子技能，不消耗骰子。
+A throw with no straight grants +5 damage multiplier until the next throw or turn end.,A throw with no straight grants +5 damage multiplier until the next throw or turn end.,投掷没有顺子时，伤害乘数+5，持续至下次投掷或回合结束。
+Appears in rewards after gathering all five bones.,Appears in rewards after gathering all five bones.,集齐五种残骸后出现在奖励中。
+Burning enemies take 30% more damage.,Burning enemies take 30% more damage.,燃烧中的敌人额外受到30%伤害。
+Enemies in Darkness take 30% more damage.,Enemies in Darkness take 30% more damage.,黑暗中的敌人额外受到30%伤害。
+Corroded enemies take 30% more damage.,Corroded enemies take 30% more damage.,腐蚀中的敌人额外受到30%伤害。
+"At 10 Plague, kill the enemy; bosses lose 30% of current HP. Once per enemy or boss phase.","At 10 Plague, kill the enemy; bosses lose 30% of current HP. Once per enemy or boss phase.",敌人瘟疫达到10层时消灭敌人；Boss改为失去当前生命的30%。每名敌人或每个Boss阶段触发一次。
+"Fuse all six Remains. After each throw, deal 50 base damage to a random enemy.","Fuse all six Remains. After each throw, deal 50 base damage to a random enemy.",集齐六种残骸合成；每次投掷后，对随机敌人造成50基础伤害。
+Item damage x2. Skill damage x0.5.,Item damage x2. Skill damage x0.5.,物品伤害×2，技能伤害×0.5。
+(Set: %s),(Set: %s),（套装：%s）
+Meal,Meal,套餐
+Pets,Pets,宠物
+Marbles,Marbles,弹珠
+Magic Stones,Magic Stones,魔石
+Codex,Codex,法典
+Broken Sword,Broken Sword,断剑
+Remains,Remains,残骸
+Stored multiplier: +%.2f.,Stored multiplier: +%.2f.,已积累伤害乘数：+%.2f。
+RELIC VANISHED,RELIC VANISHED,法具消失

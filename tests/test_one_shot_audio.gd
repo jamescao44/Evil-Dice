@@ -18,11 +18,7 @@ func run() -> void:
 	stream.data = data
 	var capped = audio.play("item/pluck_001",stream,20,-22)
 	check(is_equal_approx(capped.pitch_scale,audio.MAX_PITCH),"Extreme pitches are capped for every one-shot")
-	check(AudioServer.get_bus_effect_count(0) == 2,"Master filters cover home, combat and chest audio")
-	var eq = AudioServer.get_bus_effect(0,0)
-	var rolloff = AudioServer.get_bus_effect(0,1)
-	check(eq is AudioEffectEQ10 and eq.get_band_gain_db(9) == -9,"Master EQ attenuates the highest band")
-	check(rolloff is AudioEffectLowPassFilter and rolloff.cutoff_hz == 10000,"Master gently rolls off high-frequency noise")
+	check(AudioServer.get_bus_effect_count(0) == 0,"Master preserves the original high end without global EQ or low-pass filtering")
 	audio.clear()
 	var first = audio.play("enemy/chop",stream,0.7,-15)
 	check(first != null and is_equal_approx(first.volume_db,-15),"Single death cue retains authored volume")

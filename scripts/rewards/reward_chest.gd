@@ -31,11 +31,11 @@ const Catalog = preload("res://scripts/rewards/reward_catalog.gd")
 const Icons = preload("res://scripts/rewards/reward_icons.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
+const RelicPaint = preload("res://scripts/relics/relic_paint.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
 var symbols: Array = Catalog.ITEMS.duplicate(true)
 var scroll_symbols: Array = []
 var relic_symbols: Dictionary = {}
-var relic_atlas: Texture2D
 const OPEN_TIME := 0.65
 const SPIN_TIME := 1.55
 const REEL_STEPS := 64
@@ -66,7 +66,6 @@ func _ready() -> void:
 	z_index = 80
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	cosmetic.randomize()
-	relic_atlas = load("res://assets/art/relic_atlas.png")
 	audio = ChestAudio.new()
 	add_child(audio)
 	for id in Relics.ITEMS:
@@ -153,7 +152,7 @@ func _refresh_scroll_symbols() -> void:
 	scroll_symbols.clear()
 	for id in relic_symbols:
 		if id in Relics.DISABLED or Relics.ITEMS[id].get("fusion",false): continue
-		if is_instance_valid(battle) and battle.model.relics.has(id): continue
+		if is_instance_valid(battle) and (battle.model.relics.has(id) or not battle.model.relics.Conditions.loot_allowed(battle.model.relics,id)): continue
 		scroll_symbols.append(relic_symbols[id])
 
 ## Choose cosmetic filler that differs from both adjacent symbols.
@@ -436,7 +435,8 @@ func draw_currency(canvas: CanvasItem) -> void:
 	var side: float = 32 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 23
 	Icons.paint(canvas,art,"ruby",Rect2(point-Vector2.ONE*side/2,Vector2.ONE*side))
 	var pending: int = battle.crystal_pickup.pending_total
-	canvas.draw_string(battle.description_font,point+Vector2(side*0.75,8),str(maxi(0,battle.model.blood_gems-pending)),HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("ffd0de"))
+	var amount: String = "∞" if battle.model.shop.debug_unlimited else str(maxi(0,battle.model.blood_gems-pending))
+	canvas.draw_string(battle.description_font,point+Vector2(side*0.75,8),amount,HORIZONTAL_ALIGNMENT_LEFT,-1,26 if side > 25 else 20,Color("ffd0de"))
 
 func _text(at: Vector2, text: String, point_size: int, color: Color) -> void:
 	text = GameText.text(text)
@@ -447,7 +447,7 @@ func _text(at: Vector2, text: String, point_size: int, color: Color) -> void:
 
 func upgrade_hint() -> String:
 	if tier >= 3: return ""
-	return GameText.text("25% CHANCE TO UPGRADE")
+	return GameText.text("20% CHANCE TO UPGRADE")
 
 ## Paint the current chest, horizontal reels and claim controls.
 func _draw() -> void:
@@ -474,7 +474,8 @@ func _draw() -> void:
 		var info_y: float = 1175 if portrait else 205
 		var title_size: int = 28 if portrait else 22
 		_text(Vector2(center.x,info_y),item.name,title_size,item.color)
-		var lines := GameText.lines(item.text,font,24 if portrait else 17,size.x-100)
+		var description: String = Relics.short_description(item.relic_id,GameText.text) if item.has("relic_id") else GameText.text(item.text)
+		var lines := GameText.lines(description,font,24 if portrait else 17,size.x-100)
 		for line in range(mini(3 if portrait else 1,lines.size())):
 			_text(Vector2(center.x,info_y+(36 if portrait else 30)+line*(30 if portrait else 22)),lines[line],24 if portrait else 17,Color("eee0b9"))
 	var box_at := chest_point()
@@ -605,12 +606,8 @@ func _paint_symbol(index: int, rect: Rect2, clip: Rect2 = Rect2(), tint: Color =
 		Icons.paint(self,art,item.icon,rect,clip,tint)
 		return
 	Glow.paint(self,rect.get_center(),rect.size.x*0.49,Relics.rarity_color(item.relic_id),clip,tint.a)
-	var position: int = Relics.ITEMS.keys().find(item.relic_id)
-	var source := Rect2(position*64,0,64,64)
-	var visible_rect: Rect2 = rect.intersection(clip) if clip.has_area() else rect
-	if not visible_rect.has_area(): return
-	var uv := Rect2(source.position+(visible_rect.position-rect.position)/rect.size*source.size,visible_rect.size/rect.size*source.size)
-	draw_texture_rect_region(relic_atlas,visible_rect,uv,tint)
+	# Resolve by stable item ID through the inventory renderer; catalog insertion cannot shift artwork.
+	RelicPaint.paint(self,item.relic_id,rect.get_center(),minf(rect.size.x,rect.size.y)*(26.0/64.0),false,{},clip,tint)
 
 func _draw_celebrations(foreground: bool) -> void:
 	for event in celebrations:

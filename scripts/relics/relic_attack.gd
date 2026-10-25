@@ -12,8 +12,10 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 		targets = [target]
 	var skill = Skill.new(Skill.Kind.PAIR,4 if all_targets else 1,model.pending.dice)
 	skill.cast_source = "relic"
-	if options.has("base_scale"): amount = (model.character_base_damage()+model.relic_base_damage())*options.base_scale-model.relic_base_damage()
-	var damage: int = maxi(0,floori(amount if fixed else (amount+model.relic_base_damage())*model.damage_multiplier(skill)+0.000001))
+	var attack_base: float = amount+model.RelicEffects.base_damage(model.relics.items,amount)
+	if options.has("base_scale"): attack_base = (model.character_base_damage()+model.relic_base_damage())*options.base_scale
+	var damage: int = maxi(0,floori(amount if fixed else attack_base*model.damage_multiplier(skill)+0.000001))
+	if fixed and not options.get("no_damage_modifiers",false): damage = floori(damage*pow(2,model.RelicEffects.repeat_sources(model.relics.items,"holy_grail").size()))
 	if options.get("multiplier_only",false): damage = floori(amount*model.damage_multiplier(skill)+0.000001)
 	if not fixed or options.get("multiplier_only",false): model.RelicEffects.activate_damage_modifiers(model,skill)
 	var guards: Array = model.taunting_enemies()
@@ -26,6 +28,7 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 		if index != -2 and not model.is_enemy_alive(index): continue
 		if index != -2 and model.enemies[index].get("phase_transition_pending",false): continue
 		var hit_damage: int = damage
+		if not options.get("no_damage_modifiers",false): hit_damage = floori(hit_damage*model.RelicEffects.Conditions.target_factor(model,index,true)+0.000001)
 		if not fixed and model.enemy_status_count(index,Status.CORROSION) > 0: hit_damage = floori(hit_damage*1.5)
 		if all_targets and index != -2: hit_damage = floori(hit_damage*model.area_damage_factor(index,guards))
 		var shield_before: int = 0 if index == -2 else model.enemies[index].shield
