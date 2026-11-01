@@ -1,6 +1,7 @@
 extends RefCounted
 ## Procedural pixel-light rings and sustained beams, separate from targeting and damage.
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
+const Embers = preload("res://scripts/effects/flame_particles.gd")
 
 ## Paint broad additive-looking halos behind a crisp, pale laser core.
 static func laser(canvas: CanvasItem, from: Vector2, to: Vector2, width: float, color: Color, alpha: float, age: float, reduced: bool) -> void:
@@ -20,6 +21,11 @@ static func laser(canvas: CanvasItem, from: Vector2, to: Vector2, width: float, 
 			var t: float = fposmod(age*1.8+i/8.0,1)
 			var p: Vector2 = from.lerp(to,t)
 			canvas.draw_line(p-normal*width*0.55,p+normal*width*0.55,Color("fffbee",alpha*0.45),3,false)
+		# Bright embers race alongside the beam, separate from its solid core.
+		for i in range(64 if width > 20 else 40):
+			var phase: float = fposmod(age*(1.3+fposmod(i*0.37,0.8))+i*0.618034,1.0)
+			var point: Vector2 = from.lerp(to,phase)+normal*sin(i*2.4+age*4)*width*(0.7+phase*0.8)
+			Embers.spark(canvas,point,2+i%4,color,alpha*sin(phase*PI))
 
 ## A hexagonal ritual emits one large light column with strands reaching all living targets.
 static func wide_beam(r) -> void:
@@ -113,9 +119,9 @@ static func sigil(r) -> void:
 		for i in range(4,0,-1): Pixel.disc(r,r.center,(7+i*7*power)*s,Color(tint,a*0.06*(5-i)),3)
 		Pixel.disc(r,r.center,(7+power*7)*s,Color("fff8d9",a*0.92),3)
 		if r.phase == "charge" and not r.battle.reduced:
-			for i in range(12):
-				var t: float = fposmod(r.age*1.5+i/12.0,1)
-				var d := Vector2.from_angle(i*TAU/12+r.rotation_angle)
+			for i in range(36):
+				var t: float = fposmod(r.age*1.5+i/36.0,1)
+				var d := Vector2.from_angle(i*TAU/36+r.rotation_angle)
 				Pixel.line(r,r.center+d*radius*(1-t),r.center+d*radius*maxf(0,0.8-t),Color("fff4d7",a*t),3)
 
 ## Layer sparks, the sustained beam, then the summoning seal beneath the real dice.
@@ -126,5 +132,10 @@ static func draw(r) -> void:
 	sigil(r)
 	for p in r.particles:
 		var a: float = clampf(p.life/p.max,0,1)*r.aura
-		r.draw_rect(Rect2(p.p-Vector2.ONE*p.size,Vector2.ONE*p.size*2),Color(r.tint(),a*0.14))
-		r.draw_rect(Rect2(p.p-Vector2.ONE*p.size*0.5,Vector2.ONE*p.size),Color("fff0c7",a))
+		var glow := Rect2(p.p-Vector2.ONE*p.size,Vector2.ONE*p.size*2)
+		var core := Rect2(p.p-Vector2.ONE*p.size*0.5,Vector2.ONE*p.size)
+		if p.get("combat",false):
+			glow = glow.intersection(r.battle.ARENA)
+			core = core.intersection(r.battle.ARENA)
+		if glow.has_area(): r.draw_rect(glow,Color(r.tint(),a*0.14))
+		if core.has_area(): r.draw_rect(core,Color("fff0c7",a))

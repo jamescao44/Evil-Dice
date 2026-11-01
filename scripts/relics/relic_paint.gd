@@ -3,10 +3,6 @@ extends RefCounted
 ## All magic stones use one neutral gem with data-driven element colors.
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
-const VECTOR_ICONS := ["three_leaf_clover", "four_leaf_clover", "five_leaf_clover", "ice_rose", "cursed_die_1", "cursed_die_2", "cursed_die_3", "cursed_die_4", "cursed_die_5", "cursed_die"]
-const SPRITE_FILES := {"holy_grail":"holy_grail.svg","witch_ghost":"unidentified_ring.png","ticket":"ticket.svg","unknown_arm":"unknown_arm.svg","unknown_leg":"unknown_leg.svg","unknown_pelvis":"unknown_pelvis.svg","unknown_sternum":"unknown_sternum.svg","unknown_skull":"unknown_skull.svg","broken_blade":"broken_blade.svg","broken_hilt":"broken_hilt.svg","nightmare_totem":"nightmare_totem.svg","red_chip":"red_chip.svg","blue_chip":"blue_chip.svg","black_chip":"black_chip.svg","fries":"fries.tres","hamburger":"hamburger.tres","oreo_sundae":"oreo_sundae.tres",
-	"pet_bat":"pet_food_bat.svg","pet_lizard":"pet_food_lizard.svg","pet_slime":"pet_food_slime.svg",
-	"pet_ghost":"pet_food_ghost.svg","pet_dragon":"pet_food_dragon.svg","pet_orb":"pet_ball.svg"}
 static var textures: Dictionary = {}
 static var regions: Dictionary = {}
 static var silhouettes: Dictionary = {}
@@ -17,7 +13,7 @@ static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow
 	if Catalog.Sets.uses_composite_art(id):
 		for part in _set_parts(id,item,at,radius): paint(node,part.id,part.at,part.radius,false,{},clip,tint)
 		return
-	var stone: bool = id in Catalog.STONES or id == "prismatic_stone"
+	var stone: bool = Catalog.ITEMS[id].get("tint_sprite",false)
 	var sprite: String = _load_sprite(id)
 	var source: Rect2 = regions[sprite]
 	var size: Vector2 = (source.size * (radius*2/maxf(source.size.x,source.size.y))).round()
@@ -53,11 +49,9 @@ static func _set_parts(id: String, item: Dictionary, at: Vector2, radius: float)
 
 ## Load and trim each source once for inventory, chest and orbit rendering.
 static func _load_sprite(id: String) -> String:
-	var stone: bool = id in Catalog.STONES or id == "prismatic_stone"
-	var sprite: String = "magic_gem" if stone else id
+	var sprite: String = Catalog.sprite_path(id)
 	if not textures.has(sprite):
-		var file: String = SPRITE_FILES.get(sprite,sprite+(".svg" if stone or id in VECTOR_ICONS else ".png"))
-		var texture: Texture2D = load("res://assets/art/relics/"+file)
+		var texture: Texture2D = load(sprite)
 		textures[sprite] = texture
 		regions[sprite] = Rect2(texture.get_image().get_used_rect())
 	return sprite

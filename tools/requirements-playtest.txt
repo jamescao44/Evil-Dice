@@ -1,0 +1,2 @@
+# Optional plotting dependency; the headless gameplay bridge itself uses the standard library.
+matplotlib>=3.8,<4

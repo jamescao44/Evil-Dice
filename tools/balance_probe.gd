@@ -1,11 +1,12 @@
 extends SceneTree
+const Vitals = preload("res://scripts/combat/player_vitals.gd")
 ## Reproducible balance probes use the real CLI adapter, with an explicit visible-state policy.
 const Session = preload("res://scripts/testing/playtest_session.gd")
 const Waves = preload("res://scripts/progression/wave_catalog.gd")
 const Enemy = preload("res://scripts/enemies/enemy_catalog.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const SEEDS := [11,29,47,83,109,157,211,307,401,503,601,701]
-const WAVES := [1,3,5,7,9,10,11,13,15,17,19,20]
+const WAVES := [1,3,5,7,8,9,11,13,15,16,17,19,21,23,24]
 const RANK := {"bracelet":90,"oreo_sundae":85,"magic_sword":85,"orange_stone":90,"fries":70,"hamburger":85,"lemon_soda":75,"fried_chicken":70,"mithril_blade":110,"pet_dragon":105,"pet_ghost":95,"runestone":85,"disguise_mask":95,"ancient_tentacle":110,"crystal_ball":90,"bloodstone":80,"armor":65,"heart":55,"blue_stone":85,"green_stone":90,"black_stone":90,"purple_stone":80,"yellow_stone":65,"contract":90,"clover":80,"five_leaf_clover":95,"ancient_prophecy":85,"fortune_cookie":75,"pet_slime":70,"reaper_scythe":35}
 var decisions: Array = []
 var failures: Array = []
@@ -24,7 +25,7 @@ func best_skill(state: Dictionary) -> Dictionary:
 			if not skill.area and not enemy.legal_target: continue
 			var damage: float = hit.total_per_use*skill.uses
 			var value: float = minf(enemy.hp+enemy.shield,damage)
-			if damage >= enemy.hp+enemy.shield: value += 20+enemy.damage*2
+			if damage >= enemy.hp+enemy.shield: value += 20+Vitals.to_combat(enemy.damage)*2
 			if enemy.charge > 0: value += 25 if enemy.break_marks > 1 else 90
 			if skill.faces.size() in [3,5]: value += 8
 			area_score += value
@@ -76,6 +77,23 @@ func tarot_action(state: Dictionary) -> Dictionary:
 	return {}
 
 ## Decide from the published CLI state, with no forced dice or omniscient forecasting.
+## Pick one unused die by the expected straight available over its six possible faces.
+func best_reroll(state: Dictionary) -> int:
+	var unused: Array = state.dice.filter(func(d): return not d.spent and not d.locked)
+	var best: int = -1
+	var score: float = -1
+	for die in unused:
+		var expected := 0.0
+		for face in range(1,7):
+			var values: Array = unused.map(func(d): return face if d.slot == die.slot else d.face)
+			var longest := 0
+			for first in range(1,5):
+				for length in range(3,8-first):
+					if range(first,first+length).all(func(pip): return pip in values): longest = maxi(longest,length)
+			expected += longest*longest
+		if expected > score: best = die.slot; score = expected
+	return best
+
 func choose(state: Dictionary, timing: RandomNumberGenerator, use_tarots: bool = true, passive_only: bool = false) -> Dictionary:
 	if "start" in state.actions: return {"action":"start"}
 	if state.has("choice"):
@@ -92,8 +110,7 @@ func choose(state: Dictionary, timing: RandomNumberGenerator, use_tarots: bool =
 		return {"action":"choose","slot":best+1}
 	if state.phase == "closed_chest": return {"action":"open"}
 	if state.phase == "rewards":
-		# Ultra loot is deliberately not accepted in this balance study.
-		if state.chest_tier == 3: return {"action":"skip"}
+		# Evaluate every prize, including Ultra; salvage only when the full build is better.
 		for item in state.rewards:
 			if item.claimed: continue
 			var slot: int = replacement(item.id,state)
@@ -125,12 +142,13 @@ func choose(state: Dictionary, timing: RandomNumberGenerator, use_tarots: bool =
 		for hit in state.skill.damage:
 			for enemy in state.enemies:
 				if hit.target != enemy.slot or not enemy.legal_target: continue
-				var value: float = minf(hit.total_per_use,enemy.hp)+ (100 if hit.total_per_use >= enemy.hp else 0)+enemy.damage
+				var value: float = minf(hit.total_per_use,enemy.hp)+ (100 if hit.total_per_use >= enemy.hp else 0)+Vitals.to_combat(enemy.damage)
 				if value > score: score = value; target = enemy.slot
 		return {"action":"cast","target":target}
 	if not passive_only and "form" in state.actions: return {"action":"form","dice":best_skill(state).dice}
 	var unused: int = state.dice.filter(func(d): return not d.spent and not d.locked).size()
 	if "roll" in state.actions and (not state.has_rolled or unused >= 3): return {"action":"roll","perfect":timing.randf() < perfect_rate}
+	if "reroll" in state.actions and unused >= 3: return {"action":"reroll","die":best_reroll(state)}
 	if "end" in state.actions: return {"action":"end"}
 	return {}
 
@@ -177,7 +195,7 @@ func encounter(wave: int, build: String, seed_value: int, passive_only: bool = f
 		if not result.ok: failures.append({"command":command,"error":result.error}); break
 		min_hp = minf(min_hp,float(model.hp)/model.max_hp)
 		count += 1
-	var result := {"wave":wave,"build":build,"seed":seed_value,"passive_only":passive_only,"outcome":model.outcome(),"start_level":start.player.level,"end_level":model.character_level,"start_hp":start.player.max_hp,"end_hp":model.hp,"min_hp_ratio":min_hp,"stats":session.stats.duplicate(),"commands":count}
+	var result := {"wave":wave,"build":build,"seed":seed_value,"passive_only":passive_only,"outcome":model.outcome(),"start_level":start.player.level,"end_level":model.character_level,"start_hp":start.player.max_hp,"end_hp":model.hp,"min_hp_ratio":min_hp,"stats":session.stats.duplicate(),"commands":count,"telemetry":session.metrics.report()}
 	_cleanup(session)
 	return result
 
@@ -198,16 +216,15 @@ func full_run(seed_value: int) -> Dictionary:
 		wave_min_hp[wave_key] = minf(wave_min_hp.get(wave_key,1.0),float(session.model.hp)/session.model.max_hp)
 		if not result.ok: failures.append({"seed":seed_value,"command":command,"error":result.error}); break
 		count += 1
-	var result := {"seed":seed_value,"outcome":session.model.outcome(),"wave":session.model.stage+1,"stats":session.stats.duplicate(),"history":session.history.duplicate(true),"wave_min_hp":wave_min_hp,"actions":actions,"final":session.snapshot()}
+	var result := {"seed":seed_value,"outcome":session.model.outcome(),"wave":session.model.stage+1,"stats":session.stats.duplicate(),"history":session.history.duplicate(true),"wave_min_hp":wave_min_hp,"actions":actions,"final":session.snapshot(),"telemetry":session.metrics.report()}
 	_cleanup(session)
 	return result
 
 ## Break signal references so large deterministic batches do not retain every session.
 func _cleanup(session) -> void:
-	for signal_info in session.model.get_signal_list():
-		for connection in session.model.get_signal_connection_list(signal_info.name): session.model.disconnect(signal_info.name,connection.callable)
+	session.close()
 
-## Write raw results once; external summaries retain failures and excluded Ultra rewards.
+## Write raw results once; external summaries retain failures and all reward tiers.
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var output: String = args[0] if not args.is_empty() else "test-output/balance-20261024/probe.json"
@@ -216,7 +233,7 @@ func _initialize() -> void:
 	var probes: Array = []; var runs: Array = []
 	var third_probes: bool = args.size() > 2 and args[2] == "third"
 	var meal_probes: bool = args.size() > 2 and args[2] == "meals"
-	var selected_waves: Array = range(21,31) if third_probes else range(11,30) if meal_probes else [] if args.size() > 2 and args[2] == "runs" else WAVES
+	var selected_waves: Array = range(2*Waves.WAVES_PER_LEVEL+1,Waves.CITY_STAGE+1) if third_probes else range(Waves.WAVES_PER_LEVEL+1,Waves.CITY_STAGE+1) if meal_probes else [] if args.size() > 2 and args[2] == "runs" else WAVES
 	var offset: int = int(args[3]) if args.size() > 3 else 0
 	for wave in selected_waves:
 		for build in (["typical","meal_core","meal_synergy"] if third_probes else ["meal_core","meal_synergy"] if meal_probes else ["bare","typical","dragon_only","dragon_build","mithril_only","reaper_only","copy_build"]):

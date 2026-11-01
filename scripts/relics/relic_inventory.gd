@@ -3,6 +3,7 @@ const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Drops = preload("res://scripts/relics/relic_drop_table.gd")
 const Conditions = preload("res://scripts/relics/relic_conditions.gd")
 const Sets = preload("res://scripts/relics/relic_sets.gd")
+const Instance = preload("res://scripts/relics/relic_instance.gd")
 var items: Array = []
 
 func clear() -> void:
@@ -27,30 +28,30 @@ func move(from: int, to: int) -> bool:
 	items.insert(to, item)
 	return true
 
-func can_add(id: String, replace_index: int = -1) -> bool:
+func can_add(id: String, replace_index: int = -1, allow_duplicate: bool = false) -> bool:
 	if not Conditions.loot_allowed(self,id): return false
 	if Catalog.CURSED_DICE.has(id):
 		for slot in range(items.size()):
 			if slot != replace_index and Catalog.CURSED_DICE.has(items[slot].id): return false
 	if id in Catalog.STONES and has("prismatic_stone"): return false
 	if id == "codex_page" and has("ancient_codex"): return false
-	return Catalog.ITEMS.has(id) and (not has(id) or id == "codex_page")
+	return Catalog.ITEMS.has(id) and (allow_duplicate or not has(id) or id == "codex_page")
 
-func draw_one(rng: RandomNumberGenerator, excluded: Array = [], rarity_weights: Array = Catalog.RARITY_WEIGHTS, minimum_rarity: int = 0) -> String:
+func draw_one(rng: RandomNumberGenerator, excluded: Array = [], rarity_weights: Array = Catalog.RARITY_WEIGHTS, minimum_rarity: int = 0, item_weights: Dictionary = {}) -> String:
 	var eligible: Array = []
 	for id in Catalog.ITEMS:
 		if can_add(id) and id not in excluded:
 			if Catalog.CURSED_DICE.has(id) and excluded.any(func(other): return Catalog.CURSED_DICE.has(other)): continue
 			eligible.append(id)
-	return Drops.draw(rng,eligible,rarity_weights,minimum_rarity)
+	return Drops.draw(rng,eligible,rarity_weights,minimum_rarity,item_weights)
 
 ## An ingredient can fuse into an existing meal even with all inventory slots occupied.
 func needs_slot(id: String) -> bool:
 	if id == "codex_page" and has(id): return false
-	return not Sets.can_merge(items,id)
+	return has(id) or not Sets.can_merge(items,id)
 
-func add(id: String, replace_index: int = -1) -> bool:
-	if not can_add(id,replace_index): return false
+func add(id: String, replace_index: int = -1, allow_duplicate: bool = false) -> bool:
+	if not can_add(id,replace_index,allow_duplicate): return false
 	var page: int = index_of("codex_page")
 	if id == "codex_page" and page >= 0:
 		items[page].count += 1
@@ -65,7 +66,7 @@ func add(id: String, replace_index: int = -1) -> bool:
 	return true
 
 func _new_item(id: String) -> Dictionary:
-	return {"id":id, "count":1, "turns":0, "charges":0, "kills":0, "waves":0}
+	return Instance.create(id,Catalog.ITEMS[id].get("initial_state",{}))
 
 func _fuse() -> void:
 	Sets.fuse(items)
@@ -75,7 +76,10 @@ func _fuse() -> void:
 	if not has("prismatic_stone") and Catalog.STONES.all(func(id): return has(id)):
 		var first: int = items.size()
 		for id in Catalog.STONES: first = mini(first, index_of(id))
-		items = items.filter(func(item): return item.id not in Catalog.STONES)
+		var consumed: Array = Catalog.STONES.map(func(id): return index_of(id))
+		consumed.sort()
+		consumed.reverse()
+		for slot in consumed: items.remove_at(slot)
 		items.insert(first, _new_item("prismatic_stone"))
 
 func offers(rng: RandomNumberGenerator, count: int = 3, rarity_weights: Array = Catalog.RARITY_WEIGHTS) -> Array:

@@ -15,6 +15,8 @@ The treasure chest and seven reward category icons are copied unchanged from the
 | Elf Archer | `monster/deep_elf_master_archer.png` |
 | Elite mage / legacy mage | `monster/deep_elf_mage.png` |
 | Paladin | `monster/holy/paladin.png` |
+| Cleric | `monster/deep_elf_priest.png` |
+| Assassin | `monster/deep_elf_knight_new.png` |
 | High Priest | `monster/deep_elf_high_priest.png` |
 | Elf Spellsword | `monster/deep_elf_blademaster.png` |
 | Fleeing civilians | `monster/human_new.png`, `monster/human_old.png` |
@@ -118,7 +120,7 @@ See `art/tarot/LICENSE.txt` for the source and license summary.
 
 ### Player evolution forms
 
-All three active levels use [Flamelings by surt](https://opengameart.org/content/flamelings), CC0. Sprites extracted with transparent backgrounds and nearest-neighbor scaling. The former original AI-generated ember starter is retained as an unused source asset. See [source and generation record](licenses/Flamelings.txt).
+The former three-form placeholders use [Flamelings by surt](https://opengameart.org/content/flamelings), CC0. Sprites extracted with transparent backgrounds and nearest-neighbor scaling. The former original AI-generated ember starter is retained as an unused source asset. See [source and generation record](licenses/Flamelings.txt).
 
 ### Meal ingredient additions
 - Lemon soda and fried chicken: **KARSIORI STUDIO**, [Food Pack 2](https://karsiori.itch.io/free-pixel-art-food-pack-2), CC0. Original Soda Can 4 and Chicken Drumstick PNGs.
@@ -137,3 +139,30 @@ Pet food bowls and the Super Pet Ball are original project pixel-vector SVG icon
 Remains and broken-sword parts, Ticket, enchanted chips and Nightmare Totem are original project pixel-vector icons. Other new relic placeholders reuse the unchanged CC0 DCSS tiles recorded in `art/relics/sources.json`. Ghost of the Witch shares Unidentified Ring artwork with a runtime violet magic glow.
 
 Ghost of the Witch companion: unchanged `monster/enchantress_human.png` from the credited CC0 DCSS archive, rendered with a spectral tint and transparency.
+
+Fire Storm (`art/fx/fire_storm.png`): user-provided original 64×64, 18-frame spritesheet, copied unchanged from the project's Aseprite FX folder. Frames 1–7 build up, 8–13 loop during damage, and 14–18 fade out; the golden halo and orange embers are added at runtime.
+
+Brimstone (`art/fx/brimstone.png`): user-provided original 64×64, 40-frame spritesheet, copied unchanged from the project's Aseprite FX folder. Frames 1–24 build up, 25–32 loop four times during damage, and 33–40 fade out; expansion, transparency, golden glow and rising sparks are added at runtime.
+
+Dusted (`art/enemies/deaths/dusted.png`): user-provided 48×48, 11-frame spritesheet, copied unchanged from the project's Aseprite enemy folder. Used for non-boss deaths from Burning, Fire Storm and Brimstone.
+
+Fiery Slash (`art/fx/fiery_slash.png`): user-provided original 32×32, 10-frame spritesheet, copied unchanged from the project's Aseprite FX folder. The area hit lands on frame 6; an orange halo is added at runtime.
+
+Challenger's Badge (2026-10-27): original 32×32 pixel-style SVG drawn for this project, `art/relics/challenger_badge.svg`. The battlefield focus mark uses the same asset.
+
+### Magic Cannon placeholder
+
+`art/enemies/magic_cannon.svg` is original code-drawn pixel artwork created for this project: a bronze barrel, violet crystal core and iron carriage. It uses no external source asset.
+
+- `art/tarot/indicator.png`: original active-tarot indicator supplied by James (Aseprite).
+
+`art/enemies/bomber.svg` is original code-drawn 48×48 pixel artwork for this project: a hooded sapper carrying a lit iron bomb. No external asset was used.
+
+### Diablo player animation
+James supplied `art/player/diablo/diablo_3.png` (2026-10-31), copied unchanged. All three evolutions now use this 64×64, 20-column atlas: 109 frames in row-major order. The former Flamelings artwork is retained only as a legacy asset. Runtime sigils are drawn in code.
+
+James also supplied `art/player/diablo/divine_ring_FX.png`, copied unchanged: 48×48 cells, looping frames 2–12. This permanent ring is drawn at 70% width behind the character's upper back, with a runtime golden glow.
+
+### Baked chest confetti
+
+`art/fx/chest_confetti/` is generated from the project’s original procedural paper effect by `tools/fx/bake_chest_confetti.gd`. No external artwork is used.

@@ -16,7 +16,7 @@ var rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	z_as_relative = false
-	z_index = 70 # Over combat; below treasure, inspection, held items and menus.
+	z_index = BattleLayers.LOOT_PICKUP # Over combat; below treasure, inspection, held items and menus.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	rng.randomize()
 
@@ -53,7 +53,7 @@ func enqueue(target: int, amount: int) -> void:
 func enqueue_chest(origin: Vector2, amount: int) -> void:
 	if amount <= 0: return
 	chest_mode = true
-	z_index = 96
+	z_index = BattleLayers.CHEST_PICKUP
 	var count: int = mini(amount,18+floori(amount/5.0))
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	var spread: float = 320 if portrait else 290
@@ -119,7 +119,7 @@ func advance(delta: float) -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
-	z_index = 96 if chest_mode else 70
+	z_index = BattleLayers.CHEST_PICKUP if chest_mode else BattleLayers.LOOT_PICKUP
 	visible = not paused()
 	if visible: advance(delta*clampf(battle.speed,1,2))
 

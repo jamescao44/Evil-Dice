@@ -26,6 +26,10 @@ var critical: bool = false
 var effect_multiplier: float = 1.0
 var amplifier_locked: bool = false
 var source_dice: Array = [] # Physical dice spent before a skill-tier upgrade.
+var socket_gems: Array = [] # Equipment snapshot aligned with physical source dice.
+var gem_critical_factor: float = 1.0
+var gem_roll_locked: bool = false
+var gem_targets: Dictionary = {} # Apply gemstone statuses once per target and use.
 var cast_source: String = "manual"
 var relic_cast_locked: bool = false
 var alternating_bonus: bool = false
@@ -52,7 +56,7 @@ func is_freeze() -> bool:
 	return pattern.is_empty() and kind == Kind.PAIR and face == 2
 
 func hits_all() -> bool:
-	if not pattern.is_empty(): return pattern == "annihilation" or (pattern == "straight" and dice.size() >= 4) or (pattern == "match_auto" and dice.size() == 6)
+	if not pattern.is_empty(): return pattern == "annihilation" or (pattern == "straight" and dice.size() >= 4) or (pattern == "match_auto" and preload("res://scripts/combat/flamelings_auto.gd").profile(dice.size()).area)
 	return kind == Kind.ULTIMATE or (kind in [Kind.PAIR,Kind.SPECIAL] and face == 4)
 
 func set_use_multiplier(source: String, multiplier: int) -> void:
@@ -81,6 +85,9 @@ func consume_use() -> bool:
 	if uses_left() == 0: return false
 	uses_spent += 1
 	damage_ticks_spent = 0
+	gem_targets.clear()
+	gem_roll_locked = false
+	gem_critical_factor = 1.0
 	return true
 
 func has_use_orbs(additional_modifiers: Dictionary = {}) -> bool:
@@ -117,6 +124,10 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 	copy.effect_multiplier = effect_multiplier
 	copy.amplifier_locked = amplifier_locked
 	copy.source_dice = source_dice.duplicate()
+	copy.socket_gems = socket_gems.duplicate(true)
+	copy.gem_targets = gem_targets.duplicate()
+	copy.gem_critical_factor = gem_critical_factor
+	copy.gem_roll_locked = gem_roll_locked
 	copy.cast_source = cast_source
 	copy.relic_cast_locked = relic_cast_locked
 	copy.alternating_bonus = alternating_bonus
@@ -125,5 +136,6 @@ func duplicate(_deep: bool = true) -> MultiHitSkill:
 	return copy
 
 func same_as(other: MultiHitSkill) -> bool:
+	if other == null or socket_gems != other.socket_gems or gem_targets != other.gem_targets or gem_roll_locked != other.gem_roll_locked or gem_critical_factor != other.gem_critical_factor: return false
 	if other == null or calculated_damage_total != other.calculated_damage_total or inherited_damage != other.inherited_damage or source_dice != other.source_dice or cast_source != other.cast_source or relic_effect_scale != other.relic_effect_scale or relic_cast_locked != other.relic_cast_locked or alternating_bonus != other.alternating_bonus: return false
 	return other != null and split_attack == other.split_attack and pattern == other.pattern and kind == other.kind and face == other.face and dice == other.dice and damage_ticks == other.damage_ticks and damage_ticks_spent == other.damage_ticks_spent and base_uses == other.base_uses and use_modifiers == other.use_modifiers and target == other.target and grants_bonus_fireballs == other.grants_bonus_fireballs and uses_spent == other.uses_spent and _cast_uses == other._cast_uses and perfect == other.perfect and critical == other.critical and effect_multiplier == other.effect_multiplier and amplifier_locked == other.amplifier_locked

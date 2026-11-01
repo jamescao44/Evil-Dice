@@ -9,7 +9,7 @@ var tier: int = 0
 var clock: float = 0.0
 
 func _ready() -> void:
-	z_index = 80
+	z_index = BattleLayers.REWARD_PAGE
 	hide()
 
 func cancel() -> void:

@@ -26,7 +26,7 @@ func capture(name: String) -> void:
 func claim_reroll(g) -> void:
 	var field_phase: String = g.wave_chest.phase
 	var routes: Array = g.model.route_choices.duplicate()
-	g.model.reroll_progress = 10
+	g.model.reroll_progress = 20
 	check(g._can_claim_chest(),"Ready reroll treasure can be claimed during field rewards and route selection")
 	g._handle_click(g._chest_milestone_rect(1).get_center())
 	check(g.view_phase == "reward" and g.chest.active and not g.wave_chest.visible,"Treasure tap reaches reels and hides underlying field controls")
@@ -65,7 +65,7 @@ func scene(portrait: bool) -> void:
 	if not await until(func(): return g.wave_chest.phase == "keeper","Keeper appears while traveling to shop"): g.queue_free(); return
 	await capture("field-keeper-"+str(portrait))
 	if not await until(func(): return g.shop_ui.visible,"Keeper transitions into storefront"): g.queue_free(); return
-	check(g.model.stage == 3 and g.model.enemies.is_empty(),"Shop occupies wave four without enemies")
+	check(g.model.stage == 2 and g.model.enemies.is_empty(),"Shop follows wave three without consuming another wave")
 	await create_timer(0.3).timeout
 	await capture("route-shop-"+str(portrait))
 	g._handle_click(g.shop_ui.leave_rect().get_center())
@@ -73,7 +73,7 @@ func scene(portrait: bool) -> void:
 	check(g.model.WaveRewards.SHOP not in g.model.route_choices,"Immediate repeat shop is excluded")
 	g._handle_click(g.wave_chest.route_rect(0).get_center())
 	if not await until(func(): return g.view_phase == "ready","Chosen next battle accepts input"): g.queue_free(); return
-	check(g.model.stage == 4 and not g.model.enemies.is_empty(),"Battle resumes in wave five")
+	check(g.model.stage == 3 and not g.model.enemies.is_empty(),"Battle resumes in wave four")
 	# A controlled soul route tests the shared direct-resource path and automatic level transaction.
 	g.model.wave_kind = g.model.WaveRewards.SOULS
 	g.model.souls = 9

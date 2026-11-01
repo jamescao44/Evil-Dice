@@ -24,7 +24,7 @@ func fresh(city: bool = false):
 	for e in m.enemies:
 		e.hp = 1000
 		e.max_hp = 1000
-		e.damage = 0
+		e.damage_percent = 0; e.damage = 0
 	return m
 
 func freezing() -> void:

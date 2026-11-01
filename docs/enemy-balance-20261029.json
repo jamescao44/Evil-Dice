@@ -1,0 +1,172 @@
+{
+  "assumptions": {
+    "perfect_rate": 0.35,
+    "unique_seeds_per_batch": 12,
+    "runs_per_seed": "with and without tarot use",
+    "ultra_prizes": "skipped",
+    "policy": "tools/current_balance.gd; natural rewards, gem management and food-set preference",
+    "limits": "Heuristic policy, not human play; no timing, input friction or animation measurement."
+  },
+  "batches": {
+    "before": {
+      "runs": 24,
+      "wins": 21,
+      "failures": 0,
+      "defeat_waves": {
+        "16": 1,
+        "10": 1,
+        "14": 1
+      },
+      "levels": [
+        {
+          "level": 1,
+          "normal_encounters": 162,
+          "normal_mean_rolls": 4.19,
+          "normal_mean_enemy_phases": 0.89,
+          "normal_no_hp_loss_pct": 51.2,
+          "boss_encounters": 24,
+          "boss_mean_enemy_phases": 6.62,
+          "boss_mean_damage_received": 54.83,
+          "mean_slots_by_boss": 5.21
+        },
+        {
+          "level": 2,
+          "normal_encounters": 143,
+          "normal_mean_rolls": 6.66,
+          "normal_mean_enemy_phases": 2.06,
+          "normal_no_hp_loss_pct": 35.7,
+          "boss_encounters": 22,
+          "boss_mean_enemy_phases": 2.91,
+          "boss_mean_damage_received": 16.36,
+          "mean_slots_by_boss": 10
+        },
+        {
+          "level": 3,
+          "normal_encounters": 110,
+          "normal_mean_rolls": 6.55,
+          "normal_mean_enemy_phases": 1.9,
+          "normal_no_hp_loss_pct": 37.3,
+          "boss_encounters": 21,
+          "boss_mean_enemy_phases": 2.48,
+          "boss_mean_damage_received": 0,
+          "mean_slots_by_boss": 10
+        }
+      ],
+      "winning_run_mean_actions": {
+        "take": 10.95,
+        "buy": 4.81,
+        "treasure": 4.62,
+        "discard": 6.9,
+        "skip": 0.29
+      }
+    },
+    "verified": {
+      "runs": 24,
+      "wins": 13,
+      "failures": 0,
+      "defeat_waves": {
+        "8": 2,
+        "20": 2,
+        "7": 1,
+        "11": 2,
+        "21": 1,
+        "16": 1,
+        "17": 2
+      },
+      "levels": [
+        {
+          "level": 1,
+          "normal_encounters": 162,
+          "normal_mean_rolls": 4.48,
+          "normal_mean_enemy_phases": 1.09,
+          "normal_no_hp_loss_pct": 44.4,
+          "boss_encounters": 23,
+          "boss_mean_enemy_phases": 4.96,
+          "boss_mean_damage_received": 41.35,
+          "mean_slots_by_boss": 5.96
+        },
+        {
+          "level": 2,
+          "normal_encounters": 108,
+          "normal_mean_rolls": 5.26,
+          "normal_mean_enemy_phases": 1.32,
+          "normal_no_hp_loss_pct": 51.9,
+          "boss_encounters": 19,
+          "boss_mean_enemy_phases": 5.37,
+          "boss_mean_damage_received": 69.58,
+          "mean_slots_by_boss": 9.89
+        },
+        {
+          "level": 3,
+          "normal_encounters": 80,
+          "normal_mean_rolls": 6.64,
+          "normal_mean_enemy_phases": 1.69,
+          "normal_no_hp_loss_pct": 36.2,
+          "boss_encounters": 13,
+          "boss_mean_enemy_phases": 4.46,
+          "boss_mean_damage_received": 44.77,
+          "mean_slots_by_boss": 10
+        }
+      ],
+      "winning_run_mean_actions": {
+        "take": 10.69,
+        "buy": 5.38,
+        "treasure": 4.15,
+        "discard": 6,
+        "skip": 0.54
+      }
+    },
+    "verified-heldout": {
+      "runs": 24,
+      "wins": 18,
+      "failures": 0,
+      "defeat_waves": {
+        "11": 1,
+        "8": 4,
+        "7": 1
+      },
+      "levels": [
+        {
+          "level": 1,
+          "normal_encounters": 156,
+          "normal_mean_rolls": 4.66,
+          "normal_mean_enemy_phases": 1.19,
+          "normal_no_hp_loss_pct": 37.2,
+          "boss_encounters": 23,
+          "boss_mean_enemy_phases": 6.43,
+          "boss_mean_damage_received": 48.22,
+          "mean_slots_by_boss": 4.78
+        },
+        {
+          "level": 2,
+          "normal_encounters": 102,
+          "normal_mean_rolls": 5.2,
+          "normal_mean_enemy_phases": 1.29,
+          "normal_no_hp_loss_pct": 54.9,
+          "boss_encounters": 18,
+          "boss_mean_enemy_phases": 4.5,
+          "boss_mean_damage_received": 10.44,
+          "mean_slots_by_boss": 10
+        },
+        {
+          "level": 3,
+          "normal_encounters": 93,
+          "normal_mean_rolls": 5.3,
+          "normal_mean_enemy_phases": 1.39,
+          "normal_no_hp_loss_pct": 44.1,
+          "boss_encounters": 18,
+          "boss_mean_enemy_phases": 4.44,
+          "boss_mean_damage_received": 9.83,
+          "mean_slots_by_boss": 10
+        }
+      ],
+      "winning_run_mean_actions": {
+        "take": 8.78,
+        "buy": 7.33,
+        "treasure": 4.11,
+        "discard": 6.28,
+        "skip": 0.28
+      }
+    }
+  }
+}

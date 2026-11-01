@@ -2,6 +2,11 @@ extends SceneTree
 const Waves = preload("res://scripts/progression/wave_catalog.gd")
 const Run = preload("res://scripts/progression/run_rules.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
+## A bounded eligible pool tests exhaustion without relying on the live legendary count.
+class WorldPool extends "res://scripts/relics/relic_inventory.gd":
+	func can_add(id: String, replace_index: int = -1) -> bool:
+		return id in ["ancient_prophecy","mithril_blade"] and super.can_add(id,replace_index)
+
 var checks := 0
 var failures := 0
 
@@ -59,11 +64,9 @@ func prophecy_checks() -> void:
 	m.roll_pool(false,[1,2,3,4,5,6],true)
 	var second_roll: Dictionary = cast_repeat(m)
 	check(first_roll.reroll and second_roll.reroll and m.dice_turn.rolls_left == 2,"Justice requests two separate free animated throws")
-	m = prophecy_model(); m.roll_pool(false,[1,2,3,4,5,6])
-	m.dice_turn.selected = [0,1,2]; m.form_selected_skill(); m.apply_player(0)
-	cast_first(m,"hermit")
-	check(m.tarot_effects.prepare(m,m.tarot_effects.pending_repeat.instance_id).has("error"),"Second Hermit safely skips when no spent dice remain")
-	m.tarot_effects.dismiss_repeat()
+	m = prophecy_model()
+	var disabled: Dictionary = m.tarots.add("hermit")
+	check(m.tarot_effects.cast(m,disabled.instance_id).has("error") and m.tarot_effects.pending_repeat.is_empty(),"Prophecy cannot activate a disabled Hermit")
 	m = prophecy_model(); cast_first(m,"hanged_man",{"ban":"sun"}); cast_repeat(m,{"ban":"moon"})
 	check(m.tarot_effects.banned == ["sun","moon"],"Two bans use distinct choices")
 	m = prophecy_model(); cast_first(m,"empress"); cast_repeat(m)
@@ -97,12 +100,7 @@ func prophecy_checks() -> void:
 	check(m.relics.items.all(func(item): return item.id not in first_ids),"Snapshot repeat rerolls the first replacements even after losing Prophecy")
 	m = prophecy_model(); cast_first(m,"emperor"); cast_repeat(m)
 	check(m.relics.items.size() == 3,"Emperor grants two different unowned relics")
-	m = prophecy_model()
-	for id in m.Relics.Catalog.ITEMS:
-		var entry: Dictionary = m.Relics.Catalog.ITEMS[id]
-		if entry.rarity == 3 and not entry.get("fusion",false) and id not in ["mithril_blade","ancient_prophecy"]: m.acquire_relic(id)
-	# Put copying relics before Prophecy so this case still has one repeat.
-	m.relics.move(m.relics.index_of("ancient_tentacle"),0)
+	m = fresh(); m.relics = WorldPool.new(); m.acquire_relic("ancient_prophecy")
 	cast_first(m,"world")
 	check(m.relics.has("mithril_blade"),"World grants the only unowned eligible legendary")
 	check(m.tarot_effects.prepare(m,m.tarot_effects.pending_repeat.instance_id).has("error"),"World does not fabricate a prize when the second pool is exhausted")
@@ -154,9 +152,9 @@ func _initialize() -> void:
 	var count_before: int = m.tarots.items.size()
 	m.roll_pool(false,[1,2,3,1,2,3])
 	while not m.roll_attacks.is_empty(): m.resolve_roll_attack_step()
-	for indices in [[0,1,2],[3,4,5]]:
+	for indices in [[0,1,2]]:
 		m.dice_turn.selected = indices; m.form_selected_skill(); m.apply_player(0)
-	check(m.bonus_turn_count == 1 and m.tarots.items.size() == count_before and m.relics.items[0].turns == 0,"Dice bonus turns do not advance tarot generators")
+	check(m.bonus_turn_count == 0 and m.tarots.items.size() == count_before and m.relics.items[0].turns == 0,"Finishing a skill does not grant extra tarot-generator turns")
 	m = fresh(); m.load_debug_wave(Waves.COUNT); m.begin_round(); m.acquire_relic("crystal_ball")
 	m.set_test_roll([2,2,2]); m.apply_player(); m.end_round(); m.begin_round()
 	check(m.tarots.items.size() == 1 and m.tarots.items[0].get("projection",false),"City also generates a projection on the next turn start")

@@ -26,7 +26,7 @@ static func refresh_resolution(window: Window) -> void:
 ## Keep the FPS overlay above menus without intercepting clicks or touches.
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 200
+	layer = BattleLayers.DISPLAY_CANVAS
 	fps_label = Label.new()
 	fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fps_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
@@ -42,7 +42,7 @@ func _resize() -> void:
 	var design: Vector2i = get_window().get_meta("design_size", Vector2i(1280, 800))
 	var portrait := design.y > design.x
 	fps_label.add_theme_font_size_override("font_size", 26 if portrait else 18)
-	fps_label.position = Vector2(20, design.y - 62) if portrait else Vector2(12, design.y - 32)
+	fps_label.position = Vector2(20, design.y - 46) if portrait else Vector2(12, design.y - 32)
 
 ## Sample Godot's FPS counter in real time, including during pauses and kill slow motion.
 func _process(_delta: float) -> void:

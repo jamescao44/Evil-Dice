@@ -24,7 +24,7 @@ var dialogue_time: float = 0.0
 
 ## Keep merchandise below pickups, held relics and settings pages.
 func _ready() -> void:
-	z_index = 80
+	z_index = BattleLayers.REWARD_PAGE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	Cards.soften(self)
 	keeper_sprite = Sprite2D.new()
@@ -88,6 +88,7 @@ func dialogue_rect() -> Rect2:
 
 ## The invitation persists; the completed reading answers only when tapped again.
 func dialogue_text() -> String:
+	if not battle.model.shop.divination_used and not battle.model.shop.gift.is_empty(): return "Looking for this?"
 	if not battle.model.shop.divination_used: return "Would you like a divination?"
 	return "Fate has spoken." if dialogue_time > 0 else ""
 
@@ -99,8 +100,20 @@ func _divine() -> void:
 	else:
 		selected = -1
 		cancel_drag()
-		battle.tarot_ui.begin_reward("shop",-1,divination_deck_position(),divination_deck_size())
+		if not battle.model.shop.gift.is_empty():
+			selected = Stock.GIFT_SLOT
+			battle._sound("ui/book",1,-17)
+		else:
+			battle.tarot_ui.begin_reward("shop",-1,divination_deck_position(),divination_deck_size())
+	queue_redraw()
 	keeper_overlay.queue_redraw()
+
+## Treat the keeper's free gift as an inspectable offer without adding a shelf slot.
+func selected_offer() -> Dictionary:
+	return battle.model.shop.offer_at(selected)
+
+func selected_gift() -> bool:
+	return selected == Stock.GIFT_SLOT and not selected_offer().is_empty()
 
 ## Keep six relics and two face-up cards, with a bottle shelf beneath the keeper.
 func offer_rect(slot: int) -> Rect2:
@@ -140,31 +153,50 @@ func offer_name_size(slot: int, label: String) -> int:
 
 ## Keep the owned relic rail above the large purchase target.
 func inventory_rect() -> Rect2:
-	return Rect2(48,1384,708,64) if portrait() else Rect2(260,650,760,42)
+	return Rect2(48,1384,708,64) if portrait() else Rect2(260,642,760,42)
 
 ## Place readable inspection text between merchandise and the owned rail.
 func detail_rect() -> Rect2:
 	return Rect2(48,1116,708,232) if portrait() else Rect2(350,474,878,164)
 
-## The large lower purchase area is shared by taps and item drops.
+## Reserve the taller purchase target; only tarot offers need a second action.
+func purchase_rect() -> Rect2:
+	return Rect2(48,1464,708,162) if portrait() else Rect2(396,692,490,102)
+
+## Show quick use only for tarot merchandise, including unavailable cards dimmed.
+func shows_buy_and_use() -> bool:
+	return selected_offer().get("kind","") == "tarot"
+
 func buy_rect() -> Rect2:
-	return Rect2(48,1480,708,108) if portrait() else Rect2(396,710,490,68)
+	var rect := purchase_rect()
+	if shows_buy_and_use(): rect.size.x = rect.size.x*2.0/3.0-5
+	return rect
+
+func buy_use_rect() -> Rect2:
+	if not shows_buy_and_use(): return Rect2()
+	var rect := purchase_rect()
+	rect.position.x += rect.size.x*2.0/3.0+5
+	rect.size.x = rect.size.x/3.0-5
+	return rect
+
+func can_buy_and_use() -> bool:
+	return not replacing and not busy() and battle.model.shop.can_buy_and_use(battle.model,selected)
 
 ## Keep refresh separate from purchasing; the stock owns its escalating fee.
 func refresh_rect() -> Rect2:
-	return Rect2(48,1612,340,76) if portrait() else Rect2(52,715,290,58)
+	return Rect2(48,1644,340,76) if portrait() else Rect2(52,715,290,58)
 
 ## Leave without requiring purchases or spending crystals.
 func leave_rect() -> Rect2:
-	return Rect2(414,1612,342,76) if portrait() else Rect2(940,715,288,58)
+	return Rect2(414,1644,342,76) if portrait() else Rect2(940,715,288,58)
 
 ## Ignore shop mutations while a purchased relic is landing.
 func busy() -> bool:
-	return battle.relic_ui.pickup.active
+	return battle.relic_ui.pickup.active or battle.tarot_cast.active()
 
 ## Identify useful pointer targets without including empty shelf space.
 func hit(at: Vector2) -> bool:
-	return keeper_rect().has_point(at) or refresh_rect().has_point(at) or leave_rect().has_point(at) or buy_rect().has_point(at) or inventory_rect().has_point(at) or range(battle.model.shop.offers.size()).any(func(i): return offer_rect(i).has_point(at))
+	return keeper_rect().has_point(at) or refresh_rect().has_point(at) or leave_rect().has_point(at) or buy_rect().has_point(at) or buy_use_rect().has_point(at) or inventory_rect().has_point(at) or range(battle.model.shop.offers.size()).any(func(i): return offer_rect(i).has_point(at))
 
 ## Route purchases and replacements before allowing normal inventory dragging.
 func click(at: Vector2) -> bool:
@@ -179,6 +211,7 @@ func click(at: Vector2) -> bool:
 		return true
 	if keeper_rect().has_point(at):
 		_divine()
+		if selected_gift() and stock.can_buy(battle.model,selected): _begin_drag(selected,at)
 		return true
 	if inventory_rect().grow(6).has_point(at): return false
 	if leave_rect().has_point(at):
@@ -191,19 +224,26 @@ func click(at: Vector2) -> bool:
 			refresh_flash = 0.3
 			battle._sound("item/book",1.1,-14)
 		return true
+	if buy_use_rect().has_point(at):
+		_attempt_buy_and_use()
+		return true
 	if selected >= 0 and buy_rect().has_point(at):
 		_attempt_buy()
 		return true
 	for i in range(stock.offers.size()):
 		if offer_rect(i).has_point(at):
 			selected = i
-			pressed_offer = i if not stock.offers[i].sold and not stock.offers[i].id.is_empty() else -1
-			press_at = at
-			pointer = at
-			dragging = false
+			if not stock.offers[i].sold and not stock.offers[i].id.is_empty(): _begin_drag(i,at)
 			battle._sound("ui/click_001",1,-20)
 			break
 	return true
+
+## Share the same drag gesture for shelf merchandise and the keeper's free gift.
+func _begin_drag(slot: int, at: Vector2) -> void:
+	pressed_offer = slot
+	press_at = at
+	pointer = at
+	dragging = false
 
 ## Share one purchase path for the buy button and drag-to-buy gesture.
 func _attempt_buy() -> void:
@@ -211,6 +251,15 @@ func _attempt_buy() -> void:
 		replacing = true
 		battle.inventory_page.open("shop")
 	else: _buy()
+
+## Purchase the exact card silently, then immediately enter its existing use flow.
+func _attempt_buy_and_use() -> void:
+	if not can_buy_and_use(): return
+	var origin: Vector2 = offer_art_rect(selected).get_center()
+	var bought: Dictionary = battle.model.shop.buy(battle.model,selected,-1,true)
+	if bought.is_empty(): return
+	battle._sound("item/confirmation_002",1,-12)
+	battle.tarot_cast.request_shop(bought.tarot_instance,origin)
 
 ## Capture only a merchandise press; no hover can accidentally begin a purchase.
 func motion(at: Vector2) -> bool:
@@ -223,8 +272,10 @@ func motion(at: Vector2) -> bool:
 func release(at: Vector2) -> bool:
 	if pressed_offer < 0: return false
 	var should_buy: bool = dragging and buy_rect().has_point(at) and not battle._menus_open()
+	var should_use: bool = dragging and buy_use_rect().has_point(at) and not battle._menus_open()
 	cancel_drag()
-	if should_buy: _attempt_buy()
+	if should_use: _attempt_buy_and_use()
+	elif should_buy: _attempt_buy()
 	return true
 
 ## Discard a held listing on refresh, focus loss, inventory opening or exit.
@@ -236,14 +287,26 @@ func cancel_drag() -> void:
 ## Play the existing inventory landing after a successful model transaction.
 func _buy(replace_index: int = -1) -> void:
 	if replace_index >= 0 and not replacing: return
+	var from_keeper: bool = selected_gift()
+	var origin: Vector2 = divination_deck_position() if from_keeper else offer_art_rect(selected).get_center()
 	var previous: Array = battle.model.relics.items.map(func(item): return item.id)
 	var bought: Dictionary = battle.model.shop.buy(battle.model,selected,replace_index)
 	if bought.is_empty(): return
 	replacing = false
 	battle._sound("item/confirmation_002",1,-12)
-	if bought.kind == "relic": battle.relic_ui.collect(bought.id,offer_art_rect(selected).get_center(),46 if portrait() else 30,previous)
+	if bought.kind == "relic": battle.relic_ui.collect(bought.id,origin,46 if portrait() else 30,previous)
 	elif bought.kind == "soul_bottle":
-		battle.fx.floating(offer_art_rect(selected).get_center(),GameText.format("+%d souls",bought.souls),SOUL_COLOR,36 if portrait() else 28)
+		battle.fx.floating(offer_art_rect(selected).get_center(),GameText.format("+%d souls",bought.souls),SOUL_COLOR,36 if portrait() else 28,true)
+	if from_keeper: selected = -1
+
+## Explicitly forfeit the keeper's gift, preserving ordinary shop cancellation behavior.
+func discard_gift() -> void:
+	if not selected_gift(): return
+	var amount: int = battle.model.shop.discard_gift(battle.model)
+	if amount <= 0: return
+	battle.fx.floating(divination_deck_position(),GameText.format("+%d blood gems",amount),Color("fa6086"),30,true)
+	battle._sound("item/confirmation_002",1,-12)
+	cancel_purchase()
 
 ## Animate only small storefront accents; random stock never changes here.
 func _process(delta: float) -> void:
@@ -279,7 +342,10 @@ func _price(at: Vector2, amount: int, enabled: bool = true) -> void:
 func _button(rect: Rect2, text: String, enabled: bool = true) -> void:
 	var color: Color = GOLD if enabled else Color("777575")
 	Cards.panel(self,rect,Color("292526"),color,12)
-	_text(rect.get_center()+Vector2(0,10),text,28 if portrait() else 22,color)
+	var size: int = 28 if portrait() else 22
+	var label: String = GameText.text(text)
+	while size > 14 and battle.description_font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x > rect.size.x-20: size -= 1
+	_text(rect.get_center()+Vector2(0,10),text,size,color)
 
 ## Draw a simple wooden shelf whose merchandise has no individual boxes.
 func _shelf(at: Vector2, width: float) -> void:
@@ -310,8 +376,14 @@ func _draw_stall() -> void:
 func _draw_divination() -> void:
 	if not visible or battle.tarot_ui.ceremony.active(): return
 	if not battle.model.shop.divination_used:
-		for i in range(3,-1,-1):
-			Cards.card(keeper_overlay,"",divination_deck_position()+Vector2(i*3,-i*2),divination_deck_size(),0,1,0.35 if i == 0 else 0)
+		if not battle.model.shop.gift.is_empty():
+			if not (dragging and pressed_offer == Stock.GIFT_SLOT):
+				var radius: float = 46 if portrait() else 36
+				RelicPaint.paint(keeper_overlay,battle.model.shop.gift.id,divination_deck_position(),radius,true)
+				Cards.text(keeper_overlay,battle.description_font,divination_deck_position()+Vector2(0,radius+22),"FREE",22 if portrait() else 18,GOLD)
+		else:
+			for i in range(3,-1,-1):
+				Cards.card(keeper_overlay,"",divination_deck_position()+Vector2(i*3,-i*2),divination_deck_size(),0,1,0.35 if i == 0 else 0)
 	var message: String = dialogue_text()
 	if message.is_empty(): return
 	var rect: Rect2 = dialogue_rect()
@@ -336,7 +408,7 @@ func _draw() -> void:
 	for i in range(8):
 		draw_line(Vector2(i*screen.x/7,0),Vector2(i*screen.x/7,screen.y),Color("33302a",0.18),2)
 	_text(Vector2(screen.x/2,180 if portrait() else 69),"Shop",58 if portrait() else 44)
-	_text(Vector2(screen.x/2,234 if portrait() else 108),"调试 · 无限血宝石" if battle.model.shop.debug_unlimited else GameText.format("WAVE %d",battle.model.shop.wave),26 if portrait() else 19,Color("a9a39c"))
+	_text(Vector2(screen.x/2,234 if portrait() else 108),"调试 · 无限血宝石" if battle.model.shop.debug_unlimited else GameText.format("After wave %d-%d",[battle.model.level_number(),battle.model.level_wave()]),26 if portrait() else 19,Color("a9a39c"))
 	battle.chest.draw_currency(self)
 	_draw_stall()
 	for i in range(battle.model.shop.offers.size()): _draw_offer(i)
@@ -345,8 +417,14 @@ func _draw() -> void:
 	var over: bool = dragging and buy_rect().has_point(pointer) and valid
 	if over:
 		for i in range(4,0,-1): Cards.panel(self,buy_rect().grow(i*5),Color(GOLD,0.04))
-	_button(buy_rect(),"CANCEL" if replacing else "DROP TO BUY" if dragging else "BUY",valid or replacing)
+	_button(buy_rect(),"CANCEL" if replacing else "TAKE RELIC" if selected_gift() else "DROP TO BUY" if dragging else "BUY",valid or replacing)
 	if over: draw_rect(buy_rect().grow(-6),Color(GOLD,0.8),false,3)
+	var use_enabled: bool = can_buy_and_use()
+	var over_use: bool = dragging and buy_use_rect().has_point(pointer) and use_enabled
+	if over_use:
+		for i in range(4,0,-1): Cards.panel(self,buy_use_rect().grow(i*5),Color(GOLD,0.04))
+	if shows_buy_and_use(): _button(buy_use_rect(),"BUY AND USE",use_enabled)
+	if over_use: draw_rect(buy_use_rect().grow(-6),Color(GOLD,0.8),false,3)
 	var refresh_price: int = battle.model.shop.refresh_price
 	_button(refresh_rect(),"刷新全部" if battle.model.shop.debug_unlimited else GameText.format("REFRESH ALL · %d",refresh_price),battle.model.shop.can_afford(battle.model,refresh_price) and not busy() and not replacing)
 	_button(leave_rect(),"LEAVE SHOP",not busy() and not replacing)
@@ -355,7 +433,8 @@ func _draw() -> void:
 ## Keep the dragged item above the entire shop while exposing the drop target.
 func _draw_held() -> void:
 	if not dragging or pressed_offer < 0: return
-	var offer: Dictionary = battle.model.shop.offers[pressed_offer]
+	var offer: Dictionary = battle.model.shop.offer_at(pressed_offer)
+	if offer.is_empty(): return
 	var at: Vector2 = pointer-Vector2(0,36 if portrait() else 22)
 	if offer.kind == "relic": RelicPaint.paint(held_layer,offer.id,at,66 if portrait() else 52,true)
 	elif offer.kind == "tarot": Cards.card(held_layer,offer.id,at,Vector2(108,168),0,1,0.4,0.86)
@@ -369,7 +448,7 @@ func offer_name(offer: Dictionary) -> String:
 
 ## Reveal the exact soul amount only after this bottle has been purchased.
 func offer_description(offer: Dictionary) -> String:
-	if offer.kind == "relic": return Relics.short_description(offer.id,GameText.text)
+	if offer.kind == "relic": return Relics.short_description(offer.id,GameText.text,battle.model.relics.items)
 	if offer.kind == "tarot": return Cards.Catalog.description(offer.id)
 	if offer.sold: return GameText.format("Opened: +%d souls.",offer.souls)
 	return GameText.text("A sealed bottle of souls. Opens on purchase. Its contents are a mystery.")
@@ -409,8 +488,8 @@ func _draw_detail() -> void:
 	if selected < 0:
 		_wrap(rect.grow(-24),"Tap an item to inspect it. Purchased tarot cards go straight into your collection.",30 if portrait() else 24,Color("c9c0af"),true)
 		return
-	var offer: Dictionary = battle.model.shop.offers[selected]
-	if offer.id.is_empty(): return
+	var offer: Dictionary = selected_offer()
+	if offer.is_empty() or offer.id.is_empty(): return
 	var title := offer_name(offer)
 	var description := offer_description(offer)
 	var name_color := offer_color(offer)
@@ -419,4 +498,5 @@ func _draw_detail() -> void:
 	var size: int = 28 if portrait() else 23
 	while size > 18 and GameText.lines(description,battle.description_font,size,body.size.x).size()*size*1.3 > body.size.y: size -= 1
 	_wrap(body,description,size,Color("e7dfd1"))
-	_price(Vector2(rect.get_center().x,rect.end.y-14),offer.price,battle.model.shop.can_afford(battle.model,offer.price))
+	if selected_gift(): _text(Vector2(rect.get_center().x,rect.end.y-14),"FREE",28 if portrait() else 23)
+	else: _price(Vector2(rect.get_center().x,rect.end.y-14),offer.price,battle.model.shop.can_afford(battle.model,offer.price))

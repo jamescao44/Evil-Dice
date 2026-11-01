@@ -6,7 +6,11 @@ const Swipe = preload("res://scripts/tarot/card_swipe.gd")
 const DragFeedback = preload("res://scripts/shared/cast_drag_feedback.gd")
 var drag_feedback = DragFeedback.new()
 var swipe = Swipe.new()
+var scroll_audio = preload("res://scripts/tarot/card_scroll_audio.gd").new()
 var gesture: String = ""
+var external_drag := false
+var external_from := Vector2.ZERO
+var external_dice_drop := false
 var pointer := Vector2.ZERO
 var float_levels: Dictionary = {}
 var cast_visual: Dictionary = {}
@@ -35,8 +39,12 @@ var audio_rng := RandomNumberGenerator.new()
 
 ## Connect tarot grants, draw selection and card sounds to the battle adapter.
 func _ready() -> void:
+	swipe.friction = 3.2
+	swipe.release_boost = 0.35
+	swipe.speed_reference = 4.0
+	swipe.max_speed = 10.0
 	audio_rng.randomize()
-	z_index = 120
+	z_index = BattleLayers.TAROT_INVENTORY
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(ceremony)
 	pickup.ui = self
@@ -44,6 +52,9 @@ func _ready() -> void:
 	battle.model.tarot_granted.connect(pickup.enqueue)
 	battle.model.tarot_expired.connect(_expire_projections)
 	ceremony.picked.connect(_collect)
+	ceremony.use_picked.connect(func(index: int): _collect(index,true))
+	ceremony.can_use_choice = _can_use_draw_choice
+	ceremony.shuffle_preference_changed.connect(_save_shuffle_preference)
 	ceremony.card_drawn.connect(func(): battle._sound("item/card_draw",1.0,-5))
 	ceremony.card_shuffled.connect(func(): battle._sound("item/deck_flip" if audio_rng.randi_range(0,1) == 0 else "item/deck_flip2",1.0,-13 if ceremony.reduced else -7))
 
@@ -66,7 +77,7 @@ func blocks_battle() -> bool:
 ## Return the shared card/dice toggle hit area for this screen layout.
 func icon_rect() -> Rect2:
 	if battle.view_phase == "shop": return Rect2(86,342,80,72) if portrait() else Rect2(70,130,66,56)
-	return Rect2(48,battle.DICE_CENTER.y+108,104,104) if portrait() else Rect2(402,battle.DICE_CENTER.y+64,66,66)
+	return Rect2(48,battle.DICE_CENTER.y+190,104,104) if portrait() else Rect2(402,battle.DICE_CENTER.y+102,66,66)
 
 ## Check whether a tarot action is allowed in the current battle phase.
 func available() -> bool:
@@ -91,11 +102,28 @@ func begin_reward(source: String, slot: int = -1, from: Vector2 = Vector2.INF, d
 	reward_slot = slot
 	battle._cancel_enemy_hold()
 	battle.relic_ui.cancel_hold()
+	var settings := ConfigFile.new()
+	settings.load(GameText.settings_path)
+	ceremony.skip_shuffle = bool(settings.get_value("interface","skip_tarot_shuffle",false))
 	ceremony.start(choices,battle.fx.canvas_size,battle.description_font,icon_rect().get_center(),battle.reduced,from,deck_size)
 	return true
 
-## Keep the chosen tarot and acknowledge its chest reward slot when applicable.
-func _collect(index: int) -> void:
+## Preserve the animation preference across visits, runs and application restarts.
+func _save_shuffle_preference(enabled: bool) -> void:
+	var settings := ConfigFile.new()
+	settings.load(GameText.settings_path)
+	settings.set_value("interface","skip_tarot_shuffle",enabled)
+	var error := settings.save(GameText.settings_path)
+	if error != OK: push_warning("Could not save tarot animation setting: %s" % error_string(error))
+
+## Only expose immediate use at a safe decision point and for a valid reserved card.
+func _can_use_draw_choice(index: int) -> bool:
+	return battle.view_phase in ["ready","skill","frozen","shop"] and not settings_open() and not battle.tarot_cast.active() and battle.model.tarot_effects.draw_error(battle.model,index).is_empty()
+
+## Keep exactly one card, then optionally hand that new instance to normal casting.
+func _collect(index: int, use_now: bool = false) -> void:
+	if use_now and not _can_use_draw_choice(index): return
+	var from: Vector2 = ceremony.row_point(index)
 	var item: Dictionary = battle.model.choose_tarot(index)
 	if item.is_empty(): return
 	scroll = battle.model.tarots.items.size()-1
@@ -107,6 +135,9 @@ func _collect(index: int) -> void:
 	battle._sound("item/confirmation_002",1,-12)
 	reward_source = ""
 	reward_slot = -1
+	if use_now:
+		ceremony.reset()
+		battle.tarot_cast.request_drawn(item.instance_id,from)
 
 ## Clear tarot gestures and presentation when starting a new run.
 func reset() -> void:
@@ -140,6 +171,8 @@ func _expire_projections(instances: Array) -> void:
 
 ## Release held cards and swipe inertia without consuming a tarot.
 func cancel_gesture() -> void:
+	external_drag = false
+	external_dice_drop = false
 	drag_feedback.reset()
 	swipe.dragging = false
 	swipe.velocity = 0
@@ -172,7 +205,7 @@ func carousel_pose(index: int) -> Dictionary:
 	var t: float = smoothstep(0,1,expansion)
 	at = icon_rect().get_center().lerp(at,t)
 	extent *= lerpf(0.12,1,t)
-	return {"at":at,"size":extent,"depth":depth}
+	return {"at":at,"size":extent,"depth":depth,"angle":0.0 if battle.reduced else sin(clock*1.8-index*0.55)*0.035}
 
 ## Sort cards from back to front using depth alone, preserving overlap order.
 func carousel_order() -> Array:
@@ -246,6 +279,10 @@ func click(point: Vector2) -> bool:
 		battle._cancel_enemy_hold()
 		battle._sound("item/book",1.2 if opened else 0.9,-18)
 		return true
+	# The carousel owns its cards, not the still-visible ice around the player.
+	if battle.view_phase == "frozen" and inspected < 0 and battle._player_ice_rect().has_point(point):
+		cancel_gesture()
+		return false
 	if not blocks_battle(): return false
 	if expansion < 0.98 or not opened: swallow_release = true; return true
 	if sort_rect().has_point(point):
@@ -260,12 +297,34 @@ func click(point: Vector2) -> bool:
 	pressed_card = card_at(point)
 	swipe.reset(scroll*card_angle())
 	swipe.begin()
+	scroll_audio.reset(scroll)
 	return true
+
+## Quick-access cards share the existing held sprite, targeting and cast transaction.
+func begin_quick_drag(instance_id: int, point: Vector2, from: Vector2, dice_drop: bool) -> bool:
+	var index: int = battle.model.tarots.find_instance(instance_id)
+	if index < 0 or not available(): return false
+	cancel_gesture()
+	external_drag = true
+	external_from = from
+	external_dice_drop = dice_drop
+	held = true
+	moved = true
+	gesture = "card"
+	pressed_card = index
+	pointer = point
+	press_at = point
+	last_at = point
+	return true
+
+## Dice shortcuts also accept a drop into the dice circle; field cards retain targeting.
+func accepts_drop(point: Vector2) -> bool:
+	return battle.ARENA.has_point(point) or (external_drag and external_dice_drop and battle._in_dice_range(point))
 
 ## Update swipe inertia or move a held card toward the battlefield.
 func motion(point: Vector2) -> bool:
 	if ceremony.active(): return ceremony.motion(point)
-	if not blocks_battle(): return false
+	if not blocks_battle() and not held: return false
 	pointer = point
 	if held:
 		var distance: Vector2 = point-press_at
@@ -278,6 +337,7 @@ func motion(point: Vector2) -> bool:
 			swipe.move(-(point.x-last_at.x)/carousel_radius())
 			scroll = swipe.position/card_angle()
 			scroll_target = scroll
+			_scroll_tick(true)
 			inspected = -1
 		last_at = point
 	return true
@@ -291,9 +351,9 @@ func release(point: Vector2) -> bool:
 		motion(point)
 		swipe.release()
 		if gesture == "card" and pressed_card >= 0 and pressed_card < battle.model.tarots.items.size():
-			if battle.ARENA.has_point(point):
+			if accepts_drop(point):
 				var item: Dictionary = battle.model.tarots.items[pressed_card]
-				use_requested.emit(item.instance_id,point,carousel_pose(pressed_card).at)
+				use_requested.emit(item.instance_id,point,external_from if external_drag else carousel_pose(pressed_card).at)
 		elif not moved and pressed_card >= 0 and pressed_card == card_at(point):
 			if pressed_card == front_index(): inspected = -1 if inspected == pressed_card else pressed_card
 			else:
@@ -306,6 +366,8 @@ func release(point: Vector2) -> bool:
 			scroll_target = roundf(scroll)
 	held = false
 	gesture = ""
+	external_drag = false
+	external_dice_drop = false
 	drag_feedback.reset()
 	return true
 
@@ -331,19 +393,23 @@ func focus_instance(instance_id: int) -> void:
 	queue_redraw()
 
 ## Start the consumed-card effect and adjust scrolling to the remaining inventory.
-func play_cast(id: String, at: Vector2) -> void:
-	cast_visual = {"id":id,"at":at,"age":0.0}
+func play_cast(id: String, at: Vector2, lane: String = "") -> void:
+	cast_visual = {"id":id,"at":at,"age":0.0,"lane":lane}
 	inspected = -1
 	cancel_gesture()
 	scroll = minf(scroll,maxi(0,battle.model.tarots.items.size()-1))
 	scroll_target = roundf(scroll)
 	swipe.reset(scroll*card_angle())
 
+## Quiet, rate-limited card ticks use index crossings while movement stays in radians.
+func _scroll_tick(moving: bool) -> void:
+	if scroll_audio.update(scroll,moving and opened): battle._sound("ui/click_001",1,-25)
+
 ## Advance tarot expansion, swipe inertia, inspection lift and reward animation.
 func _process(delta: float) -> void:
-	z_index = battle.HELD_ITEM_Z if gesture == "card" else 120
+	z_index = battle.HELD_ITEM_Z if gesture == "card" else BattleLayers.TAROT_INVENTORY
 	if not settings_open():
-		drag_feedback.advance(delta,gesture == "card",battle.ARENA.has_point(pointer),battle.reduced)
+		drag_feedback.advance(delta,gesture == "card",accepts_drop(pointer),battle.reduced)
 		clock += delta
 		expansion = move_toward(expansion,1.0 if opened else 0.0,delta*(8 if battle.reduced else 2.8))
 		if not held:
@@ -354,6 +420,7 @@ func _process(delta: float) -> void:
 			else:
 				scroll = lerpf(scroll,scroll_target,1-exp(-delta*14))
 				swipe.position = scroll*card_angle()
+		_scroll_tick(not held and absf(swipe.velocity) > 0.1)
 		# Only inspected cards need lift state; closed inventories do no per-card work.
 		var lifted_id: int = battle.model.tarots.items[inspected].instance_id if inspected >= 0 and inspected < battle.model.tarots.items.size() else -1
 		if lifted_id >= 0 and not float_levels.has(lifted_id): float_levels[lifted_id] = 0.0
@@ -363,7 +430,9 @@ func _process(delta: float) -> void:
 			else: float_levels[instance_id] = level
 		if not cast_visual.is_empty():
 			cast_visual.age += delta
-			if cast_visual.age >= 0.4: cast_visual.clear()
+			if cast_visual.age >= (0.6 if not cast_visual.lane.is_empty() else 0.4):
+				if not cast_visual.lane.is_empty(): battle.tarot_feedback.finish_arrival(cast_visual.id,cast_visual.lane)
+				cast_visual.clear()
 		ceremony.reduced = battle.reduced
 		ceremony.advance(delta)
 	battle.dice_group.transform = dice_transform()
@@ -379,7 +448,7 @@ func _draw() -> void:
 		for i in carousel_order():
 			if gesture == "card" and pressed_card == i: continue
 			var pose: Dictionary = carousel_pose(i)
-			Paint.card(self,battle.model.tarots.items[i].id,pose.at,pose.size,0,1,0.65 if i == front_index() else 0,expansion*lerpf(0.55,1,pose.depth))
+			Paint.card(self,battle.model.tarots.items[i].id,pose.at,pose.size,pose.angle,1,(0.65 if i == front_index() else 0.4)+sin(clock*2.5+i)*0.08,expansion*lerpf(0.55,1,pose.depth))
 			if battle.model.tarots.items[i].get("projection",false):
 				Paint.text(self,battle.description_font,pose.at+Vector2(0,pose.size.y*0.34),"PROJECTION",20 if portrait() else 14,Color("a5e6ff",expansion))
 		var front: int = front_index()
@@ -398,19 +467,72 @@ func _draw() -> void:
 		Paint.text(self,battle.description_font,rect.get_center()+Vector2(0,9 if portrait() else 6),"SORT BY NAME",24 if portrait() else 17,Paint.GOLD)
 	if gesture == "card" and pressed_card >= 0 and pressed_card < battle.model.tarots.items.size():
 		_draw_drag_backdrop()
-		var valid: bool = battle.ARENA.has_point(pointer) and available()
+		var valid: bool = accepts_drop(pointer) and available()
 		draw_rect(battle.ARENA,Color(Paint.GOLD,0.65 if valid else 0.2),false,3)
-		var at: Vector2 = pointer-Vector2(0,70 if portrait() else 35)
-		var size: Vector2 = (Vector2(170,264) if portrait() else Vector2(110,170))*drag_feedback.scale_factor()
+		if external_dice_drop: draw_arc(battle.DICE_CENTER,battle.DICE_RADIUS,0,TAU,64,Color(Paint.LILAC,0.6 if valid else 0.2),3)
+		var held_item: Dictionary = battle.model.tarots.items[pressed_card]
+		var layout: Dictionary = held_layout(held_item)
+		var at: Vector2 = layout.at
+		var size: Vector2 = layout.size
 		Paint.card(self,battle.model.tarots.items[pressed_card].id,at,size,0,1,1.0,drag_feedback.opacity())
 		drag_feedback.paint(self,at,size*0.56,Paint.GOLD,battle.reduced)
+		paint_card_details(self,held_item,layout.details)
 		if Catalog.ITEMS[battle.model.tarots.items[pressed_card].id].target == "enemy" and not battle.model.is_city():
 			var target: int = battle._enemy_inspect_at(pointer)
 			for index in battle.model.tarot_effects.targets(battle.model,battle.model.tarots.items[pressed_card].id):
 				battle._draw_target_indicator(self,index,index == target,Paint.GOLD)
 	if not cast_visual.is_empty():
-		var t: float = cast_visual.age/0.4
-		Paint.card(self,cast_visual.id,cast_visual.at,Vector2(120,186)*(1+t*0.4),sin(t*PI)*0.12,1,2*(1-t),1-t)
+		if cast_visual.lane.is_empty():
+			var t: float = cast_visual.age/0.4
+			Paint.card(self,cast_visual.id,cast_visual.at,Vector2(120,186)*(1+t*0.4),sin(t*PI)*0.12,1,2*(1-t),1-t)
+		else: _paint_indicator_delivery()
+
+## Compress the card into light, then follow the live badge anchor with a sparkling arc.
+func _paint_indicator_delivery() -> void:
+	var shrink: float = clampf(cast_visual.age/0.18,0,1)
+	var travel: float = clampf((cast_visual.age-0.18)/0.42,0,1)
+	var target: Vector2 = battle.tarot_feedback.indicator_center(cast_visual.id,cast_visual.lane)
+	var origin: Vector2 = cast_visual.at
+	var t: float = travel*travel*(3-2*travel)
+	var at: Vector2 = origin.lerp(target,t)+Vector2(0,-sin(t*PI)*55)
+	if shrink < 1:
+		Paint.card(self,cast_visual.id,origin,Vector2(120,186)*maxf(0.02,1-shrink*shrink),shrink*0.2,1,2,1-shrink)
+	for layer in range(5,0,-1):
+		draw_circle(at,(5+layer*5)*shrink,Color(Paint.LILAC,0.08*shrink))
+	draw_circle(at,7*shrink,Color("faf1ff"))
+	if not battle.reduced:
+		for i in range(9):
+			var tail: float = maxf(0,t-i*0.022)
+			var point: Vector2 = origin.lerp(target,tail)+Vector2(sin(i*9.1)*5,-sin(tail*PI)*55)
+			draw_circle(point, maxf(1,3-i*0.2),Color(Paint.LILAC,(1-i/9.0)*travel))
+
+## Keep the effect underneath the held card and inside the screen, regardless of source.
+func held_layout(item: Dictionary) -> Dictionary:
+	var size: Vector2 = (Vector2(170,264) if portrait() else Vector2(110,170))*drag_feedback.scale_factor()
+	var width: float = 380 if portrait() else 290
+	var height: float = card_details_size(item,width).y
+	var at: Vector2 = pointer-Vector2(0,70 if portrait() else 35)
+	at.x = clampf(at.x,width/2+8,battle.fx.canvas_size.x-width/2-8)
+	at.y = clampf(at.y,size.y/2+8,battle.fx.canvas_size.y-size.y/2-height-20)
+	return {"at":at,"size":size,"details":Rect2(Vector2(at.x-width/2,at.y+size.y/2+8),Vector2(width,height))}
+
+## Size localized descriptions once for either a held card or the quick-row preview.
+func card_details_size(item: Dictionary, width: float) -> Vector2:
+	var font_size: int = 23 if portrait() else 17
+	var title_size: int = 28 if portrait() else 21
+	var title_lines: int = GameText.lines(GameText.text(Catalog.ITEMS[item.id].name),battle.description_font,title_size,width-24).size()
+	var lines: int = GameText.lines(inspection_description(item),battle.description_font,font_size,width-24).size()
+	return Vector2(width,24+title_lines*title_size*1.3+lines*font_size*1.3)
+
+## Shared live card details stay readable even when the aiming card is transparent.
+func paint_card_details(canvas: CanvasItem, item: Dictionary, rect: Rect2) -> void:
+	Paint.panel(canvas,rect,Color("211b2e",0.92),Color(Paint.LILAC,0.3),8)
+	var content := Rect2(rect.position+Vector2(12,5),rect.size-Vector2(24,10))
+	var title_size: int = 28 if portrait() else 21
+	Paint.wrap(canvas,battle.description_font,content,Catalog.ITEMS[item.id].name,title_size,Paint.LILAC,true)
+	var title_lines: int = GameText.lines(GameText.text(Catalog.ITEMS[item.id].name),battle.description_font,title_size,content.size.x).size()
+	var y: float = content.position.y+title_lines*title_size*1.3+8
+	Paint.wrap(canvas,battle.description_font,Rect2(Vector2(content.position.x,y),Vector2(content.size.x,rect.end.y-y-5)),inspection_description(item),23 if portrait() else 17,Color("eee6ed"),true)
 
 ## Dim controls around the battlefield while leaving enemies clear for aiming.
 func _draw_drag_backdrop() -> void:
@@ -462,7 +584,11 @@ func _draw_inspection() -> void:
 	draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.02,0.05,0.62*lift))
 	var pose: Dictionary = carousel_pose(inspected)
 	Paint.card(self,item.id,pose.at,pose.size,0,1,0.8)
-	var rect: Rect2 = inspection_rect(item)
-	Paint.panel(self,rect,Color("211a38",0.94),Color("75628d"))
-	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,12),Vector2(rect.size.x-44,76)),Catalog.ITEMS[item.id].name,30 if portrait() else 23,Paint.GOLD)
-	Paint.wrap(self,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),inspection_description(item),26 if portrait() else 19)
+	paint_inspection(self,item)
+
+## Share localized titles, projection reminders and wrapping with quick access.
+func paint_inspection(canvas: CanvasItem, item: Dictionary, rect: Rect2 = Rect2()) -> void:
+	if not rect.has_area(): rect = inspection_rect(item)
+	Paint.panel(canvas,rect,Color("211a38",0.94),Color("75628d"))
+	Paint.wrap(canvas,battle.description_font,Rect2(rect.position+Vector2(22,12),Vector2(rect.size.x-44,76)),Catalog.ITEMS[item.id].name,30 if portrait() else 23,Paint.GOLD)
+	Paint.wrap(canvas,battle.description_font,Rect2(rect.position+Vector2(22,82 if portrait() else 64),Vector2(rect.size.x-44,rect.size.y-92 if portrait() else rect.size.y-72)),inspection_description(item),26 if portrait() else 19)

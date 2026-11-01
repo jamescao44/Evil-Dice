@@ -5,6 +5,7 @@ const BLOOD_GEMS := "blood_gems"
 const RELIC := "relic"
 const SHOP := "shop"
 const SOULS := "souls"
+const BLOOD_GEM_SCALE := 0.8
 const TYPES := [BLOOD_GEMS, RELIC, SHOP, SOULS]
 const BATTLE_TYPES := [BLOOD_GEMS, RELIC, SOULS]
 const LABELS := {BLOOD_GEMS:"Blood Gems", RELIC:"Relic", SHOP:"Shop", SOULS:"Souls"}
@@ -22,7 +23,7 @@ static func amount(rng: RandomNumberGenerator, kind: String, stage: int = 0) -> 
 	var upper: int = band.y
 	# Integrating 1/x gives a log curve; floor preserves every integer, including the maximum.
 	var rolled: int = clampi(floori(exp(lerpf(log(float(lower)),log(float(upper+1)),rng.randf()))),lower,upper)
-	return roundi(rolled*Balance.soul_chest_scale(stage)) if kind == SOULS else rolled
+	return roundi(rolled*Balance.soul_chest_scale(stage)) if kind == SOULS else roundi(rolled*BLOOD_GEM_SCALE)
 
 ## Scale currency receipts from 1x at the minimum to 2x at the maximum; bonuses cap at 2x.
 static func amount_scale(kind: String, value: int, stage: int = 0) -> float:
@@ -32,4 +33,7 @@ static func amount_scale(kind: String, value: int, stage: int = 0) -> float:
 	if kind == SOULS:
 		minimum = roundi(minimum*Balance.soul_chest_scale(stage))
 		maximum = roundi(maximum*Balance.soul_chest_scale(stage))
+	else:
+		minimum = roundi(minimum*BLOOD_GEM_SCALE)
+		maximum = roundi(maximum*BLOOD_GEM_SCALE)
 	return 1.0+clampf(float(value-minimum)/(maximum-minimum),0,1)

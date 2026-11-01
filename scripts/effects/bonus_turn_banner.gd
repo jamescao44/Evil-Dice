@@ -8,7 +8,7 @@ var age: float = -1
 var message: String = "BONUS TURN"
 
 func _ready() -> void:
-	z_index = 120
+	z_index = BattleLayers.BANNER
 
 func play(text: String = "BONUS TURN") -> void:
 	message = text

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -83,6 +84,20 @@ def load_log(path: Path) -> list[dict]:
     return records
 
 
+def plot_log(path: Path) -> None:
+    """Always retain metrics; generate charts on exit using the optional plotting environment."""
+    fallback = ROOT / "test-output/plot-env/bin/python"
+    python = os.environ.get("PLAYTEST_PLOT_PYTHON") or (sys.executable if importlib.util.find_spec("matplotlib") else str(fallback) if fallback.is_file() else None)
+    if python is None:
+        emit({"metrics_log": str(path), "plot_error": "Install tools/requirements-playtest.txt or set PLAYTEST_PLOT_PYTHON, then run tools/plot_playtest.py on this log."})
+        return
+    result = subprocess.run([python, str(ROOT / "tools/plot_playtest.py"), str(path)], capture_output=True, text=True)
+    if result.returncode:
+        emit({"metrics_log": str(path), "plot_error": result.stderr.strip()})
+    else:
+        emit({"artifacts": result.stdout.splitlines()})
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=1)
@@ -139,6 +154,7 @@ def main() -> int:
             finally:
                 if args.commands:
                     stream.close()
+        plot_log(path)
     finally:
         engine.close()
     return 0

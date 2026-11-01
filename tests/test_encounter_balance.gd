@@ -12,15 +12,15 @@ func check(ok: bool, label: String) -> void:
 
 func _initialize() -> void:
 	var m = Run.new(81)
-	m.load_debug_wave(10)
-	check(m.enemies[0].level == 5 and m.enemies[0].hp == 2142 and m.enemies[0].damage == 23,"Commander uses its individual level")
+	m.load_debug_wave(8)
+	check(m.enemies[0].level == 7 and m.enemies[0].hp == 1568 and m.enemies[0].damage == 34,"Commander durability and damage use the first-level phase budget")
 	m.hit_enemy(0,99999,true)
-	check(m.enemies[0].hp == 3142 and m.enemies[0].damage == 23,"Second phase scales from base exactly once")
-	check(m.enemies.slice(1).all(func(e): return e.level == 2 and e.hp == 520 and e.damage == 19),"Guards have a lower authored level than their commander")
-	m.load_debug_wave(20)
-	check(m.enemies[0].level == 11 and m.enemies[0].hp == 13786 and m.enemies[0].damage == 30,"Spellsword uses level eleven")
+	check(m.enemies[0].hp == 1478 and m.enemies[0].damage == 34,"Second phase has its own budget alongside reinforcements")
+	check(m.enemies.slice(1).all(func(e): return e.level == 1 and e.hp == 40 and e.damage == 20),"Guards have a lower authored level than their commander")
+	m.load_debug_wave(16)
+	check(m.enemies[0].level == 10 and m.enemies[0].hp == 4386 and m.enemies[0].damage == 55,"Spellsword uses its separate level-ten budget")
 	m.hit_enemy(0,99999,true)
-	check(m.enemies[0].hp == 16543,"Spellsword second bar scales independently")
+	check(m.enemies[0].hp == 5263,"Spellsword second bar scales independently")
 	for stage in range(Run.PLAYABLE_WAVES):
 		for enemy in m.Waves.create(stage,RandomNumberGenerator.new()):
 			check(enemy.hp > 0 and enemy.damage > 0 and m.EnemyCatalog.soul_reward(enemy) > 0,"Every roster has positive stats and rewards")
@@ -29,9 +29,9 @@ func _initialize() -> void:
 	for i in range(200):
 		var initial: int = m.WaveRewards.amount(early,"souls",0)
 		var scaled: int = m.WaveRewards.amount(late,"souls",19)
-		check(scaled == roundi(initial*2.52),"Soul scaling preserves each locked rarity-band roll")
-	check(m.WaveRewards.amount_scale("souls",25,19) == 1.0 and m.WaveRewards.amount_scale("souls",101,19) == 2.0,"Late soul receipts retain the requested size endpoints")
-	check(m.WaveRewards.amount_scale("blood_gems",333,19) == 1.0 and m.WaveRewards.amount_scale("blood_gems",666,19) == 2.0,"Blood gem amounts and visuals stay unchanged")
+		check(scaled == roundi(initial*1.76),"Soul scaling preserves each locked rarity-band roll")
+	check(m.WaveRewards.amount_scale("souls",18,19) == 1.0 and m.WaveRewards.amount_scale("souls",70,19) == 2.0,"Late soul receipts retain the requested size endpoints")
+	check(m.WaveRewards.amount_scale("blood_gems",266,19) == 1.0 and m.WaveRewards.amount_scale("blood_gems",533,19) == 2.0,"Reduced gem reward endpoints preserve receipt sizes")
 	m = Run.new(10); m.acquire_relic("reaper_scythe")
 	for kills in [0,1,10,40,400]:
 		m.relics.items[0].kills = kills
@@ -59,9 +59,11 @@ func _initialize() -> void:
 		var actions: Array = m.RelicEffects.roll_actions(m,false)
 		check(actions.size() == (2 if id == "pet_dragon" else 1) and actions.all(func(a): return a.amount == (15 if id == "pet_dragon" else 20)),"Pets preserve trigger counts with revised amounts")
 	var session = Session.new(42)
-	session.model.reroll_progress = 10
-	session.model.chest_pity.misses = [0,4,4]
+	session.model.reroll_progress = 20
+	session.model.chest_pity.misses = [5,5,5]
 	var claimed: Dictionary = session.command({"action":"treasure"})
 	check(claimed.ok and claimed.state.chest_tier == 3 and claimed.state.rewards.size() == 5,"CLI uses the shared reroll chest upgrade chain")
+	for signal_info in session.model.get_signal_list():
+		for connection in session.model.get_signal_connection_list(signal_info.name): session.model.disconnect(signal_info.name,connection.callable)
 	print("Encounter balance: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

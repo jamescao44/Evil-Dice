@@ -5,7 +5,7 @@ const Statuses = preload("res://scripts/status/status_catalog.gd")
 var battle
 
 func _ready() -> void:
-	z_index = 300
+	z_index = BattleLayers.ENEMY_INSPECTION
 
 func _process(_delta: float) -> void:
 	queue_redraw()

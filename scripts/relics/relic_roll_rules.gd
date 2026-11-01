@@ -1,5 +1,5 @@
 extends RefCounted
-## Apply straight guarantees only to newly rolled dice, before tarot overrides.
+## Opening-throw straight guarantees and counters run before tarot overrides.
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 
 static func apply(model, indices: Array) -> void:

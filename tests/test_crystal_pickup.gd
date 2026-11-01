@@ -10,7 +10,7 @@ func check(ok: bool, label: String) -> void:
 	if not ok: failures += 1; push_error(label)
 func _initialize() -> void: call_deferred("run")
 func model_checks() -> void:
-	for role in range(Enemy.ITEMS.size()):
+	for role in Enemy.ITEMS:
 		for elite in [false,true]:
 			var m = Run.new(51)
 			m.enemies = [Enemy.make(role,1,elite)]
@@ -18,12 +18,13 @@ func model_checks() -> void:
 			m.enemy_crystals_dropped.connect(func(target, amount): drops.append([target,amount]))
 			var expected: int = Enemy.crystal_reward(m.enemies[0])
 			m.enemies[0].shield = 10
-			m.hit_enemy(0,9999)
+			m.hit_enemy(0,m.enemies[0].hp)
 			check(m.blood_gems == 0 and drops.is_empty(),"Shield break grants no crystals")
-			m.hit_enemy(0,9999)
+			m.hit_enemy(0,m.enemies[0].hp)
 			if m.enemies[0].get("boss",false):
 				check(drops.is_empty(),"First boss bar grants no currency")
-				m.hit_enemy(0,9999,true)
+				# Isolate boss death payout from the Fanatic's phase-two damage protector.
+				m.direct_enemy_hp_damage(0,m.enemies[0].hp)
 			check(m.blood_gems == expected and drops == [[0,expected]],"Kill awards the correct role/elite amount exactly once")
 			m.hit_enemy(0,9999,true)
 			check(m.blood_gems == expected and drops.size() == 1,"Corpse hits cannot duplicate drops")
@@ -89,7 +90,7 @@ func run() -> void:
 		p.advance(0.4)
 		check(p.pending_total == 0 and p.gems.is_empty() and g.model.blood_gems == 5,"Pickup only reveals committed rewards; never awards twice")
 		g._restart(19); g.set_process(false)
-		for i in range(g.model.enemies.size()): g.model.hit_enemy(i,9999,true)
+		for i in range(g.model.enemies.size()): g.model.hit_enemy(i,g.model.enemies[i].hp,true)
 		g._sync_corpses(); p.advance(0.57)
 		check(p.gems.all(func(item): return g.ARENA.has_point(item.ground)),"Late-wave mass drops remain inside the field")
 		await capture("portrait-group" if portrait else "landscape-group")

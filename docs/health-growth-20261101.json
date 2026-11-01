@@ -1,0 +1,174 @@
+{
+  "health_growth_before": 1.1,
+  "health_growth_after": 1.2,
+  "damage_growth": 1.1,
+  "enemy_gap_factor": 1.1,
+  "perfect_rate": 0.35,
+  "all_prizes": true,
+  "runs": [
+    {
+      "seed": 112011,
+      "before": {
+        "outcome": "defeat",
+        "wave": 14,
+        "level": 10,
+        "max_hp": 2358,
+        "boss_phase_turns": [
+          5,
+          7
+        ]
+      },
+      "after": {
+        "outcome": "defeat",
+        "wave": 14,
+        "level": 10,
+        "max_hp": 5160,
+        "boss_phase_turns": [
+          5,
+          7
+        ]
+      }
+    },
+    {
+      "seed": 112029,
+      "before": {
+        "outcome": "defeat",
+        "wave": 14,
+        "level": 10,
+        "max_hp": 2593,
+        "boss_phase_turns": [
+          3,
+          3
+        ]
+      },
+      "after": {
+        "outcome": "defeat",
+        "wave": 14,
+        "level": 10,
+        "max_hp": 5676,
+        "boss_phase_turns": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "seed": 112047,
+      "before": {
+        "outcome": "victory",
+        "wave": 24,
+        "level": 17,
+        "max_hp": 5054,
+        "boss_phase_turns": [
+          3,
+          4,
+          2,
+          3,
+          10,
+          5
+        ]
+      },
+      "after": {
+        "outcome": "defeat",
+        "wave": 19,
+        "level": 13,
+        "max_hp": 9807,
+        "boss_phase_turns": [
+          3,
+          4,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "seed": 112083,
+      "before": {
+        "outcome": "victory",
+        "wave": 24,
+        "level": 17,
+        "max_hp": 4595,
+        "boss_phase_turns": [
+          2,
+          4,
+          2,
+          4,
+          3,
+          6
+        ]
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24,
+        "level": 17,
+        "max_hp": 18488,
+        "boss_phase_turns": [
+          2,
+          4,
+          2,
+          4,
+          3,
+          6
+        ]
+      }
+    },
+    {
+      "seed": 112109,
+      "before": {
+        "outcome": "defeat",
+        "wave": 21,
+        "level": 14,
+        "max_hp": 3452,
+        "boss_phase_turns": [
+          4,
+          5,
+          4,
+          4
+        ]
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24,
+        "level": 17,
+        "max_hp": 20336,
+        "boss_phase_turns": [
+          4,
+          5,
+          1,
+          3,
+          2,
+          6
+        ]
+      }
+    },
+    {
+      "seed": 112157,
+      "before": {
+        "outcome": "defeat",
+        "wave": 17,
+        "level": 12,
+        "max_hp": 3138,
+        "boss_phase_turns": [
+          5,
+          4,
+          5,
+          9
+        ]
+      },
+      "after": {
+        "outcome": "defeat",
+        "wave": 17,
+        "level": 12,
+        "max_hp": 8173,
+        "boss_phase_turns": [
+          5,
+          4,
+          5,
+          9
+        ]
+      }
+    }
+  ],
+  "action_failures": [],
+  "note": "Same six natural CLI seeds and policy; baseline outcomes and phase lengths match the previous percentage pass. Small heuristic sample, not a human win rate. No user saves touched."
+}

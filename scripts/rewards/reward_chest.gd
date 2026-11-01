@@ -8,6 +8,8 @@ signal revealed(tier: int)
 const Chests = preload("res://scripts/rewards/chest_rules.gd")
 const ChestAudio = preload("res://scripts/audio/chest_audio.gd")
 const RewardBurst = preload("res://scripts/rewards/reward_burst.gd")
+const RewardPrompt = preload("res://scripts/rewards/reward_prompt.gd")
+var confetti = preload("res://scripts/rewards/chest_confetti.gd").new()
 var audio: Node
 var battle
 var tier: int = 0
@@ -63,7 +65,7 @@ var cosmetic := RandomNumberGenerator.new()
 
 ## Load reward artwork and build the cosmetic symbol pool without rolling outcomes.
 func _ready() -> void:
-	z_index = 80
+	z_index = BattleLayers.REWARD_PAGE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	cosmetic.randomize()
 	audio = ChestAudio.new()
@@ -108,6 +110,7 @@ func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = fals
 	focused = -1
 	celebrations.clear()
 	landing_bursts.clear()
+	confetti.clear()
 	sequences.clear()
 	_refresh_scroll_symbols()
 	reel_steps = maxi(REEL_STEPS,scroll_symbols.size())
@@ -116,6 +119,7 @@ func start(values: Array, canvas: Vector2, pixel_font: Font, reduce: bool = fals
 		sequences.append(sequence)
 	active = not rewards.is_empty()
 	visible = active
+	if active and tier == 3: confetti.entrance(size,reduced)
 	audio.stop()
 	audio.reveal_count = 0
 	_sync_audio()
@@ -126,6 +130,10 @@ func closed_rect() -> Rect2:
 	return Rect2(Vector2(size.x/2,850 if portrait else 430)-Vector2.ONE*side/2,Vector2.ONE*side)
 
 func click(point: Vector2) -> void:
+	if not visible or paused: return
+	if tier == 3:
+		confetti.bloom(size,reduced)
+		queue_redraw()
 	if roll_phase == "closed":
 		if closed_rect().grow(18).has_point(point): open_chest()
 	else: request_stop()
@@ -194,6 +202,7 @@ func cancel() -> void:
 	collected.clear()
 	celebrations.clear()
 	landing_bursts.clear()
+	confetti.clear()
 	focused = -1
 	hide()
 
@@ -276,7 +285,9 @@ func request_stop() -> void:
 		upgrade_age = 0
 		roll_phase = "upgrading"
 		upgraded.emit(tier)
-		if tier == 3: _begin_settle(elapsed)
+		if tier == 3:
+			confetti.entrance(size,reduced)
+			_begin_settle(elapsed)
 	else:
 		_begin_settle(elapsed)
 	queue_redraw()
@@ -310,6 +321,7 @@ func _land_reels() -> void:
 		var index: int = order[announced]
 		focused = index
 		landing_bursts.append(RewardBurst.create(reel_rect(index).get_center(),reward_color(rewards[index]),stop_time(index),cosmetic,reward_burst_scale(rewards[index])*(1.35 if size.y > size.x else 1.0)))
+		confetti.prize(reel_rect(index).get_center(),size,reduced,reward_burst_scale(rewards[index]))
 		if announced == 0 and tier < 3: audio.reveal(tier)
 		landed.emit(index)
 		announced += 1
@@ -333,6 +345,10 @@ func pickup_at(point: Vector2) -> int:
 	for i in range(rewards.size()):
 		if i not in collected and reel_rect(i).grow(7).has_point(point): return i
 	return -1
+
+## Show a prompt only when the same prize can actually be collected.
+func reward_prompt_visible(index: int) -> bool:
+	return visible and not active and not skip_requested and index not in collected and index >= 0 and index < rewards.size()
 
 func skip_rect() -> Rect2:
 	return Rect2(152,130,500,88) if size.y > size.x else Rect2(944,112,304,56)
@@ -392,6 +408,7 @@ func celebrate(index: int) -> void:
 func _process(delta: float) -> void:
 	_sync_audio()
 	if paused or not visible or rewards.is_empty(): return
+	confetti.advance(delta)
 	if roll_phase == "closed":
 		idle_age += delta
 		queue_redraw()
@@ -426,7 +443,7 @@ func _sync_audio() -> void:
 	if not is_instance_valid(audio): return
 	var muted: bool = not is_instance_valid(battle) or battle.muted
 	# Tarot selection holds the revealed chest's visuals, not its payout music.
-	audio.sync(muted,paused and reveal_age < 0)
+	audio.sync(muted,(is_instance_valid(battle) and battle.pause_menu.active()) or (paused and reveal_age < 0))
 
 
 func draw_currency(canvas: CanvasItem) -> void:
@@ -458,6 +475,8 @@ func _draw() -> void:
 	draw_currency(self)
 	if roll_phase == "closed":
 		_draw_closed(gold,portrait)
+		confetti.paint(self)
+		RewardPrompt.paint(self,closed_rect(),idle_age,portrait,reduced)
 		return
 	_draw_celebrations(false)
 	var center := Vector2(size.x/2,1040 if portrait else 490)
@@ -469,12 +488,12 @@ func _draw() -> void:
 	_text(Vector2(center.x,516 if portrait else 138),hint,24 if portrait else 20,Color("eee0b9"))
 	if upgrade_mode and active and tier < 3 and roll_phase in ["spinning","upgrading"]:
 		_text(Vector2(center.x,572 if portrait else 185),upgrade_hint(),22 if portrait else 18,gold)
-	if focused >= 0 and not active and focused not in collected:
+	if rewards.size() == 1 and focused >= 0 and not active and focused not in collected:
 		var item: Dictionary = symbols[rewards[focused]]
 		var info_y: float = 1175 if portrait else 205
 		var title_size: int = 28 if portrait else 22
 		_text(Vector2(center.x,info_y),item.name,title_size,item.color)
-		var description: String = Relics.short_description(item.relic_id,GameText.text) if item.has("relic_id") else GameText.text(item.text)
+		var description: String = Relics.short_description(item.relic_id,GameText.text,battle.model.relics.items) if item.has("relic_id") else GameText.text(item.text)
 		var lines := GameText.lines(description,font,24 if portrait else 17,size.x-100)
 		for line in range(mini(3 if portrait else 1,lines.size())):
 			_text(Vector2(center.x,info_y+(36 if portrait else 30)+line*(30 if portrait else 22)),lines[line],24 if portrait else 17,Color("eee0b9"))
@@ -510,6 +529,7 @@ func _draw() -> void:
 	_draw_ultra_impact(box_at,gold)
 	# Reels appear at full size; additional reels slide in horizontally.
 	for reel in range(visible_reel_count()):
+		if rewards.size() > 1 and elapsed >= stop_time(reel): _draw_reward_name(reel)
 		if reel in collected:
 			_text(reel_rect(reel).get_center()+Vector2(0,8), "CLAIMED", 18 if portrait and rewards.size() == 5 else 22 if portrait else 18, gold.darkened(0.3))
 			continue
@@ -519,7 +539,24 @@ func _draw() -> void:
 		_draw_reel(reel,rect,gold)
 	for burst in landing_bursts: RewardBurst.paint(self,burst,elapsed,reduced)
 	_draw_celebrations(true)
+	confetti.paint(self)
+	for reel in range(visible_reel_count()):
+		if reward_prompt_visible(reel): RewardPrompt.paint(self,reel_rect(reel),elapsed,portrait,reduced)
 	draw_skip_button(self)
+
+## Multi-prize payouts label each reel instead of focusing a single description.
+func _draw_reward_name(reel: int) -> void:
+	var rect := reel_rect(reel)
+	var item: Dictionary = symbols[rewards[reel]]
+	var point_size: int = 24 if size.y > size.x else 19
+	var label: String = GameText.text(item.name)
+	var lines: Array = GameText.lines(label,font,point_size,rect.size.x)
+	while lines.size() > 3 and point_size > 14:
+		point_size -= 1
+		lines = GameText.lines(label,font,point_size,rect.size.x)
+	var color: Color = item.color.darkened(0.45) if reel in collected else item.color
+	for line in range(lines.size()):
+		_text(Vector2(rect.get_center().x,rect.end.y+point_size+12+line*(point_size+5)),lines[line],point_size,color)
 
 func _draw_closed(color: Color, portrait: bool) -> void:
 	var rect: Rect2 = closed_rect()

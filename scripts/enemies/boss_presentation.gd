@@ -12,6 +12,9 @@ static func feet(battle, index: int) -> Vector2:
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	var boss_side: float = battle._enemy_unit_side(0)
 	var boss_y: float = battle.ARENA.get_center().y+boss_side*0.5
+	var commander: bool = battle.model.enemies[0].role == Catalog.Role.COMMANDER
+	# Leave room for the player's relic orbit while retaining the full charging HUD.
+	if commander: boss_y -= 40 if portrait else 24
 	var fanatic: bool = battle.model.enemies[0].role == Catalog.Role.FANATIC
 	if fanatic: boss_y = 535 if portrait else 275
 	if battle.model.enemies[index].get("boss",false):
@@ -22,7 +25,9 @@ static func feet(battle, index: int) -> Vector2:
 		var position: int = battle.model.enemies[index].get("summon_slot",0)
 		return Vector2(415+(position%3)*140+(position/3)*10,680+(position/3)*150) if portrait else Vector2(620+(position%3)*190+(position/3)*70,365+(position/3)*145)
 	var slot: int = index-1
-	return Vector2(390+slot*300 if portrait else 630+slot*530,boss_y+boss_side*0.22)
+	var guard_y: float = boss_y+boss_side*0.22
+	if commander: guard_y -= 48 if portrait else 20
+	return Vector2(390+slot*300 if portrait else 630+slot*530,guard_y)
 
 ## Zoom the entire world out only when a giant body cannot fit the available height.
 static func rest_transform(battle, bounds: Rect2) -> Transform2D:
@@ -45,8 +50,6 @@ static func health_rect(battle, index: int) -> Rect2:
 	return Rect2(head-Vector2(width/2,62 if portrait else 54),Vector2(width,20))
 
 static func marks_center(battle, index: int) -> Vector2:
-	if battle.model.enemies[index].role == Catalog.Role.BOUND_DEMON:
-		return health_rect(battle,index).get_center()+Vector2(35,-32)
 	return health_rect(battle,index).get_center()-Vector2(0,32)
 
 ## Forecasting Charge alone does not reveal the marks; the first charge must land.
@@ -58,14 +61,34 @@ static func intent_rect(battle, index: int) -> Rect2:
 	var bar: Rect2 = health_rect(battle,index)
 	var size: float = 40 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 30
 	var offset: float = 110 if shows_marks(battle.model.enemies[index]) else size+10
-	if battle.model.enemies[index].role == Catalog.Role.BOUND_DEMON and shows_marks(battle.model.enemies[index]): offset = 76
-	return Rect2(bar.position-Vector2(0,offset),Vector2.ONE*size)
+	var top: float = bar.position.y-offset
+	if battle.model.enemies[index].role == Catalog.Role.COMMANDER: top = maxf(top,battle.ARENA.position.y+8)
+	return Rect2(Vector2(bar.position.x,top),Vector2.ONE*size)
+
+## Move the Commander's guard icons outward so neither can cover the large boss sprite.
+static func guard_intent_rect(battle, index: int, rect: Rect2) -> Rect2:
+	if not present(battle.model) or index == 0 or battle.model.enemies[0].role != Catalog.Role.COMMANDER: return rect
+	var feet: Vector2 = battle._enemy_feet(0)
+	var side: float = battle._enemy_unit_side(0)*battle.battlefield_view.zoom
+	var boss := Rect2(feet-Vector2(side*0.5,side),Vector2.ONE*side)
+	var gutter: float = 12*battle.battlefield_view.zoom
+	if rect.grow(gutter).intersects(boss):
+		if rect.get_center().x < feet.x: rect.position.x = boss.position.x-gutter-rect.size.x
+		else: rect.position.x = boss.end.x+gutter
+		rect.position.x = clampf(rect.position.x,battle.ARENA.position.x+8,battle.ARENA.end.x-rect.size.x-8)
+	return rect
 
 ## Inspection includes the title and charging rows without enlarging the intent icon.
 static func hud_rect(battle, index: int) -> Rect2:
-	return health_rect(battle,index).merge(intent_rect(battle,index))
+	var rect: Rect2 = health_rect(battle,index).merge(intent_rect(battle,index))
+	return rect.merge(challenge_rect(battle,index)) if shows_marks(battle.model.enemies[index]) else rect
 
-## Filled blue diamonds are the remaining casts needed to break the current charge.
+## Keep the linked-dice challenge in the old interruption row, clear of the name and charge lights.
+static func challenge_rect(battle, index: int) -> Rect2:
+	var width: float = 146 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 120
+	return Rect2(marks_center(battle,index)-Vector2(width/2,18),Vector2(width,36))
+
+## Linked dice show this turn’s interrupt shape; charge lights retain their progress.
 static func paint(battle, index: int) -> void:
 	var enemy: Dictionary = battle.model.enemies[index]
 	var data: Dictionary = Catalog.ITEMS[enemy.role]
@@ -78,19 +101,10 @@ static func paint(battle, index: int) -> void:
 	battle._center(Vector2(bar.get_center().x+icon.size.x*0.5,icon.get_center().y+font_size*0.35),GameText.text(enemy.name)+(" · "+phase if enemy.get("boss",false) else ""),font_size,data.color)
 	battle._draw_enemy_intent(index)
 	if not shows_marks(enemy): return
-	var remaining: int = enemy.break_marks
-	for i in range(data.break_casts):
-		var at: Vector2 = center+Vector2((i-(data.break_casts-1)*0.5)*28,0)
-		var lit: bool = i < remaining
-		var diamond := PackedVector2Array([at+Vector2(0,-9),at+Vector2(8,0),at+Vector2(0,9),at+Vector2(-8,0)])
-		battle.draw_colored_polygon(diamond,Color(BREAK_COLOR,0.85 if enemy.charging and lit else 0.3 if lit else 0.08))
-		battle.draw_polyline(PackedVector2Array([diamond[0],diamond[1],diamond[2],diamond[3],diamond[0]]),BREAK_COLOR if lit else Color("575f61"),2,true)
-		if not lit:
-			battle.draw_line(at+Vector2(-2,-6),at+Vector2(2,-1),Color("b6eff4"),2)
-			battle.draw_line(at+Vector2(2,-1),at+Vector2(-3,6),Color("b6eff4"),2)
+	if enemy.get("interrupt_straight",0) > 0:
+		preload("res://scripts/enemies/cannon_presentation.gd").paint(battle,index,challenge_rect(battle,index),false)
 	for i in range(data.charge_turns):
 		var at: Vector2 = center+Vector2((i-(data.charge_turns-1)*0.5)*38,-29)
-		if enemy.role == Catalog.Role.BOUND_DEMON: at = Vector2(bar.position.x+18+i*30,center.y)
 		var lit: bool = i < enemy.charge
 		var pulse: float = 1 if battle.reduced else 0.82+0.18*sin(battle.clock_time*5)
 		battle.draw_circle(at,12,Color(CHARGE_COLOR,0.22*pulse) if lit else Color(battle.INK,0.65))

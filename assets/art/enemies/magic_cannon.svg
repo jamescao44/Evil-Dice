@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" shape-rendering="crispEdges">
+<!-- Original pixel-built arcane artillery: left-facing barrel, crystal core, iron carriage. -->
+<path fill="#1c1829" d="M4 11h10v3h18V9h10v6h4v18h-5v5h3v7H30v-3H17v3H3v-8h5v-7H2V15h2z"/>
+<path fill="#433b55" d="M6 32h33v6H6zM5 38h11v5H5zM31 38h11v5H31z"/>
+<path fill="#817582" d="M7 34h29v3H7zM6 39h7v2H6zM33 39h6v2h-6z"/>
+<path fill="#b48a56" d="M12 17h27v15H12zM33 11h7v6h-7z"/>
+<path fill="#ead4a0" d="M14 18h19v3H14zM34 12h4v3h-4z"/>
+<path fill="#65466a" d="M17 23h17v7H17zM32 16h10v3H32z"/>
+<path fill="#aa77c9" d="M19 24h13v3H19z"/>
+<path fill="#6e6276" d="M6 13h7v18H6zM4 17h3v10H4z"/>
+<path fill="#ad9fa8" d="M7 14h4v4H7zM7 28h4v2H7z"/>
+<path fill="#231e36" d="M5 18h5v9H5z"/>
+<path fill="#d5acff" d="M6 19h2v7H6z"/>
+<path fill="#60446f" d="M34 19h8v12h-8z"/>
+<path fill="#b88bed" d="M36 17h3v3h3v7h-3v4h-3v-4h-3v-7h3z"/>
+<path fill="#eee4ff" d="M36 19h2v6h-2zM35 21h5v2h-5z"/>
+<path fill="#756078" d="M17 31h4v6h-4zM29 31h4v6h-4z"/>
+<path fill="#d1ac67" d="M22 29h4v3h-4zM13 16h3v17h-3z"/>
+</svg>

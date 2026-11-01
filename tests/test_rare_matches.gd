@@ -40,11 +40,12 @@ func rules() -> void:
 			var m = fresh()
 			var values: Array = []; values.resize(count); values.fill(face)
 			var skill = m.Patterns.automatic_groups(values,range(count))[0].skill
-			var factor: float = (0.5+0.05*face)*(8 if count == 6 else 4 if count == 5 else 1)
+			var pip_factor: float = 1.0+0.1*face if count in [3,4] else 0.5+0.05*face
+			var factor: float = pip_factor*(8 if count == 6 else 4 if count in [4,5] else 3 if count == 3 else 1)
 			check(is_equal_approx(m.attack_base(skill),5*factor),"Face and group-size coefficients compose before rounding")
-			check(skill.hits_all() == (count == 6),"Only six alike attacks all enemies")
+			check(skill.hits_all() == (count in [4,6]),"Four and six alike attack all enemies")
 			m.acquire_relic("twin_scythes")
-			check(m.skill_use_count(skill) == count,"Matching attacks remain immune to combo extra-hit relics")
+			check(m.skill_use_count(skill) == (1 if count in [3,4] else count),"Matching attacks remain immune to combo extra-hit relics")
 	var m = fresh()
 	m.tarot_effects.strength = 2; m.tarot_effects.extra_uses = 4
 	m.roll_pool(false,[4,4,4,4,4,1])
@@ -165,7 +166,8 @@ func straight_timing(phone: bool) -> void:
 				if g.model.enemies[0].hp < hp:
 					hits.append(Time.get_ticks_usec())
 					hp = g.model.enemies[0].hp
-					check(not g.fx.spell.is_empty(),"Every straight damage tick retains the same active spell visual")
+					var authored_finishing: bool = hits.size() == (5 if length == 5 else 10) and g.fx.finishing_spells.any(func(s): return s.get("flame_tier",0) == length-2 and s.get("storm",s.get("brimstone",{})).get("phase","") == "fade")
+					check(not g.fx.spell.is_empty() or authored_finishing,"Every damage tick retains the spell or its final authored fade")
 					if hits.size() == 3:
 						await capture("straight-%d-speed-%s-%s" % [length,str(rate),str(phone)])
 				if g.view_phase != "resolving": break

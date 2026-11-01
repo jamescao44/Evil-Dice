@@ -30,18 +30,18 @@ func run() -> void:
 	var partial_seed: int = seed_for([true,false])
 	check(fail_seed >= 0 and partial_seed >= 0,"Deterministic random success/failure fixtures exist")
 	var pity = Pity.new()
-	# Even if every random chance fails, each fifth tier attempt must advance.
-	for number in range(1,251):
+	# Even if every random chance fails, each sixth tier attempt must advance.
+	for number in range(1,433):
 		rng.seed = fail_seed
 		var tier: int = pity.roll(rng)
-		var expected: int = 3 if number%125 == 0 else 2 if number%25 == 0 else 1 if number%5 == 0 else 0
-		check(tier == expected,"Worst-case chest %d follows the 5/25/125 bound" % number)
+		var expected: int = 3 if number%216 == 0 else 2 if number%36 == 0 else 1 if number%6 == 0 else 0
+		check(tier == expected,"Worst-case chest %d follows the 6/36/216 bound" % number)
 	check(pity.misses == [0,0,0],"Ultra resets all three successful tier counters")
 	pity.misses = [2,1,2]
 	rng.seed = partial_seed
 	check(pity.roll(rng) == 1 and pity.misses == [0,2,2],"Natural success resets only its tier; one failure advances; unreached tier stays")
 	check(pity.last_misses == [2,1,2],"Presentation keeps the counters from before the committed outcome")
-	pity.misses = [4,4,4]
+	pity.misses = [5,5,5]
 	var before_rng: int = rng.state
 	check(pity.roll(rng) == 3 and rng.state == before_rng,"Ready pity guarantees the full chain without random rerolls")
 
@@ -51,25 +51,25 @@ func run() -> void:
 	check(model.chest_pity.misses == [2,2,2],"Restart keeps accumulated pity")
 	model.load_debug_wave(20)
 	check(model.chest_pity.misses == [2,2,2],"Debug wave changes also keep pity")
-	model.chest_pity.misses = [4,4,4]
+	model.chest_pity.misses = [5,5,5]
 	model.open_debug_chest()
 	check(model.opened_chest_tier == 3 and model.chest_pity.misses == [0,0,0],"Debug chest uses the real shared guarantee")
 	before_rng = model.reward_rng.state
 	check(model.open_debug_chest().is_empty() and model.chest_pity.misses == [0,0,0] and model.reward_rng.state == before_rng,"A pending chest cannot consume another pity attempt")
 	model.discard_unclaimed_rewards()
 	model.close_chest()
-	model.chest_pity.misses = [2,4,4]
-	model.reroll_progress = 10
+	model.chest_pity.misses = [5,5,5]
+	model.reroll_progress = 20
 	model.open_chest()
-	check(model.chest_pity.misses == [2,0,0] and model.opened_chest_tier == 3 and model.chest_start_tier == 1,"Reroll chest upgrades from Perfect without touching Normal pity")
+	check(model.chest_pity.misses == [0,0,0] and model.opened_chest_tier == 3 and model.chest_start_tier == 0,"Reroll chest starts Normal and shares all three pity counters")
 	model.discard_unclaimed_rewards()
 	model.close_chest()
 	model.reset_run()
-	model.chest_pity.misses = [4,4,4]
+	model.chest_pity.misses = [5,5,5]
 	model.wave_kind = model.WaveRewards.RELIC
 	for enemy in model.enemies: enemy.hp = 0
 	check(model.begin_wave_reward() and model.wave_chest_tier == 3,"Wave chest uses all ready tier guarantees")
-	check(model.chest_pity.misses == [0,0,0] and model.chest_pity.last_misses == [4,4,4],"Wave outcome commits counters before presentation")
+	check(model.chest_pity.misses == [0,0,0] and model.chest_pity.last_misses == [5,5,5],"Wave outcome commits counters before presentation")
 	before_rng = model.reward_rng.state
 	model.begin_wave_reward()
 	check(model.reward_rng.state == before_rng,"Repeated wave reward entry never rerolls upgrades")
@@ -100,12 +100,15 @@ func run() -> void:
 	invalid.set_value("chest_upgrades","2","invalid")
 	invalid.save(path)
 	pity.configure(path)
-	check(pity.misses == [0,4,0],"Malformed counter entries are bounded or safely defaulted")
+	check(pity.misses == [0,5,0],"Malformed counter entries are bounded or safely defaulted")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	for scene_path in ["res://scenes/battle.tscn","res://scenes/battle_portrait.tscn"]:
-		var scene = load(scene_path).instantiate()
-		check(scene.chest_pity_path == "user://chest_pity.cfg","Both shipped layouts use the same persistent save")
-		scene.free()
+		# Inspect configuration without creating battle nodes whose _ready never runs.
+		var scene_state: SceneState = load(scene_path).get_state()
+		var saved_path := ""
+		for property in range(scene_state.get_node_property_count(0)):
+			if scene_state.get_node_property_name(0,property) == "chest_pity_path": saved_path = scene_state.get_node_property_value(0,property)
+		check(saved_path == "user://chest_pity.cfg","Both shipped layouts use the same persistent save")
 
 	var chest = Chest.new()
 	root.add_child(chest)

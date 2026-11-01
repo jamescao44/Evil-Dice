@@ -21,7 +21,7 @@ static func _copy(items: Array, index: int, slot: int, chain: Array) -> Array:
 	if item.id == TENTACLE or item.id in Catalog.DISABLED: return []
 	var activators: Array = chain + [item.id]
 	if item.id == MASK: return _copy(items,index-1,slot,activators)
-	if item.id == "pet_orb":
+	if Catalog.Sets.is_fused(item.id) and Catalog.Sets.recipe_for(item.id).get("activate_components",false):
 		var pets: Array = []
 		for id in Catalog.Sets.ingredients(item):
 			var component: Dictionary = item.duplicate()

@@ -38,6 +38,11 @@ func scene(phone: bool, language: String) -> void:
 			await process_frame
 			RenderingServer.force_draw()
 			root.get_texture().get_image().save_png("res://test-output/form-guide-%s-%s-%d.png" % ["portrait" if phone else "landscape",language,form])
+	for entry in g.character_guide.entries(false):
+		var text: String = GameText.text(entry.text)
+		check(language == "en" or text != entry.text,"Every matching attack description is translated")
+		var lines: Array = GameText.lines(text,g.description_font,24 if phone else 18,718 if phone else 504)
+		check(lines.size() <= 3,"Five matching profiles fit their compact help rows")
 	g._handle_click(g.GUIDE_STATUSES.get_center())
 	check(g.guide_status_page,"Status help remains available")
 	var old: int = g.character_guide.selected_form

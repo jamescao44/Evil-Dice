@@ -1,0 +1,84 @@
+{
+  "health_growth": 1.0,
+  "base_hp": 1000,
+  "elite_health_factor": 1.5,
+  "elite_damage_factor": 1.25,
+  "same_level_percent": {
+    "paladin": 15,
+    "high_priest": 20,
+    "bomber": 30,
+    "magic_cannon": 50
+  },
+  "perfect_rate": 0.35,
+  "all_prizes": true,
+  "runs": [
+    {
+      "seed": 112011,
+      "before": {
+        "outcome": "defeat",
+        "wave": 14
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24
+      }
+    },
+    {
+      "seed": 112029,
+      "before": {
+        "outcome": "defeat",
+        "wave": 14
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24
+      }
+    },
+    {
+      "seed": 112047,
+      "before": {
+        "outcome": "defeat",
+        "wave": 19
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24
+      }
+    },
+    {
+      "seed": 112083,
+      "before": {
+        "outcome": "victory",
+        "wave": 24
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24
+      }
+    },
+    {
+      "seed": 112109,
+      "before": {
+        "outcome": "victory",
+        "wave": 24
+      },
+      "after": {
+        "outcome": "defeat",
+        "wave": 19
+      }
+    },
+    {
+      "seed": 112157,
+      "before": {
+        "outcome": "defeat",
+        "wave": 17
+      },
+      "after": {
+        "outcome": "victory",
+        "wave": 24
+      }
+    }
+  ],
+  "action_failures": [],
+  "note": "Six matched CLI seeds with natural rewards. Multiple authored changes applied together; small policy sample, not a human win rate. No real saves touched."
+}

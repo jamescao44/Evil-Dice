@@ -12,7 +12,9 @@ const FORMATION_SCALE := 0.7
 const GATHER_DICE_SCALE := 0.5*FORMATION_SCALE
 const CAST_DICE_SCALE := 0.32*FORMATION_SCALE
 const ORBIT_SPEED := 0.8
+const SPARK_LIMIT := 1024
 var battle
+var battlefield_clip: Control
 var active := false
 var phase := ""
 var progress := 0.0
@@ -41,7 +43,7 @@ var sparks_clock := 0.0
 var cosmetic := RandomNumberGenerator.new()
 
 func _ready() -> void:
-	z_index = 52
+	z_index = BattleLayers.DICE_RITUAL
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	cosmetic.randomize()
 
@@ -92,14 +94,16 @@ func play(group: Dictionary, token: int) -> bool:
 		var die = battle.dice[index]
 		if die.motion_tween and die.motion_tween.is_running(): die.motion_tween.kill()
 		snapshots.append({"die":die,"position":die.position,"scale":die.scale,"rotation":die.rotation,"z":die.z_index})
-		die.z_index = 54
+		die.z_index = BattleLayers.RITUAL_DIE
 		die.auto_attack_active = true
 		die.auto_attack_pulse = 0
 	battle._sound("player/bell",0.85 if count == 6 else 1.1,-13)
+	battle.player_animation.begin("ultimate",battle._roll_speed())
 	if not await _animate("gather",GATHER_TIME,token,stamp): return false
 	if not await _animate("rise",RISE_TIME,token,stamp): return false
 	if not await _animate("travel",TRAVEL_TIME,token,stamp): return false
 	battle._sound("player/rumble",0.75 if count == 6 else 1.1,-15)
+	battle.player_animation.launch(CHARGE_TIME/battle._roll_speed())
 	if not await _animate("charge",CHARGE_TIME,token,stamp): return false
 	var skill: MultiHitSkill = group.skill
 	for shot in range(count):
@@ -119,15 +123,17 @@ func play(group: Dictionary, token: int) -> bool:
 		# Commit one pulse at the laser's bright core; later pulses re-evaluate living foes.
 		for hit in hits:
 			var at: Vector2 = battle._enemy_impact_point(hit.target)
-			burst(at,14 if count == 6 else 9,190)
-			battle.fx.attack_burst(at,tint(),hit.damage,8 if battle.reduced else 18,170)
+			burst(at,56 if count == 6 else 36,190)
+			battle.fx.attack_burst(at,tint(),hit.damage,8 if battle.reduced else (72 if count == 6 else 48),170)
 		shots_fired += 1
+		if shots_fired == 1: battle.player_animation.damage()
 		battle._show_events(battle.model.resolve_roll_attack_step())
 		battle.shake = 0 if battle.reduced else (4.5 if count == 6 else 2.5)*battle.ATTACK_SHAKE_SCALE
 		battle._sound("player/crash" if count == 6 else "player/hit",0.85+shot*0.025,-18)
 		if not await _animate("fire",SHOT_TIME*0.6,token,stamp): return false
 		if not battle.model.has_living_enemies(): break
 	beam_strength = 0
+	battle.player_animation.finish()
 	# Six alike lingers for one real second, independent of 1x/2x speed and kill slowmo.
 	if count == 6 and not await _animate("hold",SIX_HOLD_TIME,token,stamp,true): return false
 	if not await _animate("return",RETURN_TIME,token,stamp): return false
@@ -152,6 +158,7 @@ func _animate(next_phase: String, seconds: float, token: int, stamp: int, real_t
 
 ## Interpolate real dice through the polygon, aerial rise, casting ring and return arc.
 func _pose() -> void:
+	if is_instance_valid(battlefield_clip): battlefield_clip.clip_contents = phase in ["charge","fire","hold"]
 	var t: float = smoothstep(0,1,progress)
 	center = gather_center
 	radius = gather_radius
@@ -196,9 +203,9 @@ func tint() -> Color:
 func burst(at: Vector2, amount: int, force: float) -> void:
 	if battle.reduced: amount = mini(amount,3)
 	for i in range(amount):
-		if particles.size() >= 160: break
+		if particles.size() >= SPARK_LIMIT: break
 		var life: float = cosmetic.randf_range(0.25,0.65)
-		particles.append({"p":at,"v":Vector2.from_angle(cosmetic.randf()*TAU)*cosmetic.randf_range(force*0.3,force),"life":life,"max":life,"size":cosmetic.randf_range(2,5)})
+		particles.append({"p":at,"v":Vector2.from_angle(cosmetic.randf()*TAU)*cosmetic.randf_range(force*0.3,force),"life":life,"max":life,"size":cosmetic.randf_range(2,5),"combat":phase in ["charge","fire","hold"]})
 
 ## Animate only cosmetic embers here; all damage is committed by the ritual coroutine.
 func _process(delta: float) -> void:
@@ -218,8 +225,8 @@ func _process(delta: float) -> void:
 	particles = particles.filter(func(p): return p.life > 0)
 	sparks_clock -= step
 	if sparks_clock <= 0 and not points.is_empty() and phase != "return":
-		sparks_clock = 0.14 if battle.reduced else 0.035
-		burst(points[cosmetic.randi_range(0,points.size()-1)],1 if battle.reduced else 3,45)
+		sparks_clock = 0.14 if battle.reduced else 0.02
+		burst(points[cosmetic.randi_range(0,points.size()-1)],1 if battle.reduced else (16 if count == 6 else 12),65)
 	queue_redraw()
 
 func _draw() -> void:

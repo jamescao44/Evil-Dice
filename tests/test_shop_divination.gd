@@ -12,7 +12,8 @@ func check(ok: bool, label: String) -> void:
 
 ## Open a visit without awarding or purchasing anything first.
 func open_shop(m) -> void:
-	m.wave_kind = m.WaveRewards.SHOP
+	m.stage = maxi(2,m.stage)
+	m.at_shop = true
 	m.wave_reward_resolved = true
 	check(m.shop.open(m),"A fresh shop visit opens")
 
@@ -113,7 +114,7 @@ func presentation(portrait: bool) -> void:
 		g.wave_chest.present_chest(kind)
 		await capture(g,"chest-closed-"+kind+"-"+name)
 		if kind == g.model.WaveRewards.RELIC: continue
-		for amount in ([333,666] if kind == g.model.WaveRewards.BLOOD_GEMS else [10,40]):
+		for amount in ([266,533] if kind == g.model.WaveRewards.BLOOD_GEMS else [10,40]):
 			g.wave_chest.reveal_amount(amount); g.wave_chest.age = 0.5
 			await capture(g,"chest-receipt-"+kind+"-"+str(amount)+"-"+name)
 	root.remove_child(g); g.free()

@@ -60,7 +60,7 @@ func death_immunity(wave: int, second_phase: bool) -> void:
 	check(m.tarot_effects.cast(m,-1,{"target":0}).has("error"),"Ancient Prophecy cannot bypass boss immunity")
 	check(e.hp == before.hp and e.shield == before.shield and e.boss_phase == before.boss_phase and m.blood_gems == gems,"Rejected Death has no damage, phase or reward side effects")
 	m.tarot_effects.dismiss_repeat()
-	if wave == 10 and second_phase:
+	if wave == 8 and second_phase:
 		check(m.tarot_effects.targets(m,"death") == [1,2],"Death can still target the Commander's Paladin reinforcements")
 		var result: Dictionary = m.tarot_effects.cast(m,card.instance_id,{"target":1})
 		check(not result.has("error") and m.enemies[1].hp == 0 and e.hp == before.hp,"Death executes a guard without harming the boss")
@@ -104,7 +104,7 @@ func skill_sequence(wave: int, faces: Array, uses: int, bonus: bool) -> void:
 	while m.phase == "player" and m.pending.cast_source != "manual": m.apply_player()
 	check(e.boss_phase == 2 and e.hp == e.max_hp and not e.get("phase_transition_pending",false),"Whole cast finishes before a fresh full second bar")
 	check(m.phase != "executing" and m.blood_gems == gems,"Zero-damage remaining impacts cannot stall or reward the cast")
-	if wave == 10:
+	if wave == 8:
 		check(m.enemies.size() == 3 and m.enemies.slice(1).all(func(x): return x.hp == x.max_hp and x.acted),"Reinforcements enter unharmed after all bonus attacks")
 	else:
 		check(m.status_count(m.Status.DARKNESS) == 2 and m.enemy_status_count(0,m.Status.DARKNESS) == 2,"Shared curse starts only after the cast")
@@ -119,6 +119,7 @@ func roll_sequence(wave: int, faces: Array, with_relic: bool = false) -> void:
 	e.hp = 1
 	if with_relic: m.acquire_relic("magic_slingshot")
 	m.begin_round(); m.roll_pool(false,faces)
+	var remaining_rolls: int = m.dice_turn.rolls_left
 	var gems: int = m.blood_gems
 	if with_relic: m.resolve_perfect_relic()
 	else: m.resolve_roll_attack_step()
@@ -129,10 +130,10 @@ func roll_sequence(wave: int, faces: Array, with_relic: bool = false) -> void:
 		m.resolve_roll_attack_step()
 	check(guard < 30 and m.phase == "roll" and m.outcome().is_empty(),"Automatic queue returns control without finishing the wave")
 	check(e.boss_phase == 2 and e.hp == e.max_hp and m.blood_gems == gems,"Neither six-alike pulses nor another match group damages phase two")
-	check(m.dice_turn.rolls_left == 2 and m.dice_turn.unused().size() == 6,"Phase handoff preserves the current dice and rerolls")
+	check(m.dice_turn.rolls_left == remaining_rolls and m.dice_turn.unused().size() == 6,"Phase handoff preserves the current dice and rerolls")
 
 func _initialize() -> void:
-	for wave in [10,20]:
+	for wave in [8,16]:
 		for second in [false,true]:
 			immediate_release(wave,second)
 			death_immunity(wave,second)
@@ -143,14 +144,14 @@ func _initialize() -> void:
 		roll_sequence(wave,[6,6,6,6,6,6])
 		roll_sequence(wave,[1,1,1,2,2,2])
 		roll_sequence(wave,[1,1,1,2,3,4],true)
-	var m = fresh(20)
+	var m = fresh(16)
 	m.hit_enemy(0,99999,true)
 	var e: Dictionary = m.enemies[0]
 	e.forced_charge = true
 	m.apply_enemy_status(0,m.Status.FROZEN,1,false); act(m)
 	check(e.forced_charge and m.choose_intent(0).skill == "charge","Freeze retains the charge commitment after Corrosive Heal")
 	# Tower uses the same boss/death path even though its damage ignores defenses.
-	m = fresh(20); m.begin_round(); m.enemies[0].hp = 20
+	m = fresh(16); m.begin_round(); m.enemies[0].hp = 20
 	var gems: int = m.blood_gems
 	var card: Dictionary = m.grant_tarot("tower")
 	m.tarot_effects.cast(m,card.instance_id,{})

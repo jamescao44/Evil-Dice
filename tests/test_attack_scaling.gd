@@ -16,7 +16,7 @@ func _initialize() -> void:
 		check(Effects.damage_scale(reference,stage) == 1.0,"Level reference starts at regular size")
 		check(is_equal_approx(Effects.damage_scale(reference*10,stage),1.25),"Tenfold damage grows effects only 25 percent")
 		check(Effects.damage_scale(1000000000,stage) == 1.4,"Impact size has a hard ceiling")
-		check(Effects.damage_font_size(1000000000,stage) == 38,"Damage numbers have an independent readable ceiling")
+		check(Effects.damage_font_size(1000000000,stage) == 48,"Larger damage numbers retain an independent readable ceiling")
 	check(Effects.damage_scale(1000,20) < Effects.damage_scale(1000,0),"The next level normalizes the same absolute damage")
 	var fx = Effects.new()
 	root.add_child(fx)

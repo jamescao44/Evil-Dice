@@ -79,7 +79,7 @@ func _initialize() -> void:
 	for seed_value in range(100):
 		m = Run.new(seed_value); m.load_debug_wave(9)
 		for e in m.enemies: e.hp = 0
-		m.wave_reward_resolved = true; m.battles_since_shop = 10
+		m.wave_reward_resolved = true
 		check(m.WaveRewards.SHOP not in m.offer_routes(),"Shop cannot replace the boss milestone")
 	print("Knight Commander: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

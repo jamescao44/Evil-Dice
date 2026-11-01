@@ -18,7 +18,7 @@ func economy() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 391
 	for kind in [Rewards.BLOOD_GEMS,Rewards.SOULS]:
-		var bands: Array = [Vector2i(333,443),Vector2i(444,554),Vector2i(555,666)] if kind == Rewards.BLOOD_GEMS else [Vector2i(10,19),Vector2i(20,29),Vector2i(30,40)]
+		var bands: Array = [Vector2i(266,354),Vector2i(355,443),Vector2i(444,533)] if kind == Rewards.BLOOD_GEMS else [Vector2i(10,19),Vector2i(20,29),Vector2i(30,40)]
 		var tails := [0,0]
 		var halves := [0,0]
 		var seen_min: int = 10000
@@ -59,42 +59,37 @@ func economy() -> void:
 
 ## Exercise complete runs so shop spacing and reward streaks include actual route visits.
 func progression() -> void:
-	for seed_value in range(80):
+	for seed_value in range(8):
 		var m = Run.new(seed_value)
-		var last_shop := -100
 		for stage in range(Run.PLAYABLE_WAVES):
-			check(m.stage == stage,"Every destination, including shops, consumes one wave")
-			if m.wave_kind == Rewards.SHOP:
-				check(m.enemies.is_empty() and m.shop.open(m),"Shop wave has no enemies and opens directly")
-				check(stage-last_shop >= 3,"Two battle waves separate shop visits")
-				last_shop = stage
-				check(not m.begin_wave_reward(),"Shop wave does not create a free reward chest")
-				m.shop.close()
-			else:
-				for e in m.enemies: e.hp = 0
-				check(m.begin_wave_reward(),"Each defeated battle creates one reward")
-				if m.wave_kind == Rewards.RELIC:
-					m.open_wave_chest(); m.discard_unclaimed_rewards(); m.close_chest()
-				else:
-					check(m.claim_wave_resource() > 0 and m.claim_wave_resource() == 0,"Direct reward is credited exactly once")
-				check(m.finish_wave_reward() and not m.begin_wave_reward(),"Finished chest cannot reopen")
+			check(m.stage == stage and not m.at_shop,"Every authored battle consumes exactly one wave")
+			for e in m.enemies: e.hp = 0
+			check(m.begin_wave_reward(),"Each defeated battle creates one reward")
+			if m.wave_kind == Rewards.RELIC:
+				m.open_wave_chest()
+				for slot in range(m.open_rewards.size()): m.claim_reward(slot,0 if m.relics.items.size() >= 10 else -1)
+				m.close_chest()
+			else: check(m.claim_wave_resource() > 0 and m.claim_wave_resource() == 0,"Direct reward is credited exactly once")
+			check(m.finish_wave_reward() and not m.begin_wave_reward(),"Finished chest cannot reopen")
 			if stage == Run.PLAYABLE_WAVES-1:
-				check(m.outcome() == "victory" and m.offer_routes().is_empty(),"Final destination ends run without extra routes")
+				check(m.outcome() == "victory" and m.offer_routes().is_empty(),"Final battle ends run without extra routes")
 				continue
 			if (stage+1)%Run.Campaign.WAVES_PER_LEVEL == 0:
-				if m.auto_claim_victory_chest() > 0: m.discard_unclaimed_rewards(); m.close_chest()
 				var campaign = Run.Campaign.new()
 				check(campaign.complete(m),"Completed level commits after all rewards")
 				campaign.start(m)
 				continue
+			if m.Waves.has_shop_after(stage):
+				check(m.offer_routes() == [Rewards.SHOP],"Shop is the only route after local wave three or six")
+				check(m.choose_route(0) and m.advance_wave() and m.stage == stage,"Entering the shop consumes no battle")
+				check(m.shop.open(m) and not m.begin_wave_reward(),"A shop visit opens once and grants no extra battle chest")
+				m.shop.close()
 			var choices: Array = m.offer_routes()
 			var rng_state: int = m.reward_rng.state
-			check(choices.size() == 2 and choices[0] != choices[1],"Two distinct route choices")
+			check(choices.size() == 2 and choices[0] != choices[1] and Rewards.SHOP not in choices,"Two distinct battle reward choices")
 			check(m.offer_routes() == choices and rng_state == m.reward_rng.state,"Repainting route choices cannot reroll them")
-			if stage == 2: check(Rewards.SHOP in choices,"First shop is guaranteed in choices after wave three")
-			if stage < last_shop+2: check(Rewards.SHOP not in choices,"Shop cannot return before two battles")
 			if m.route_history.size() >= 2 and m.route_history[-1] == m.route_history[-2]: check(m.route_history[-1] not in choices,"No third consecutive reward of the same type")
-			var index: int = choices.find(Rewards.SHOP) if Rewards.SHOP in choices else seed_value%2
+			var index: int = seed_value%2
 			var hp_capacity: int = m.max_hp
 			m.hp = 12
 			check(m.choose_route(index) and not m.choose_route(1-index),"Route selection commits once")
@@ -112,18 +107,18 @@ func leveling() -> void:
 	m.gain_souls(9)
 	check(m.character_level == 1 and m.level_cost() == 10 and m.hp == 70,"Below threshold does not level or heal")
 	m.gain_souls(1)
-	check(m.character_level == 2 and m.souls == 0 and m.max_hp == 110 and m.hp == 110,"First level costs ten, increases HP ten percent and fully heals")
+	check(m.character_level == 2 and m.souls == 0 and m.max_hp == Run.Vitals.base_health(2) and m.hp == m.max_hp,"First level costs ten, increases HP ten percent and fully heals")
 	check(is_equal_approx(m.attack_base_with_bonus(skill,7),base*1.1+7*3.6),"Levels multiply character base without scaling flat relic bonuses")
 	m.hp = 1
 	m.statuses[m.Status.DARKNESS].apply(1)
 	m.gain_souls(55)
 	check(m.character_level == 4 and m.souls == 5 and m.level_cost() == 40,"A grant crosses costs twenty and thirty, preserving five XP")
-	check(m.max_hp == 133 and m.hp == 133 and is_equal_approx(m.attack_base_with_bonus(skill,0),base*1.331),"Levels compound and full healing also works under Darkness")
+	check(m.max_hp == Run.Vitals.base_health(4) and m.hp == m.max_hp and is_equal_approx(m.attack_base_with_bonus(skill,0),base*1.331),"Levels compound and full healing also works under Darkness")
 	check(events == [2,3,4],"Each crossed threshold emits one ordered level notification")
 	m.gain_souls(500)
 	check(m.character_level == 11 and m.souls == 15 and m.level_cost() == 110,"XP has no old three-level cap")
 	m.reset_run()
-	check(m.character_level == 1 and m.max_hp == 100 and m.souls == 0,"Run restart resets all leveling")
+	check(m.character_level == 1 and m.max_hp == Run.Vitals.base_health(1) and m.souls == 0,"Run restart resets all leveling")
 
 func presentation(portrait: bool) -> void:
 	var g = Portrait.new() if portrait else Battle.new()

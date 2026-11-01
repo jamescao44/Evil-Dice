@@ -9,7 +9,7 @@ func _initialize() -> void:
 func serve() -> void:
 	var args := OS.get_cmdline_user_args()
 	var session = Session.new(int(args[0]) if not args.is_empty() else 1)
-	print("PLAYTEST_JSON "+JSON.stringify({"ok":true,"protocol":1,"seed":session.seed_value,"events":session.events,"state":session.snapshot()}))
+	print("PLAYTEST_JSON "+JSON.stringify({"ok":true,"protocol":1,"seed":session.seed_value,"events":session.events,"state":session.snapshot(),"metrics":session.metrics.samples,"metric_reference":session.Metrics.REFERENCE,"metric_inventory":session.metrics.inventory_events,"metric_commands":[],"metric_wave_turns":session.metrics.wave_report(),"metric_schema":2}))
 	while true:
 		var line := OS.read_string_from_stdin().strip_edges()
 		if line.is_empty(): break
@@ -19,4 +19,5 @@ func serve() -> void:
 			continue
 		if parser.data.get("action","") == "quit": break
 		print("PLAYTEST_JSON "+JSON.stringify(session.command(parser.data)))
+	session.close()
 	quit()

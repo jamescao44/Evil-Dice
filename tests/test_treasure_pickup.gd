@@ -32,10 +32,10 @@ func layout(portrait: bool) -> void:
 	var m = g.model
 	var receipt = g.treasure_pickup
 	m.roll_pool(false,[1,2,3,4,5,6]); settle_turn(m)
-	check(m.reroll_progress == 2 and receipt.orbs.size() == 2,"Two unused rolls bank immediately and spawn two receipts")
+	check(m.reroll_progress == 4 and receipt.orbs.size() == 4,"Four unused rolls bank immediately and spawn four receipts")
 	check(receipt.displayed_progress() == 0,"Meter waits for the visual receipt without delaying model credit")
 	m._bank_unused_rolls()
-	check(receipt.orbs.size() == 2,"Duplicate settlement never duplicates receipts")
+	check(receipt.orbs.size() == 4,"Duplicate settlement never duplicates receipts")
 	var state: int = m.rng.state
 	var reward_state: int = m.reward_rng.state
 	g.view_phase = "ready"
@@ -45,13 +45,19 @@ func layout(portrait: bool) -> void:
 	check(receipt.displayed_progress() == 0 and not receipt.visible,"Menus pause and cover traveling orbs")
 	g.menu_open = false; receipt._process(0)
 	receipt.advance(0.25)
-	check(receipt.displayed_progress() == 1 and receipt.impacts.size() == 1,"First landing lights exactly one diamond")
+	check(receipt.displayed_progress() == 1 and receipt.impacts.size() == 1,"First landing advances the bar by one point")
 	await capture(g,"first-landing")
 	receipt.advance(0.13)
-	check(receipt.displayed_progress() == 2 and receipt.orbs.is_empty(),"Second arrival completes the receipt")
+	check(receipt.displayed_progress() == 2 and receipt.orbs.size() == 2,"Second arrival advances one more point")
+	receipt.advance(0.3)
+	check(receipt.displayed_progress() == 4 and receipt.orbs.is_empty(),"All four points arrive")
 	check(m.rng.state == state and m.reward_rng.state == reward_state,"Receipt animation never consumes gameplay randomness")
-	m.reroll_progress = 9; m.begin_round(); m.roll_pool(false,[1,2,3,4,5,6]); settle_turn(m)
-	check(receipt.orbs.size() == 1 and receipt.orbs[0].index == 9,"Cap sends only the one point that fits in the meter")
+	m.reroll_progress = 19; m.begin_round(); m.roll_pool(false,[1,2,3,4,5,6]); settle_turn(m)
+	check(receipt.orbs.size() == 1 and receipt.orbs[0].index == 19,"Cap sends only the one point that fits in the meter")
+	for progress in [0,10,19,20]:
+		receipt.reset(); m.reroll_progress = progress
+		check(g._chest_tier_at(g._chest_milestone_rect(0).get_center()) == (0 if progress == 20 else -1),"Chest endpoint becomes tappable only at twenty")
+		await capture(g,"bar-%d" % progress)
 	m.open_chest()
 	check(receipt.orbs.is_empty() and receipt.displayed_progress() == 0,"Claim during flight clears stale receipts without repeating a reward")
 	m.discard_unclaimed_rewards(); m.close_chest()
@@ -75,7 +81,7 @@ func layout(portrait: bool) -> void:
 	g.relic_ui.pickup.advance(0.07)
 	check(g.relic_ui.pickup.flight_position(target,false).distance_to(target) < 0.01,"Relic reaches the exact backpack center")
 	await capture(g,"backpack-impact")
-	g.chest.cancel(); g.queue_free(); await process_frame
+	g._restart(); g.queue_free(); await process_frame
 
 func run() -> void:
 	await layout(false); await layout(true)

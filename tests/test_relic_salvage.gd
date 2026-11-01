@@ -82,18 +82,18 @@ func upgrade_rules() -> void:
 	var m = Run.new(77)
 	for progress in range(10):
 		m.reroll_progress = progress
-		check(m.chest_tier() == 0 and m.open_chest().is_empty(),"No milestone below ten")
-	m.reroll_progress = 10; m.chest_pity.misses = [2,4,4]
-	check(m.open_chest(2).is_empty() and m.reroll_progress == 10,"Higher starting tiers cannot be requested")
+		check(m.chest_tier() == -1 and m.open_chest().is_empty(),"No milestone below ten")
+	m.reroll_progress = 20; m.chest_pity.misses = [5,5,5]
+	check(m.open_chest(2).is_empty() and m.reroll_progress == 20,"Higher starting tiers cannot be requested")
 	var prizes: Array = m.open_chest()
-	check(m.reroll_progress == 0 and m.chest_start_tier == 1 and m.opened_chest_tier == 3,"Ten points starts Perfect with normal upgrades")
-	check(m.chest_pity.misses == [2,0,0],"Only Perfect and Greed pity are consumed")
+	check(m.reroll_progress == 0 and m.chest_start_tier == 0 and m.opened_chest_tier == 3,"Ten points starts Normal with shared upgrades")
+	check(m.chest_pity.misses == [0,0,0],"All reached tier pity counters reset on upgrade")
 	var state: int = m.reward_rng.state
 	check(m.open_chest() == prizes and m.reward_rng.state == state,"Reopening does not reroll upgrades")
 	var rng := RandomNumberGenerator.new(); rng.seed = 20261024
 	var counts := [0,0,0,0]
-	for n in range(20000): counts[m.Chests.roll_wave_tier(rng,[0,0,0],1)] += 1
-	check(counts[0] == 0 and absf(counts[1]/20000.0-0.80) < 0.015 and absf(counts[2]/20000.0-0.16) < 0.015 and absf(counts[3]/20000.0-0.04) < 0.015,"Starting Perfect preserves 20 percent per-step natural odds")
+	for n in range(20000): counts[m.Chests.roll_wave_tier(rng,[0,0,0],0)] += 1
+	check(absf(counts[0]/20000.0-0.80) < 0.015 and absf(counts[1]/20000.0-0.16) < 0.015 and absf(counts[2]/20000.0-0.032) < 0.008 and absf(counts[3]/20000.0-0.008) < 0.004,"Starting Normal preserves 20 percent per-step natural odds")
 
 func capture(g, label: String) -> void:
 	if "--capture" not in OS.get_cmdline_user_args() or DisplayServer.get_name() == "headless": return
@@ -106,11 +106,19 @@ func layout(portrait: bool) -> void:
 	root.size = Vector2i(402,874) if portrait else Vector2i(1280,800)
 	var g = Portrait.new() if portrait else Battle.new()
 	root.add_child(g); g.muted = true; g.speed = 2
-	g.model.reroll_progress = 10
+	g.model.reroll_progress = 9
+	check(g._chest_tier_at(g._chest_milestone_rect(0).get_center()) == -1,"Incomplete meter is not clickable")
+	g.model.reroll_progress = 20
+	for phase in ["ready","wave_reward","over"]:
+		g.view_phase = phase
+		g.wave_chest.phase = "closed"
+		check(g._chest_tier_at(g._chest_milestone_rect(0).get_center()) == 0,"Normal treasure is clickable in "+phase)
+		check(g._chest_tier_at(Vector2.ZERO) == -1,"Outside the claim target never opens a Normal chest")
+	g.view_phase = "ready"
 	await capture(g,"meter")
-	g.model.chest_pity.misses = [0,4,4]
+	g.model.chest_pity.misses = [5,5,5]
 	g._reward_sequence()
-	check(g.chest.tier == 1 and g.chest.final_tier == 3 and g.chest.upgrade_mode,"Real reroll presentation begins at Perfect, hiding locked upgrades")
+	check(g.chest.tier == 0 and g.chest.final_tier == 3 and g.chest.upgrade_mode,"Real reroll presentation begins at Normal, hiding locked upgrades")
 	g.run_id += 1 # End the asynchronous fixture without collecting its prizes.
 	g.model.discard_unclaimed_rewards(); g.model.close_chest(); g.chest.cancel()
 	g.view_phase = "ready"; g.model.blood_gems = 0

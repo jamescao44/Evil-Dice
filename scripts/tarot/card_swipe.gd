@@ -5,6 +5,10 @@ var velocity: float = 0.0
 var dragging: bool = false
 var last_stamp: int = 0
 const FRICTION := 5.5
+var friction := FRICTION
+var release_boost := 0.0
+var speed_reference := 12.0
+var max_speed := 30.0
 
 func reset(value: float = 0.0) -> void:
 	position = value
@@ -26,11 +30,12 @@ func move(amount: float, stamp: int = Time.get_ticks_msec()) -> void:
 func release(stamp: int = Time.get_ticks_msec()) -> void:
 	dragging = false
 	if stamp-last_stamp > 120: velocity = 0
+	else: velocity = clampf(velocity*(1+release_boost*minf(1,absf(velocity)/speed_reference)),-max_speed,max_speed)
 
 func advance(delta: float, snap: bool = false) -> void:
 	if dragging: return
-	var decay: float = exp(-FRICTION*delta)
-	position += velocity*(1-decay)/FRICTION
+	var decay: float = exp(-friction*delta)
+	position += velocity*(1-decay)/friction
 	velocity *= decay
 	if snap and absf(velocity) < 0.45:
 		position = lerpf(position,roundf(position),1-exp(-delta*12))

@@ -24,10 +24,10 @@ func clear_wave(m, wave: int) -> void:
 
 ## Enter a deliberately chosen shop destination, with a completed prior battle.
 func prepare_shop(m, wave: int) -> void:
-	clear_wave(m,wave-1)
-	m.route_choices = [m.WaveRewards.SHOP,m.WaveRewards.SOULS]
+	clear_wave(m,wave)
+	m.offer_routes()
 	m.choose_route(0)
-	check(m.advance_wave(),"Chosen shop advances the wave counter")
+	check(m.advance_wave(),"Scheduled shop preserves the cleared wave counter")
 
 ## Continue into route selection after the shop's NPC transition and visit.
 func visit(g) -> void:
@@ -45,7 +45,7 @@ func economy() -> void:
 		check(not m.shop.open(m),"Battle routes never open shops")
 	for visit in range(1,4):
 		for seed_value in range(50):
-			prepare_shop(m,[5,8,15][visit-1]) # Wave ten is now a boss, never a shop.
+			prepare_shop(m,[3,11,19][visit-1]) # Keep shop fixtures off each eighth-wave boss.
 			m.shop.number = visit-1
 			m.reward_rng.seed = seed_value
 			m.shop.refresh_price = 800
@@ -58,7 +58,7 @@ func economy() -> void:
 				var o: Dictionary = m.shop.offers[i]
 				check(not o.id.is_empty() and not o.sold,"Every fresh listing is available")
 				if i < 6:
-					check(o.kind == "relic" and o.id not in ids and o.id not in Relics.DISABLED and not Relics.ITEMS[o.id].get("fusion",false),"Eligible unique shelf relic")
+					check(o.kind == "relic" and (o.id == "codex_page" or o.id not in ids) and o.id not in Relics.DISABLED and not Relics.ITEMS[o.id].get("fusion",false),"Eligible unique shelf relic")
 					ids.append(o.id)
 				elif i < 8: check(o.kind == "tarot" and o.id not in m.Tarot.DISABLED,"Direct eligible tarot listing")
 				else:
@@ -74,7 +74,7 @@ func economy() -> void:
 			m.offer_routes(); m.choose_route(0)
 			check(not m.shop.open(m) and m.advance_wave(),"Leaving resumes next wave without reopening")
 	check(contents_by_price.values().any(func(amounts): return amounts.size() > 1),"Identically priced bottles can contain different soul amounts")
-	prepare_shop(m,5); m.blood_gems = 10000; m.shop.open(m)
+	prepare_shop(m,3); m.blood_gems = 10000; m.shop.open(m)
 	var o: Dictionary = m.shop.offers[0].duplicate()
 	check(not m.shop.buy(m,0).is_empty() and m.relics.has(o.id) and m.blood_gems == 10000-o.price,"Relic purchase grants exactly once at its listed price")
 	var balance: int = m.blood_gems
@@ -85,16 +85,16 @@ func economy() -> void:
 	balance = m.blood_gems
 	var snapshot: Array = m.shop.offers.duplicate(true)
 	check(m.shop.refresh(m) and m.blood_gems == balance-50 and m.shop.offers != snapshot and m.shop.offers.all(func(x): return not x.sold),"Fifty gems refresh all nine listings including the bottle")
-	check(m.shop.refresh_price == 100 and not m.shop.open(m) and m.shop.refresh_price == 100,"Successful refresh doubles its fee; reopening cannot reset it")
+	check(m.shop.refresh_price == 75 and not m.shop.open(m) and m.shop.refresh_price == 75,"Successful refresh raises its fee by half; reopening cannot reset it")
 	check(m.shop.offers.slice(0,6).all(func(x): return x.id != o.id or x.id == "codex_page"),"Refresh excludes owned unique relics")
 	m.blood_gems = 49; snapshot = m.shop.offers.duplicate(true)
 	var rng_state: int = m.reward_rng.state
-	check(not m.shop.refresh(m) and m.blood_gems == 49 and snapshot == m.shop.offers and rng_state == m.reward_rng.state and m.shop.refresh_price == 100,"Unaffordable refresh changes neither fee, stock nor RNG")
+	check(not m.shop.refresh(m) and m.blood_gems == 49 and snapshot == m.shop.offers and rng_state == m.reward_rng.state and m.shop.refresh_price == 75,"Unaffordable refresh changes neither fee, stock nor RNG")
 	check(m.shop.buy(m,0).is_empty() and m.blood_gems == 49,"Unaffordable purchase has no side effects")
 	m.blood_gems = 10000
-	for price in [100,200,400]:
+	for price in [75,113,170]:
 		balance = m.blood_gems
-		check(m.shop.refresh(m) and m.blood_gems == balance-price and m.shop.refresh_price == price*2,"Successive refreshes charge the displayed fee and double the next")
+		check(m.shop.refresh(m) and m.blood_gems == balance-price and m.shop.refresh_price == ceili(price*1.5),"Successive refreshes charge the displayed fee and raise the next by half")
 	m.blood_gems = 10000
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","bloodstone","contract","worn_dagger","worn_bow"]:
 		if m.relics.items.size() < 10: m.acquire_relic(id)
@@ -125,7 +125,7 @@ func scene(portrait: bool) -> void:
 	var g = Portrait.new() if portrait else Battle.new()
 	root.add_child(g); g.muted = true; g.set_process_input(false)
 	g.speed = 20
-	prepare_shop(g.model,5); g.model.blood_gems = 2000
+	prepare_shop(g.model,3); g.model.blood_gems = 2000
 	visit(g)
 	await create_timer(0.6).timeout
 	for frame in range(100):
@@ -216,9 +216,9 @@ func scene(portrait: bool) -> void:
 	check(g.wave_chest.phase == "routes","Leaving shop offers the next battle routes")
 	g._handle_click(g.wave_chest.route_rect(0).get_center())
 	for frame in range(100):
-		if g.model.stage == 5 and g.view_phase == "ready": break
+		if g.model.stage == 3 and g.view_phase == "ready": break
 		await create_timer(0.01).timeout
-	check(g.model.stage == 5 and g.view_phase == "ready","After leaving, growth completes and wave six accepts dice input")
+	check(g.model.stage == 3 and g.view_phase == "ready","After leaving, growth completes and wave four accepts dice input")
 	g._restart(); check(g.view_phase != "shop" and not g.model.shop.active,"Restart leaves no shop overlay")
 	g.queue_free(); await process_frame
 

@@ -1,4 +1,5 @@
 extends SceneTree
+const Fanatic = preload("res://scripts/enemies/fanatical_mage.gd")
 const Battle = preload("res://scripts/combat/battle.gd")
 const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 var checks := 0
@@ -34,13 +35,13 @@ func run():
 		var g = Portrait.new() if phone else Battle.new()
 		root.add_child(g); g.muted = true; g.set_process_input(false); g._restart(30)
 		g.model.character_level = 22; g.model.hp = g.model.max_hp; g.evolution.reset(); g.soul_pickup.reset()
-		g.model.BossRules.Fanatic.summon(g.model,0)
-		g.model.BossRules.Fanatic.split(g.model,0)
+		Fanatic.summon(g.model,0)
+		Fanatic.split(g.model,0)
 		g.model.begin_round()
 		await settled(g)
 		check_visible(g)
 		await screenshot(g,"fanatic-servants-"+str(phone))
-		for i in g.model.BossRules.Fanatic.servants(g.model,0): g.model.BossRules.Fanatic.dismiss(g.model,i)
+		for i in Fanatic.servants(g.model,0): Fanatic.dismiss(g.model,i)
 		g.model.hit_enemy(0,g.model.enemies[0].hp,true)
 		var demon: int = g.model.enemies.size()-1
 		g.model.enemies[demon].charging = true; g.model.enemies[demon].charge = 1
@@ -50,11 +51,11 @@ func run():
 		check_visible(g)
 		check(g._enemy_intent_data(demon).description.contains("3") or g._enemy_intent_data(demon).description.contains("三"),"Demon inspection describes break marks")
 		await screenshot(g,"fanatic-demon-"+str(phone))
-		g.model.BossRules.Fanatic.summon(g.model,0); g.model.BossRules.Fanatic.split(g.model,0)
+		Fanatic.summon(g.model,0); Fanatic.split(g.model,0)
 		g.model.begin_round()
 		await settled(g)
 		check_visible(g)
-		check(g.model.BossRules.Fanatic.servants(g.model,0).all(func(i): return g.model.enemies[i].summon_slot < 6),"Demon does not consume a small servant's formation slot")
+		check(Fanatic.servants(g.model,0).all(func(i): return g.model.enemies[i].summon_slot < 6),"Demon does not consume a small servant's formation slot")
 		await screenshot(g,"fanatic-full-phase2-"+str(phone))
 		g.queue_free(); await process_frame
 	print("Fanatic scene: %d checks, %d failures" % [checks,failures])

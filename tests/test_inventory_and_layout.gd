@@ -21,7 +21,7 @@ func capture(g, name: String) -> void:
 
 ## Check every wave before and after targeting zoom, including intent headroom.
 func formation(g, label: String) -> void:
-	for wave in range(1,20):
+	for wave in range(1,preload("res://scripts/progression/wave_catalog.gd").COUNT+1):
 		g._restart(wave)
 		for focused in [false,true]:
 			g.result = g.Rules.Patterns.classify([6,6])
@@ -91,7 +91,7 @@ func inventory(g, label: String) -> void:
 	check(not g.relic_ui.strip_visible() and not g.relic_ui.interactable(),"Removed battle strip has no invisible hit targets")
 	check(is_equal_approx(page.button_rect().get_center().x+g.tarot_ui.icon_rect().get_center().x,g.DICE_CENTER.x*2),"Backpack mirrors the tarot shortcut")
 	check(is_equal_approx(page.button_rect().get_center().y,g.tarot_ui.icon_rect().get_center().y),"Both shortcuts share the same height")
-	check(g.DICE_CENTER.y < (1410 if label == "portrait" else 610),"Dice move upward")
+	check(g.DICE_CENTER.y+g.DICE_RADIUS <= g.fx.canvas_size.y,"Dice area fits above the screen bottom")
 	check(g.DICE_CENTER.y-g.DICE_RADIUS >= g.ARENA.end.y,"Raised dice do not overlap the battlefield")
 	check(not page.button_rect().intersects(g.dice_selection.skill_cancel_rect()) or page.button_rect().position.x > g.DICE_CENTER.x+g.DICE_RADIUS,"Backpack stays clear of the dice")
 	g._process(0)
@@ -132,10 +132,10 @@ func inventory(g, label: String) -> void:
 
 ## Exercise drag cancellation, direct buys, duplicate protection and pickup layering.
 func shop_drag(g, label: String) -> void:
-	g._restart(5)
+	g._restart(3)
 	for enemy in g.model.enemies: enemy.hp = 0
 	g.model.wave_reward_resolved = true
-	g.model.wave_kind = g.model.WaveRewards.SHOP
+	g.model.at_shop = true
 	g.model.blood_gems = 3000
 	check(g.model.shop.open(g.model),"Shop opens for drag test")
 	g.view_phase = "shop"; g.shop_ui.open()

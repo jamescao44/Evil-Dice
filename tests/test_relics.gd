@@ -12,6 +12,7 @@ func check(ok: bool, label: String) -> void:
 
 func fresh():
 	var m = Run.new(430)
+	m.enemies = [Rules.make_enemy(0)] # Unit checks do not depend on the authored first-wave roster.
 	m.begin_round()
 	return m
 
@@ -54,7 +55,7 @@ func _initialize() -> void:
 		counts[Catalog.ITEMS[offers[0]].rarity] += 1
 		for id in offers: check(not Catalog.ITEMS[id].get("fusion",false),"Fusion relics never drop directly")
 	for tier in range(5): check(absf(counts[tier]/120.0-Catalog.RARITY_WEIGHTS[tier]) < 1.5,"Drop rarity matches specified probability")
-	check(Catalog.ITEMS.size() == 108,"All 108 relic definitions exist")
+	check(Catalog.ITEMS.size() == 109,"All 109 relic definitions exist")
 	for id in ["heart","bracelet","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","codex_page"]:
 		check(m.acquire_relic(id),"Acquire " + id)
 	check(not m.acquire_relic("heart"),"Relics are unique")
@@ -182,7 +183,7 @@ func chest_checks() -> void:
 	for legacy_curse_weight in [false,true]:
 		var m = fresh()
 		m.acquire_relic("heart")
-		m.reroll_progress = 10
+		m.reroll_progress = 20
 		m.reward_weights = [0,0 if legacy_curse_weight else 1,1 if legacy_curse_weight else 0,0,0,0,0]
 		var rewards: Array = m.open_chest()
 		var locked: Dictionary = m.chest_relics.duplicate()

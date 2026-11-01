@@ -71,7 +71,8 @@ func run() -> void:
 	check(game.debug_repeat and game.debug_choice == 2 and not game.debug_open, "Debug touch queues repeating pair")
 	game.model.statuses[2].count = 2
 	tap(game._status_rect(2).get_center())
-	check(game.selected_status == 2, "Active status descriptions available without hover")
+	check(game.tarot_feedback.inspection.opened and game.tarot_feedback.inspection.status_id == 2, "Active status descriptions available without hover")
+	tap(game.tarot_feedback.inspection.close_rect().get_center())
 	game.model.statuses[2].count = 0
 	touch(game.DICE_CENTER, true)
 	var pending: MultiHitSkill = game.model.pending.duplicate(true)

@@ -13,21 +13,24 @@ func check(ok: bool, label: String) -> void:
 
 ## Equal enemy identities and levels have equal stats anywhere in the campaign.
 func scaling() -> void:
-	for role in range(Enemy.ITEMS.size()):
+	for role in Enemy.ITEMS:
 		for elite in [false,true]:
 			var base: Dictionary = Enemy.make(role,1,elite)
-			check(base.hp == Enemy.ITEMS[role].hp[int(elite)] and base.damage == Enemy.ITEMS[role].damage[int(elite)],"Level one preserves catalog base stats")
+			var data: Dictionary = Enemy.ITEMS[role]
+			var elite_factor: float = 1.5 if elite and data.get("standard_elite",false) else 1.0
+			var boss_hp: float = Enemy.BossBalance.health_scale(data.name,1) if data.get("boss",false) else 1.0
+			check(base.hp == roundi(data.hp[int(elite)]*elite_factor*boss_hp) and base.damage == roundi(10.0*base.damage_percent),"Level one applies explicit elite/percentage/boss budgets once")
 			var previous := base
 			for level in range(2,16):
 				var current: Dictionary = Enemy.make(role,level,elite)
 				check(current.level == level and current.hp > previous.hp and current.damage >= previous.damage,"HP increases and rounded damage never falls")
 				check(Enemy.soul_reward(current) >= Enemy.soul_reward(previous) and Enemy.crystal_reward(current) >= Enemy.crystal_reward(previous),"Both drop currencies scale monotonically")
-				check(float(current.hp)/base.hp > float(current.damage)/base.damage,"Health grows faster than unavoidable damage")
+				check((current.hp+0.5)/base.hp > float(Enemy.Damage.base_hit(current,1))/base.damage,"Health grows faster than unavoidable damage, allowing half a point of HP rounding")
 				previous = current
 	var early: Dictionary = Enemy.make(Enemy.Role.VANGUARD,5)
-	check(early.hp == 214 and early.damage == 8 and Enemy.soul_reward(early) == 7 and Enemy.crystal_reward(early) == 7,"Level-five Vanguard has independently verified stats and drops")
+	check(early.hp == 127 and early.damage == 110 and Enemy.soul_reward(early) == 7 and Enemy.crystal_reward(early) == 7,"Level-five Vanguard has independently verified stats and drops")
 	var late: Dictionary = Enemy.make(Enemy.Role.VANGUARD,10)
-	check(late.hp == 795 and late.damage == 10 and Enemy.soul_reward(late) == 10 and Enemy.crystal_reward(late) == 10,"Level-ten Vanguard uses one final rounding per value")
+	check(late.hp == 244 and late.damage == 110 and Enemy.soul_reward(late) == 9 and Enemy.crystal_reward(late) == 10,"Level-ten Vanguard uses one final rounding per value")
 	check(Enemy.make(0,-5) == Enemy.make(0,1),"Invalid low levels normalize to the level-one baseline")
 	check(Waves.create(-1,RandomNumberGenerator.new()).is_empty() and Waves.create(Waves.CITY_STAGE,RandomNumberGenerator.new()).is_empty(),"Out-of-range and dormant city encounters have no authored roster")
 
@@ -43,48 +46,46 @@ func payouts() -> void:
 		check(gems == [5,7] and souls == [5,7],"Mixed enemy levels pay their own gems and souls, not the stage's level")
 		m.hit_enemy(0,99999,true); m.hit_enemy(1,99999,true)
 		check(gems.size() == 2 and souls.size() == 2 and m.blood_gems == 12,"Re-hitting corpses cannot duplicate either reward")
-	var m = Run.new(50); m.load_debug_wave(10)
-	check(m.enemies[0].level == 5 and m.enemies[0].hp == 2142 and m.enemies[0].damage == 23,"First boss is level five")
+	var m = Run.new(50); m.load_debug_wave(8)
+	var commander: Dictionary = m.enemies[0]
+	check(commander.level == 5 and commander.hp == Enemy.phase_health(commander,1),"First boss has its independent health budget")
 	m.hit_enemy(0,99999,true)
-	check(m.enemies[0].hp == 3142 and m.enemies[0].level == 5 and m.blood_gems == 0,"Phase two recomputes its own base HP once and pays no premature reward")
-	check(m.enemies.slice(1).all(func(e): return e.level == 2 and e.hp == 520 and e.damage == 19 and Enemy.soul_reward(e) == 22 and Enemy.crystal_reward(e) == 11),"Boss summons use their explicit lower support level for stats and drops")
+	check(commander.hp == Enemy.phase_health(commander,2) and m.blood_gems == 0,"Phase two restores its budget without premature loot")
+	check(m.enemies.slice(1).all(func(e): return e.level == 1 and e.hp == 40),"Commander reinforcements use their smaller encounter budget")
 	m.hit_enemy(0,99999,true)
-	check(m.blood_gems == 21,"Boss's final death grants level-scaled gems once")
+	check(m.blood_gems == Enemy.crystal_reward(commander),"Boss final death pays its level-scaled gems once")
 
 ## Introduce one new identity at a time, without shops skipping its learning encounter.
 func rosters() -> void:
 	var seen: Dictionary = {}
-	var mixed := 0
 	for stage in range(Run.PLAYABLE_WAVES):
 		var row: Dictionary = Waves.SQUADS[stage]
 		var new_types: Array = []
 		var levels: Array = []
 		for entry in row.units:
-			var key := "%d:%s" % [entry.role,entry.get("elite",false)]
+			var key := str(entry.role) if Enemy.ITEMS[entry.role].get("standard_elite",false) else "%d:%s" % [entry.role,entry.get("elite",false)]
 			if not seen.has(key) and key not in new_types: new_types.append(key)
 			if entry.get("elite",false) and not Enemy.ITEMS[entry.role].get("boss",false):
-				check(seen.has("%d:false" % entry.role),"An elite always follows an earlier normal version")
+				check(seen.has(str(entry.role)) if Enemy.ITEMS[entry.role].get("standard_elite",false) else seen.has("%d:false" % entry.role),"An elite always follows an earlier normal version")
 			if entry.level not in levels: levels.append(entry.level)
 		check(new_types.size() <= 1,"No wave introduces two unfamiliar enemy identities")
 		check(row.units.size() <= 4,"Authored squads stay small enough to read")
 		if not new_types.is_empty():
 			check(Waves.requires_combat(stage),"First appearance cannot be replaced by a shop")
 			for key in new_types: seen[key] = true
-		if levels.size() > 1: mixed += 1
 		for seed_value in range(8):
 			var rng := RandomNumberGenerator.new(); rng.seed = seed_value
 			var actual: Array = Waves.create(stage,rng).map(func(e): return "%d:%d:%s" % [e.role,e.level,e.elite])
 			var expected: Array = row.units.map(func(e): return "%d:%d:%s" % [e.role,e.level,e.get("elite",false)])
 			actual.sort(); expected.sort()
 			check(actual == expected,"Seeds can change positions, never authored identities or levels")
-			if stage > 0 and stage % 10 != 0:
+			if stage > 0 and stage % 8 != 0:
 				var m = Run.new(seed_value); m.load_debug_wave(stage)
 				for e in m.enemies: e.hp = 0
-				m.wave_reward_resolved = true; m.battles_since_shop = 20
+				m.wave_reward_resolved = true
 				var options: Array = m.offer_routes()
-				if Waves.requires_combat(stage): check("shop" not in options,"Natural route choices preserve onboarding encounters")
-	check(mixed >= 10,"Mixed-level waves are used throughout all three levels")
-	check(seen.size() == 13,"All five normal/elite identities and all three bosses appear")
+				if not Waves.has_shop_after(m.stage): check("shop" not in options,"Shops appear only after scheduled checkpoints")
+	check(seen.size() == 12,"Five basic classes, four specials and three bosses appear")
 	var session = Session.new(50)
 	session.model.enemies = [Enemy.make(0,1),Enemy.make(0,5)]
 	var state: Dictionary = session.snapshot()

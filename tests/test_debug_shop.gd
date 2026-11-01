@@ -21,7 +21,7 @@ func economy() -> void:
 		check(m.shop.can_buy(m,slot),"Debug accepts relic, tarot and soul-bottle purchases with seven gems")
 		check(not m.shop.buy(m,slot).is_empty() and m.blood_gems == 7,"Purchase grants its reward without spending real gems")
 	check(m.shop.buy(m,0).is_empty(),"Unlimited money still respects sold stock")
-	for i in range(70): check(m.shop.refresh(m) and m.blood_gems == 7,"Repeated debug refreshes never require money")
+	for i in range(120): check(m.shop.refresh(m) and m.blood_gems == 7,"Repeated debug refreshes never require money")
 	check(m.shop.refresh_price == 0x7FFFFFFFFFFFFFFF,"Refresh price remains bounded after many refreshes")
 	m.shop.close()
 	check(not m.shop.debug_unlimited and not m.shop.can_afford(m,100),"Leaving removes unlimited spending")
@@ -30,11 +30,11 @@ func economy() -> void:
 
 ## Count complete six-item shelves, including the guaranteed Rare, against the target mix.
 func rarity_curve() -> void:
-	check(Stock.rarity_weights(1) == Stock.rarity_weights(4),"Early debug shops retain starting odds")
-	check(Stock.rarity_weights(4) == [58.0,30.0,10.0,1.0,1.0],"First possible shop uses base rarity odds")
+	check(Stock.rarity_weights(1) == Stock.rarity_weights(3),"Early debug shops retain starting odds")
+	check(Stock.rarity_weights(3) == [58.0,30.0,10.0,1.0,1.0],"First possible shop uses base rarity odds")
 	check(Stock.rarity_weights(1000).all(func(w): return absf(w-20) < 0.001),"All five rarities converge to twenty percent")
 	var m = Run.new(910)
-	for wave in [4,10,20,30]:
+	for wave in [3,10,20,30]:
 		m.stage = wave-1
 		var expected: Array = Stock.rarity_weights(wave)
 		var counts := [0,0,0,0,0]
@@ -65,7 +65,7 @@ func scene(phone: bool) -> void:
 	var phase: String = g.view_phase
 	var old_stock = g.model.shop
 	var enemies: Array = g.model.enemies.duplicate(true)
-	g._open_debug()
+	g._open_debug(); g._handle_menu_page_click(g.debug_page.tab_rect(1).get_center())
 	check(Rect2(Vector2.ZERO,g.fx.canvas_size).encloses(g.DEBUG_SHOP),"Debug shortcut fits the screen")
 	check(not g.DEBUG_SHOP.intersects(g._debug_option_rect(-1)),"Shop shortcut does not cover the random-dice button")
 	await capture(g,"menu-"+str(phone))
@@ -82,7 +82,7 @@ func scene(phone: bool) -> void:
 	await process_frame
 	check(g.view_phase == phase and not g.shop_ui.visible and g.model.shop == old_stock,"Leaving returns to the exact original battle and stock")
 	check(not g.model.shop.debug_unlimited,"Normal shopping remains paid after debug closes")
-	g._open_debug(); g._handle_click(g.DEBUG_SHOP.get_center()); g._restart(1)
+	g._open_debug(); g._handle_menu_page_click(g.debug_page.tab_rect(1).get_center()); g._handle_click(g.DEBUG_SHOP.get_center()); g._restart(1)
 	await process_frame
 	check(g.view_phase != "shop" and not g.model.shop.active and not g.model.shop.debug_unlimited,"Restart safely cancels an open debug shop")
 	g.queue_free(); await process_frame

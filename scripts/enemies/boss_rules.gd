@@ -1,13 +1,12 @@
 extends RefCounted
 ## Shared boss phases and cast-based interruption, independent of rendering and ticks.
 const Catalog = preload("res://scripts/enemies/enemy_catalog.gd")
-const Commander = preload("res://scripts/enemies/knight_commander.gd")
-const Fanatic = preload("res://scripts/enemies/fanatical_mage.gd")
-const Spellsword = preload("res://scripts/enemies/elf_spellsword.gd")
+const Behaviors = preload("res://scripts/enemies/enemy_behaviors.gd")
 
 ## Register a distinct committed skill or bonus cast, including a shield-blocked hit.
 static func skill_contact(model, index: int) -> void:
 	var enemy: Dictionary = model.enemies[index]
+	if Catalog.ITEMS[enemy.role].has("interrupt_shapes"): return
 	if not (enemy.get("boss",false) or Catalog.ITEMS[enemy.role].get("interruptible",false)) or not enemy.get("charging",false) or enemy.hp <= 0: return
 	var key: String = "%d:%d" % [index,enemy.get("boss_phase",0)]
 	if model.boss_cast_contacts.has(key): return
@@ -18,6 +17,7 @@ static func skill_contact(model, index: int) -> void:
 		return
 	enemy.charge = 0
 	enemy.charging = false
+	Behaviors.StraightInterrupt.clear(enemy)
 	enemy.break_marks = Catalog.ITEMS[enemy.role].break_casts
 	enemy.canceled = true
 	model.apply_enemy_status(index,model.Status.IMMOBILIZED,1,false)
@@ -50,6 +50,7 @@ static func enter_second_phase(model, index: int) -> bool:
 	enemy.shield = 0
 	enemy.charge = 0
 	enemy.charging = false
+	Behaviors.StraightInterrupt.clear(enemy)
 	enemy.break_marks = Catalog.ITEMS[enemy.role].break_casts
 	enemy.forced_charge = false
 	enemy.canceled = false
@@ -60,9 +61,7 @@ static func enter_second_phase(model, index: int) -> bool:
 	enemy.erase("statuses")
 	enemy.erase("potion_x_phase")
 	enemy.intent = {"skill":"rest","type":"rest","target":index,"amount":0,"name":"PHASE II"}
-	match enemy.role:
-		Catalog.Role.COMMANDER: Commander.enter_phase_two(model,index)
-		Catalog.Role.SPELLSWORD: Spellsword.enter_phase_two(model,index)
-		Catalog.Role.FANATIC: Fanatic.enter_phase_two(model,index)
+	Behaviors.phase_two(model,index)
+	model.RelicFocus.sync(model)
 	model.boss_changed.emit(index,"boss_phase")
 	return true

@@ -44,7 +44,7 @@ var hit_damage: int = -1
 var damage_ticks: int = 1
 
 func _ready() -> void:
-	z_index = 115
+	z_index = BattleLayers.DAMAGE_READOUT
 	battle.model.relic_activated.connect(_relic_activated)
 	clear()
 

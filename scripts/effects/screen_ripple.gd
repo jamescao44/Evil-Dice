@@ -1,5 +1,5 @@
 extends CanvasLayer
-## Capture the finished battle AND HUD before applying the ultimate shockwave.
+## Distort only the battlefield; the finished HUD remains untouched.
 const RippleShader = preload("res://scripts/effects/screen_ripple.gdshader")
 const DURATION := 1.15
 var battle
@@ -10,7 +10,7 @@ var surface: ColorRect
 var ripple_material: ShaderMaterial
 
 func _ready() -> void:
-	layer = 128
+	layer = BattleLayers.RIPPLE_CANVAS
 	capture = BackBufferCopy.new()
 	capture.copy_mode = BackBufferCopy.COPY_MODE_DISABLED
 	add_child(capture)
@@ -39,12 +39,16 @@ func _process(delta: float) -> void:
 	_update_surface()
 
 func _update_surface() -> void:
-	var active: bool = age < DURATION and not battle._menus_open() and battle.inspecting_enemy < 0
+	var active: bool = age < DURATION and battle.BattlefieldRender.overlays_visible(battle)
 	surface.visible = active
 	capture.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT if active else BackBufferCopy.COPY_MODE_DISABLED
 	if not active: return
 	var size: Vector2 = Vector2(get_window().get_meta("design_size", Vector2i(1280, 800)))
-	surface.size = size
+	surface.position = battle.global_position+battle.ARENA.position
+	surface.size = battle.ARENA.size
+	var clip_start: Vector2 = battle.get_global_transform_with_canvas()*battle.ARENA.position
+	var clip_end: Vector2 = battle.get_global_transform_with_canvas()*battle.ARENA.end
+	ripple_material.set_shader_parameter("clip_uv",Vector4(clip_start.x/size.x,clip_start.y/size.y,clip_end.x/size.x,clip_end.y/size.y))
 	# Both the sampled image and the impact follow the battle's camera shake.
 	var screen_origin: Vector2 = battle.get_global_transform_with_canvas() * origin
 	ripple_material.set_shader_parameter("origin", screen_origin / size)

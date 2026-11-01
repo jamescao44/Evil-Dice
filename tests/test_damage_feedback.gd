@@ -18,7 +18,7 @@ func _initialize() -> void: call_deferred("run")
 func hit_display_checks() -> void:
 	check(Battle.DamageFeedback.number(5.01) == "6" and Battle.DamageFeedback.number(5.0) == "5", "Base display rounds upward without changing whole values")
 	check(Battle.DamageFeedback.number(1.25,true) == "1.25", "Multiplier display retains its decimal precision")
-	for sample in [[0,24],[1,24],[20,24],[200,30],[2000,36],[20000,38]]:
+	for sample in [[0,30],[1,30],[20,30],[200,38],[2000,45],[20000,48]]:
 		check(Battle.Effects.damage_font_size(sample[0]) == sample[1],"Damage font follows log10 with a regular-size floor")
 	for sample in [[0,0],[99,0],[100,0],[1000,4],[10000,8],[100000000,12]]:
 		check(is_equal_approx(Battle.DamageFeedback.damage_tremble_amplitude(sample[0]),sample[1]),"Damage tremble has a silent threshold, logarithmic growth, and readable cap")
@@ -78,7 +78,7 @@ func hit_display_checks() -> void:
 		m.city_hp = 1
 		m.set_test_roll(values)
 		var expected: int = 75 if values[0] == 1 else 2000
-		check(m.damage_caption(m.pending) == "%d + 0 (x1)" % expected,"City previews retain full damage at one remaining HP")
+		check(m.damage_caption(m.pending) == GameText.format("%s damage",str(expected)),"City previews retain full damage at one remaining HP")
 		hit = m.apply_player_step()[0]
 		check(hit.amount == 1 and hit.display_amount == expected and not hit.instant_kill and m.city_hp == 0,"City 111 and 666 remain numeric attacks on the killing blow")
 	for city in [false,true]:
@@ -266,7 +266,7 @@ func scene_checks(portrait: bool) -> void:
 	g.view_phase = "resolving"
 	var panel = g.damage_feedback
 	g._show_events([Rules.damage_event(0,1,1234)])
-	check(g.fx.floats.back().text == "-1234" and g.fx.floats.back().size == 35,"Battle renderer uses full hit damage for both the number and its logarithmic size")
+	check(g.fx.floats.back().text == "-1234" and g.fx.floats.back().size == 43,"Battle renderer uses full hit damage for both the number and its logarithmic size")
 	if "--visual" in OS.get_cmdline_user_args():
 		g.fx.floating(g._player_point()-Vector2(0,45),"-10",g.RED,g.fx.damage_font_size(10))
 		await capture(g,"hit-sizes")
@@ -474,7 +474,8 @@ func sustained_total_checks() -> void:
 			m.begin_round()
 			var skill: MultiHitSkill = m.Patterns.classify(range(1,length+1))
 			var ticks: int = 5 if length == 5 else 10
-			check(m.damage_caption(skill) == (("35 + 0 (x1)" if level == 1 else "40 + 0 (x1)") if length == 5 else ("100 + 0 (x1)" if level == 1 else "110 + 0 (x1)")),"Held sustained skill shows full damage without premature Storm ignition")
+			var expected: int = (35 if level == 1 else 40) if length == 5 else (100 if level == 1 else 110)
+			check(m.damage_caption(skill) == GameText.format("%s damage",str(expected))+GameText.format(" (%d hits)",ticks),"Sustained skill preview shows total damage and its hit count")
 			var total: int = m.skill_damage_total(skill,0)
 			var state: int = m.rng.state
 			g.model = m

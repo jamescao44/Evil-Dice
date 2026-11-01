@@ -1,7 +1,8 @@
 extends RefCounted
 ## Shared combination rules and tuning for selection, combat and help previews.
 const Skill = preload("res://scripts/combat/multi_hit_skill.gd")
-const BONUS_TURN_HELP := "Use all six dice in skills: bonus turn with three rolls. Automatic attacks and leftover healing do not count."
+const Auto = preload("res://scripts/combat/flamelings_auto.gd")
+const TURN_HELP := "One throw + four single-die rerolls. One straight skill per turn."
 
 ## Only three or more consecutive unique faces can summon a skill.
 static func has_combination(values: Array) -> bool:
@@ -27,7 +28,7 @@ static func automatic_groups(values: Array, indices: Array) -> Array:
 	for face in range(6,0,-1):
 		var sources: Array = indices.filter(func(i): return values[i] == face)
 		if sources.size() < 2: continue
-		var skill := Skill.new(Skill.Kind.NORMAL,face,sources.map(func(_i): return face),sources.size())
+		var skill := Skill.new(Skill.Kind.NORMAL,face,sources.map(func(_i): return face),Auto.profile(sources.size()).uses)
 		skill.pattern = "match_auto"
 		skill.amplifier_locked = true
 		groups.append({"skill":skill,"indices":sources})
@@ -45,7 +46,7 @@ static func can_extend(values: Array, available: Array) -> bool:
 			if values.all(func(face): return face in straight) and straight.all(func(face): return face in available): return true
 	return false
 
-## Leftovers form one internal healing action, with no summoned skill bubble.
+## Leftovers form an internal turn-ending action, with no summoned skill bubble.
 static func cleanup(values: Array) -> MultiHitSkill:
 	if values.is_empty(): return Skill.new()
 	var skill := Skill.new(Skill.Kind.NORMAL,0,values)
@@ -63,8 +64,9 @@ static func help_entries(straights: bool, evolution: int = 0) -> Array:
 			entries.append({"name":caption.name,"text":caption.description})
 		return entries
 	return [
-		{"name":"Matching Auto Attacks","text":"2+ matching dice: one random-target hit per die. Each hit = base x (0.5 + 0.05 x pip)."},
-		{"name":"Five Alike","text":"Five linked dice form a pentagon and fire 5 random-target laser hits, each dealing 4x auto-attack damage."},
-		{"name":"Six Alike","text":"Six linked dice form a hexagon and fire one huge beam: 6 hits to all enemies, each dealing 8x auto-attack damage."},
-		{"name":"Dice Stay Available","text":"Dice stay usable. Reroll unused dice up to 3 times per turn. Leftovers heal 1% HP per pip."},
+		{"name":"Two Alike","text":"2 random shots. Each hit: base x (0.5 + 0.05 x pip)."},
+		{"name":"Three Alike","text":"One explosive fireball at 6x auto-attack damage. Applies 2 Burning."},
+		{"name":"Four Alike","text":"One fiery eruption hits all enemies at 8x auto-attack damage."},
+		{"name":"Five Alike","text":"5 random laser hits, each at 4x auto-attack damage."},
+		{"name":"Six Alike","text":"One huge beam hits all enemies 6 times, each at 8x auto-attack damage."},
 	]

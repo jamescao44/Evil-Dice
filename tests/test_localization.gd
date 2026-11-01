@@ -52,7 +52,7 @@ func catalog_checks() -> void:
 				check(font.fallbacks[0].has_char(character.unicode_at(0)),"Bundled font covers "+character)
 	check(GameText.lines("Alpha\nBeta",font,22,500) == PackedStringArray(["Alpha","Beta"]),"Explicit newlines retain later description paragraphs")
 	var ring_text: String = Relics.short_description("witch_ghost",GameText.text)
-	check(GameText.lines(ring_text,font,22,500).has("（套装：残骸）"),"Chinese set hint remains visible after the effect description")
+	check(GameText.lines(ring_text,font,22,500).has("（套装：残骸 0/6）"),"Chinese set progress remains visible after the effect description")
 	var sources: Array = [Rules.NORMAL_NAME]
 	for group in [Rules.PAIR_NAMES,Rules.PAIR_TEXT,Rules.SPECIAL_NAMES,Rules.SPECIAL_TEXT,Rules.CITY_SPECIAL_TEXT,Home.TABS]: sources.append_array(group)
 	for entry in Relics.ITEMS.values()+Statuses.ENTRIES.values()+Rewards.ITEMS:

@@ -57,7 +57,7 @@ func scene(portrait: bool) -> void:
 	check(g.fx.feeds.is_empty() and g.model.roll_attacks[0].skill.uses_spent == 0,"Brief matching bounce has no charging orbs or early damage")
 	await capture("match-bounce-"+str(portrait))
 	check(await until(func(): return g.fx.spell.has("flame_tier")),"Player launches auto attack after the matching bounce")
-	check(g.fx.spell.from.distance_to(g._player_point()) < 1,"Auto attack launches from player instead of dice")
+	check(g.fx.spell.world_from.distance_to(g.battlefield_view.transform.affine_inverse()*g._player_cast_point()) < 2,"Auto attack launches from the animated player hand instead of dice")
 	check(g.combat_motion.attacks.has(-1),"Player bobs when firing")
 	await capture("auto-"+str(portrait))
 	check(await until(func(): return g.view_phase == "ready"),"Roll attacks finish and restore dice interaction")
@@ -73,26 +73,21 @@ func scene(portrait: bool) -> void:
 	for face in [1,2,3]: tap(g,g.DICE_POSITIONS[g.model.dice_turn.values.find(face)])
 	check(g.dice_selection.preview.dice.size() == 3,"Three connected dice preview Fireball")
 	await capture("selection-"+str(portrait))
-	tap(g,g.DICE_CENTER)
-	check(await until(func(): return g.view_phase == "skill"),"OK summons Fireball")
-	check(g._skill_needs_target() and g.skill_bubble.caption.name == "Fireball","Fireball shows its name and asks for a target")
 	var rolls_before: int = g.model.dice_turn.rolls_left
-	var start: Vector2 = g.skill_bubble.display_center()
-	var drop := Vector2(g.fx.canvas_size.x-12,g.DICE_CENTER.y+24)
-	check(not g.dice_selection.center_hit(drop) and g.dice_selection.skill_cancel_rect().has_point(drop),"Cancel zone spans beyond the old center target")
-	g._handle_click(start); g._handle_motion(drop); g._handle_release(drop)
-	check(g.model.pending.is_empty() and g.model.dice_turn.locked.is_empty(),"Wide-zone drop cancels and unlocks skill dice")
-	check(g.model.dice_turn.rolls_left == rolls_before,"Cancellation preserves remaining throws")
+	tap(g,g.dice_selection.cancel_rect().get_center())
+	check(g.model.pending.is_empty() and g.model.dice_turn.locked.is_empty(),"Deselect cancels before confirmation without spending dice")
+	check(g.model.dice_turn.rolls_left == rolls_before,"Selection cancellation preserves remaining throws")
 	for face in [1,2,3]: tap(g,g.DICE_POSITIONS[g.model.dice_turn.values.find(face)])
 	tap(g,g.DICE_CENTER)
-	check(await until(func(): return g.view_phase == "skill"),"Reformed Fireball is ready")
-	g._activate_skill(0)
+	check(g.view_phase in ["forming","resolving"],"Confirm immediately starts casting without a targeting step")
 	check(await until(func(): return g.fx.spell.has("flame_tier")),"Fireball uses new flame visuals")
-	check(is_equal_approx(g.fx.spell.scales[0],g.Effects.damage_scale(g.model.attack_damage(g.model.pending,0))),"Fireball visual scale follows its actual target damage")
+	check(is_equal_approx(g.fx.spell.scales[0],g.Effects.damage_scale(g.model.attack_damage(g.model.pending,g.model.pending.target))),"Fireball visual scale follows its actual target damage")
+	var random_target: int = g.model.pending.target
 	await capture("fireball-"+str(portrait))
 	check(await until(func(): return g.view_phase == "ready"),"Fireball finishes without ending the turn")
-	check(g.model.enemy_status_count(0,g.Status.BURNING) == 2,"Scene impact applies two Burning")
+	check(g.model.enemy_status_count(random_target,g.Status.BURNING) == 2,"Scene impact applies two Burning to its random target")
 	g.model.hp = 20
+	for i in g.model.dice_turn.unused(): g.model.gemstones.add("healing"); g.model.gemstones.equip(i,"healing")
 	var health_before: int = g.model.hp
 	g._end_dice_turn()
 	check(await until(func(): return not g.leftover_volley.flights.is_empty()),"Leftovers visibly return toward the player")
@@ -105,7 +100,12 @@ func scene(portrait: bool) -> void:
 		g._show_pending_skill(false)
 		g._activate_skill(-1)
 		check(await until(func(): return g.fx.spell.has("flame_tier") and g.fx.spell.flame_tier == length-2),"Higher tier uses its distinct fire effect")
-		while not g.fx.spell.is_empty() and 1-g.fx.spell.life/g.fx.spell.duration < 0.42: await process_frame
+		if length == 5:
+			while g.fx.spell.has("storm") and g.fx.spell.storm.age < g.fx.spell.storm.build_duration*0.7: await process_frame
+		elif length == 6:
+			while g.fx.spell.has("brimstone") and g.fx.spell.brimstone.age < g.Effects.Brimstone.BUILD_DURATION*0.7: await process_frame
+		else:
+			while not g.fx.spell.is_empty() and 1-g.fx.spell.life/g.fx.spell.duration < 0.42: await process_frame
 		await capture("tier-"+str(length)+"-"+str(portrait))
 		var observed := {"life":float(g.fx.spell.get("life",0)),"hp":int(g.model.enemies[0].hp),"ticks":0,"restarted":false}
 		check(await until(func():

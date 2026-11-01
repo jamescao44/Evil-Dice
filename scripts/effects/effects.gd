@@ -1,6 +1,10 @@
 extends Node2D
 ## Small reusable pixel effects; this RNG is deliberately separate from combat.
+const MatchBurst = preload("res://scripts/effects/match_burst.gd")
 const FlameSpell = preload("res://scripts/effects/flame_spell.gd")
+const FireStorm = preload("res://scripts/effects/fire_storm.gd")
+const FierySlash = preload("res://scripts/effects/fiery_slash.gd")
+const Brimstone = preload("res://scripts/effects/brimstone.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 var particles: Array = []
 var rings: Array = []
@@ -8,6 +12,7 @@ var floats: Array = []
 var damage_lanes: Dictionary = {}
 var flashes: Array = []
 var spell: Dictionary = {}
+var finishing_spells: Array = []
 var enemy_spells: Array = []
 var slashes: Array = []
 var sigils: Array = []
@@ -17,6 +22,12 @@ var skill: Dictionary = {}
 var perfect: Dictionary = {}
 var dice_power: Dictionary = {}
 var font: Font
+var battlefield_rect := Rect2()
+var battlefield_canvas: Node2D
+var damage_layer: CanvasLayer
+var damage_clip: Control
+var damage_canvas: Node2D
+var combat_text_visible: bool = true
 var cosmetic = RandomNumberGenerator.new()
 var reduced: bool = false
 var damage_stage: int = 0
@@ -27,6 +38,7 @@ var skill_anchor := Vector2(640, 280)
 var skill_max_width: float = 1200
 var combo_font_size: int = 64
 const FLOAT_FONT_SIZE := 24
+const DAMAGE_FONT_SIZE := 30
 const PERFECT_FONT_SIZE := 80
 const PAIR_FONT_SIZE := 52
 var ultimate_center := Vector2(927, 286)
@@ -34,44 +46,84 @@ var ultimate_scale: float = 1.0
 
 func _ready() -> void:
 	cosmetic.randomize()
+	# Above the ultimate ripple (128), with its own arena clip and camera tracking.
+	damage_layer = CanvasLayer.new()
+	damage_layer.name = "DamageNumbers"
+	damage_layer.layer = BattleLayers.DAMAGE_CANVAS
+	damage_layer.follow_viewport_enabled = true
+	add_child(damage_layer)
+	damage_clip = Control.new()
+	damage_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	damage_layer.add_child(damage_clip)
+	damage_canvas = Node2D.new()
+	damage_clip.add_child(damage_canvas)
+	damage_canvas.draw.connect(_draw_floats.bind(damage_canvas,true,true))
+	visibility_changed.connect(_sync_damage_layer)
+	_sync_damage_layer()
 
-func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160, size_scale: float = 1.0) -> void:
+## Keep the frontmost numbers clipped and hidden whenever the battle FX are hidden.
+func _sync_damage_layer() -> void:
+	if not is_instance_valid(damage_layer): return
+	damage_layer.visible = is_visible_in_tree() and combat_text_visible
+	damage_clip.position = global_position+battlefield_rect.position
+	damage_clip.size = battlefield_rect.size
+	damage_clip.clip_contents = battlefield_rect.has_area()
+	damage_canvas.position = -battlefield_rect.position
+	damage_canvas.queue_redraw()
+
+## Clip combat drawing separately so dice, cards and reward UI effects remain visible.
+func clip_battlefield(rect: Rect2) -> void:
+	battlefield_rect = rect
+	var clip := Control.new()
+	clip.name = "CombatEffectsClip"
+	clip.position = rect.position; clip.size = rect.size
+	clip.clip_contents = true
+	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(clip)
+	battlefield_canvas = Node2D.new()
+	battlefield_canvas.position = -rect.position
+	clip.add_child(battlefield_canvas)
+	battlefield_canvas.draw.connect(_draw_layer.bind(battlefield_canvas,true))
+	_sync_damage_layer()
+
+func burst(at: Vector2, color: Color, count: int = 24, strength: float = 160, size_scale: float = 1.0, ui_effect: bool = false) -> void:
 	for i in range(count):
 		var angle := cosmetic.randf_range(0, TAU)
 		var velocity := Vector2.from_angle(angle) * cosmetic.randf_range(strength * 0.25, strength)
-		particles.append({"p": at, "v": velocity, "color": color, "life": cosmetic.randf_range(0.4, 0.9), "max": 1.0, "size": cosmetic.randi_range(3, 7)*size_scale})
+		particles.append({"p": at, "v": velocity, "color": color, "life": cosmetic.randf_range(0.4, 0.9), "max": 1.0, "size": cosmetic.randi_range(3, 7)*size_scale,"ui":ui_effect})
 
 func ring(at: Vector2, color: Color, radius: float = 90.0, clip: Rect2 = Rect2()) -> void:
 	rings.append({"p": at, "color": color, "life": 0.55, "radius": radius, "clip":clip})
 
 ## Fixed level baselines give each chapter segment room to grow without tracking gear.
+const CampaignWaves = preload("res://scripts/progression/wave_catalog.gd")
 const DAMAGE_REFERENCES := [20.0,100.0,300.0]
 const DAMAGE_GROWTH := 0.25
 const ATTACK_SIZE_CAP := 1.4
 const NUMBER_SIZE_CAP := 1.6
 
 static func damage_scale(damage: int, stage: int = 0, cap: float = ATTACK_SIZE_CAP) -> float:
-	var reference: float = DAMAGE_REFERENCES[clampi(floori(stage/10.0),0,DAMAGE_REFERENCES.size()-1)]
+	var reference: float = DAMAGE_REFERENCES[clampi(floori(float(stage)/CampaignWaves.WAVES_PER_LEVEL),0,DAMAGE_REFERENCES.size()-1)]
 	return clampf(1.0+DAMAGE_GROWTH*log(maxf(1.0,damage/reference))/log(10.0),1.0,cap)
 
 static func damage_font_size(damage: int, stage: int = 0) -> int:
-	return roundi(FLOAT_FONT_SIZE*damage_scale(damage,stage,NUMBER_SIZE_CAP))
+	return roundi(DAMAGE_FONT_SIZE*damage_scale(damage,stage,NUMBER_SIZE_CAP))
 
-func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE) -> void:
-	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size})
+func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE, ui_effect: bool = false) -> void:
+	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size,"ui":ui_effect})
 
 ## Alternate launch sides per actor, with cosmetic variation and a short ballistic arc.
-func damage_number(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE, actor: int = -1) -> void:
+func damage_number(at: Vector2, text: String, color: Color, size: int = DAMAGE_FONT_SIZE, actor: int = -1) -> void:
 	if text.is_empty(): return
 	var side: int = damage_lanes.get(actor,1 if cosmetic.randf() < 0.5 else -1)
 	damage_lanes[actor] = -side
 	if at.x < 120: side = 1
 	elif at.x > canvas_size.x-120: side = -1
 	var movement: float = 0.25 if reduced else 1.0
-	var spread: float = clampf(sqrt(float(size)/FLOAT_FONT_SIZE),1.0,1.6)
+	var spread: float = clampf(sqrt(float(size)/DAMAGE_FONT_SIZE),1.0,1.6)
 	var velocity := Vector2(side*cosmetic.randf_range(150,250)*spread*0.65,cosmetic.randf_range(-380,-170))*movement
 	var offset := Vector2(cosmetic.randf_range(-9,9),cosmetic.randf_range(-5,4))*movement
-	floats.append({"p":at+offset,"text":text,"color":color,"life":1.15,"size":size,"velocity":velocity,"gravity":480.0*movement,"speed":1.2})
+	floats.append({"p":at+offset,"text":text,"color":color,"life":1.15,"size":size,"velocity":velocity,"gravity":480.0*movement,"speed":1.2,"damage":true})
 
 func reveal_combo(label: String, at: Vector2, color: Color) -> void:
 	combo = {"label": label, "p": at, "color": color, "age": 0.0}
@@ -105,9 +157,58 @@ func cast(face: int, from: Vector2, targets: Array, duration: float, track_targe
 			activate_circle(target + Vector2(0, 60), Color("efd394") if face == 6 else Color("c5a4de"), 70, duration,track_targets)
 
 ## Fire attacks reuse world tracking so camera zoom cannot detach their endpoints.
-func flame_cast(tier: int, from: Vector2, targets: Array, duration: float, damages: Array = []) -> void:
+func flame_cast(tier: int, from: Vector2, targets: Array, duration: float, damages: Array = [], feet: Array = [], health_bottoms: Array = []) -> void:
+	if tier == 3: duration = FireStorm.CAST_DURATION
+	elif tier == 4: duration = Brimstone.CAST_DURATION
 	spell = {"face":0,"flame_tier":clampi(tier,0,4),"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"scales":targets.map(func(_point): return 1.0)}
 	for i in range(mini(damages.size(),targets.size())): spell.scales[i] = damage_scale(damages[i],damage_stage)
+	if tier == 2: FierySlash.prepare(spell)
+	if tier == 3: FireStorm.prepare(spell,cosmetic)
+	if not feet.is_empty(): spell.world_feet = feet.map(func(point): return world_transform.affine_inverse()*point)
+	if not health_bottoms.is_empty(): spell.world_health_bottoms = health_bottoms.map(func(point): return world_transform.affine_inverse()*point)
+	if tier == 4: Brimstone.prepare(spell,canvas_size.y > canvas_size.x,cosmetic)
+
+## Automatic triple/quadruple effects retain the same camera tracking and battlefield clip.
+func match_cast(count: int, from: Vector2, targets: Array, feet: Array, duration: float, damages: Array) -> void:
+	spell = {"face":0,"match_count":count,"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"world_feet":feet.map(func(point): return world_transform.affine_inverse()*point),"scales":damages.map(func(damage): return damage_scale(damage,damage_stage))}
+
+## Share authored-sheet timing while keeping each effect's frame ranges independent.
+func flame_animation(cast_info: Dictionary):
+	if cast_info.has("fiery_slash"): return FierySlash
+	if cast_info.has("storm"): return FireStorm
+	if cast_info.has("brimstone"): return Brimstone
+	return null
+
+func flame_state() -> Dictionary:
+	return spell.get("fiery_slash",spell.get("storm",spell.get("brimstone",{})))
+
+## Six readable sways per second replace the high-frequency blur during damage loops.
+func flame_loop_shake() -> Vector2:
+	var state: Dictionary = flame_state()
+	if reduced or state.get("phase","") != "loop" or time_factor <= 0: return Vector2.ZERO
+	var duration: float = flame_animation(spell).LOOP_DURATION
+	var envelope: float = smoothstep(0,0.08,state.age)*smoothstep(0,0.1,duration-state.age)
+	var amplitude: float = 4.5 if spell.has("brimstone") else 1.5
+	return Vector2(sin(state.age*TAU*6),sin(state.age*TAU*7.5+0.8))*amplitude*envelope
+
+## Link authored loop frames to the first actual damage tick, not an estimated timer.
+func begin_flame_damage() -> void:
+	var animation = flame_animation(spell)
+	if animation != null: animation.begin_damage(spell)
+
+## Light up each damage pulse without restarting the storm's animation loop.
+func pulse_flame_damage() -> void:
+	var state: Dictionary = flame_state()
+	if not state.is_empty(): state.pulse = 1.0
+
+## Keep the closing frames alive even if the next skill begins immediately.
+func finish_flame_damage() -> void:
+	var animation = flame_animation(spell)
+	if animation != null:
+		animation.finish(spell)
+		finishing_spells.append(spell)
+		spell = {}
+	else: spell.erase("hold_damage")
 
 ## Enlarge sparks and their spread without multiplying particle counts or changing timing.
 func attack_burst(at: Vector2, color: Color, damage: int, count: int, strength: float) -> void:
@@ -118,8 +219,8 @@ func slash(at: Vector2, heavy: bool = false, damage: int = 0) -> void:
 	slashes.append({"p": at, "life": 0.38, "heavy": heavy, "flip": cosmetic.randi_range(0, 1) * 2 - 1,"scale":damage_scale(damage,damage_stage)})
 	attack_burst(at, Color("efc1ab"),damage,22 if heavy else 10,180)
 
-func activate_circle(at: Vector2, color: Color, radius: float = 90, duration: float = 0.8, track_world: bool = false) -> void:
-	var circle: Dictionary = {"p": at, "color": color, "radius": radius, "life": duration, "duration": duration}
+func activate_circle(at: Vector2, color: Color, radius: float = 90, duration: float = 0.8, track_world: bool = false, ui_effect: bool = false) -> void:
+	var circle: Dictionary = {"p": at, "color": color, "radius": radius, "life": duration, "duration": duration,"ui":ui_effect}
 	if track_world: circle.world_p = world_transform.affine_inverse()*at
 	sigils.append(circle)
 
@@ -137,6 +238,7 @@ func clear() -> void:
 	damage_lanes.clear()
 	flashes.clear()
 	spell.clear()
+	finishing_spells.clear()
 	enemy_spells.clear()
 	slashes.clear()
 	sigils.clear()
@@ -145,6 +247,7 @@ func clear() -> void:
 	skill.clear()
 	perfect.clear()
 	dice_power.clear()
+	_sync_damage_layer()
 
 func _process(delta: float) -> void:
 	var real_delta: float = delta
@@ -186,57 +289,88 @@ func _process(delta: float) -> void:
 		f.life -= real_delta
 	flashes = flashes.filter(func(f): return f.life > 0)
 	if not spell.is_empty():
-		spell.life -= delta
-		# Keep the damaging visual present if frame rounding delays a sustained spell's final tick.
-		if spell.get("hold_damage",false): spell.life = maxf(spell.life,spell.duration*0.1)
-		if spell.life <= 0:
-			spell = {}
+		var animation = flame_animation(spell)
+		if animation != null:
+			spell.life = maxf(spell.duration*0.1 if spell.get("hold_damage",false) else 0,spell.life-delta)
+			if animation.advance(spell,delta,reduced): spell = {}
+		else:
+			spell.life -= delta
+			# Keep the damaging visual present if frame rounding delays a sustained spell's final tick.
+			if spell.get("hold_damage",false): spell.life = maxf(spell.life,spell.duration*0.1)
+			if spell.life <= 0: spell = {}
+	finishing_spells = finishing_spells.filter(func(s): return not flame_animation(s).advance(s,delta,reduced))
+	_sync_damage_layer()
 	queue_redraw()
+	if is_instance_valid(battlefield_canvas): battlefield_canvas.queue_redraw()
 
 func _draw() -> void:
+	_draw_layer(self,false)
+	_draw_callouts()
+	_draw_dice_power()
+	if is_instance_valid(battlefield_canvas): battlefield_canvas.queue_redraw()
+
+## Tag UI emissions at creation; combat sparks remain clipped after drifting out of bounds.
+func _combat_effect(effect: Dictionary) -> bool:
+	return battlefield_rect.has_area() and not effect.get("ui",false)
+
+## Draw shared collections on either the combat clip or the unrestricted UI layer.
+func _draw_layer(canvas: CanvasItem, combat: bool) -> void:
 	for s in sigils:
+		if _combat_effect(s) != combat: continue
 		if s.has("world_p"): s.p = world_transform*s.world_p
 		var t: float = 1 - s.life / s.duration
 		var color: Color = Color(s.color, minf(1, s.life * 5) * 0.85)
 		var radius: float = s.radius * minf(1, t * 5 + 0.25)
-		Pixel.circle(self, s.p, radius, color, 3)
-		Pixel.circle(self, s.p, radius * 0.8, Color(color, color.a * 0.5), 2)
+		Pixel.circle(canvas, s.p, radius, color, 3)
+		Pixel.circle(canvas, s.p, radius * 0.8, Color(color, color.a * 0.5), 2)
 		for i in range(6):
 			var angle: float = i * TAU / 6 + (0 if reduced else t * 0.7)
 			var a: Vector2 = s.p + Vector2.from_angle(angle) * radius * 0.7
 			var b: Vector2 = s.p + Vector2.from_angle(angle + TAU / 3) * radius * 0.7
-			Pixel.line(self, a, b, color, 2)
+			Pixel.line(canvas, a, b, color, 2)
 			var p: Vector2 = s.p + Vector2.from_angle(angle) * radius
-			Pixel.line(self, p - Vector2(0, 6), p + Vector2(0, 6), color, 3)
+			Pixel.line(canvas, p - Vector2(0, 6), p + Vector2(0, 6), color, 3)
 	for f in feeds:
+		if _combat_effect(f) != combat: continue
 		var t: float = clampf(1 - f.life / f.duration, 0, 1)
 		var p: Vector2 = f.from.lerp(f.to, t * t)
 		p.y -= sin(t * PI) * (75 + f.bend)
-		draw_rect(Rect2(p.snapped(Vector2.ONE * 3), Vector2(6, 6)), Color("c86e79"))
-		draw_rect(Rect2(p.snapped(Vector2.ONE * 3) + Vector2(0, 0), Vector2(3, 3)), Color("f4b8b4"))
-	if not spell.is_empty():
-		_draw_spell(spell)
-	for effect in enemy_spells:
-		_draw_spell(effect)
+		canvas.draw_rect(Rect2(p.snapped(Vector2.ONE * 3), Vector2(6, 6)), Color("c86e79"))
+		canvas.draw_rect(Rect2(p.snapped(Vector2.ONE * 3) + Vector2(0, 0), Vector2(3, 3)), Color("f4b8b4"))
+	if combat == battlefield_rect.has_area():
+		for finish in finishing_spells: _draw_spell(finish,canvas)
+		if not spell.is_empty(): _draw_spell(spell,canvas)
+		for effect in enemy_spells: _draw_spell(effect,canvas)
 	for s in slashes:
+		if _combat_effect(s) != combat: continue
 		var t: float = 1 - s.life / 0.38
-		draw_set_transform(s.p,0,Vector2.ONE*s.scale)
+		canvas.draw_set_transform(s.p,0,Vector2.ONE*s.scale)
 		for i in range(3 if s.heavy else 2):
 			var a := Vector2(-45 * s.flip + i * 14, 38 - i * 8)
 			var b := Vector2(45 * s.flip + i * 14, -48 - i * 8)
 			var end: Vector2 = a.lerp(b, minf(1, t * 4))
 			var start: Vector2 = a.lerp(b, maxf(0, (t - 0.25) * 1.33))
-			Pixel.line(self, start + Vector2(4, 4), end + Vector2(4, 4), Color("9b5475"), 8)
-			Pixel.line(self, start, end, Color("fff1c5"), 4)
-		draw_set_transform(Vector2.ZERO)
+			Pixel.line(canvas, start + Vector2(4, 4), end + Vector2(4, 4), Color("9b5475"), 8)
+			Pixel.line(canvas, start, end, Color("fff1c5"), 4)
+		canvas.draw_set_transform(Vector2.ZERO)
 	for r in rings:
+		if _combat_effect(r) != combat: continue
 		var progress: float = 1 - r.life / 0.55
-		Pixel.circle(self, r.p, 10 + progress * r.radius, Color(r.color, (1 - progress) * 0.8), 3, r.clip)
+		Pixel.circle(canvas, r.p, 10 + progress * r.radius, Color(r.color, (1 - progress) * 0.8), 3, r.clip)
 	for p in particles:
-		draw_rect(Rect2(p.p.snapped(Vector2(2, 2)), Vector2.ONE * p.size), Color(p.color, minf(1, p.life * 2)))
+		if _combat_effect(p) != combat: continue
+		canvas.draw_rect(Rect2(p.p.snapped(Vector2(2, 2)), Vector2.ONE * p.size), Color(p.color, minf(1, p.life * 2)))
 	for f in flashes:
-		draw_rect(Rect2(Vector2.ZERO, canvas_size), Color(f.color, f.life / 0.22 * f.amount))
+		if _combat_effect(f) != combat: continue
+		canvas.draw_rect(Rect2(Vector2.ZERO, canvas_size), Color(f.color, f.life / 0.22 * f.amount))
+	_draw_floats(canvas,combat,false)
+
+## Damage labels render above every battle effect with a dark four-sided outline.
+func _draw_floats(canvas: CanvasItem, combat: bool, damage: bool) -> void:
+	if font == null: return
 	for f in floats:
+		if f.get("damage",false) != damage: continue
+		if not damage and _combat_effect(f) != combat: continue
 		var alpha: float = minf(1, f.life * 3)
 		var translated := GameText.text(f.text)
 		var size: int = f.get("size",FLOAT_FONT_SIZE)
@@ -245,10 +379,12 @@ func _draw() -> void:
 			size = maxi(1,floori(size*(canvas_size.x-32)/width))
 			width = font.get_string_size(translated,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 		var point := Vector2(clampf(f.p.x-width/2,16,canvas_size.x-width-16),maxf(font.get_ascent(size)+8,f.p.y)).snapped(Vector2.ONE*2)
-		draw_string(font, point + Vector2(2, 2), translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.02, 0.04, 0.07, alpha))
-		draw_string(font, point, translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(f.color, alpha))
-	_draw_callouts()
-	_draw_dice_power()
+		if damage:
+			for offset in [Vector2(-2,0),Vector2(2,0),Vector2(0,-2),Vector2(0,2)]:
+				canvas.draw_string(font,point+offset,translated,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Color(0.04,0.025,0.035,alpha))
+		canvas.draw_string(font, point + Vector2(2, 2), translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.02, 0.04, 0.07, alpha))
+		canvas.draw_string(font, point, translated, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(f.color, alpha))
+
 
 func _draw_dice_power() -> void:
 	if dice_power.is_empty(): return
@@ -346,12 +482,18 @@ func projected_spell(cast_info: Dictionary) -> Dictionary:
 	var projected: Dictionary = cast_info.duplicate()
 	if cast_info.has("world_from"): projected.from = world_transform*cast_info.world_from
 	if cast_info.has("world_targets"): projected.targets = cast_info.world_targets.map(func(point): return world_transform*point)
+	if cast_info.has("world_feet"): projected.feet = cast_info.world_feet.map(func(point): return world_transform*point)
+	# Only move the grounded anchor with the camera; the pillar's dimensions stay fixed.
+	if cast_info.has("world_brimstone_anchor"): projected.brimstone_anchor = world_transform*cast_info.world_brimstone_anchor+Vector2(0,Brimstone.FLOOR_PADDING)
 	return projected
 
-func _draw_spell(cast_info: Dictionary) -> void:
+func _draw_spell(cast_info: Dictionary, canvas: CanvasItem) -> void:
 	cast_info = projected_spell(cast_info)
+	if cast_info.has("match_count"):
+		MatchBurst.paint(canvas,cast_info,reduced)
+		return
 	if cast_info.has("flame_tier"):
-		FlameSpell.paint(self,cast_info,reduced)
+		FlameSpell.paint(canvas,cast_info,reduced)
 		return
 	var progress: float = 1 - cast_info.life / cast_info.duration
 	var strength: float = sin(progress * PI)
@@ -361,39 +503,52 @@ func _draw_spell(cast_info: Dictionary) -> void:
 		var tint: Color = [Color("eee0b9"), Color("82dfff"), Color("ff9955"), Color("ffe388"), Color("c18ce8"), Color("8ad26a"), Color("93899e")][attribute]
 		var target: Vector2 = cast_info.targets[0]
 		var head: Vector2 = cast_info.from.lerp(target, minf(1, progress * 1.6))
-		if cast_info.role in [0,3,5,6]:
-			Pixel.line(self, target + Vector2(-32, 46) * strength, target + Vector2(32, -46) * strength, tint, 6)
+		if cast_info.role == preload("res://scripts/enemies/enemy_catalog.gd").Role.MAGIC_CANNON:
+			var beam_end: Vector2 = cast_info.from.lerp(target,minf(1,progress*2.5))
+			Pixel.line(canvas,cast_info.from,beam_end,Color("d1a0ff",strength*0.25),26)
+			Pixel.line(canvas,cast_info.from,beam_end,Color("b276ef",strength),12)
+			Pixel.line(canvas,cast_info.from,beam_end,Color("fff1ff",strength),5)
+			Pixel.circle(canvas,cast_info.from,20*strength,Color("e4beff"),3)
+		elif cast_info.role == preload("res://scripts/enemies/enemy_catalog.gd").Role.BOMBER:
+			var travel: float = minf(1,progress*1.4)
+			var bomb: Vector2 = cast_info.from.lerp(target,travel)+Vector2(0,-sin(travel*PI)*70)
+			Pixel.disc(canvas,bomb,17,Color("ff9f3f",strength*0.4),3)
+			Pixel.disc(canvas,bomb,11,Color("30303d"),3)
+			Pixel.circle(canvas,bomb,11,Color("9d8c81"),2)
+			Pixel.line(canvas,bomb+Vector2(3,-10),bomb+Vector2(7,-17),Color("fff0a1"),3)
+		elif cast_info.role in [0,3,5,6]:
+			Pixel.line(canvas, target + Vector2(-32, 46) * strength, target + Vector2(32, -46) * strength, tint, 6)
 		elif cast_info.role == 1:
-			Pixel.line(self, head, head + Vector2(42, -2), tint, 3)
-			Pixel.line(self, head + Vector2(9, -9), head, tint.lightened(0.3), 3)
-			Pixel.line(self, head + Vector2(9, 9), head, tint.lightened(0.3), 3)
+			Pixel.line(canvas, head, head + Vector2(42, -2), tint, 3)
+			Pixel.line(canvas, head + Vector2(9, -9), head, tint.lightened(0.3), 3)
+			Pixel.line(canvas, head + Vector2(9, 9), head, tint.lightened(0.3), 3)
 		else:
-			Pixel.disc(self, head, 12, tint if attribute else Color("c5a4de"), 4)
-			Pixel.circle(self, head, 20, tint.lightened(0.3), 3)
+			Pixel.disc(canvas, head, 12, tint if attribute else Color("c5a4de"), 4)
+			Pixel.circle(canvas, head, 20, tint.lightened(0.3), 3)
 		return
 	if cast_info.face == 6:
 		color = Color("efd394")
 		# An abyssal seal opens over the squad; pale tendrils tear through it.
 		var center := ultimate_center
 		var radius: float = 164 * strength * ultimate_scale
-		Pixel.disc(self, center, radius, Color("1d182c"), 5)
-		Pixel.circle(self, center, radius + 8, Color(color, strength), 4)
-		Pixel.circle(self, center, radius - 7, Color("c5a4de"), 3)
+		Pixel.disc(canvas, center, radius, Color("1d182c"), 5)
+		Pixel.circle(canvas, center, radius + 8, Color(color, strength), 4)
+		Pixel.circle(canvas, center, radius - 7, Color("c5a4de"), 3)
 		for i in range(8):
 			var direction := Vector2.from_angle(i * TAU / 8)
-			Pixel.line(self, center + direction * (radius + 18), center + direction * (radius + 43), Color(color, strength), 4)
+			Pixel.line(canvas, center + direction * (radius + 18), center + direction * (radius + 43), Color(color, strength), 4)
 		for i in range(3):
 			var a: Vector2 = center + Vector2.from_angle(-PI / 2 + i * TAU / 3) * radius * 0.8
 			var b: Vector2 = center + Vector2.from_angle(-PI / 2 + (i + 1) * TAU / 3) * radius * 0.8
-			Pixel.line(self, a, b, Color(color, strength * 0.6), 3)
+			Pixel.line(canvas, a, b, Color(color, strength * 0.6), 3)
 		for i in range(7):
 			var points := PackedVector2Array()
 			for step in range(14):
 				var t: float = step / 13.0
 				points.append((center + Vector2(-237 + i * 78 + sin(t * TAU + i + progress * 4) * 38 * t, 135 - t * (135 + i * 37 % 120) * strength) * ultimate_scale).snapped(Vector2.ONE * 4))
-			draw_polyline(points, Color("593c6c"), 20)
-			draw_polyline(points, Color("c4a3c0"), 12)
-			draw_polyline(points, Color("f0d8cb"), 4)
+			canvas.draw_polyline(points, Color("593c6c"), 20)
+			canvas.draw_polyline(points, Color("c4a3c0"), 12)
+			canvas.draw_polyline(points, Color("f0d8cb"), 4)
 		return
 	for target in cast_info.targets:
 		if cast_info.face in [0, 1, 3]:
@@ -405,12 +560,12 @@ func _draw_spell(cast_info: Dictionary) -> void:
 					var point: Vector2 = cast_info.from.lerp(end, t)
 					point.y += sin(t * PI * 2 + progress * 8 + strand) * 20 * sin(t * PI) + strand * 9
 					points.append(point.snapped(Vector2(3, 3)))
-				draw_polyline(points, Color("745476"), 15 if cast_info.face else 7)
-				draw_polyline(points, Color("f0d8cb"), 5 if cast_info.face else 3)
+				canvas.draw_polyline(points, Color("745476"), 15 if cast_info.face else 7)
+				canvas.draw_polyline(points, Color("f0d8cb"), 5 if cast_info.face else 3)
 		elif cast_info.face == 4:
 			for i in range(12):
 				var p: Vector2 = target + Vector2(sin(i * 2.4 + progress * 5) * 58, cos(i * 1.7) * 55)
-				draw_rect(Rect2(p, Vector2(18, 18) * strength), Color("997bc8"))
+				canvas.draw_rect(Rect2(p, Vector2(18, 18) * strength), Color("997bc8"))
 		else:
 			for i in range(3):
-				draw_arc(target, 25 + i * 14 + strength * 15, progress * TAU + i, progress * TAU + i + PI * 1.5, 24, Color(color, strength), 5)
+				canvas.draw_arc(target, 25 + i * 14 + strength * 15, progress * TAU + i, progress * TAU + i + PI * 1.5, 24, Color(color, strength), 5)

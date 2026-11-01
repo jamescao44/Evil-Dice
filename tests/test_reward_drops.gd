@@ -38,11 +38,14 @@ func distribution_checks() -> void:
 			var members: int = eligible.filter(func(other): return Relics.ITEMS[other].rarity == tier).size()
 			frequency(item_counts.get(id,0),SAMPLES,Relics.RARITY_WEIGHTS[tier]/100/members,"Uniform selection within rarity: " + id)
 	var inventory = Inventory.new()
+	var excluded_legendary: Array = []
 	for id in all:
-		if Relics.ITEMS[id].rarity == Relics.Rarity.LEGENDARY: inventory.add(id)
+		if Relics.ITEMS[id].rarity == Relics.Rarity.LEGENDARY:
+			# The expanded catalogue has more legendaries than ten inventory slots.
+			if not inventory.add(id): excluded_legendary.append(id)
 	var exhausted := [0,0,0,0,0]
-	for n in range(SAMPLES): exhausted[Relics.ITEMS[inventory.draw_one(rng)].rarity] += 1
-	check(exhausted[3] == 0,"All owned legendary relics are excluded")
+	for n in range(SAMPLES): exhausted[Relics.ITEMS[inventory.draw_one(rng,excluded_legendary)].rarity] += 1
+	check(exhausted[3] == 0,"Owned and explicitly excluded legendaries exhaust that rarity")
 	for tier in [0,1,2,4]: frequency(exhausted[tier],SAMPLES,Relics.RARITY_WEIGHTS[tier]/(100-Relics.RARITY_WEIGHTS[3]),"Empty rarity redistributes proportionally")
 	check(inventory.draw_one(rng,all).is_empty(),"Fully excluded pools return no relic")
 	check(Drops.draw(rng,["ancient_codex","prismatic_stone"]).is_empty(),"Fusion-only entries cannot enter reward rolls")
@@ -73,10 +76,10 @@ func wave_curve_checks() -> void:
 		model.load_debug_wave(wave); model.begin_round()
 		var card: Dictionary = model.tarots.add("emperor")
 		mirror.state = model.reward_rng.state
-		var pool: Array = Relics.ITEMS.keys().filter(func(id): return model.relics.can_add(id))
-		var expected_relic: String = Drops.draw(mirror,pool,model.relic_drop_weights())
+		var pool: Array = Relics.ITEMS.keys().filter(func(id): return model.relics.can_add(id) and id not in Relics.DISABLED and not Relics.ITEMS[id].get("fusion",false))
+		var expected_relic: String = pool[mirror.randi_range(0,pool.size()-1)]
 		model.tarot_effects.prepare(model,card.instance_id)
-		check(model.tarot_effects.locked_grants[card.instance_id] == expected_relic,"Emperor uses the current wave rates before its animation")
+		check(model.tarot_effects.locked_grants[card.instance_id] == expected_relic,"Emperor retains its uniform eligible-item draw without shop steering")
 
 func chest_distribution_checks() -> void:
 	var model = Run.new(890)

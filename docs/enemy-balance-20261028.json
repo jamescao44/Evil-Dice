@@ -1,0 +1,32 @@
+{
+  "seeds": 12,
+  "runs": 24,
+  "perfect_rate": 0.35,
+  "policy": "Visible-state choices, natural rewards, meal components preferred; paired tarot on/off; Ultra rewards skipped. A roll is a throw including rerolls. Shops consume zero throws. Completed levels only for pacing; losses retained in raw run data.",
+  "chapter_wins": 14,
+  "command_errors": 0,
+  "target_boss_throw_share": 0.2,
+  "levels": [
+    {
+      "level": 1,
+      "completions": 24,
+      "mean_regular_throws": 26.42,
+      "mean_boss_throws": 6.67,
+      "boss_share_of_total_throws": 0.2015
+    },
+    {
+      "level": 2,
+      "completions": 18,
+      "mean_regular_throws": 31.67,
+      "mean_boss_throws": 8.67,
+      "boss_share_of_total_throws": 0.2149
+    },
+    {
+      "level": 3,
+      "completions": 14,
+      "mean_regular_throws": 38.43,
+      "mean_boss_throws": 8.29,
+      "boss_share_of_total_throws": 0.1774
+    }
+  ]
+}

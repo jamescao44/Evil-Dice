@@ -1,9 +1,11 @@
 extends Node2D
 ## Presentation-only reward ceremony. Fan positions never determine the locked outcomes.
 signal picked(index: int)
+signal use_picked(index: int)
 signal card_drawn
 signal card_shuffled
 signal finished
+signal shuffle_preference_changed(enabled: bool)
 const SHUFFLE_LEAD := 0.16
 const SHUFFLE_STEP := 0.027
 const SHUFFLE_TRAVEL := 0.18
@@ -32,9 +34,12 @@ var collection_target := Vector2.ZERO
 var shuffled_cards: int = 0
 var arrival_origin := Vector2.ZERO
 var arrival_size := Vector2.ZERO
+var can_use_choice: Callable
+var skip_shuffle: bool = false
 
 func _ready() -> void:
-	z_index = 160
+	z_as_relative = false
+	z_index = BattleLayers.TAROT_DRAW
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 func active() -> bool:
@@ -51,7 +56,7 @@ func start(ids: Array, size: Vector2, text_font: Font, target: Vector2, reduce: 
 	font = text_font
 	collection_target = target
 	reduced = reduce
-	state = "shuffle" if from == Vector2.INF else "arrive"
+	state = ("fan" if skip_shuffle else "shuffle") if from == Vector2.INF else "arrive"
 	arrival_origin = from if from != Vector2.INF else Vector2.ZERO
 	arrival_size = deck_size if deck_size != Vector2.ZERO else fan_size()
 	queue_redraw()
@@ -118,11 +123,53 @@ func fan_at(point: Vector2) -> int:
 	return -1
 
 func keep_rect() -> Rect2:
+	if can_use_selected():
+		var rect := action_rect()
+		rect.size.x = rect.size.x/2-8
+		return rect
 	return Rect2(152,1458,500,92) if portrait() else Rect2(420,670,440,62)
+
+## Keep both actions readable without moving the revealed card or its description.
+func action_rect() -> Rect2:
+	return Rect2(66,1458,672,92) if portrait() else Rect2(264,670,752,62)
+
+func can_use_selected() -> bool:
+	return state == "choose" and selected >= 0 and can_use_choice.is_valid() and can_use_choice.call(selected)
+
+func use_rect() -> Rect2:
+	if not can_use_selected(): return Rect2()
+	var rect := action_rect()
+	rect.position.x += rect.size.x/2+8
+	rect.size.x = rect.size.x/2-8
+	return rect
+
+## Keep the preference clear of the fan, drawn cards and collection actions.
+func shuffle_checkbox_rect() -> Rect2:
+	return Rect2(174,354,456,64) if portrait() else Rect2(24,24,364,52)
+
+## Retarget the deck from its visible position when the option changes mid-flight.
+func set_skip_shuffle(enabled: bool) -> void:
+	if skip_shuffle == enabled: return
+	if state == "arrive":
+		var pose: Dictionary = arrival_pose()
+		arrival_origin = pose.at
+		arrival_size = pose.size
+		age = 0
+	elif enabled and state in ["shuffle","drop"]:
+		arrival_origin = _deck_right() if state == "shuffle" else _deck_left().lerp(fan_center(),smoothstep(0,0.18 if reduced else 0.48,age))
+		arrival_size = fan_size()
+		state = "arrive"
+		age = 0
+	skip_shuffle = enabled
+	queue_redraw()
 
 func click(point: Vector2) -> bool:
 	if not active(): return false
 	cancel_gesture()
+	if shuffle_checkbox_rect().has_point(point):
+		set_skip_shuffle(not skip_shuffle)
+		shuffle_preference_changed.emit(skip_shuffle)
+		return true
 	# Consume the skip tap; its release must not also draw or select a card.
 	if skip_preparation(): return true
 	pressed = true
@@ -158,7 +205,9 @@ func release(point: Vector2) -> bool:
 		elif state == "choose":
 			for i in range(3):
 				if row_rect(i).grow(12).has_point(point): selected = i
-			if selected >= 0 and keep_rect().has_point(point) and keep_rect().has_point(press_at):
+			if can_use_selected() and use_rect().has_point(point) and use_rect().has_point(press_at):
+				use_picked.emit(selected)
+			elif selected >= 0 and keep_rect().has_point(point) and keep_rect().has_point(press_at):
 				state = "collect"
 				age = 0
 				picked.emit(selected)
@@ -191,7 +240,7 @@ func advance(delta: float) -> void:
 		swipe.advance(delta)
 		offset = swipe.position
 	for d in draws: d.age += delta*(3 if reduced else 1)
-	if state == "arrive" and age >= (0.18 if reduced else ARRIVAL_TIME): state = "shuffle"; age = 0
+	if state == "arrive" and age >= (0.18 if reduced else ARRIVAL_TIME): state = "fan" if skip_shuffle else "shuffle"; age = 0
 	elif state == "shuffle" and age >= shuffle_duration(): state = "drop"; age = 0
 	elif state == "drop" and age >= (0.18 if reduced else 0.48): state = "fan"; age = 0
 	elif state == "drawing" and draws[-1].age >= 0.55: state = "reveal"; age = 0
@@ -205,6 +254,7 @@ func _draw() -> void:
 	if not active() or font == null: return
 	if state == "arrive":
 		_draw_arrival()
+		_draw_shuffle_checkbox()
 		return
 	Paint.sky(self,canvas_size,sky_age,reduced)
 	var mid: float = canvas_size.x/2
@@ -247,6 +297,9 @@ func _draw() -> void:
 		Paint.text(self,font,Vector2(mid,rect.end.y-24),"Single use",22 if portrait() else 17,Paint.LILAC)
 		Paint.panel(self,keep_rect(),Color("3c3056"),Paint.GOLD)
 		Paint.text(self,font,keep_rect().get_center()+Vector2(0,10),"KEEP THIS CARD",28 if portrait() else 22)
+		if can_use_selected():
+			Paint.panel(self,use_rect(),Color("594371"),Paint.GOLD)
+			Paint.text(self,font,use_rect().get_center()+Vector2(0,10),"KEEP AND USE",28 if portrait() else 22)
 	if state == "collect":
 		var t: float = smoothstep(0.12,0.78,age)
 		var at: Vector2 = row_point(selected).lerp(collection_target,t)-Vector2(0,sin(t*PI)*110)
@@ -255,6 +308,18 @@ func _draw() -> void:
 			var p: Vector2 = at+Vector2.from_angle(i*TAU/12+age)*sin(t*PI)*110
 			draw_circle(p,2+(i%3),Color(Paint.GOLD,sin(t*PI)))
 	Paint.text(self,font,Vector2(mid,canvas_size.y-38),"Art by Jose Angel Canabal",18 if portrait() else 14,Color("94869f"))
+	_draw_shuffle_checkbox()
+
+## Make the entire labeled row tappable, with a high-contrast checked state.
+func _draw_shuffle_checkbox() -> void:
+	var rect := shuffle_checkbox_rect()
+	var side: float = 32 if portrait() else 26
+	var box := Rect2(rect.position+Vector2(8,(rect.size.y-side)/2),Vector2.ONE*side)
+	Paint.panel(self,rect,Color("211a38",0.88),Color("534265"),10)
+	Paint.panel(self,box,Color("534265") if skip_shuffle else Color("161021"),Paint.LILAC,4)
+	if skip_shuffle:
+		draw_polyline(PackedVector2Array([box.position+Vector2(side*0.22,side*0.52),box.position+Vector2(side*0.43,side*0.73),box.position+Vector2(side*0.81,side*0.25)]),Color.WHITE,3,true)
+	Paint.text(self,font,Vector2(box.end.x+14,rect.get_center().y+8),"Skip shuffle animation",24 if portrait() else 18,Paint.LILAC,false)
 
 func _deck_left() -> Vector2:
 	return Vector2(canvas_size.x*0.28,870 if portrait() else 370)
@@ -263,16 +328,25 @@ func _deck_left() -> Vector2:
 func _deck_right() -> Vector2:
 	return Vector2(canvas_size.x*0.72,_deck_left().y)
 
-## Carry the keeper's visible deck into the star field before the normal shuffle.
-func _draw_arrival() -> void:
+## Share the arrival endpoint with the fan so skipping cannot jump between decks.
+func fan_center() -> Vector2:
+	return Vector2(canvas_size.x/2,1330 if portrait() else 590)
+
+func arrival_pose() -> Dictionary:
 	var t: float = smoothstep(0,0.18 if reduced else ARRIVAL_TIME,age)
-	Paint.sky(self,canvas_size,sky_age,reduced,t)
-	var at: Vector2 = arrival_origin.lerp(_deck_right(),t)
+	var at: Vector2 = arrival_origin.lerp(fan_center() if skip_shuffle else _deck_right(),t)
 	if not reduced: at.y -= sin(t*PI)*60
+	return {"at":at,"size":arrival_size.lerp(fan_size(),t),"t":t}
+
+## Carry the keeper's deck straight to the fan when shuffling is disabled.
+func _draw_arrival() -> void:
+	var pose := arrival_pose()
+	var t: float = pose.t
+	Paint.sky(self,canvas_size,sky_age,reduced,smoothstep(0,0.18 if reduced else ARRIVAL_TIME,sky_age))
 	for i in range(21,-1,-1):
 		var from_offset := Vector2((i/7)*3,-(i/7)*2)
-		var to_offset := Vector2(0,-(21-i)*1.5)
-		Paint.card(self,"",at+from_offset.lerp(to_offset,t),arrival_size.lerp(fan_size(),t),0 if reduced else sin(t*PI)*0.06,1,0.35*(1-t))
+		var to_offset := Vector2.ZERO if skip_shuffle else Vector2(0,-(21-i)*1.5)
+		Paint.card(self,"",pose.at+from_offset.lerp(to_offset,t),pose.size,0 if reduced else sin(t*PI)*0.06,1,0.35*(1-t))
 
 func shuffle_duration() -> float:
 	return 0.35 if reduced else 1.00

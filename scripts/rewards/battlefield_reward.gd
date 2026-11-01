@@ -3,6 +3,7 @@ extends Node2D
 const Rewards = preload("res://scripts/progression/wave_rewards.gd")
 const Icons = preload("res://scripts/rewards/reward_icons.gd")
 const Cards = preload("res://scripts/tarot/tarot_paint.gd")
+const RewardPrompt = preload("res://scripts/rewards/reward_prompt.gd")
 signal chest_pressed
 signal route_pressed(index: int)
 var battle
@@ -17,7 +18,7 @@ const SHAKE_SECONDS := 0.28
 
 ## Keep the reward on top of battlefield actors and beneath inventory/modal pages.
 func _ready() -> void:
-	z_index = 80
+	z_index = BattleLayers.REWARD_PAGE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	keeper = Sprite2D.new()
 	keeper.texture = preload("res://assets/art/shop/keeper.png")
@@ -192,4 +193,6 @@ func _draw() -> void:
 	draw_texture_rect(battle.chest.art.chest_open if opening else battle.chest.art.chest_closed,rect,false)
 	if phase == "lift": return
 	if opening: _draw_amount(rect)
-	elif phase == "closed": _text(Vector2(rect.get_center().x,rect.end.y+30),"TAP TO OPEN",26 if portrait() else 19,color)
+	elif phase == "closed":
+		RewardPrompt.paint(self,rect,age,portrait(),battle.reduced)
+		_text(Vector2(rect.get_center().x,rect.end.y+30),"TAP TO OPEN",26 if portrait() else 19,color)

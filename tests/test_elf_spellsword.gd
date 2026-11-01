@@ -103,7 +103,7 @@ func _initialize() -> void:
 	for seed_value in range(100):
 		m = Run.new(seed_value); m.load_debug_wave(19)
 		for enemy in m.enemies: enemy.hp = 0
-		m.wave_reward_resolved = true; m.battles_since_shop = 10
+		m.wave_reward_resolved = true
 		check(m.outcome() == "wave_clear" and m.WaveRewards.SHOP not in m.offer_routes(),"Wave nineteen continues to a guaranteed boss battle")
 		m.choose_route(0); check(m.advance_wave() and m.enemies[0].role == m.EnemyCatalog.Role.SPELLSWORD,"Route enters wave-twenty boss")
 	print("Elf Spellsword: %d checks, %d failures" % [checks,failures])

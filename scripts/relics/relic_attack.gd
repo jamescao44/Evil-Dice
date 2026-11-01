@@ -8,7 +8,8 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 	var targets: Array = [-2] if model.is_city() and model.city_hp > 0 else (model.living() if all_targets else model.attack_targets())
 	if targets.is_empty() or model.hp <= 0: return []
 	if not all_targets:
-		if target not in targets: target = targets[model.rng.randi_range(0,targets.size()-1)]
+		if target not in targets: target = -2 if model.is_city() else model.RelicFocus.choose(model)
+		if target == -1: return []
 		targets = [target]
 	var skill = Skill.new(Skill.Kind.PAIR,4 if all_targets else 1,model.pending.dice)
 	skill.cast_source = "relic"

@@ -1,4 +1,5 @@
 extends RefCounted
+const Vitals = preload("res://scripts/combat/player_vitals.gd")
 ## Turn-scoped healing conditions and non-recursive overheal attacks.
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 const Attack = preload("res://scripts/relics/relic_attack.gd")
@@ -26,7 +27,7 @@ func overhealed(model, amount: int) -> void:
 	for entry in Sequence.entries(model.relics.items):
 		if entry.item.id != "mysterious_seed": continue
 		var key := str(entry.activators)
-		stored[key] = stored.get(key,0)+amount*2
+		stored[key] = stored.get(key,0.0)+Vitals.to_combat(amount)*2.0
 
 ## Release one projectile per active seed trigger before enemies begin acting.
 func finish_player_turn(model) -> Array:
@@ -39,7 +40,7 @@ func finish_player_turn(model) -> Array:
 			Sequence.activate(model,entry)
 			events.append_array(Attack.apply(model,entry.item.id,leftover_sum))
 		if entry.item.id != "mysterious_seed": continue
-		var amount: int = stored.get(str(entry.activators),0)
+		var amount: int = floori(stored.get(str(entry.activators),0.0))
 		if amount <= 0: continue
 		Sequence.activate(model,entry)
 		events.append_array(Attack.apply(model,entry.item.id,amount))

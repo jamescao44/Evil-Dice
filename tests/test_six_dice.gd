@@ -32,30 +32,26 @@ func _initialize() -> void:
 	check(not m.save_pending_skill() and not m.begin_saved_cast(),"Saved skills remain disabled")
 	check(m.cancel_formed_skill() and m.dice_turn.rolls_left == 2 and m.dice_turn.locked.is_empty(),"Cancel returns dice but never refunds rolls")
 	form(m,[0,1,2]); m.apply_player(0)
-	check(m.dice_turn.committed == [0,1,2] and m.phase == "roll","Cast commits just its three dice")
-	check(m.roll_pool(false,[4,4,4]) == [3,4,5],"Only unused dice reroll")
-	while not m.roll_attacks.is_empty(): m.resolve_roll_attack_step()
-	check(m.dice_turn.values == [1,2,3,4,4,4] and m.dice_turn.rolls_left == 1,"Committed faces and budget survive automatic attacks")
-	check(not m.dice_turn.select(3),"An uncompletable straight cannot start")
-	m.end_dice_turn(); m.apply_player()
-	check(m.phase == "enemy" and m.bonus_turn_count == 0,"Leftovers end the turn without a bonus")
+	check(m.dice_turn.committed.size() == 6 and m.phase == "enemy","Cast settles the remaining dice and closes the turn")
+	check(m.roll_pool(false,[4,4,4]).is_empty(),"No reroll is offered after the one manual skill")
+	check(m.bonus_turn_count == 0,"Closing the pool grants no bonus turn")
 	m = fresh(); m.relics.add("magic_sword"); m.relics.items[-1].charges = 1
 	m.roll_pool(false,[1,2,3,4,5,6]); m.hp = 20
 	m.end_dice_turn(); m.apply_player()
-	check(m.hp == 41 and m.relics.items[-1].charges == 1,"Healing keeps stored critical for an attack skill")
+	check(m.hp == 20 and m.relics.items[-1].charges == 1,"Passing adds no default healing and keeps stored critical")
 	m = fresh(); m.enemies.append(m.make_enemy(0)); m.enemies[0].hp = 1
 	m.roll_pool(false,[1,2,3,4,5,6]); m.tarot_effects.extra_uses = 2
 	form(m,[0,1,2]); var other_hp: int = m.enemies[1].hp
 	m.apply_player_step(0)
 	check(m.player_target() == 0,"Additional Fireball uses stay on the selected corpse")
 	m.apply_player(1)
-	check(m.enemies[1].hp == other_hp and m.phase == "roll","Fireball cannot overflow to another enemy")
+	check(m.enemies[1].hp == other_hp and m.phase == "enemy","Fireball cannot overflow to another enemy")
 	m = fresh(); m.relics.add("tissue_pack"); m.roll_pool(false,[1,2,3,4,5,6])
 	form(m,[0,1,2]); check(m.roll_relic_actions.is_empty(),"Selection never farms formation relics")
 	m.cancel_formed_skill(); form(m,[0,1,2]); m.begin_player_cast()
 	check(m.roll_relic_actions.is_empty(),"Tissue Pack does not trigger on a throw with a playable straight")
 	check("magic_slingshot" not in Catalog.DISABLED,"Roll-based Slingshot remains available")
-	m = fresh(); m.load_debug_wave(20)
+	m = fresh(); m.load_debug_wave(24)
 	for enemy in m.enemies: enemy.hp = 0
 	check(m.outcome() == "victory" and not m.advance_wave(),"City remains skipped")
 	print("Six dice transactions: %d checks, %d failures" % [checks,failures])

@@ -26,14 +26,15 @@ static func soften(canvas: CanvasItem) -> void:
 		ink.shader = preload("res://scripts/tarot/tarot_ink.gdshader")
 	canvas.material = ink
 
-static func card(canvas: CanvasItem, id: String, at: Vector2, size: Vector2, angle: float = 0.0, flip: float = 1.0, glow: float = 0.0, alpha: float = 1.0) -> void:
+static func card(canvas: CanvasItem, id: String, at: Vector2, size: Vector2, angle: float = 0.0, flip: float = 1.0, glow: float = 0.0, alpha: float = 1.0, brightness: float = 1.0) -> void:
 	soften(canvas)
+	glow *= brightness
 	canvas.draw_set_transform(at,angle,Vector2(maxf(0.015,absf(flip)),1))
 	var rect := Rect2(-size/2,size)
 	panel(canvas,Rect2(rect.position+Vector2(-1,3),rect.size+Vector2(8,8)),Color(0.015,0.01,0.04,alpha*0.65))
 	if glow > 0:
 		for i in range(5,0,-1): panel(canvas,rect.grow(i*3),Color(LILAC,alpha*glow*0.035),Color(LILAC,alpha*glow*0.055))
-	canvas.draw_texture_rect(texture(id),rect,false,Color(1,1,1,alpha))
+	canvas.draw_texture_rect(texture(id),rect,false,Color(brightness,brightness,brightness,alpha))
 	if glow > 0: panel(canvas,rect.grow(3),Color.TRANSPARENT,Color(GOLD,alpha*glow))
 	canvas.draw_set_transform(Vector2.ZERO)
 

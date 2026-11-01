@@ -1,19 +1,21 @@
 extends RefCounted
-## Shared chest economy. Ten unused throws earn a Perfect chest and its upgrade chain.
+## Shared chest economy. Twenty unused throws earn a Normal chest and its upgrade chain.
 const NAMES := ["Normal Chest", "Perfect Chest", "Greed Chest", "Ultra Chest"]
 const COLORS := [Color("eee0b9"), Color("ffd773"), Color("ce82ff"), Color("ff6977")]
 const COUNTS := [1, 1, 3, 5]
 const CRYSTALS := [30, 50, 70, 100]
-const REROLL_COST := 10
-const REROLL_TIER := 1
+const REROLL_COST := 20
+const NO_CHEST := -1
+const REROLL_TIER := 0
 const THRESHOLDS := [0, REROLL_COST]
 const MIN_RARITY := [0, 1, 2, 3]
 const UPGRADE_CHANCE := 0.20
-const PITY_ATTEMPTS := 5
+const PITY_ATTEMPTS := 6
 const TAROT_PRICE := 30
 
+## Return a real chest tier, or NO_CHEST while the meter is incomplete.
 static func tier_for_progress(progress: int) -> int:
-	return REROLL_TIER if progress >= REROLL_COST else 0
+	return REROLL_TIER if progress >= REROLL_COST else NO_CHEST
 
 static func roll_wave_tier(rng: RandomNumberGenerator, misses: Array = [], starting_tier: int = 0) -> int:
 	# Only attempted tiers advance. A successful upgrade resets its own drought.

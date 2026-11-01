@@ -49,7 +49,7 @@ func visual_check() -> void:
 				changed += 1
 				if y < game.ARENA.position.y / viewport_size.y * clean.get_height(): top_changed += 1
 	check(changed > 200, "GPU ripple distorts the rendered scene")
-	check(top_changed > 10, "Ripple also reaches the HUD above the battlefield")
+	check(top_changed == 0, "Ripple stays inside the battlefield without distorting the HUD")
 	DirAccess.make_dir_recursive_absolute("res://test-output")
 	var layout: String = "portrait" if game is Portrait else "landscape"
 	distorted.save_png("res://test-output/ripple-%s.png" % layout)
@@ -74,7 +74,7 @@ func run() -> void:
 	await wait_for_impact()
 	check(game.screen_ripple.origin == point, "Wave originates from the actual drop position")
 	check(game.model.rng.state == rng, "Presentation does not consume combat randomness")
-	check(game.screen_ripple.layer > 0 and game.screen_ripple.surface.mouse_filter == Control.MOUSE_FILTER_IGNORE, "Fullscreen pass covers the HUD without intercepting input")
+	check(game.screen_ripple.surface.size == game.ARENA.size and game.screen_ripple.surface.mouse_filter == Control.MOUSE_FILTER_IGNORE, "Battlefield pass stays within the arena without intercepting input")
 	if "--visual" in OS.get_cmdline_user_args(): await visual_check()
 	game.menu_open = true
 	await process_frame

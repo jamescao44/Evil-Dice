@@ -83,13 +83,12 @@ func scene_checks(game) -> void:
 	check(ban in game.model.tarot_effects.banned,"Ban chooser remains usable")
 	game._restart(); tough_enemies(game); prepare_roll(game)
 	game.model.dice_turn.selected = [0,1,2]
-	game.model.form_selected_skill()
-	game._show_pending_skill(false)
+	game.dice_selection._selection_changed()
 	var justice_budget: int = game.model.dice_turn.rolls_left
 	game.model.perfect_combo = 5
 	var justice: Dictionary = give_front(game,"justice")
 	drag(game,drop); await settle(game)
-	check(game.model.pending.is_empty() and game.skill_bubble.roll.is_empty(),"Justice removes the pending model and visible skill")
+	check(game.model.pending.is_empty() and game.model.dice_turn.selected.is_empty() and game.dice_selection.preview.is_empty(),"Justice clears an unconfirmed selection before rerolling")
 	check(game.view_phase == "ready" and game.model.dice_turn.unused().size() == 6,"Justice rerolls unlocked dice and restores control")
 	check(game.model.dice_turn.rolls_left == justice_budget and game.model.tarots.find_instance(justice.instance_id) == -1,"Justice consumes its card but no roll")
 	check(game.model.perfect_combo == 5,"Animated Justice preserves the Perfect combo")

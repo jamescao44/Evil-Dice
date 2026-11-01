@@ -34,7 +34,7 @@ var dissolve_age: float = 0
 var fragments: Array = []
 
 func _ready() -> void:
-	z_index = 40
+	z_index = BattleLayers.SKILL
 
 func begin(value: MultiHitSkill) -> void:
 	aim_dock = 0
@@ -66,7 +66,7 @@ func clear() -> void:
 	dissolve_age = 0
 	fragments.clear()
 	self_modulate = Color.WHITE
-	z_index = 40
+	z_index = BattleLayers.SKILL
 	queue_redraw()
 
 func lock_cast_position(at: Vector2) -> void:
@@ -174,7 +174,7 @@ func radius_scale() -> float:
 func _process(delta: float) -> void:
 	if not is_instance_valid(battle): return
 	var selected: bool = battle.skill_source == ("saved" if stored else "current")
-	z_index = battle.HELD_ITEM_Z if selected and battle.view_phase == "targeting" and (battle.skill_pressed or battle.skill_dragging) else 40
+	z_index = battle.HELD_ITEM_Z if selected and battle.view_phase == "targeting" and (battle.skill_pressed or battle.skill_dragging) else BattleLayers.SKILL
 	# Once taken out, the saved skill still plays its cast and dissolve effects.
 	var locked_saved: bool = stored and not is_casting() and not battle._can_use_saved()
 	if not battle._menus_open():

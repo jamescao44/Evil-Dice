@@ -16,7 +16,7 @@ var rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	z_as_relative = false
-	z_index = 70 # Above combat, beneath inspections, reward pages and held items.
+	z_index = BattleLayers.LOOT_PICKUP # Above combat, beneath inspections, reward pages and held items.
 	rng.randomize()
 
 ## Clear every outstanding receipt on restart without changing the model's XP.

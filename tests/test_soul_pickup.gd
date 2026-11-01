@@ -12,7 +12,7 @@ func check(ok: bool, label: String) -> void:
 
 ## Check role rewards, shields, corpse hits and status kills through the real damage path.
 func kills() -> void:
-	for role in range(Enemy.ITEMS.size()):
+	for role in Enemy.ITEMS:
 		for elite in [false,true]:
 			var m = Run.new(51)
 			m.enemies = [Enemy.make(role,1,elite)]
@@ -20,22 +20,23 @@ func kills() -> void:
 			m.enemy_souls_dropped.connect(func(target,amount): drops.append([target,amount]))
 			var expected: int = Enemy.soul_reward(m.enemies[0])
 			m.enemies[0].shield = 10
-			m.hit_enemy(0,9999)
+			m.hit_enemy(0,999999)
 			check(drops.is_empty() and m.souls == 0,"Shield break awards no XP")
-			m.hit_enemy(0,9999,true)
+			m.hit_enemy(0,999999,true)
 			if m.enemies[0].get("boss",false):
 				check(drops.is_empty(),"First boss phase grants no XP")
-				m.hit_enemy(0,9999,true)
+				m.hit_enemy(0,999999,true)
 			check(drops == [[0,expected]],"Kill grants class-specific XP once")
 			check(m.souls+5*m.character_level*(m.character_level-1) == expected,"XP remains exact after automatic spending")
-			m.hit_enemy(0,9999,true)
+			m.hit_enemy(0,999999,true)
 			check(drops.size() == 1,"Corpse hits cannot award more souls")
 	var m = Run.new(52)
 	m.acquire_relic("soul_vessel")
 	m.enemies = [Enemy.make(0),Enemy.make(1,1,true),Enemy.make(3),Enemy.make(4,1,true)]
-	for i in range(4): m.hit_enemy(i,9999,true)
+	for i in range(4): m.hit_enemy(i,999999,true)
 	check(m.character_level == 4 and m.souls == 37 and is_equal_approx(m.enemy_soul_remainder,0.75),"Soul Vessel boosts 85 base enemy XP by 15 percent with fractional carry")
 	m = Run.new(53)
+	m.enemies = [Enemy.make(0)]
 	m.enemies[0].hp = 5
 	m.apply_enemy_status(0,m.Status.BURNING,1)
 	m._tick_enemy_statuses(); m._tick_enemy_statuses()
@@ -61,7 +62,7 @@ func scene(portrait: bool) -> void:
 	var p = g.soul_pickup
 	p.set_process(false); g.evolution.set_process(false)
 	g.model.enemies = [Enemy.make(0),Enemy.make(1)]
-	g.model.hit_enemy(0,9999,true); g.model.hit_enemy(1,9999,true)
+	g.model.hit_enemy(0,999999,true); g.model.hit_enemy(1,999999,true)
 	g._sync_corpses()
 	check(p.orbs.size() == 20 and p.pending_total == 10,"Simultaneous kills retain both receipt clouds")
 	check(g.model.character_level == 2 and p.counter_state() == {"souls":0,"level":1},"Model grants once while the displayed XP waits for collection")

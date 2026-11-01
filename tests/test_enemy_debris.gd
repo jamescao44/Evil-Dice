@@ -132,13 +132,13 @@ func status_death(portrait: bool) -> void:
 	var events: Array = g.model._tick_enemy_statuses()
 	check(g.model.enemies[0].hp == 0 and 0 not in g.model.living(),"Burning death is already final in combat logic")
 	g._show_events(events)
-	check(g.fallen.has(0) and g.enemy_debris.bodies.has(0),"Status death registers its animation in the same event dispatch")
+	check(g.fallen.has(0) and g.enemy_dust.bodies.has(0),"Status death registers its dust animation in the same event dispatch")
 	g.fallen[0] = 0.7
 	g.kill_slow_remaining = 0.04
-	var pieces: Array = g.enemy_debris.bodies[0].pieces.duplicate(true)
+	var dust: Dictionary = g.enemy_dust.bodies[0].duplicate(true)
 	g._show_events([g.model.damage_event(1,g.model.hit_enemy(1,1),1)])
 	check(g.fallen[0] == 0.7 and g.kill_slow_remaining == 0.04,"Next attack cannot restart a prior status death")
-	check(g.enemy_debris.bodies[0].pieces == pieces and g.model.blood_gems == 5,"Next attack cannot respawn debris or duplicate death rewards")
+	check(g.enemy_dust.bodies[0] == dust and g.model.blood_gems == 5,"Next attack cannot respawn dust or duplicate death rewards")
 	g.model.hit_enemy(1,9999,true)
 	g._show_events([])
 	check(g.fallen.has(1),"Reactive kills register even without a returned damage event")

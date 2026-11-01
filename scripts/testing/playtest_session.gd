@@ -6,13 +6,15 @@ const Character = preload("res://scripts/combat/flamelings_skills.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const Tarot = preload("res://scripts/tarot/tarot_catalog.gd")
 const Statuses = preload("res://scripts/status/status_catalog.gd")
+const Metrics = preload("res://scripts/testing/playtest_metrics.gd")
+var metrics = Metrics.new()
 var model
 var seed_value: int
 var choice: Dictionary = {}
 var chest_source := ""
 var events: Array = []
 var history: Array = []
-var stats := {"rolls":0,"skills":0,"tarots":0,"enemy_phases":0,"damage_taken":0,"healing":0,"kills":0,"boss_charges":0,"boss_releases":0,"boss_interrupts":0}
+var stats := {"rolls":0,"skills":0,"tarots":0,"enemy_phases":0,"damage_taken":0,"healing":0,"kills":0,"boss_charges":0,"boss_releases":0,"boss_interrupts":0,"cannon_interrupts":0,"cannon_shots":0}
 var stop_after_enemy_phases: int = 0 # Optional bounded encounter probe; zero plays normally.
 var completed: Dictionary = {}
 var campaign = Run.Campaign.new()
@@ -29,9 +31,16 @@ func _init(run_seed: int = 1) -> void:
 	model.boss_changed.connect(_boss_changed)
 	model.damage_redirected.connect(func(source,target,damage,loss): events.append({"type":"redirect","source":source,"target":target,"amount":loss,"display_amount":damage}))
 	_settle()
+	metrics.capture(model,"session_start")
+
+## Release session callbacks after a probe or interactive run, without touching GUI saves.
+func close() -> void:
+	for info in model.get_signal_list():
+		for connection in model.get_signal_connection_list(info.name): model.disconnect(info.name,connection.callable)
 
 func _boss_changed(_index: int, kind: String) -> void:
 	if kind == "boss_break": stats.boss_interrupts += 1
+	if kind == "cannon_break": stats.cannon_interrupts += 1
 
 func _souls_received(target: int, amount: int) -> void:
 	stats.kills += 1
@@ -45,10 +54,12 @@ func _tarot_received(item: Dictionary) -> void:
 
 func _leveled(level: int) -> void:
 	events.append({"type":"level_up","level":level,"hp":model.hp,"max_hp":model.max_hp})
+	metrics.capture(model,"level_up")
 
 ## Collect actual model events; totals describe gameplay, never animation elapsed time.
 func _record(batch: Array) -> void:
 	for event in batch:
+		if event.type == "charge" and event.amount == 3 and event.target >= 0 and model.enemies[event.target].role == model.EnemyCatalog.Role.MAGIC_CANNON: stats.cannon_shots += 1
 		if event.type == "charge" and event.target >= 0 and (model.enemies[event.target].get("boss",false) or model.EnemyCatalog.ITEMS[model.enemies[event.target].role].get("interruptible",false)):
 			stats.boss_charges += 1
 			if event.amount == model.EnemyCatalog.ITEMS[model.enemies[event.target].role].charge_turns: stats.boss_releases += 1
@@ -56,18 +67,38 @@ func _record(batch: Array) -> void:
 			if event.type in ["damage","burn"]: stats.damage_taken += event.amount
 			elif event.type == "heal": stats.healing += event.amount
 	events.append_array(batch)
+	metrics.capture(model,"resolution")
 
 ## Public commands use one-based die, enemy, reward, inventory and shop slots.
 func command(request: Dictionary) -> Dictionary:
 	events = []
 	var op: String = str(request.get("action","state"))
+	var first_sample: int = metrics.samples.size()
+	var first_inventory_event: int = metrics.inventory_events.size()
+	if op != "state":
+		metrics.begin_command(model,request,choice)
+		metrics.capture(model,"before_"+op)
 	var error := _dispatch(op,request)
 	if error.is_empty(): _settle()
-	return {"ok":error.is_empty(),"error":error,"events":events.duplicate(true),"state":snapshot()}
+	if op != "state":
+		metrics.capture(model,("after_" if error.is_empty() else "rejected_")+op)
+		metrics.finish_command(model,error,_plain(events))
+	return {"ok":error.is_empty(),"error":error,"events":events.duplicate(true),"state":snapshot(),"metrics":metrics.samples.slice(first_sample),
+		"metric_inventory":metrics.inventory_events.slice(first_inventory_event),"metric_commands":[] if op == "state" else [metrics.commands.back()],"metric_wave_turns":metrics.wave_report(),"metric_schema":2}
 
 ## Reject commands outside the displayed decision boundary before calling model mutations.
 func _dispatch(op: String, args: Dictionary) -> String:
 	if op == "state": return ""
+	if op == "gem_move":
+		var source: Dictionary = _gem_location(args.get("from",{}))
+		var destination: Dictionary = _gem_location(args.get("to",{}))
+		return "" if not source.is_empty() and not destination.is_empty() and model.gemstones.transfer(source,destination) else "Invalid gemstone move."
+	if op == "gem_unequip": return "" if model.gemstones.unequip(_index(args,"socket")) else "Empty gemstone socket."
+	if op == "gem_merge":
+		var location: Dictionary = _gem_location(args.get("from",{}))
+		if location.is_empty(): return "Invalid gemstone location."
+		var gem: Dictionary = model.gemstones.sockets[location.socket] if location.has("socket") and location.socket >= 0 and location.socket < model.Gemstones.SOCKETS else model.gemstones.bag_gem(int(location.get("bag",-1)))
+		return "" if model.gemstones.merge(gem,int(location.get("socket",-1))) else "No matching gemstone."
 	if op == "reorder":
 		return "" if model.move_relic(_index(args,"from"),_index(args,"to")) else "Invalid inventory move."
 	if op == "sell":
@@ -114,8 +145,16 @@ func _dispatch(op: String, args: Dictionary) -> String:
 				if not model.shop.refresh(model): return "Not enough blood gems."
 			"divination":
 				if model.begin_tarot_reward("shop").is_empty(): return "Free draw already used."
+			"gift":
+				var item: Dictionary = model.shop.buy(model,model.shop.GIFT_SLOT,_index(args,"replace"))
+				if item.is_empty(): return "Gift unavailable or replacement required."
+				events.append({"type":"gift","item":item})
+			"discard_gift":
+				var amount: int = model.shop.discard_gift(model)
+				if amount <= 0: return "No free relic to forfeit."
+				events.append({"type":"blood_gems","amount":amount})
 			"leave": model.shop.close()
-			_: return "Choose buy, refresh, divination, or leave."
+			_: return "Choose buy, refresh, divination, gift, discard_gift, or leave."
 		return ""
 	if not model.route_choices.is_empty():
 		if op != "route" or not model.choose_route(_index(args,"slot")): return "Choose an offered route slot."
@@ -128,7 +167,13 @@ func _dispatch(op: String, args: Dictionary) -> String:
 		return ""
 	if not model.outcome().is_empty(): return "Run has ended."
 	match op:
+		"focus":
+			return "" if model.RelicFocus.select(model,_index(args,"target")) else "No badge or eligible focus target."
+		"reroll":
+			if model.reroll_die(_integer(args,"die",0)-1).is_empty(): return "Reroll unavailable."
+			stats.rolls += 1
 		"roll":
+			if model.dice_turn.has_rolled(): return "Choose a die with the reroll action."
 			if args.has("perfect") and not args.perfect is bool: return "perfect must be true or false."
 			if model.roll_pool(args.get("perfect",false)).is_empty(): return "Roll unavailable."
 			stats.rolls += 1
@@ -137,15 +182,15 @@ func _dispatch(op: String, args: Dictionary) -> String:
 			if not model.cancel_formed_skill(): return "No cancellable skill."
 		"cast":
 			if model.phase != "player" or model.pending.is_empty(): return "Form a skill first."
-			var target: int = _index(args,"target")
-			if not model.pending.hits_all() and target not in model.attack_targets(): return "Choose a living eligible enemy."
-			if model.pending.hits_all() and target < 0: target = model.attack_targets().front()
-			if target not in model.attack_targets(): return "Target protected by taunt or unavailable."
+			var target: int = _index(args,"target") if args.has("target") else model.player_target()
+			if not model.pending.hits_all() and target not in model.player_attack_targets(): return "Choose a living eligible enemy."
+			if model.pending.hits_all() and target < 0 and not model.player_attack_targets().is_empty(): target = model.player_attack_targets().front()
+			if target not in model.player_attack_targets(): return "Target protected by taunt or unavailable."
 			stats.skills += 1
-			_record(model.apply_player(target))
+			_record(_apply_player(target))
 		"end":
 			if not model.end_dice_turn(): return "Throw dice and resolve or cancel the formed skill first."
-			_record(model.apply_player())
+			_record(_apply_player())
 		"ice":
 			if model.phase != "frozen": return "Player is not frozen."
 			_record(model.break_ice())
@@ -205,6 +250,24 @@ func _cast_tarot(instance: int, options: Dictionary) -> String:
 		if not model.roll_pool(false,[],true).is_empty(): stats.rolls += 1
 	return ""
 
+## Observe one shared-model cast without confusing bonus casts, extra uses or damage ticks.
+func _apply_player(primary: int = -1) -> Array:
+	var skill: MultiHitSkill = model.pending
+	var before: int = skill.uses_spent
+	var starting: bool = model.phase == "player"
+	var result: Array = model.apply_player(primary)
+	if starting and skill._cast_uses > 0: metrics.skill_cast(model,skill,skill.uses_spent-before)
+	return result
+
+## Count only matching attacks that actually execute, not queued groups cancelled by victory.
+func _apply_auto_step() -> Array:
+	if model.roll_attacks.is_empty(): return model.resolve_roll_attack_step()
+	var skill: MultiHitSkill = model.roll_attacks.front().skill
+	var before: int = skill.uses_spent
+	var result: Array = model.resolve_roll_attack_step()
+	if skill.uses_spent > before: metrics.auto_step(model,skill,before == 0)
+	return result
+
 ## Match the GUI's automatic transitions while preserving every player decision boundary.
 func _settle() -> void:
 	for guard in range(1000):
@@ -217,9 +280,9 @@ func _settle() -> void:
 		if chest_source == "wave_closed": return
 		if model.phase == "turn_end": _record(model.end_round()); continue
 		if model.perfect_relic_ready: _record(model.resolve_roll_relic_step()); continue
-		if model.phase == "roll_attacks": _record(model.resolve_roll_attack_step()); continue
+		if model.phase == "roll_attacks": _record(_apply_auto_step()); continue
 		if model.start_roll_chip_casts(): continue
-		if model.phase == "player" and model.pending.cast_source != "manual": _record(model.apply_player()); continue
+		if model.phase == "player" and model.pending.cast_source != "manual": _record(_apply_player()); continue
 		if not model.tarot_effects.pending_repeat.is_empty():
 			if not model.outcome().is_empty(): model.tarot_effects.dismiss_repeat(); continue
 			var repeat: Dictionary = model.tarot_effects.pending_repeat
@@ -234,11 +297,11 @@ func _settle() -> void:
 		if model.shop.active: return
 		if not model.outcome().is_empty():
 			_mark_wave()
-			if model.wave_kind != model.WaveRewards.SHOP and model.wave_chest_stage != model.stage:
+			if not model.at_shop and model.wave_chest_stage != model.stage:
 				if model.begin_wave_reward(): chest_source = "wave_closed"
 				return
 			if model.outcome() == "victory":
-				if model.auto_claim_victory_chest() > 0:
+				if model.auto_claim_victory_chest() >= 0:
 					chest_source = "victory"
 					model.release_chest_crystals()
 				return
@@ -246,7 +309,7 @@ func _settle() -> void:
 			return
 		if model.tarot_effects.pending_turn_end:
 			model.tarot_effects.pending_turn_end = false
-			if model.end_dice_turn(): _record(model.apply_player())
+			if model.end_dice_turn(): _record(_apply_player())
 			continue
 		if model.phase == "enemy":
 			stats.enemy_phases += 1
@@ -255,7 +318,9 @@ func _settle() -> void:
 			continue
 		if model.phase in ["new","round_end"]:
 			if stop_after_enemy_phases > 0 and stats.enemy_phases >= stop_after_enemy_phases: return
-			_record(model.begin_round()); continue
+			var start_events: Array = model.begin_round()
+			metrics.note_turn(model)
+			_record(start_events); continue
 		if not model.tarot_effects.bonus_chests.is_empty():
 			model.open_bonus_chest(); model.release_chest_crystals(); chest_source = "bonus"
 		return
@@ -265,21 +330,24 @@ func _settle() -> void:
 func _mark_wave() -> void:
 	if completed.has(model.stage): return
 	completed[model.stage] = true
-	history.append({"wave":model.stage+1,"kind":model.wave_kind,"outcome":model.outcome(),"level":model.character_level,"hp":model.hp,"max_hp":model.max_hp,"relics":model.relics.items.map(func(i): return i.id),"totals":stats.duplicate()})
+	metrics.finish_wave(model)
+	history.append({"wave":model.stage+1,"kind":model.wave_kind,"boss":model.Waves.is_boss_stage(model.stage),"outcome":model.outcome(),"level":model.character_level,"hp":model.hp,"max_hp":model.max_hp,"relics":model.relics.items.map(func(i): return i.id),"totals":stats.duplicate()})
 
 ## Snapshot exposes current information only; no RNG state or sealed future rewards.
 func snapshot() -> Dictionary:
 	var state := {"wave":model.stage+1,"wave_count":Run.PLAYABLE_WAVES,"reward_route":model.wave_kind,"phase":model.phase,"outcome":model.outcome(),"round":model.round_number,
 		"level":model.level_number(),"level_wave":model.level_wave(),
 		"player":{"hp":model.hp,"max_hp":model.max_hp,"shield":model.shield,"level":model.character_level,"xp":model.souls,"xp_needed":model.level_cost(),"base_damage":model.character_base_damage(),"combo_multiplier":model.combo_multiplier(),"blood_gems":model.blood_gems,"fireball_charges":model.character_passive.charge,"fireball_threshold":model.character_passive.charge_limit(model.character_evolution_stage()),"statuses":_statuses(model.statuses)},
-		"dice":[],"rolls_left":model.dice_turn.rolls_left,"has_rolled":model.dice_turn.has_rolled(),"bonus_turns":model.bonus_turn_count,"leftover_heal":model.leftover_total_healing() if model.dice_turn.has_rolled() else 0,
+		"dice":[],"rolls_left":model.dice_turn.rolls_left,"has_rolled":model.dice_turn.has_rolled(),"manual_skills_left":maxi(0,model.dice_turn.MANUAL_SKILLS_PER_TURN-model.dice_turn.manual_casts),"bonus_turns":model.bonus_turn_count,"leftover_heal":model.leftover_total_healing() if model.dice_turn.has_rolled() else 0,
 		"enemies":[],"relics":[],"tarots":[],"combinations":[],"treasure":{"progress":model.reroll_progress,"tier":model.chest_tier()},"actions":[],"totals":stats.duplicate(),"wave_history":history.duplicate(true)}
+	state.gemstones = {"bag":range(model.gemstones.order.size()).map(func(i): return model.gemstones.bag_gem(i)),"sockets":model.gemstones.sockets.duplicate(true)}
 	for i in range(6): state.dice.append({"slot":i+1,"face":model.dice_turn.values[i] if model.dice_turn.has_rolled() else null,"spent":i in model.dice_turn.committed,"locked":i in model.dice_turn.locked})
 	for i in model.living():
 		var enemy: Dictionary = model.enemies[i]
 		var intent: Dictionary = enemy.intent.duplicate()
+		if intent.get("friendly_fire",false): intent.amount = roundi(model.Vitals.to_combat(intent.amount))
 		if intent.has("target"): intent.target = "player" if intent.target == -1 else str(int(intent.target)+1)
-		state.enemies.append({"slot":i+1,"name":enemy.name,"level":enemy.get("level",1),"soul_reward":model.EnemyCatalog.soul_reward(enemy),"gem_reward":model.EnemyCatalog.crystal_reward(enemy),"elite":enemy.elite,"hp":enemy.hp,"max_hp":enemy.max_hp,"shield":enemy.shield,"damage":enemy.damage,"intent":intent,"statuses":_statuses(enemy.get("statuses",{})),"attack_boost":enemy.attack_boost,"boss_phase":enemy.get("boss_phase",0),"charge":enemy.get("charge",0),"break_marks":enemy.get("break_marks",0),"taunt":model.EnemyCatalog.taunts(enemy),"legal_target":i in model.attack_targets()})
+		state.enemies.append({"slot":i+1,"name":enemy.name,"level":enemy.get("level",1),"soul_reward":model.EnemyCatalog.soul_reward(enemy),"gem_reward":model.EnemyCatalog.crystal_reward(enemy),"elite":enemy.elite,"modifier":enemy.get("modifier",""),"element":enemy.get("element",-1),"swift":model.EnemyCatalog.ITEMS[enemy.role].get("swift",false),"hp":enemy.hp,"max_hp":enemy.max_hp,"shield":enemy.shield,"damage":model.EnemyCatalog.Damage.base_hit(enemy,model.character_level),"damage_percent":enemy.get("damage_percent",0),"intent":intent,"statuses":_statuses(enemy.get("statuses",{})),"attack_boost":enemy.attack_boost,"boss_phase":enemy.get("boss_phase",0),"charge":enemy.get("charge",0),"break_marks":enemy.get("break_marks",0),"interrupt_straight":enemy.get("interrupt_straight",0),"taunt":model.EnemyCatalog.taunts(enemy),"focused":i == model.RelicFocus.current(model),"legal_target":i in model.RelicFocus.targets(model)})
 	for i in range(model.relics.items.size()):
 		var item: Dictionary = _relic(model.relics.items[i]); item.slot = i+1; state.relics.append(item)
 	for item in model.tarots.items:
@@ -313,23 +381,28 @@ func snapshot() -> Dictionary:
 			var item: Dictionary = _relic({"id":offer.id}) if offer.kind == "relic" and not offer.id.is_empty() else _tarot(offer.id) if offer.kind == "tarot" and not offer.id.is_empty() else {"id":offer.id,"name":"Sealed Soul Bottle","description":"Hidden souls: 1 per 10–20 blood gems paid."}
 			item.merge({"slot":i+1,"kind":offer.kind,"price":offer.price,"sold":offer.sold,"can_buy":model.shop.can_buy(model,i)},true)
 			state.shop.append(item)
-		state.free_divination = not model.shop.divination_used
+		state.free_divination = not model.shop.divination_used and model.shop.gift.is_empty()
+		if not model.shop.divination_used and not model.shop.gift.is_empty():
+			state.free_gift = _relic({"id":model.shop.gift.id})
 		state.shop_refresh_price = model.shop.refresh_price
 		state.actions = ["buy","refresh","leave"]
 		if state.free_divination: state.actions.append("divination")
+		if state.has("free_gift"): state.actions.append_array(["gift","discard_gift"])
 	elif not model.route_choices.is_empty(): state.phase = "routes"; state.routes = model.route_choices.duplicate(); state.actions = ["route"]
 	elif model.level_rewards_complete() and model.has_next_level(): state.phase = "level_complete"; state.actions = ["start"]
 	elif model.outcome().is_empty():
 		if model.phase == "roll":
-			if model.dice_turn.can_roll(): state.actions.append("roll")
+			if model.dice_turn.can_roll(): state.actions.append("reroll" if model.dice_turn.has_rolled() else "roll")
 			state.combinations = _combinations()
 			if not state.combinations.is_empty(): state.actions.append("form")
 			if model.can_end_dice_turn(): state.actions.append("end")
-			if model.chest_tier() > 0: state.actions.append("treasure")
+			if model.chest_tier() >= 0: state.actions.append("treasure")
 		elif model.phase == "player": state.actions = ["cast","cancel"]
 		elif model.phase == "frozen": state.actions = ["ice"]; state.ice_taps_left = model.ice_hits_remaining
 		if not model.tarots.items.is_empty(): state.actions.append("tarot")
+		if model.RelicFocus.current(model) >= 0: state.actions.append("focus")
 	state.actions.append("state")
+	if not model.gemstones.order.is_empty() or model.gemstones.sockets.any(func(gem): return not gem.is_empty()): state.actions.append_array(["gem_move","gem_merge","gem_unequip"])
 	if not model.relics.items.is_empty(): state.actions.append("sell")
 	if model.relics.items.size() > 1: state.actions.append("reorder")
 	return state
@@ -400,3 +473,12 @@ func _integer(args: Dictionary, key: String, fallback: int = -1) -> int:
 
 func _index(args: Dictionary, key: String) -> int:
 	return _integer(args,key,0)-1
+
+## Translate one-based inventory locations without accepting negative socket indices.
+func _gem_location(value: Variant) -> Dictionary:
+	if not value is Dictionary: return {}
+	for kind in ["socket","bag"]:
+		if value.has(kind) and value[kind] is int and value[kind] > 0:
+			if kind == "socket" and value[kind] > 6: return {}
+			return {kind:int(value[kind])-1}
+	return {}

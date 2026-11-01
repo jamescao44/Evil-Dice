@@ -1,5 +1,7 @@
 extends RefCounted
+const Vitals = preload("res://scripts/combat/player_vitals.gd")
 ## Consumable rules and queued effects. No animation, input, or scene dependencies.
+signal effect_applied(id: String, lane: String)
 const Catalog = preload("res://scripts/tarot/tarot_catalog.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const Drops = preload("res://scripts/relics/relic_drop_table.gd")
@@ -50,11 +52,25 @@ func begin_skill(skill: MultiHitSkill) -> void:
 	if skill.amplifier_locked: return
 	skill.effect_multiplier = 1.0+strength
 	skill.amplifier_locked = true
+	if strength > 0: effect_applied.emit("strength","skill")
 	strength = 0
+
+## Pending badges are a read-only view of live rules, never a second effect inventory.
+func active_indicators(lane: String) -> Array:
+	var values: Dictionary = {"strength":strength} if lane == "skill" else {"high_priestess":dice_boost,"lovers":int(lovers),"devil":maxi(0,devil-2),"star":star_throws,"temperance":carried_rolls}
+	var result: Array = []
+	for id in values:
+		if values[id] > 0: result.append({"id":id,"count":values[id]})
+	return result
+
+## Consume one Star charge only after a successful throw has been committed.
+func finish_roll() -> void:
+	if star_throws > 0: effect_applied.emit("star","roll")
+	star_throws = maxi(0,star_throws-1)
 
 ## Legacy scripted rolls do not use six-die outcome settings.
 func modify_dice(_model, natural: Array) -> Array:
-	star_throws = maxi(0,star_throws-1)
+	finish_roll()
 	return natural.duplicate()
 
 ## Reset turn-only boosts and redeem carryover only within its original wave.
@@ -62,6 +78,7 @@ func start_pool(model) -> int:
 	dice_boost = 0
 	var wave: int = model.stage if "stage" in model else 0
 	var bonus: int = carried_rolls if wave == carry_wave else 0
+	if bonus > 0: effect_applied.emit("temperance","turn")
 	carried_rolls = 0
 	carry_wave = -1
 	return bonus
@@ -69,6 +86,7 @@ func start_pool(model) -> int:
 ## Apply value boosts, then the latest guaranteed outcome to newly rolled dice.
 func modify_pool(model, indices: Array) -> void:
 	var pool = model.dice_turn
+	if not indices.is_empty() and dice_boost > 0: effect_applied.emit("high_priestess","roll")
 	for index in indices: pool.values[index] = mini(6,pool.values[index]+dice_boost)
 	if lovers and indices.size() >= 4:
 		# Restrict the start to boosted faces when possible, retaining a real straight.
@@ -77,30 +95,71 @@ func modify_pool(model, indices: Array) -> void:
 		for face in range(first,first+4):
 			var at: int = model.rng.randi_range(0,slots.size()-1)
 			pool.values[slots.pop_at(at)] = face
+		effect_applied.emit("lovers","roll")
 		lovers = false
 	elif devil > 0 and indices.size() >= 3:
 		var slots: Array = indices.duplicate()
 		for i in range(mini(indices.size(),devil)):
 			pool.values[slots.pop_at(model.rng.randi_range(0,slots.size()-1))] = 6
+		effect_applied.emit("devil","roll")
 		devil = 0
 
-func usable(model) -> bool:
-	return pending_steps.is_empty() and (model.phase in ["roll","player","frozen"] or (model.is_city() and model.phase == "round_end")) and model.outcome().is_empty() and model.tarot_source.is_empty() and model.open_rewards.is_empty()
+## Shop checks are read-only: never roll a reward merely to light a purchase button.
+func shop_error(model, id: String, completing_draw: bool = false) -> String:
+	if not ("shop" in model) or not model.shop.active or model.hp <= 0: return "Use tarot between actions, before or after rolling."
+	if id not in Catalog.SHOP_USABLE or id in Catalog.DISABLED: return "This tarot needs an active battle."
+	if id == "sun" and (model.hp >= model.max_hp or model.status_count(Status.DARKNESS) > 0): return "No healing is available."
+	if id == "hierophant" and not Status.HARMFUL.any(func(status): return model.status_count(status) > 0): return "No harmful statuses to remove."
+	if id == "fool" and model.relics.items.is_empty(): return "No relics to reroll."
+	if id == "hanged_man" and Catalog.eligible(banned).size() <= 1: return "At least one tarot must remain in the deck."
+	if id in ["emperor","world"] and eligible_relics(model,id).is_empty(): return "No eligible relic is available."
+	if not pending_repeat.is_empty() or not pending_steps.is_empty() or (not completing_draw and not model.tarot_source.is_empty()) or not model.open_rewards.is_empty(): return "Finish the tarot effect first."
+	return ""
+
+## Preview a reserved draw choice without granting cards, consuming charges or rolling RNG.
+func draw_error(model, index: int) -> String:
+	if model.tarot_source.is_empty() or index < 0 or index >= model.tarot_choices.size(): return "Choose a tarot first."
+	if not pending_repeat.is_empty() or not pending_steps.is_empty(): return "Finish the tarot effect first."
+	var id: String = model.tarot_choices[index]
+	if id in ["emperor","world"] and eligible_relics(model,id).is_empty(): return "No eligible relic is available."
+	var choice := {}
+	if id == "death":
+		var candidates: Array = targets(model,id)
+		if not candidates.is_empty(): choice.target = candidates.front()
+	return error(model,id,choice,false,true)
+
+## Reward eligibility is shared by button previews and actual Emperor/World grants.
+func eligible_relics(model, id: String) -> Array:
+	var eligible: Array = []
+	for relic_id in Relics.ITEMS:
+		if relic_id in Relics.DISABLED or Relics.ITEMS[relic_id].get("fusion",false): continue
+		if model.relics.can_add(relic_id) and (id != "world" or Relics.ITEMS[relic_id].rarity == Relics.Rarity.LEGENDARY): eligible.append(relic_id)
+	return eligible
+
+func usable(model, completing_draw: bool = false) -> bool:
+	return pending_steps.is_empty() and (model.phase in ["roll","player","frozen"] or (model.is_city() and model.phase == "round_end")) and model.outcome().is_empty() and (completing_draw or model.tarot_source.is_empty()) and model.open_rewards.is_empty()
 
 ## Share valid tarot targets between casting, drag indicators and repeated effects.
 func targets(model, id: String) -> Array:
 	if model.is_city(): return []
-	return model.attack_targets().filter(func(index): return id != "death" or not model.enemies[index].get("boss",false))
+	return model.attack_targets().filter(func(index): return id != "death" or not model.EnemyCatalog.death_tarot_immune(model.enemies[index]))
 
-func error(model, id: String, choice: Dictionary = {}, repeating: bool = false) -> String:
-	if not model.outcome().is_empty() or (not repeating and not usable(model)): return "Use tarot between actions, before or after rolling."
+func error(model, id: String, choice: Dictionary = {}, repeating: bool = false, completing_draw: bool = false) -> String:
+	if "shop" in model and model.shop.active:
+		# A committed Prophecy repeat is already the active transaction.
+		if repeating:
+			if id not in Catalog.SHOP_USABLE or model.hp <= 0: return "This tarot needs an active battle."
+			return ""
+		return shop_error(model,id,completing_draw)
+	if not model.outcome().is_empty() or (not repeating and not usable(model,completing_draw)): return "Use tarot between actions, before or after rolling."
 	if not Catalog.ITEMS.has(id): return "Unknown tarot card."
 	if model.phase == "frozen" and id != "hierophant": return "Use Hierophant to clear freezing first."
-	if id in Catalog.DISABLED: return "Temporarily disabled for six-dice turns."
+	if id in Catalog.DISABLED: return Catalog.description(id)
 	if id == "death" and model.is_city(): return "This card cannot affect the city."
 	if id == "death":
 		var target: int = choice.get("target",-1)
 		if model.is_enemy_alive(target) and model.enemies[target].get("boss",false): return "Death cannot affect bosses."
+		if model.is_enemy_alive(target) and model.EnemyCatalog.death_tarot_immune(model.enemies[target]): return "Death cannot affect this enemy."
 		if target not in targets(model,id): return "Drag Death onto an eligible enemy. Paladins protect their allies."
 	if id == "magician" and (not model.dice_turn.has_rolled() or model.dice_turn.unused().is_empty()): return "Roll first, then choose an unused die."
 	if id == "lovers" and model.dice_turn.unused().size() < 4: return "Lovers needs at least four unused dice."
@@ -125,10 +184,7 @@ func prepare(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	if id in ["magician","hanged_man"]: return {"choice":id}
 	if id in ["emperor","world"]:
 		if not locked_grants.has(instance_id):
-			var eligible: Array = []
-			for relic_id in Relics.ITEMS:
-				if relic_id in Relics.DISABLED or Relics.ITEMS[relic_id].get("fusion",false): continue
-				if model.relics.can_add(relic_id) and (id != "world" or Relics.ITEMS[relic_id].rarity == Relics.Rarity.LEGENDARY): eligible.append(relic_id)
+			var eligible: Array = eligible_relics(model,id)
 			var rolled: String = "" if eligible.is_empty() else eligible[model.reward_rng.randi_range(0,eligible.size()-1)]
 			if rolled.is_empty(): return {"error":"No eligible relic is available."}
 			locked_grants[instance_id] = rolled
@@ -230,6 +286,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			model.dice_turn.committed.clear()
 			model.dice_turn.groups.clear()
 			model.dice_turn.selected.clear()
+			effect_applied.emit("justice","roll")
 		"hanged_man": banned.append(choice.ban)
 		"devil":
 			devil = mini(6,devil+1) if devil > 0 else 3
@@ -243,8 +300,8 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 		"death": events.append_array(_execute(model,choice.target))
 		"judgement": model.dice_turn.rolls_left += 2
 		"chariot":
-			model.shield += 50
-			events.append(model.event(-1,50,"shield","SHIELD +50"))
+			model.shield += Vitals.CHARIOT_SHIELD
+			events.append(model.event(-1,Vitals.CHARIOT_SHIELD,"shield","SHIELD +%d" % Vitals.CHARIOT_SHIELD))
 		"moon":
 			for target in model.living():
 				events.append_array(model.apply_enemy_status(target,Status.DARKNESS,1))
@@ -270,6 +327,7 @@ func resolve_next_step(model) -> Dictionary:
 	return step
 
 func _finish_effect(model, events: Array) -> void:
+	if "shop" in model and model.shop.active: return
 	if not model.outcome().is_empty():
 		if model.SAVED_SKILLS_ENABLED and model.saved_skill.is_empty(): model.saved_skill = model.pending.duplicate()
 		model.pending = Skill.new()
@@ -301,8 +359,8 @@ func _tower(model) -> Array:
 			if not enemy.elite: events.append_array(model.apply_enemy_status(target,Status.IMMOBILIZED,1))
 		var loss: int = model.direct_enemy_hp_damage(target,50)
 		events.append(model.damage_event(target,loss,50))
-	var loss: int = mini(model.hp,30)
+	var loss: int = mini(model.hp,Vitals.TOWER_SELF_DAMAGE)
 	model.hp -= loss
-	events.append(model.damage_event(-1,loss,30))
+	events.append(model.damage_event(-1,loss,Vitals.TOWER_SELF_DAMAGE))
 	if model.hp <= 0: events.append_array(model.RelicEffects.prevent_death(model))
 	return events

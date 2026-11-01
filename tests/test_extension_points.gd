@@ -51,13 +51,16 @@ func _initialize() -> void:
 	model.acquire_relic("cursed_bow")
 	model.acquire_relic("twin_scythes")
 	var random_state: int = model.rng.state
-	for values in [[1,2,6],[1,1,2],[4,4,6],[5,5,1],[4,4,4],[5,5,5]]:
-		var skill = model.classify(values)
+	for values in [[1,2,3],[4,5,6],[1,2,3,4],[2,3,4,5,6],[1,2,3,4,5,6]]:
+		var skill = model.make_straight_skill(values)
 		var before: Array = model.enemies.duplicate(true)
-		for i in range(model.enemies.size()):
+		for i in model.player_attack_targets():
 			check(not model.damage_caption(skill,i).is_empty(),"Targeted preview remains available")
 			var hits: Array = model.preview(skill,i)
-			check(hits[0].damage == model.attack_damage(skill,hits[0].target),"Preview and combat share the numeric damage path")
+			for hit in hits:
+				var expected: int = model.attack_damage(skill,hit.target)
+				if skill.hits_all(): expected = floori(expected*model.area_damage_factor(hit.target,model.taunting_enemies()))
+				check(hit.damage == expected,"Preview and combat share the numeric damage path")
 		check(model.enemies == before and model.rng.state == random_state and model.relics.items[0].charges == 1,"Preview never mutates enemies, charges or combat randomness")
 	print("Extension points: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

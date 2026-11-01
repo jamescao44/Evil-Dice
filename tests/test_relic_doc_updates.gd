@@ -21,18 +21,20 @@ func only_strength(m) -> void:
 	m.tarot_effects.banned = m.Tarot.ITEMS.keys().filter(func(id): return id != "strength")
 
 func damage_checks() -> void:
-	for id in ["magic_sword","magic_slingshot","royal_dagger","contract","runestone","orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]:
+	for id in ["magic_sword","magic_slingshot","royal_dagger","runestone","orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]:
 		var m = fresh(); m.begin_round(); m.acquire_relic(id)
-		var bonus: float = 10 if id == "magic_sword" else 5
+		var bonus: float = 2 if id == "magic_slingshot" else 10 if id in ["magic_sword","royal_dagger"] else 5
 		var skill = m.Patterns.classify([1,2,3])
 		check(m.standing_damage_values().x == 5+bonus,"Standing damage includes the new bonus: "+id)
 		check(is_equal_approx(m.attack_base(skill),(5+bonus)*3.6),"Flat relic damage enters before the Fireball coefficient: "+id)
 		check(m.attack_damage_steps(skill).any(func(step): return step.get("id","") == id and step.base_bonus == bonus),"Damage animation includes the granting relic: "+id)
+	var contract = fresh(); contract.acquire_relic("contract")
+	check(is_equal_approx(contract.standing_damage_values().x,6.0),"Contract increases base damage by twenty percent")
 	var m = fresh(); m.acquire_relic("magic_sword"); m.acquire_relic("disguise_mask"); m.acquire_relic("ancient_tentacle")
 	check(m.relic_base_damage() == 40,"Mask and Tentacle repeat flat bonuses through the usual order")
 	m = fresh()
 	for id in m.RelicEffects.Catalog.STONES: m.acquire_relic(id)
-	check(m.relics.has("prismatic_stone") and m.relics.items.size() == 1 and m.relic_base_damage() == 60,"Stone fusion keeps its documented sixty-point total")
+	check(m.relics.has("prismatic_stone") and m.relics.items.size() == 1 and m.relic_base_damage() == 30,"Stone fusion keeps its documented thirty-point total")
 	m = fresh(); m.acquire_relic("contract"); m.hp = 1
 	m.receive_damage(1000)
 	check(m.hp == 60 and not m.relics.has("contract") and m.relic_base_damage() == 0,"Contract's flat bonus disappears when it saves the player")

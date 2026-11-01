@@ -27,8 +27,9 @@ func settle_roll(m) -> void:
 func set_checks() -> void:
 	check(C.ITEMS.magic_sword.rarity == C.Rarity.EPIC,"Magic Sword is Epic")
 	var m = fresh()
+	var bones: Array = C.Sets.RECIPES.remains.ingredients.filter(func(id): return id != "unidentified_ring")
 	check(not m.relics.can_add("unidentified_ring"),"Ring locked without five bones")
-	for id in Conditions.BONES: m.acquire_relic(id)
+	for id in bones: m.acquire_relic(id)
 	check(m.relics.items.size() == 5 and m.relics.can_add("unidentified_ring"),"Five bones wait for ring")
 	var actions: Array = m.RelicEffects.roll_actions(m,false)
 	check(actions.map(func(a): return int(a.amount)) == [5,5,5,10,10],"Bones produce five individual attacks")
@@ -37,7 +38,7 @@ func set_checks() -> void:
 	check(m.relics.items.size() == 1 and m.relics.has("witch_ghost"),"Six remains fuse into one Witch")
 	actions = m.RelicEffects.roll_actions(m,false)
 	check(actions.size() == 1 and actions[0].amount == 50,"Witch replaces component attacks with 50 base")
-	check(Conditions.BONES.all(func(id): return m.relics.has(id) and not m.relics.can_add(id)),"Fusion preserves component exclusion")
+	check(bones.all(func(id): return m.relics.has(id) and not m.relics.can_add(id)),"Fusion preserves component exclusion")
 	m.sell_relic(0)
 	check(not m.relics.can_add("unidentified_ring"),"Selling Witch closes ring pool")
 	m = fresh(["broken_blade"])
@@ -46,7 +47,7 @@ func set_checks() -> void:
 	check(m.relics.items.size() == 1 and is_equal_approx(m.damage_multiplier(),3.0),"General sword replaces component bonus with +2")
 	for id in C.ITEMS:
 		var set_title: String = C.Sets.set_label(id)
-		check(C.short_description(id).contains("(Set: "+set_title+")") if not set_title.is_empty() else not C.short_description(id).contains("(Set:"),"Set hint for "+id)
+		check(C.short_description(id).contains("(Set: "+set_title+" 0/") if not set_title.is_empty() else not C.short_description(id).contains("(Set:"),"Set progress for "+id)
 		if C.Sets.uses_composite_art(id): continue
 		var sprite: String = Paint._load_sprite(id)
 		check(Paint.textures[sprite] != null,"Artwork for "+id)

@@ -9,10 +9,14 @@ var roll_radius: float = 0
 var motion_tween: Tween
 
 var face: int = 1
+var socket_gem: Dictionary = {}
+const GemPaint = preload("res://scripts/dice/gemstone_paint.gd")
 var final_face: int = 1
 var rolling: bool = false
 var elapsed: float = 0.0
 const ROLL_PLAYBACK_SPEED := 0.75
+const REROLL_LOOPS := 2
+const REROLL_SPEEDUP := 1.15
 var duration: float = 1.0
 var reveal_order: int = 0
 var glow: float = 0.0
@@ -36,8 +40,10 @@ var rejection_age: float = 0.0
 var idle_hint := Vector2.ZERO # Extra scale and tilt supplied by idle dice feedback.
 const AUTO_ATTACK_PULSE_SECONDS := 0.30
 var magician_hint: bool = false
+var reroll_hint: bool = false
 var auto_attack_active: bool = false
 var auto_attack_pulse: float = 0.0
+var tarot_glow: float = 0.0
 
 ## Brighten the whole matching group, then bounce each die again when it fires.
 func pulse_auto_attack() -> void:
@@ -99,6 +105,13 @@ func roll_to(value: int, order: int, speed: float, power: float = 0.0, perfect: 
 	selection_emphasis = 0
 	scale = Vector2.ONE * base_scale
 
+## Single-die corrections play two complete atlas loops at 15% faster playback.
+func reroll_to(value: int, speed: float) -> void:
+	roll_to(value,0,speed,0.0,false)
+	roll_motion.begin(cosmetic,resting,resting,48,0.34,0.0,false)
+	roll_motion.seconds = Art.ROLL_COUNT*REROLL_LOOPS/roll_motion.frames_per_second
+	duration = roll_motion.seconds/(speed*REROLL_SPEEDUP)
+
 func celebrate(color: Color, strong: bool) -> void:
 	tint = color
 	glow = 1.0
@@ -110,6 +123,7 @@ func celebrate(color: Color, strong: bool) -> void:
 
 func _process(delta: float) -> void:
 	effect_age += delta
+	tarot_glow = maxf(0,tarot_glow-delta*1.7)
 	auto_attack_pulse = maxf(0,auto_attack_pulse-delta)
 	rejection_age = maxf(0,rejection_age-delta)
 	if charging:
@@ -144,11 +158,25 @@ func _process(delta: float) -> void:
 func sprite_frame() -> int:
 	return roll_motion.frame_at(elapsed/duration) if rolling else clampi(face,1,6)-1
 
+## Selected dice lift off their resting places and gently float while awaiting confirmation.
+func selection_offset() -> Vector2:
+	return Vector2(0,-selection_emphasis*(30.0+(0.0 if reduced else sin(effect_age*TAU/1.5)*3.0)))
+
 func _draw() -> void:
 	var rejection: float = sin(rejection_age*90)*10*(rejection_age/0.28)
 	var bounce: float = auto_attack_bounce()
 	var magic_scale: float = (0.1 if reduced else 0.1+0.08*sin(effect_age*TAU*1.8)) if magician_hint else 0.0
-	draw_set_transform(Vector2(rejection,-bounce*30),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x+bounce*0.36+magic_scale))
+	var reroll_scale: float = (0.08 if reduced else 0.08+0.07*sin(effect_age*TAU*1.5)) if reroll_hint else 0.0
+	draw_set_transform(selection_offset()+Vector2(rejection,-bounce*30),idle_hint.y,Vector2.ONE*(1+selection_emphasis*0.12+idle_hint.x+bounce*0.36+magic_scale+reroll_scale))
+	if reroll_hint:
+		for spread in range(4,0,-1):
+			var extent: float = 55+spread*5
+			draw_rect(Rect2(-extent,-extent,extent*2,extent*2),Color("ffe1a0",0.025+reroll_scale*0.3))
+	if not socket_gem.is_empty(): _draw_socket_glow()
+	if tarot_glow > 0:
+		for layer in range(5,0,-1):
+			var side: float = 56+layer*6
+			draw_rect(Rect2(-side,-side,side*2,side*2),Color("bd75ff",tarot_glow*0.055))
 	if auto_attack_active or auto_attack_pulse > 0: _draw_auto_attack_glow()
 	if connection_fire > 0: _draw_connection_fire()
 	if connection_glow:
@@ -159,6 +187,12 @@ func _draw() -> void:
 			var extent: float = 54 + i * 5
 			draw_rect(Rect2(-extent, -extent, extent * 2, extent * 2), Color(tint, glow * 0.035 * (5 - i)))
 	Art.paint_frame(self,sprite_frame(),Rect2(Vector2.ONE*(-Art.DRAW_SIDE/2),Vector2.ONE*Art.DRAW_SIDE))
+	if tarot_glow > 0:
+		draw_rect(Rect2(-53,-55,106,109),Color("c98aff",tarot_glow*0.23))
+		draw_rect(Rect2(-53,-55,106,109),Color("e6baff",tarot_glow*0.9),false,3)
+	if not socket_gem.is_empty():
+		draw_rect(Rect2(-53,-55,106,109),Color(GemPaint.Gems.Catalog.color(socket_gem.id),0.6),false,3)
+		GemPaint.paint(self,Vector2(40,43),socket_gem,13,false)
 	if connection_glow:
 		draw_rect(Rect2(-53,-55,106,109),Color(1,1,1,0.18))
 		draw_rect(Rect2(-53,-55,106,109),Color.WHITE,false,3)
@@ -167,6 +201,14 @@ func _draw() -> void:
 	if auto_attack_active or auto_attack_pulse > 0:
 		draw_rect(Rect2(-53,-55,106,109),Color("fff4c6",0.18 if auto_attack_active else auto_attack_pulse*0.3))
 		draw_rect(Rect2(-53,-55,106,109),Color("ffdc87",0.9 if auto_attack_active else 0.85*auto_attack_pulse/AUTO_ATTACK_PULSE_SECONDS),false,3)
+
+## Equipped color stays visible behind the neutral face and white selection outline.
+func _draw_socket_glow() -> void:
+	var color: Color = GemPaint.Gems.Catalog.color(socket_gem.id)
+	var pulse: float = 1.0 if reduced else 0.9+sin(effect_age*TAU/2)*0.1
+	for layer in range(5,0,-1):
+		var side: float = 55+layer*5
+		draw_rect(Rect2(-side,-side,side*2,side*2),Color(color,(0.05+0.008*int(socket_gem.level))*pulse))
 
 ## A layered amber halo distinguishes firing dice from idle selection hints.
 func _draw_auto_attack_glow() -> void:

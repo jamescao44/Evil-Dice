@@ -1,6 +1,7 @@
 extends Node2D
 const Run = preload("res://scripts/progression/run_rules.gd")
 ## Collection shell. Battles remain separate scenes with the same combat model.
+const PlayerSprite = preload("res://scripts/player/player_sprite.gd")
 const Catalog = preload("res://scripts/home/home_catalog.gd")
 const Rules = preload("res://scripts/combat/battle_rules.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
@@ -52,10 +53,11 @@ func _ready() -> void:
 	pixel_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	GameText.prepare_font(pixel_font)
 	pixel_font.oversampling = 1
-	for key in ["eldritch", "stone", "arch", "column", "floor0", "book", "crown", "fx", "attack", "vanguard", "archer", "mage", "paladin", "high_priest", "spellsword", "fanatic", "octopus", "tentacle", "bound_demon"]:
+	for key in ["eldritch", "stone", "arch", "column", "floor0", "book", "crown", "fx", "attack"]:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
+	preload("res://scripts/enemies/enemy_visuals.gd").load_into(art)
 	# Match the opening portrait and collection thumbnails to the run's level-one form.
-	art.flameling = preload("res://assets/art/player/flamelings/level-2.png")
+	art.flameling = PlayerSprite.texture()
 	preview_die = Die.new()
 	preview_die.set_process(false)
 	add_child(preview_die)
@@ -88,7 +90,11 @@ func stage_rect() -> Rect2:
 	return Rect2(40, 260, 724, 680) if portrait else Rect2(48, 132, 550, 520)
 
 func play_rect() -> Rect2:
-	return Rect2(88, 1372, 628, 112) if portrait else Rect2(680, 530, 500, 88)
+	return Rect2(88, 1372, 384, 112) if portrait else Rect2(680, 530, 300, 88)
+
+## Keep the fresh-run action beside Play with a separate, full-height touch target.
+func restart_rect() -> Rect2:
+	return Rect2(488, 1372, 228, 112) if portrait else Rect2(996, 530, 184, 88)
 
 func skills_rect() -> Rect2:
 	return Rect2(48, 1268, 708, 96) if portrait else Rect2(656, 493, 560, 70)
@@ -146,7 +152,7 @@ func _interactive(point: Vector2) -> bool:
 	if settings_rect().has_point(point): return true
 	for i in range(5):
 		if tab_rect(i).has_point(point): return true
-	if page == 2: return play_rect().has_point(point)
+	if page == 2: return play_rect().has_point(point) or restart_rect().has_point(point)
 	if page == 1: return skills_rect().has_point(point) or picker_rect().has_point(point) or (ancients.size() > 1 and stage_rect().has_point(point))
 	if page == 0:
 		for i in range(dices.size()):
@@ -257,6 +263,7 @@ func _activate(point: Vector2) -> void:
 	match page:
 		2:
 			if play_rect().has_point(point): start_battle()
+			elif restart_rect().has_point(point): restart_battle()
 		1:
 			if picker_rect().has_point(point):
 				modal = "ancients"
@@ -275,6 +282,13 @@ func _activate(point: Vector2) -> void:
 
 func _click() -> void:
 	if not muted and DisplayServer.get_name() != "headless": click_audio.play()
+
+## Clear the saved chapter before launching the ordinary level-one setup.
+func restart_battle() -> void:
+	if is_instance_valid(battle): return
+	campaign.restart()
+	_click()
+	start_battle()
 
 func start_battle() -> void:
 	if is_instance_valid(battle): return
@@ -392,22 +406,26 @@ func _draw_play() -> void:
 	_center(at + Vector2(0, 50 if portrait else 42), ancients[ancient_index].style, 24 if portrait else 20, GREEN)
 	var y: float = 1128 if portrait else 348
 	var start: float = 78 if portrait else 702
-	var step: float = 72 if portrait else 52
+	var step: float = 90 if portrait else 65
 	for i in range(Run.PLAYABLE_WAVES):
-		var p := Vector2(start+(i%10)*step,y+floori(i/10.0)*(64 if portrait else 52))
-		if i%10 < 9: Pixel.line(self,p,p+Vector2(step,0),EDGE.darkened(0.4),3)
+		var p := Vector2(start+(i%Run.Campaign.WAVES_PER_LEVEL)*step,y+floori(float(i)/Run.Campaign.WAVES_PER_LEVEL)*(64 if portrait else 52))
+		if i%Run.Campaign.WAVES_PER_LEVEL < Run.Campaign.WAVES_PER_LEVEL-1: Pixel.line(self,p,p+Vector2(step,0),EDGE.darkened(0.4),3)
 		var marker: Dictionary = Run.Waves.map_marker(i)
 		var special: bool = marker.highlight
 		var key: String = marker.art
 		Pixel.disc(self,p,23 if portrait else 19,INK,4)
-		var active_level: bool = floori(i/10.0)+1 == campaign.next_level()
+		var active_level: bool = floori(float(i)/Run.Campaign.WAVES_PER_LEVEL)+1 == campaign.next_level()
 		_art(key,Rect2(p-Vector2.ONE*18,Vector2.ONE*36),(GOLD if special else CREAM) if active_level else MUTED.darkened(0.5))
-		_center(p+Vector2(0,43),str(i%10+1),20 if portrait else 16,(GOLD if special else MUTED) if active_level else MUTED.darkened(0.5))
+		_center(p+Vector2(0,43),str(i%Run.Campaign.WAVES_PER_LEVEL+1),20 if portrait else 16,(GOLD if special else MUTED) if active_level else MUTED.darkened(0.5))
 	_center(Vector2(at.x, 1340 if portrait else 518), GameText.format("LEVEL %d / %d",[campaign.next_level(),Run.Campaign.LEVEL_COUNT]), 26 if portrait else 20, GOLD)
 	var button := play_rect()
 	_button(button, "", true, GREEN)
-	_mini_die(button.get_center() + Vector2(-92, 0), dices[dice_index].face, 48 if portrait else 38)
+	_mini_die(button.get_center() + Vector2(-68, 0), dices[dice_index].face, 48 if portrait else 38)
 	_center(button.get_center() + Vector2(34, 14), "PLAY", 46 if portrait else 36, CREAM)
+	_button(restart_rect(), "", true, Color("d09b8e"))
+	var restart_at := restart_rect().get_center()
+	_center(restart_at + Vector2(0, -6 if portrait else -4), "RESTART", 28 if portrait else 22, CREAM)
+	_center(restart_at + Vector2(0, 30 if portrait else 24), "FROM LEVEL 1", 22 if portrait else 18, MUTED)
 
 func _draw_ancient() -> void:
 	_draw_shrine()
@@ -497,18 +515,21 @@ func _draw_skills() -> void:
 	if skill_page == 0:
 		var point := Vector2(80,560) if portrait else Vector2(248,268)
 		var width: float = 640 if portrait else 784
-		var y: float = _wrapped(point,"Matching dice attack automatically. Connect 3-6 consecutive unique faces to summon a fire skill, or tap dice then OK. Three rolls per turn.",width,28 if portrait else 22,CREAM)
-		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),Run.Patterns.BONUS_TURN_HELP,width,28 if portrait else 22,CREAM)
-		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"End Turn: leftover pip sum x 1% of maximum HP is restored. Darkness blocks healing.",width,28 if portrait else 22,CREAM)
+		var y: float = _wrapped(point,"Matches attack on the first throw. Reroll individual dice up to four times, then cast one straight skill to end your turn.",width,28 if portrait else 22,CREAM)
+		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),Run.Patterns.TURN_HELP,width,28 if portrait else 22,CREAM)
+		y = _wrapped(Vector2(point.x,y+(90 if portrait else 60)),"Gemstones enhance matching attacks and straight skills. Equip or merge them in the backpack.",width,28 if portrait else 22,CREAM)
 		_wrapped(Vector2(point.x,y+(90 if portrait else 60)),"Unused rolls fill Reroll Treasure. Perfect still adds +0.1 DMG per consecutive success.",width,24 if portrait else 20,MUTED)
 		return
 	var entries: Array = Rules.Patterns.help_entries(skill_page == 2)
 	for i in range(entries.size()):
-		var rect := Rect2(48,490+i*216,708,210) if portrait else Rect2(168+(i%2)*480,218+floori(i/2.0)*205,464,198)
+		var rows: int = entries.size() if portrait else ceili(entries.size()/2.0)
+		var top: float = 490 if portrait else 218
+		var stride: float = minf(216 if portrait else 205,(area.end.y-24-top)/rows)
+		var rect := Rect2(48,top+i*stride,708,stride-6) if portrait else Rect2(168+(i%2)*480,top+floori(i/2.0)*stride,464,stride-6)
 		var color: Color = GREEN if skill_page == 1 else PURPLE
 		draw_rect(Rect2(rect.position+Vector2(0,rect.size.y-4),Vector2(rect.size.x,2)),Color(EDGE,0.55))
 		_text(rect.position+Vector2(12,30),entries[i].name,26 if portrait else 20,color)
-		_wrapped(rect.position+Vector2(12,72),entries[i].text,684 if portrait else 440,26 if portrait else 20,CREAM)
+		_wrapped(rect.position+Vector2(12,58 if entries.size() > 4 else 72),entries[i].text,684 if portrait else 440,26 if portrait else 18 if entries.size() > 4 else 20,CREAM)
 
 func _text(at: Vector2, value: String, size: int, color: Color = CREAM) -> void:
 	value = GameText.text(value)
@@ -529,6 +550,9 @@ func _wrapped(at: Vector2, value: String, width: float, size: int, color: Color)
 	return maxf(at.y,y-size-10)
 
 func _art(key: String, rect: Rect2, color: Color = Color.WHITE) -> void:
+	if key == "flameling":
+		PlayerSprite.paint_actor(self,rect,PlayerSprite.idle_frame(age),age,color,reduced)
+		return
 	if not art.has(key): art[key] = load("res://assets/art/fantasy/" + key + ".png")
 	draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, color)
 

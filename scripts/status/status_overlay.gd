@@ -3,13 +3,15 @@ const Paint = preload("res://scripts/status/status_paint.gd")
 var battle
 
 func _ready() -> void:
-	z_index = 35
+	z_index = BattleLayers.STATUS
 
 func _process(_delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
 	if not is_instance_valid(battle) or not battle.model.is_frozen() or battle._menus_open() or battle.view_phase in ["over","reward"]: return
+	# Tarot view replaces the dice area; the character's separate ice remains tappable.
+	if battle.tarot_ui.inventory_visible(): return
 	var radius: float = battle.DICE_RADIUS+8
 	var at: Vector2 = battle.DICE_CENTER
 	var cracks: int = 3-battle.model.ice_hits_remaining if battle.model.phase == "frozen" else 0

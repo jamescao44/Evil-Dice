@@ -39,12 +39,14 @@ func passive_text() -> String:
 func paint(canvas: CanvasItem) -> void:
 	var phone := portrait()
 	var frame := Rect2(62,536,180,220) if phone else Rect2(144,206,170,142)
-	var texture: Texture2D = battle.evolution.forms[selected_form]
+	var texture: Texture2D = battle.evolution.Sprite.texture(battle.evolution.Sprite.idle_frame(battle.clock_time))
 	var bounds: Rect2 = battle.evolution.visible_bounds[selected_form]
 	var source := Rect2(bounds.position*Vector2(texture.get_size()),bounds.size*Vector2(texture.get_size()))
 	var scale_factor: float = minf(frame.size.x/source.size.x,frame.size.y/source.size.y)
 	var size: Vector2 = source.size*scale_factor
-	canvas.draw_texture_rect_region(texture,Rect2(frame.get_center()-size/2,size),source)
+	var cell_size: Vector2 = Vector2(texture.get_size())*scale_factor
+	var actor_rect := Rect2(frame.get_center()-size/2-bounds.position*cell_size,cell_size)
+	battle.evolution.Sprite.paint_actor(canvas,actor_rect,battle.evolution.Sprite.idle_frame(battle.clock_time),battle.clock_time,Color.WHITE,battle.reduced)
 	for i in range(3):
 		var rect := option_rect(i)
 		battle._button(rect,GameText.format("FORM %d",i+1),true,canvas)

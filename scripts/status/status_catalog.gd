@@ -4,12 +4,12 @@ const Rules = preload("res://scripts/combat/battle_rules.gd")
 const Status = preload("res://scripts/status/status_effect.gd")
 const ENTRIES := {
 	Status.HIDDEN: {"name":"Invisible", "icon":"dark", "text":"Untargetable for 3 turns. Using an attack skill breaks invisibility.", "color":Color("aaa9bf")},
-	2: {"name": "Regeneration", "icon": "heal", "text": "Heal 5 at turn start.", "color": Color("aed085")},
+	2: {"name": "Regeneration", "icon": "heal", "text": "Heal 50 at turn start.", "color": Color("aed085")},
 	3: {"name": Rules.PAIR_NAMES[2], "icon": "attack", "text": "Adds +0.5 to DMG. Stacks with other bonuses.", "color": Color("dfb866")},
 	33: {"name": Rules.SPECIAL_NAMES[2], "icon": "crown", "text": "Adds +2.0 to DMG. Stacks with other bonuses.", "color": Color("c5a4de")},
 	6: {"name": Rules.PAIR_NAMES[5], "icon": "shield", "text": "Invincible.", "color": Color("80d8c6")},
 	Status.FROZEN: {"name": "Frozen", "icon": "ice", "text": "Tap the ice 3 times to break free and end your turn.", "color": Color("82dfff")},
-	Status.BURNING: {"name": "Burning", "icon": "fire", "text": "5 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.", "color": Color("ff9955")},
+	Status.BURNING: {"name": "Burning", "icon": "fire", "text": "Each stack deals 50 damage to you or 5 to enemies after the enemy phase. Lose 1 stack per turn; maximum 10.", "color": Color("ff9955")},
 	Status.STUNNED: {"name": "Stunned", "icon": "stars", "text": "The next throw's power marker moves unpredictably.", "color": Color("ffe388")},
 	Status.DARKNESS: {"name":"Darkness", "icon":"dark", "text":"Attack damage x0.5. Cannot heal. Lose 1 stack each turn.", "color":Color("c18ce8")},
 	Status.CORROSION: {"name":"Corrosion", "icon":"acid", "text":"Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.", "color":Color("8ad26a")},
@@ -18,7 +18,7 @@ const ENTRIES := {
 }
 const HELP_TEXT := {
 	Status.FROZEN:"Player: tap the ice 3 times to end the turn. Enemies: skip one turn.",
-	Status.BURNING:"5 damage per stack each turn. Lose 1 stack per turn; maximum 10 stacks.",
+	Status.BURNING:"Each stack deals 50 damage to you or 5 to enemies per turn. Lose 1 stack per turn; maximum 10.",
 	Status.STUNNED:"Player only. The next throw's Perfect marker moves unpredictably.",
 	Status.DARKNESS:"Attack damage x0.5; cannot heal. Lose 1 stack per turn.",
 	Status.CORROSION:"No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",
@@ -54,6 +54,17 @@ static func remaining(id: int, amount: int) -> String:
 static func enemy_active(enemy: Dictionary) -> Array:
 	# Enemy defenses predate StatusEffect; adapt their live values for one UI list.
 	var items: Array = []
+	var modifier: String = enemy.get("modifier","")
+	if Rules.EnemyModifiers.ITEMS.has(modifier):
+		var entry: Dictionary = Rules.EnemyModifiers.ITEMS[modifier].duplicate()
+		if modifier == "elemental" and ENTRIES.has(enemy.get("element",-1)):
+			entry.icon = ENTRIES[enemy.element].icon
+			entry.name = ENTRIES[enemy.element].name
+		entry.merge({"id":"modifier_"+modifier,"turns":1,"permanent":true,"stacking":false,"badge":"","counter":GameText.text("Elite trait")})
+		entry.color = Rules.EnemyModifiers.color(enemy,entry.color)
+		items.append(entry)
+	if Rules.EnemyCatalog.ITEMS[enemy.role].get("swift",false):
+		items.append({"id":"swift","name":"Swift","icon":"stars","color":Color("babdf2"),"turns":1,"permanent":true,"stacking":false,"badge":"","counter":GameText.text("Trait")})
 	if enemy.get("shield",0) > 0:
 		items.append({"id":"enemy_shield","name":"Shield","icon":"shield","color":Color("80d8c6"),"turns":enemy.shield,"permanent":false,"stacking":false,"counter":GameText.format("%d shield",enemy.shield),"badge":str(enemy.shield)})
 	if enemy.get("attack_boost",false):

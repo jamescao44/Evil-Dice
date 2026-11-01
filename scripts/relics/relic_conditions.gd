@@ -1,15 +1,17 @@
 extends RefCounted
 ## Conditional relic rules share the normal combat hooks, independent of presentation.
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
+const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Status = preload("res://scripts/status/status_effect.gd")
-const BONES := ["unknown_arm","unknown_pelvis","unknown_leg","unknown_sternum","unknown_skull"]
 const ROLL_DAMAGE := {"unknown_arm":5,"unknown_pelvis":5,"unknown_leg":5,"unknown_sternum":10,"unknown_skull":10,"witch_ghost":50}
 const VULNERABILITIES := {"hellfire":Status.BURNING,"nightmare_totem":Status.DARKNESS,"corrupt_crystal":Status.CORROSION}
 const RANDOM_STATUSES := [Status.BURNING,Status.FROZEN,Status.DARKNESS,Status.CORROSION,Status.PLAGUE]
 
 ## Gate conditional loot consistently in chests, shops, tarot grants and reel strips.
 static func loot_allowed(inventory, id: String) -> bool:
-	return id != "unidentified_ring" or BONES.all(func(bone): return inventory.has(bone))
+	if not Catalog.ITEMS.get(id,{}).get("requires_set_parts",false): return true
+	var recipe: Dictionary = Catalog.Sets.recipe_for(id)
+	return not recipe.is_empty() and recipe.ingredients.all(func(part): return part == id or inventory.has(part))
 
 ## The eye grows once per actual tarot use; copying repeats its benefit, not its counter.
 static func tarot_used(model) -> void:
@@ -36,7 +38,12 @@ static func target_factor(model, target: int, activate: bool = false) -> float:
 			if activate: Sequence.activate(model,entry)
 	return factor
 
-## Every accepted throw replaces Black Chip's condition and snapshots free chip casts.
+## Any new roll expires the previous Black Chip bonus without activating it again.
+static func clear_roll_bonuses(model) -> void:
+	for item in model.relics.items:
+		if item.id == "black_chip": item.no_straight = false
+
+## Opening throws set Black Chip's condition and snapshot free chip casts.
 static func rolled(model) -> Array:
 	var values: Array = model.dice_turn.unused().map(func(i): return model.dice_turn.values[i])
 	var no_straight: bool = not model.Patterns.has_combination(values)

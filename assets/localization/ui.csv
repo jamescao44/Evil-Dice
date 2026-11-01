@@ -70,12 +70,12 @@ Restore all missing health. No attack.,Restore all missing health. No attack.,�
 +2.0 damage multiplier for the next 3 attacks.,+2.0 DMG for the next 3 attacks. Recast: 50-base shockwave.,接下来3次攻击，倍率+2.0；重施释放50基础伤害冲击波。
 Hit every foe for 2x regular attack power.,Hit every foe for 2x regular attack power.,攻击所有敌人，造成普通攻击的2倍伤害。
 "6 automatic random hits, each regular attack power.","6 automatic random hits, each regular attack power.",自动攻击随机目标6次，每次造成普通攻击伤害。
-Destroy the squad. Heal 12 HP.,Destroy the squad. Heal 12 HP.,消灭整支敌方小队，恢复12点生命。
+Destroy the squad. Heal 120 HP.,Destroy the squad. Heal 120 HP.,消灭敌方小队，恢复120生命。
 Hit the city for 5x regular attack power.,Hit the city for 5x regular attack power.,对城市造成普通攻击的5倍伤害。
 +2.0 damage multiplier for the next 3 rolls.,+2.0 DMG for 3 rolls. Recast: 50-base shockwave.,倍率+2.0，持续3次投掷；重施释放50基础伤害冲击波。
 2x city attack; clear all troops.,2x city attack; clear all troops.,对城市造成2倍攻击伤害，消灭所有士兵。
 6 automatic city hits; each clears one troop.,6 automatic city hits; each clears one troop.,自动攻击城市6次，每次消灭一名士兵。
-2000 base damage x DMG multiplier; clear troops; heal 12.,2000 base damage x DMG multiplier; clear troops; heal 12.,2000基础伤害 × 伤害倍率；消灭所有士兵，恢复12点生命。
+2000 base damage x DMG multiplier; clear troops; heal 120.,2000 base damage x DMG multiplier; clear troops; heal 120.,2000基础伤害×DMG倍率，清空部队，恢复120生命。
 attack,attack,攻击
 attack x1.5 +%s,attack x1.5 +%s,攻击 ×1.5 +%s
 regen 5 for %s turns,regen 5 for %s turns,每回合恢复5点生命，持续%s回合
@@ -189,12 +189,12 @@ Stunned,Stunned,晕眩
 Darkness,Darkness,黑暗
 Corrosion,Corrosion,腐蚀
 Plague,Plague,瘟疫
-Heal 5 at turn start.,Heal 5 at turn start.,回合开始恢复5点生命。
+Heal 50 at turn start.,Heal 50 at turn start.,回合开始恢复50点生命。
 Adds +0.5 to DMG. Stacks with other bonuses.,"+0.5 DMG, additive. Recast: 10-base shockwave, then refresh.",倍率+0.5，与其他加成相加；重施释放10基础伤害冲击波后刷新。
 Adds +2.0 to DMG. Stacks with other bonuses.,"+2.0 DMG, additive. Recast: 50-base shockwave, then refresh.",倍率+2.0，与其他加成相加；重施释放50基础伤害冲击波后刷新。
 Invincible.,Invincible. Recast adds the new duration to the time remaining.,无敌；重施将新持续时间加到剩余时间上。
 Tap the ice 3 times to break free and end your turn.,Tap the ice 3 times to break free and end your turn.,点击冰块3次，破冰后结束本回合。
-5 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.,5 damage per stack after enemies act; lose 1 stack each turn. Maximum 10 stacks.,敌方行动后，每层造成5点伤害；每回合减少1层，最多10层。
+Each stack deals 50 damage to you or 5 to enemies after the enemy phase. Lose 1 stack per turn; maximum 10.,Each stack deals 50 damage to you or 5 to enemies after the enemy phase. Lose 1 stack per turn; maximum 10.,敌方阶段后，每层对玩家造成50伤害，对敌人造成5伤害。每回合减少1层，最多10层。
 The next throw's power marker moves unpredictably.,The next throw's power marker moves unpredictably.,下次投掷的力量指示条将随机移动。
 Attack damage x0.5. Cannot heal. Lose 1 stack each turn.,Attack damage x0.5. Cannot heal. Lose 1 stack each turn.,攻击伤害 ×0.5，无法恢复生命，每回合减少1层。
 "Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.","Shields, invincibility and armor do not protect you. Damage taken x1.5. Lose 1 stack each turn.",护盾、无敌和护甲失效，受到伤害 ×1.5，每回合减少1层。
@@ -316,7 +316,7 @@ Base damage +5. Apply 1 extra stack of harmful status effects.,Base damage +5. A
 Lucky Die,Lucky Die,幸运骰子
 Chance of a throw containing a 6 increases by 5%.,Chance of a throw containing a 6 increases by 5%.,投掷包含6点的概率增加5%。
 Bloodstone,Bloodstone,血石
-"Heal for 20% of attack damage. Cap: 10% max HP, or 5% per combo hit.","Heal for 20% of attack damage. Cap: 10% max HP, or 5% per combo hit.",恢复攻击伤害20%的生命。上限为最大生命的10%，连击每次上限为5%。
+"Heal for 200% of attack damage. Cap: 10% max HP, or 5% per combo hit.","Heal for 200% of attack damage. Cap: 10% max HP, or 5% per combo hit.",恢复攻击伤害200%的生命。上限为最大生命的10%，连击每次上限为5%。
 Twin Scythes,Twin Scythes,双镰
 Double the number of hits in combo skills.,Double the number of hits in combo skills.,连击技能的攻击次数翻倍。
 Last Contract,Last Contract,最后的契约
@@ -491,7 +491,7 @@ Recast: heal remainder.,Recast: heal remainder.,重施：结清剩余治疗。
 SKILLS,SKILLS,技能
 STATUSES,STATUSES,状态
 Player: tap the ice 3 times to end the turn. Enemies: skip one turn.,Player: tap the ice 3 times to end the turn. Enemies: skip one turn.,玩家：点击冰块3次破冰并结束回合。敌人：跳过一回合。
-5 damage per stack each turn. Lose 1 stack per turn; maximum 10 stacks.,5 damage per stack each turn. Lose 1 stack per turn; maximum 10 stacks.,每层每回合造成5点伤害；每回合减少1层，最多10层。
+Each stack deals 50 damage to you or 5 to enemies per turn. Lose 1 stack per turn; maximum 10.,Each stack deals 50 damage to you or 5 to enemies per turn. Lose 1 stack per turn; maximum 10.,每层每回合对玩家造成50伤害，对敌人造成5伤害。每回合减少1层，最多10层。
 Player only. The next throw's Perfect marker moves unpredictably.,Player only. The next throw's Perfect marker moves unpredictably.,仅玩家：下次投掷的完美指示条随机移动。
 Attack damage x0.5; cannot heal. Lose 1 stack per turn.,Attack damage x0.5; cannot heal. Lose 1 stack per turn.,攻击伤害减半，无法恢复生命；每回合减少1层。
 "No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.","No shield, invincibility or armor. Take x1.5 damage. Lose 1 stack per turn.",护盾、无敌与护甲失效，受到伤害×1.5；每回合减少1层。
@@ -645,7 +645,7 @@ ROLL,ROLL,投掷
 CANCEL SKILL,CANCEL SKILL,取消技能
 Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.,Tap the center to roll. Drag through three dice and release to summon a skill. Three rolls per turn.,点击中央投掷，拖过三枚骰子后松手召唤技能。每回合可投三次。
 Return a skill to the red center to unlock its dice. Use all six dice to end the turn.,Return a skill to the red center to unlock its dice. Use all six dice to end the turn.,将技能拖回红色中央可解锁骰子；用完六枚骰子结束回合。
-Reroll Treasure: bank 10 unused rolls for a Perfect Chest. It can upgrade when opened.,Reroll Treasure: bank 10 unused rolls for a Perfect Chest. It can upgrade when opened.,重投宝箱：累计10次未用投掷可开完美宝箱，开启时有概率升级。
+Reroll Treasure: bank 20 unused rolls for a Normal Chest. It can upgrade when opened.,Reroll Treasure: bank 20 unused rolls for a Normal Chest. It can upgrade when opened.,重投宝箱：累计20次未用投掷可开普通宝箱，开启时有概率升级。
 Two Alike,Two Alike,两个一样
 Three Alike,Three Alike,三个一样
 Four Alike,Four Alike,四个一样
@@ -764,12 +764,12 @@ Change one unused rolled die to a different face. Cancel without consuming the c
 Receive a random eligible relic. Every eligible relic has an equal chance.,Receive a random eligible relic. Every eligible relic has an equal chance.,随机获得一件合格法具，每件获得概率相同。
 Remove all harmful statuses from the player.,Remove all harmful statuses from the player.,解除玩家所有异常状态。
 The next eligible roll guarantees a straight of at least four dice.,The next eligible roll guarantees a straight of at least four dice.,至少有四枚未使用骰子时可用。下次合格投掷必有四顺子。
-Gain 50 shield points.,Gain 50 shield points.,获得50点护盾。
+Gain 500 shield points.,Gain 500 shield points.,获得500点护盾。
 Restore all dice spent this turn so they can be used again immediately.,Restore all dice spent this turn so they can be used again immediately.,解锁本回合已消耗的骰子，可立即再次使用。
 Immediately reroll all unused dice without spending a roll.,Immediately reroll all unused dice without spending a roll.,立即重掷所有未使用骰子，不消耗投掷次数。
 End this turn and carry unused rolls into the next turn.,End this turn and carry unused rolls into the next turn.,结束回合并结算余骰治疗，将剩余投掷次数转至下一回合；不跨波保留。
 The next throw includes at least three sixes; repeated uses guarantee one more six.,The next throw includes at least three sixes; repeated uses guarantee one more six.,下次投掷至少有三个六；每次重复使用多保证一个六。
-Break every enemy shield. Deal 50 fixed damage to all enemies and 30 to yourself.,Break every enemy shield. Deal 50 fixed damage to all enemies and 30 to yourself.,破坏所有敌方护盾，所有敌人直接损失50生命，自己损失30生命。
+Break every enemy shield. Deal 50 fixed damage to all enemies and 300 to yourself.,Break every enemy shield. Deal 50 fixed damage to all enemies and 300 to yourself.,破坏所有敌方护盾，所有敌人直接损失50生命，自己损失300生命。
 The next three throws are Perfect. Using this again resets the count to three.,The next three throws are Perfect. Using this again resets the count to three.,接下来三次投掷必定Perfect，重复使用重置为三次。
 "If currently unused dice cannot form a straight, gain 2 rerolls.","If currently unused dice cannot form a straight, gain 2 rerolls.",若当前未使用骰子无法组成顺子，获得2次重掷。
 Choose a die to change,Choose a die to change,选择要更改的骰子
@@ -885,7 +885,7 @@ Three-straight skill damage +20%. Marble bonuses add together.,Three-straight sk
 Three-straight skill damage +30%. Marble bonuses add together.,Three-straight skill damage +30%. Marble bonuses add together.,三连顺子技能伤害+30%。同类弹珠加成相加。
 Healing and lifesteal +10%.,Healing and lifesteal +10%.,治疗与吸血效果+10%。
 Store an extra 20% of enemy blood gem drops in this relic's sale value.,Store an extra 20% of enemy blood gem drops in this relic's sale value.,额外储存敌人掉落血宝石的20%，加入本物品的出售价值。
-Gain 10 shield when using a tarot.,Gain 10 shield when using a tarot.,使用塔罗牌时获得10点护盾。
+Gain 100 shield when using a tarot.,Gain 100 shield when using a tarot.,使用塔罗牌时获得100点护盾。
 Enemy tarot drop chance +5 percentage points.,Enemy tarot drop chance +5 percentage points.,敌人掉落塔罗牌的概率+5个百分点。
 Damage multiplier +2 while only one enemy remains.,Damage multiplier +2 while only one enemy remains.,仅剩一名敌人时，伤害乘数+2。
 Three consecutive Perfect throws protect your combo from one miss. Stores one protection.,Three consecutive Perfect throws protect your combo from one miss. Stores one protection.,连续三次Perfect可抵消一次失误造成的连击重置。最多储存一次。
@@ -948,7 +948,7 @@ THE FANATIC,THE FANATIC,狂热法师
 Vodka,Vodka,伏特加
 Enemy Burning damage x2.,Enemy Burning damage x2.,敌人燃烧伤害×2。
 Mysterious Seed,Mysterious Seed,神秘种子
-Store twice your overhealing as base damage. Fire at a random enemy at player-turn end.,Store twice your overhealing as base damage. Fire at a random enemy at player-turn end.,储存过量恢复的两倍作为基础伤害，玩家回合结束时攻击随机敌人。
+Store 20% of overhealing as base damage. Fire at a random enemy at player-turn end.,Store 20% of overhealing as base damage. Fire at a random enemy at player-turn end.,储存过量恢复的20%作为基础伤害，玩家回合结束时攻击随机敌人。
 Magic Bandage,Magic Bandage,魔法绷带
 "If a turn starts below full HP, healing is doubled for that turn.","If a turn starts below full HP, healing is doubled for that turn.",回合开始时未满血，本回合恢复量翻倍。
 Steel Sword,Steel Sword,精钢剑
@@ -1028,3 +1028,135 @@ Broken Sword,Broken Sword,断剑
 Remains,Remains,残骸
 Stored multiplier: +%.2f.,Stored multiplier: +%.2f.,已积累伤害乘数：+%.2f。
 RELIC VANISHED,RELIC VANISHED,法具消失
+(Set: %s %d/%d),(Set: %s %d/%d),（套装：%s %d/%d）
+Looking for this?,Looking for this?,在找这个吗？
+FREE,FREE,免费
+%s damage,%s damage,%s 伤害
+ (%d hits), (%d hits),（%d次命中）
+Hit a random foe. Apply 2 Burning.,Hit a random foe. Apply 2 Burning.,攻击随机敌人，施加2层燃烧。
+Hit a random foe. Apply 3 Burning.,Hit a random foe. Apply 3 Burning.,攻击随机敌人，施加3层燃烧。
+Hit all foes. Double damage against Burning foes.,Hit all foes. Double damage against Burning foes.,攻击全体敌人，对燃烧敌人伤害翻倍。
+Hit all foes. Double damage against Burning foes. Then apply 2 Burning.,Hit all foes. Double damage against Burning foes. Then apply 2 Burning.,攻击全体敌人，对燃烧敌人伤害翻倍，施加2层燃烧。
+Hit all foes 5 times. Double damage against Burning foes; apply 2 Burning after all hits.,Hit all foes 5 times. Double damage against Burning foes; apply 2 Burning after all hits.,攻击全体敌人5次，对燃烧敌人伤害翻倍；结束后施加2层燃烧。
+Hit all foes 5 times. Double damage against Burning foes; apply 3 Burning after all hits.,Hit all foes 5 times. Double damage against Burning foes; apply 3 Burning after all hits.,攻击全体敌人5次，对燃烧敌人伤害翻倍；结束后施加3层燃烧。
+Hit all foes 10 times. Double damage against Burning foes.,Hit all foes 10 times. Double damage against Burning foes.,攻击全体敌人10次，对燃烧敌人伤害翻倍。
+"Matching dice auto-attack. Drag or tap a straight, then Confirm to cast. Three rolls per turn.","Matching dice auto-attack. Drag or tap a straight, then OK to cast. Three rolls per turn.",同点自动攻击。拖连或点选顺子，再点确认自动施法。每回合三次投掷。
+Challenger's Badge,Challenger's Badge,挑战者徽章
+"Random attacks focus on the marked foe, ignoring taunt. Drag the mark to change targets.","Random attacks focus on the marked foe, ignoring taunt. Drag the mark to change targets.",随机攻击集中命中标记敌人，无视嘲讽。拖动标记可更换目标。
+Death cannot affect this enemy.,Death cannot affect this enemy.,死神无法作用于此敌人。
+Burning Gem,Burning Gem,燃烧宝石
+Healing Gem,Healing Gem,治疗宝石
+Corrosive Gem,Corrosive Gem,腐蚀宝石
+Empty socket,Empty socket,空镶孔
+Apply %d Burning through this die's automatic attack or skill.,Apply %d Burning through this die's automatic attack or skill.,此骰的自动攻击或技能施加%d层燃烧。
+"If unused at turn end, heal %d%% max HP per pip.","If unused at turn end, heal %d%% max HP per pip.",回合结束时若未使用，每点恢复%d%%最大生命。
+Apply %d Corrosion through this die's skill.,Apply %d Corrosion through this die's skill.,此骰组成的技能施加%d层腐蚀。
+Only unused Healing dice restore HP at turn end. Equip gemstones in the backpack.,Only unused Healing dice restore HP at turn end. Equip gemstones in the backpack.,回合结束仅未用的治疗骰恢复生命。可在背包中镶嵌宝石。
+Dice stay usable. Reroll unused dice up to 3 times per turn. Only Healing gemstones restore HP from leftovers.,Dice stay usable. Reroll unused dice up to 3 times per turn. Only Healing gemstones restore HP from leftovers.,骰子仍可用于技能。每回合最多投掷3次，重投未用骰子。只有治疗宝石可让余骰恢复生命。
+GEMSTONES,GEMSTONES,宝石
+RELICS,RELICS,法具
+DICE GEMSTONES,DICE GEMSTONES,骰子宝石
+ONE GEM / DIE,ONE GEM / DIE,每骰一孔
+GEMSTONES · %d,GEMSTONES · %d,宝石 · %d
+%s · LV.%d,%s · LV.%d,%s · LV.%d
+Drag matching gems together to merge.,Drag matching gems together to merge.,拖动相同宝石进行合成。
+"Tap a gem, then a socket to equip. Drag other gems to rearrange.","Tap a gem, then a socket to equip. Drag other gems to rearrange.",点击宝石后点击镶孔装备。拖动其他宝石可换位。
+UNEQUIP,UNEQUIP,卸下
+MERGE,MERGE,合成
+MAX LEVEL,MAX LEVEL,最高等级
+ (%d use), (%d use),（%d次使用）
+ (%d uses), (%d uses),（%d次使用）
+Magic Cannon,Magic Cannon,魔法炮
+Arcane Shot,Arcane Shot,魔能炮击
+Charge %d/3. Cast a %d-die straight to interrupt.,Charge %d/3. Cast a %d-die straight to interrupt.,充能%d/3。施放%d骰顺子可打断。
+FROM LEVEL 1,FROM LEVEL 1,从第一关开始
+Turns: %d / %d.,Turns: %d / %d.,回合：%d / %d。
+Turns: %d / %d. Stored charges: %d.,Turns: %d / %d. Stored charges: %d.,回合：%d / %d。储存次数：%d。
+Cleric,Cleric,神官
+Elite Cleric,Elite Cleric,精英神官
+Assassin,Assassin,刺客
+Elite Assassin,Elite Assassin,精英刺客
+Swift,Swift,迅捷
+Swift Flurry,Swift Flurry,迅捷连击
+Group Shield,Group Shield,队伍守护
+Shielding,Shielding,加盾
+Elemental,Elemental,元素
+Manic,Manic,狂躁
+Thorns,Thorns,荆棘
+Elite trait,Elite trait,加强属性
+Trait,Trait,特性
+Manic Healing,Manic Healing,狂乱治疗
+"After losing HP, gain 20% max HP as shield. Once per turn.","After losing HP, gain 20% max HP as shield. Once per turn.",受到生命伤害后获得最大生命20%的护盾，每回合一次。
+Attacks have a 50% chance to inflict its element.,Attacks have a 50% chance to inflict its element.,攻击有50%概率附加自身元素。
+Double damage and healing. 30% chance to attack allies or turn healing into damage.,Double damage and healing. 30% chance to attack allies or turn healing into damage.,伤害与治疗翻倍；30%概率攻击队友或将治疗转为伤害。
+Retaliate after an attack finishes. Once per turn.,Retaliate after an attack finishes. Once per turn.,受到攻击后，在攻击结束时反击，每回合一次。
+Swift: cannot be singled out while other allies live.,Swift: cannot be singled out while other allies live.,迅捷：有其他职业队友时无法被单独瞄准。
+Deal %s damage to an ally.,Deal %s damage to an ally.,对队友造成%s伤害。
+Restore %s max health to living allies.,Restore %s max health to living allies.,为全体队员恢复最大生命的%s。
+Give living allies %s max health as shield.,Give living allies %s max health as shield.,为全体队员添加最大生命%s的护盾。
+Deal %s max health as damage to allies.,Deal %s max health as damage to allies.,对队友造成最大生命%s的伤害。
+LEVEL %d   WAVE %d / %d,LEVEL %d   WAVE %d / %d,第%d关   第%d / %d波
+ACTIVE TAROT,ACTIVE TAROT,生效中的塔罗
+STATUS EFFECT,STATUS EFFECT,状态效果
+%d stacks · next skill,%d stacks · next skill,%d层 · 下一次技能
+%d stacks · this turn,%d stacks · this turn,%d层 · 本回合
+%d throw remaining,%d throw remaining,剩余%d次投掷
+%d stacks · next throw,%d stacks · next throw,%d层 · 下一次投掷
+%d throws remaining,%d throws remaining,剩余%d次投掷
+%d rolls · next turn,%d rolls · next turn,%d次投掷 · 下回合
+Applying this throw,Applying this throw,本次投掷生效中
+Guarding Gem,Guarding Gem,守护宝石
+Freezing Gem,Freezing Gem,冰冻宝石
+Plague Gem,Plague Gem,瘟疫宝石
+Darkness Gem,Darkness Gem,黑暗宝石
+Critical Gem,Critical Gem,暴击宝石
+Strength Gem,Strength Gem,力量宝石
+Focus Gem,Focus Gem,凝聚宝石
+Empowering Gem,Empowering Gem,强化宝石
+Gemstones enhance matching attacks and straight skills. Equip or merge them in the backpack.,Gemstones enhance matching attacks and straight skills. Equip or merge them in the backpack.,宝石强化同点自动攻击与顺子技能，可在背包中镶嵌或合成。
+Heal max HP per pip: matches %s%%; skills %s%%.,Heal max HP per pip: matches %s%%; skills %s%%.,每点恢复最大生命：同点自动攻击%s%%；顺子技能%s%%。
+Gain max-HP shield per pip: matches %s%%; skills %s%%.,Gain max-HP shield per pip: matches %s%%; skills %s%%.,每点获得最大生命护盾：同点自动攻击%s%%；顺子技能%s%%。
+Combined gem levels: +10% critical chance and +0.1 critical multiplier each; starts at x1.5.,Combined gem levels: +10% critical chance and +0.1 critical multiplier each; starts at x1.5.,参与组合的同类宝石等级相加，每级增加10%暴击率及0.1暴击倍率；基础倍率为×1.5。
+Combined gem levels: +10% base damage each.,Combined gem levels: +10% base damage each.,参与组合的同类宝石等级相加，每级增加10%基础伤害。
+Combined gem levels: +10% damage multiplier each.,Combined gem levels: +10% damage multiplier each.,参与组合的同类宝石等级相加，每级增加10%伤害乘数。
+Combined gem levels: +10% effect strength each.,Combined gem levels: +10% effect strength each.,参与组合的同类宝石等级相加，每级增加10%效果强度。
+Matches: %s%%; skills: %s%% chance to apply Burning.,Matches: %s%%; skills: %s%% chance to apply Burning.,同点自动攻击%s%%、顺子技能%s%%概率施加1层燃烧。
+Matches: %s%%; skills: %s%% chance to apply Corrosion.,Matches: %s%%; skills: %s%% chance to apply Corrosion.,同点自动攻击%s%%、顺子技能%s%%概率施加1层腐蚀。
+Matches: %s%%; skills: %s%% chance to apply Freeze.,Matches: %s%%; skills: %s%% chance to apply Freeze.,同点自动攻击%s%%、顺子技能%s%%概率施加1层冰冻。
+Matches: %s%%; skills: %s%% chance to apply Plague.,Matches: %s%%; skills: %s%% chance to apply Plague.,同点自动攻击%s%%、顺子技能%s%%概率施加1层瘟疫。
+Matches: %s%%; skills: %s%% chance to apply Darkness.,Matches: %s%%; skills: %s%% chance to apply Darkness.,同点自动攻击%s%%、顺子技能%s%%概率施加1层黑暗。
+Use all six dice in skills: bonus turn with three rolls. Automatic attacks and leftovers do not count.,Use all six dice in skills: bonus turn with three rolls. Automatic attacks and leftovers do not count.,将六枚骰子全部用于技能，可获得带三次投掷的额外回合。自动攻击与余骰不计入。
+Dice stay usable. Reroll unused dice up to 3 times per turn. Healing and Guarding gemstones activate through matches or skills.,Dice stay usable. Reroll unused dice up to 3 times per turn. Healing and Guarding gemstones activate through matches or skills.,骰子仍可使用，每回合最多投掷3次。治疗与守护宝石通过同点自动攻击或顺子技能生效。
+Combined gem levels: +10% attack damage or character healing each.,Combined gem levels: +10% attack damage or character healing each.,参与组合的同类宝石等级相加，每级增加10%攻击伤害或角色治疗量。
+BUY AND USE,BUY AND USE,购买并使用
+This tarot needs an active battle.,This tarot needs an active battle.,此塔罗需要在战斗中使用。
+No healing is available.,No healing is available.,当前无法恢复生命。
+No harmful statuses to remove.,No harmful statuses to remove.,当前没有可清除的异常状态。
+NEXT LEVEL,Next level,下一关
+Bomber,Bomber,炸弹兵
+Elite Bomber,Elite Bomber,精英炸弹兵
+Bomb Throw,Bomb Throw,投掷炸弹
+"Explodes on defeat, damaging all allies.","Explodes on defeat, damaging all allies.",被击败时爆炸，对所有队友造成伤害。
+Damage multiplier +1.5.,Damage multiplier +1.5.,伤害乘数＋1.5。
+"Base damage +2. After each throw, attack a random enemy for 35% of the rolled pip sum as base damage.","Base damage +2. After each throw, attack a random enemy for 35% of the rolled pip sum as base damage.",基础伤害＋2。每次投掷后，以骰子点数总和的35%为基础伤害，攻击随机敌人。
+KEEP AND USE,KEEP AND USE,保留并使用
+Choose an enemy.,Choose an enemy.,选择一名敌人。
+"Combines four food effects, then adds 5 base damage and +0.5 damage multiplier.","Combines four food effects, then adds 5 base damage and +0.5 damage multiplier.",保留四种食材效果，额外+5基础伤害、+0.5伤害乘数。
+"Combines five food effects, then adds 5 base damage and +1.5 damage multiplier.","Combines five food effects, then adds 5 base damage and +1.5 damage multiplier.",保留五种食材效果，额外+5基础伤害、+1.5伤害乘数。
+DONE,DONE,完成
+"Matches attack on the first throw only. Tap Reroll, then a die to reroll it. Connect a straight, then OK to cast.","Matches attack on the first throw only. Tap Reroll, then a die to reroll it. Connect a straight, then OK to cast.",仅每回合首掷触发同点攻击。点重掷后选择一枚骰子重投；连接顺子后点确认施法。
+2 random shots. Each hit: base x (0.5 + 0.05 x pip).,2 random shots. Each hit: base x (0.5 + 0.05 x pip).,随机射击2次。每次伤害：基础伤害 x (0.5 + 0.05 x 点数)。
+One explosive fireball at 6x auto-attack damage. Applies 2 Burning.,One explosive fireball at 6x auto-attack damage. Applies 2 Burning.,一发爆裂火球，造成6倍自动攻击伤害，附加2层燃烧。
+One fiery eruption hits all enemies at 8x auto-attack damage.,One fiery eruption hits all enemies at 8x auto-attack damage.,烈焰喷发，对全体敌人造成8倍自动攻击伤害。
+"5 random laser hits, each at 4x auto-attack damage.","5 random laser hits, each at 4x auto-attack damage.",随机发射5次激光，每次造成4倍自动攻击伤害。
+"One huge beam hits all enemies 6 times, each at 8x auto-attack damage.","One huge beam hits all enemies 6 times, each at 8x auto-attack damage.",巨型光束打击全体敌人6次，每次造成8倍自动攻击伤害。
+Charging...,Charging...,蓄力中…
+Summon two servants with Taunt.,Summon two servants with Taunt.,召唤两只带有嘲讽的爪牙。
+Split octopus servants into smaller tentacles with Taunt.,Split octopus servants into smaller tentacles with Taunt.,章鱼爪牙分裂为带有嘲讽的小触手。
+
+Temporarily disabled.,Temporarily disabled.,暂时停用。
+"Matches attack on the first throw. Reroll individual dice up to four times, then cast one straight skill to end your turn.","Matches attack on the first throw. Reroll individual dice up to four times, then cast one straight skill to end your turn.",首掷同点自动攻击。可单骰重掷四次；每回合施放一个顺子技能后结束回合。
+One throw + four single-die rerolls. One straight skill per turn.,One throw + four single-die rerolls. One straight skill per turn.,每回合一次首掷、四次单骰重掷，最多施放一个顺子技能。
+Cast a %d-die straight to interrupt.,Cast a %d-die straight to interrupt.,施放%d连顺子打断蓄力。
+After wave %d-%d,After wave %d-%d,第%d-%d波之后
+Skip shuffle animation,Skip shuffle animation,跳过洗牌动画

@@ -15,15 +15,17 @@ var prepared: Dictionary = {}
 var notice: String = ""
 var notice_time: float = 0
 var resume_phase: String = "ready"
+var from_quick_access := false
 
 func _ready() -> void:
-	z_index = 130
+	z_index = BattleLayers.TAROT_CHOICE
 	battle.tarot_ui.use_requested.connect(request)
 
 func active() -> bool:
 	return busy or not choice_type.is_empty()
 
 func reset() -> void:
+	from_quick_access = false
 	busy = false
 	choice_type = ""
 	instance_id = -1
@@ -34,16 +36,43 @@ func reset() -> void:
 
 func request(card: int, point: Vector2, from: Vector2) -> void:
 	if active() or not battle.tarot_ui.available(): return
+	_begin_request(card,point,from,battle.tarot_ui.external_drag)
+
+## Purchased cards use normal choice/consumption rules without opening the inventory first.
+func request_shop(card: int, from: Vector2) -> void:
+	if active() or not battle.model.shop.active: return
+	_begin_request(card,from,from,false)
+
+## A kept draw uses the same card transaction, with explicit targeting when needed.
+func request_drawn(card: int, from: Vector2) -> void:
+	if active(): return
+	if battle.model.shop.active:
+		request_shop(card,from)
+		return
+	if not battle.tarot_ui.available(): return
+	var index: int = battle.model.tarots.find_instance(card)
+	if index < 0: return
+	var targeted: bool = battle.model.tarots.items[index].id == "death"
+	var point: Vector2 = from
+	if targeted:
+		var targets: Array = battle.model.tarot_effects.targets(battle.model,"death")
+		if targets.is_empty(): return
+		point = battle._enemy_impact_point(targets.front())
+	_begin_request(card,point,from,false,targeted)
+
+func _begin_request(card: int, point: Vector2, from: Vector2, quick: bool, choose_target: bool = false) -> void:
+	from_quick_access = quick
 	instance_id = card
 	resume_phase = battle.view_phase
 	drop_point = point
 	origin = from
 	var target: int = battle._enemy_inspect_at(point)
+	if choose_target: target = battle.model.tarot_effects.targets(battle.model,"death").front()
 	prepared = battle.model.tarot_effects.prepare(battle.model,card,{"target":target})
 	if prepared.has("error"):
 		message(prepared.error)
 		return
-	choice_type = prepared.get("choice","")
+	choice_type = "target" if choose_target else prepared.get("choice","")
 	battle.tarot_ui.inspected = -1
 	battle.tarot_ui.cancel_gesture()
 	if choice_type == "magician": _begin_magician()
@@ -66,6 +95,10 @@ func cancel_choice() -> void:
 	if cancelled_id < 0:
 		battle.model.tarot_effects.dismiss_repeat()
 		_finish_cast()
+	elif resume_phase == "shop":
+		_finish_cast()
+	elif from_quick_access:
+		battle.tarot_quick.focus_instance(cancelled_id)
 	else:
 		battle.tarot_ui.focus_instance(cancelled_id)
 	queue_redraw()
@@ -115,7 +148,7 @@ func click(point: Vector2) -> bool:
 		cancel_choice()
 		return true
 	match choice_type:
-		"repeat_target":
+		"target","repeat_target":
 			var target: int = battle._enemy_inspect_at(point)
 			if target in battle.model.tarot_effects.targets(battle.model,"death"): _cast({"target":target})
 		"hanged_man":
@@ -131,6 +164,9 @@ func click(point: Vector2) -> bool:
 func _cast(selection: Dictionary) -> void:
 	if busy: return
 	var previous_ids: Array = battle.model.relics.items.map(func(item): return item.id)
+	var previous_indicators := {}
+	for lane in ["skill","roll"]:
+		for item in battle.model.tarot_effects.active_indicators(lane): previous_indicators[item.id] = item.count
 	var result: Dictionary = battle.model.tarot_effects.cast(battle.model,instance_id,selection)
 	if result.has("error"):
 		message(result.error)
@@ -145,8 +181,9 @@ func _cast(selection: Dictionary) -> void:
 	busy = true
 	var token: int = battle.run_id
 	battle.view_phase = "resolving"
-	battle.tarot_ui.play_cast(result.id,drop_point)
-	battle.fx.z_index = 121
+	var arrival_lane: String = battle.tarot_feedback.begin_arrival(result.id,previous_indicators)
+	battle.tarot_ui.play_cast(result.id,drop_point,arrival_lane)
+	battle.fx.z_index = BattleLayers.TAROT_FX
 	battle.fx.activate_circle(drop_point,Paint.LILAC,70 if portrait() else 44,0.5)
 	battle.fx.burst(drop_point,Paint.GOLD,26,180)
 	var targets: Array = []
@@ -154,7 +191,7 @@ func _cast(selection: Dictionary) -> void:
 		var target: Vector2 = battle._player_point() if event.target == -1 else battle.CITY_POINT if event.target == -2 else battle._enemy_impact_point(event.target)
 		if target not in targets: targets.append(target)
 	if targets.is_empty(): targets.append(battle._player_point())
-	battle.fx.cast(3,drop_point,targets,0.35,true)
+	if arrival_lane.is_empty(): battle.fx.cast(3,drop_point,targets,0.35,true)
 	battle._sound("item/bell",1.2,-14)
 	battle._show_events(result.events)
 	if not result.relic.is_empty(): battle.relic_ui.collect(result.relic,drop_point,50,previous_ids)
@@ -168,8 +205,11 @@ func _cast(selection: Dictionary) -> void:
 			battle.model.tarot_effects.pending_steps.clear()
 			battle.model.tarot_effects.dismiss_repeat()
 			busy = false
-			battle.fx.z_index = 0
+			battle.fx.z_index = BattleLayers.COMBAT
 		return
+	while not arrival_lane.is_empty() and not battle.tarot_ui.cast_visual.is_empty():
+		await get_tree().process_frame
+		if not battle._valid_turn(token): return
 	if result.get("reroll",false):
 		battle._clear_skill()
 		battle.dice_selection.cancel_gesture()
@@ -181,7 +221,7 @@ func _cast(selection: Dictionary) -> void:
 	while battle.relic_ui.pickup.active:
 		await get_tree().process_frame
 		if not battle._valid_turn(token): return
-	battle.fx.z_index = 0
+	battle.fx.z_index = BattleLayers.COMBAT
 	busy = false
 	if _continue_repeat(): return
 	_finish_cast()
@@ -189,7 +229,7 @@ func _cast(selection: Dictionary) -> void:
 func _continue_repeat() -> bool:
 	var rules = battle.model.tarot_effects
 	if rules.pending_repeat.is_empty(): return false
-	if not battle.model.outcome().is_empty():
+	if resume_phase != "shop" and not battle.model.outcome().is_empty():
 		rules.dismiss_repeat()
 		return false
 	instance_id = rules.pending_repeat.instance_id
@@ -215,6 +255,16 @@ func _continue_repeat() -> bool:
 
 func _finish_cast() -> void:
 	var token: int = battle.run_id
+	if resume_phase == "shop":
+		battle.view_phase = "shop"
+		while not battle.model.tarot_effects.bonus_chests.is_empty():
+			battle.shop_ui.hide()
+			var rewards: Array = battle.model.open_bonus_chest()
+			if rewards.is_empty(): break
+			await battle._show_chest(rewards)
+			if not battle._valid_turn(token): return
+		battle.shop_ui.show()
+		return
 	if battle._check_over(): return
 	if battle.model.tarot_effects.pending_turn_end:
 		battle.model.tarot_effects.pending_turn_end = false
@@ -271,6 +321,7 @@ func _resolve_steps(token: int) -> bool:
 	return battle._valid_turn(token)
 
 func _process(delta: float) -> void:
+	if battle.pause_menu.active(): return
 	magician_choice.advance(battle,delta,choice_type == "magician")
 	if not battle.model.outcome().is_empty() and not choice_type.is_empty():
 		choice_type = ""
@@ -287,13 +338,13 @@ func _draw() -> void:
 		magician_choice.paint(self,battle)
 		return
 	if choice_type == "replace": return # The shared backpack owns this choice and its detail page.
-	if choice_type == "repeat_target":
+	if choice_type in ["target","repeat_target"]:
 		var prompt := Rect2(62,1040,680,110) if portrait() else Rect2(340,560,600,80)
 		Paint.panel(self,prompt,Color("211f29"),Paint.GOLD)
-		Paint.wrap(self,battle.description_font,prompt.grow(-12),"Ancient Prophecy: choose another enemy.",26 if portrait() else 20,Paint.GOLD,true)
+		Paint.wrap(self,battle.description_font,prompt.grow(-12),"Ancient Prophecy: choose another enemy." if choice_type == "repeat_target" else "Choose an enemy.",26 if portrait() else 20,Paint.GOLD,true)
 		for target in battle.model.tarot_effects.targets(battle.model,"death"):
 			battle._draw_target_indicator(self,target,battle._target_at(battle._pointer_position()) == target,Paint.GOLD)
-		_label(cancel_rect(),"Skip repeat")
+		_label(cancel_rect(),"Skip repeat" if choice_type == "repeat_target" else "CANCEL")
 		return
 	if not choice_type.is_empty():
 		draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color(0.025,0.025,0.04,0.68))

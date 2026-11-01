@@ -15,6 +15,8 @@ const BACKPACK_PIXELS := [
 const BACKPACK_PALETTE := {"k":Color("171b1a"),"b":Color("8c6749"),"l":Color("b79762"),"f":Color("c6ab72"),"g":GOLD,"p":Color("72543d")}
 var battle
 var opened: bool = false
+var tab: int = 0
+var gem_page = preload("res://scripts/dice/gemstone_page.gd").new()
 var selected: int = -1
 var replacement: String = ""
 var pressed: int = -1
@@ -26,7 +28,8 @@ var sale_receipt_time: float = 0
 
 ## Cover held items while remaining below settings and help.
 func _ready() -> void:
-	z_index = 450
+	gem_page.page = self
+	z_index = BattleLayers.INVENTORY_PAGE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 ## Use the same five-column grid at both supported screen sizes.
@@ -36,19 +39,22 @@ func portrait() -> bool:
 ## Keep the backpack beside the dice during battle and rewards; the shop has its own rail.
 func button_rect() -> Rect2:
 	if battle.view_phase == "shop":
-		return Rect2(652,124,104,104) if portrait() else Rect2(1168,26,66,66)
+		var side: float = 104 if portrait() else 66
+		return Rect2(battle.MENU_RECT.position.x-side-16,battle.MENU_RECT.position.y,side,side)
 	var tarot: Rect2 = battle.tarot_ui.icon_rect()
 	return Rect2(Vector2(2*battle.DICE_CENTER.x-tarot.end.x,tarot.position.y),tarot.size)
 
 ## Permit browsing during battle, shop decisions and chest collection.
 func available(source: String = "") -> bool:
 	var tarot_choice: bool = source == "tarot" and battle.tarot_cast.choice_type == "replace" and not battle.tarot_cast.busy
-	return not battle.menu_open and not battle.guide and not battle.debug_open and not battle.tarot_ui.ceremony.active() and (not battle.tarot_cast.active() or tarot_choice) and not battle.relic_ui.pickup.active and (tarot_choice or battle.view_phase in ["ready","skill","targeting","frozen","shop","reward","wave_reward","over"])
+	return not battle.menu_open and not battle.guide and not battle.debug_open and not battle.tarot_ui.ceremony.active() and (not battle.tarot_cast.active() or tarot_choice) and not battle.relic_ui.pickup.active and (tarot_choice or battle.view_phase in ["ready","charging","rolling","forming","resolving","skill","targeting","frozen","enemy","shop","reward","wave_reward","over"])
 
 ## Open safely without carrying a held skill or item into the modal page.
 func open(source: String = "") -> void:
 	if not available(source): return
 	opened = true
+	tab = 0
+	gem_page.reset()
 	selected = -1
 	cancel_drag()
 	replacement = source
@@ -100,6 +106,7 @@ func drop_index(at: Vector2) -> int:
 ## Capture a two-dimensional drag only after a small mouse or finger movement.
 func motion(at: Vector2) -> bool:
 	if not opened: return false
+	if tab == 1: gem_page.motion(at); return true
 	if pressed >= 0:
 		pointer = at
 		if at.distance_to(press_origin) > (14 if portrait() else 8): dragging = true
@@ -108,6 +115,7 @@ func motion(at: Vector2) -> bool:
 ## A tap opens details; a drop reorders exactly once and never selects a reward.
 func release(at: Vector2) -> bool:
 	if not opened: return false
+	if tab == 1: gem_page.release(at); return true
 	if pressed >= 0:
 		motion(at)
 		if dragging:
@@ -119,12 +127,18 @@ func release(at: Vector2) -> bool:
 
 ## Cancel gestures on close or focus loss without changing inventory priority.
 func cancel_drag() -> void:
+	gem_page.cancel_drag()
 	pressed = -1
 	dragging = false
 
 ## Keep close and back controls separate from item or replacement taps.
 func close_rect() -> Rect2:
-	return Rect2(610,128,146,80) if portrait() else Rect2(1070,56,150,56)
+	var size := Vector2(146,80) if portrait() else Vector2(150,56)
+	return Rect2(battle.MENU_RECT.position.x-size.x-16,128 if portrait() else 56,size.x,size.y)
+
+## Keep relics first, with gemstones on their own tab rather than sharing the ten relic slots.
+func tab_rect(index: int) -> Rect2:
+	return Rect2(48+index*360,242,348,68) if portrait() else Rect2(370+index*250,56,238,56)
 
 func back_rect() -> Rect2:
 	return Rect2(48,1510,300,90) if portrait() else Rect2(170,686,300,64)
@@ -170,6 +184,13 @@ func _discard_incoming() -> void:
 	elif replacement == "tarot":
 		battle.tarot_cast._cast({"discard":true})
 		if battle.tarot_cast.busy: close(false)
+	elif replacement == "shop" and battle.shop_ui.selected_gift():
+		battle.shop_ui.discard_gift()
+		close(false)
+
+## Free shop gifts can be forfeited like other rewards; paid stock can only be cancelled.
+func can_discard_incoming() -> bool:
+	return replacement in ["chest","tarot"] or (replacement == "shop" and battle.shop_ui.selected_gift())
 
 ## Swallow modal input; the shortcut opens before chest or shop hit handlers.
 func click(at: Vector2) -> bool:
@@ -177,7 +198,10 @@ func click(at: Vector2) -> bool:
 		if available() and button_rect().has_point(at): open(); return true
 		return false
 	if close_rect().has_point(at): close(); return true
-	if selected < 0 and replacement in ["chest","tarot"] and not incoming_relic().is_empty() and discard_rect().has_point(at):
+	for i in range(2):
+		if tab_rect(i).has_point(at): tab = i; selected = -1; cancel_drag(); return true
+	if tab == 1: gem_page.click(at); return true
+	if selected < 0 and can_discard_incoming() and not incoming_relic().is_empty() and discard_rect().has_point(at):
 		_discard_incoming()
 		return true
 	if selected < 0 and can_take_incoming() and take_rect().has_point(at):
@@ -219,12 +243,13 @@ func incoming_relic() -> String:
 		"chest": return battle.model.reward_item(battle.relic_ui.chest_slot).get("relic_id","")
 		"tarot": return battle.tarot_cast.prepared.get("relic","")
 		"shop":
-			if battle.shop_ui.selected >= 0: return battle.model.shop.offers[battle.shop_ui.selected].id
+			return battle.shop_ui.selected_offer().get("id","")
 	return ""
 
 ## Refresh live item counters and the shortcut's enabled state.
 func _process(delta: float) -> void:
 	sale_receipt_time = maxf(0,sale_receipt_time-delta)
+	if opened and tab == 1: gem_page.advance(delta)
 	queue_redraw()
 
 ## Render crisp translated text without relying on tiny sprite lettering.
@@ -247,10 +272,14 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(Vector2.ZERO,battle.fx.canvas_size),Color("15191e"))
 	_button(close_rect(),"CANCEL" if not replacement.is_empty() else "CLOSE")
+	for i in range(2):
+		_button(tab_rect(i),"RELICS" if i == 0 else "GEMSTONES")
+		if tab == i: draw_line(tab_rect(i).position+Vector2(12,tab_rect(i).size.y-5),tab_rect(i).end-Vector2(12,5),GOLD,3)
+	if tab == 1: gem_page.draw(); return
 	if selected >= battle.model.relics.items.size(): selected = -1
 	if selected >= 0: _draw_item(); return
-	_text(Vector2(battle.fx.canvas_size.x/2,320 if portrait() else 156),"RELIC INVENTORY",44 if portrait() else 36)
-	_text(Vector2(battle.fx.canvas_size.x/2,388 if portrait() else 202),GameText.format("+%d blood gems",sale_receipt) if sale_receipt_time > 0 else GameText.format("%d / 10 ITEMS",battle.model.relics.items.size()),27 if portrait() else 21,Color("a9a39c"))
+	_text(Vector2(battle.fx.canvas_size.x/2,380 if portrait() else 156),"RELIC INVENTORY",44 if portrait() else 36)
+	_text(Vector2(battle.fx.canvas_size.x/2,438 if portrait() else 202),GameText.format("+%d blood gems",sale_receipt) if sale_receipt_time > 0 else GameText.format("%d / 10 ITEMS",battle.model.relics.items.size()),27 if portrait() else 21,Color("a9a39c"))
 	var order: Array = range(battle.model.relics.items.size())
 	var destination: int = drop_index(pointer) if dragging else -1
 	if dragging:
@@ -301,14 +330,14 @@ func _draw_incoming(compact: bool) -> void:
 	var center := rect.position+Vector2(82,88 if portrait() else 58)
 	Paint.paint(self,id,center,54 if portrait() else 42,true)
 	var text_rect := Rect2(rect.position+Vector2(162,16),rect.size-Vector2(180 if portrait() else 376,32))
-	var description: String = label+"\n"+Catalog.short_description(id,GameText.text)
+	var description: String = label+"\n"+Catalog.short_description(id,GameText.text,battle.model.relics.items)
 	var size: int = 28 if portrait() else 22
 	while size > 18 and GameText.lines(description,battle.description_font,size,text_rect.size.x).size()*size*1.3 > text_rect.size.y: size -= 1
 	Panels.wrap(self,battle.description_font,text_rect,description,size,Color("eee4d2"),false)
-	if replacement in ["chest","tarot"]:
+	if can_discard_incoming():
 		_button(discard_rect(),"DISCARD")
 		_gem_quote(discard_rect(),battle.model.relic_forfeit_preview(id))
-	if can_take_incoming(): _button(take_rect(),"BUY" if replacement == "shop" else "TAKE RELIC")
+	if can_take_incoming(): _button(take_rect(),"BUY" if replacement == "shop" and not battle.shop_ui.selected_gift() else "TAKE RELIC")
 
 ## Keep empty cells visible and tint collected cells by their item's rarity.
 func _draw_slot(index: int, item_index: int) -> void:
@@ -336,7 +365,7 @@ func _draw_item() -> void:
 	_text(Vector2(mid,775 if portrait() else 398),Catalog.ITEMS[item.id].name,40 if portrait() else 32,color)
 	_text(Vector2(mid,835 if portrait() else 442),Catalog.RARITY_NAMES[Catalog.ITEMS[item.id].rarity],26 if portrait() else 21,color)
 	var rect := Rect2(66,916,672,500) if portrait() else Rect2(228,476,824,186)
-	var description: String = Catalog.description(item,GameText.text)
+	var description: String = Catalog.description(item,GameText.text,battle.model.relics.items)
 	var size: int = 34 if portrait() else 26
 	while size > 20 and GameText.lines(description,battle.description_font,size,rect.size.x).size()*size*1.3 > rect.size.y: size -= 1
 	Panels.wrap(self,battle.description_font,rect,description,size,Color("eee4d2"),true)

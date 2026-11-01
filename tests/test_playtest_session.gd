@@ -6,6 +6,12 @@ const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 const Status = preload("res://scripts/status/status_effect.gd")
 var checks := 0
 var failures := 0
+var sessions: Array = []
+
+func make_session(seed_value: int):
+	var session = Session.new(seed_value)
+	sessions.append(session)
+	return session
 
 func check(ok: bool, label: String) -> void:
 	checks += 1
@@ -35,13 +41,15 @@ func signature(m) -> String:
 
 func combat_parity() -> void:
 	for seed in range(20):
-		var s = Session.new(seed)
+		var s = make_session(seed)
 		var m = Run.new(seed); m.begin_round()
 		durable(s.model); durable(m)
 		for id in ["worn_bow","orange_stone","pet_bat"]: s.model.acquire_relic(id); m.acquire_relic(id)
 		for roll in range(3):
-			var result: Dictionary = s.command({"action":"roll","perfect":roll == 1})
-			m.roll_pool(roll == 1); roll_procs(m)
+			var result: Dictionary = s.command({"action":"roll","perfect":true} if roll == 0 else {"action":"reroll","die":roll+1})
+			if roll == 0: m.roll_pool(true)
+			else: m.reroll_die(roll)
+			roll_procs(m)
 			check(result.ok and signature(s.model) == signature(m),"Natural roll, procs, matches and RNG match the real rules")
 		var before := signature(s.model)
 		for i in range(5): s.snapshot()
@@ -55,7 +63,7 @@ func combat_parity() -> void:
 		m.end_round(); m.begin_round()
 		check(result.ok and signature(s.model) == signature(m),"Leftover heal, enemy moves, burn ticks and next round match GUI order")
 	for length in range(3,7):
-		var s = Session.new(8)
+		var s = make_session(8)
 		var m = Run.new(8); m.begin_round()
 		durable(s.model); durable(m)
 		for run in [s.model,m]: run.roll_pool(false,[1,2,3,4,5,6]); run.character_passive.charge = 2
@@ -73,12 +81,14 @@ func combat_parity() -> void:
 		var result: Dictionary = s.command({"action":"cast","target":1})
 		m.apply_player(0)
 		while m.phase == "player" and m.pending.cast_source != "manual": m.apply_player()
-		check(result.ok and signature(s.model) == signature(m),"Damage pulses, Fireball echoes and six-die bonus preserve model parity")
-		if length == 3: check(result.events.filter(func(e): return e.type == "damage").size() == 3,"Third Fireball includes two passive echoes")
-		if length >= 5: check(result.events.filter(func(e): return e.type == "damage").size() == (5 if length == 5 else 10),"Damage pulses resolve without extra skill casts")
+		for index in m.living(): m.enemy_act(index)
+		m.end_round(); m.begin_round()
+		check(result.ok and signature(s.model) == signature(m),"Damage pulses, bonus skills and automatic turn-end preserve model parity")
+		if length == 3: check(result.events.filter(func(e): return e.type == "damage" and e.get("target",-1) >= 0).size() == 3,"Third Fireball includes two passive echoes")
+		if length >= 5: check(result.events.filter(func(e): return e.type == "damage" and e.get("target",-1) >= 0).size() == (5 if length == 5 else 10)*m.enemies.size(),"Damage pulses resolve without extra skill casts")
 
 func tarot_choices() -> void:
-	var s = Session.new(14); durable(s.model)
+	var s = make_session(14); durable(s.model)
 	s.model.roll_pool(false,[1,2,3,4,5,5]); s._settle()
 	var card: Dictionary = s.model.tarots.add("magician")
 	check(s.command({"action":"tarot","instance":card.instance_id}).state.choice.type == "magician","Magician pauses for die/face selection")
@@ -91,14 +101,14 @@ func tarot_choices() -> void:
 	s.command({"action":"form","dice":[1,2,3,4,5,6]})
 	card = s.model.tarots.add("justice")
 	check(s.command({"action":"tarot","instance":card.instance_id}).ok and s.model.pending.is_empty() and s.model.dice_turn.locked.is_empty(),"Justice cancels formed skill and freely rerolls all dice")
-	check(s.model.dice_turn.rolls_left == 2,"Justice does not charge a reroll")
+	check(s.model.dice_turn.rolls_left == 4,"Justice does not charge a reroll")
 	card = s.model.tarots.add("temperance")
-	check(s.command({"action":"tarot","instance":card.instance_id}).ok and s.model.dice_turn.rolls_left == 5,"Temperance ends turn and redeems two banked rolls next turn")
+	check(s.command({"action":"tarot","instance":card.instance_id}).ok and s.model.dice_turn.rolls_left == 9,"Temperance ends turn and redeems four banked rolls next turn")
 	s.model.apply_affliction(Status.FROZEN,1); s.model._prepare_player_turn()
 	for i in range(2): check(s.command({"action":"ice"}).state.phase == "frozen","First two ice taps retain the frozen decision")
 	check(s.command({"action":"ice"}).state.phase == "roll","Third ice tap resolves enemies and the skipped turn")
 	for id in Session.Tarot.ITEMS:
-		var t = Session.new(5); durable(t.model)
+		var t = make_session(5); durable(t.model)
 		t.model.roll_pool(false,[1,1,3,3,6,6]); t._settle()
 		t.model.acquire_relic("bracelet")
 		if id == "hermit": t.model.dice_turn.locked = [0]; t.model.dice_turn.committed = [0]
@@ -107,8 +117,8 @@ func tarot_choices() -> void:
 		if id == "death": request.target = 1
 		if id == "magician": request.die = 1; request.face = 2
 		if id == "hanged_man": request.ban = "fool"
-		check(t.command(request).ok,"Every current tarot is reachable through its real rules: "+id)
-	var repeated = Session.new(5); durable(repeated.model)
+		check(t.command(request).ok == (id != "hermit"),"Enabled tarots are reachable while Hermit remains disabled: "+id)
+	var repeated = make_session(5); durable(repeated.model)
 	repeated.model.acquire_relic("ancient_prophecy")
 	card = repeated.model.tarots.add("strength")
 	check(repeated.command({"action":"tarot","instance":card.instance_id}).ok and repeated.model.tarot_effects.strength == 2,"Prophecy repeats immediate modifiers exactly twice")
@@ -117,7 +127,7 @@ func tarot_choices() -> void:
 	repeated.command({"action":"tarot","instance":card.instance_id,"die":1,"face":2})
 	check(repeated.choice.instance_id < 0,"Repeated choice remains explicit instead of silently reusing the first answer")
 	check(repeated.command({"action":"cancel"}).ok and repeated.choice.is_empty(),"Repeated card choice can be declined")
-	var full = Session.new(5)
+	var full = make_session(5)
 	for id in ["bracelet","heart","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","twin_scythes"]: full.model.acquire_relic(id)
 	card = full.model.tarots.add("emperor")
 	check(full.command({"action":"tarot","instance":card.instance_id}).state.choice.type == "replace","Full inventory exposes the actual incoming relic")
@@ -130,7 +140,7 @@ func tarot_choices() -> void:
 	check(full.command({"action":"reorder","from":10,"to":1}).ok,"Agent can change left-to-right relic priority")
 
 func rewards_and_shop() -> void:
-	var s = Session.new(44)
+	var s = make_session(44)
 	s.model.wave_kind = s.model.WaveRewards.RELIC
 	for enemy in s.model.enemies: enemy.hp = 0
 	s._settle()
@@ -144,17 +154,17 @@ func rewards_and_shop() -> void:
 	check(s.snapshot().phase == "routes","Complete rewards before choosing a route")
 	check(not s.command({"action":"route","slot":3}).ok,"Reject unoffered route")
 	check(s.command({"action":"route","slot":1}).ok and s.model.stage == 1,"Route advances exactly one wave")
-	var full = Session.new(8)
+	var full = make_session(8)
 	for id in ["bracelet","heart","armor","coin","magic_shield","magic_sword","runestone","lucky_die","bloodstone","twin_scythes"]: full.model.acquire_relic(id)
-	full.model.reroll_progress = 10
-	full.model.chest_pity.misses = [0,4,4]
+	full.model.reroll_progress = 20
+	full.model.chest_pity.misses = [5,5,5]
 	check(full.command({"action":"treasure"}).state.rewards.size() == 5,"An upgraded reroll chest exposes five separately claimable prizes")
 	check(not full.command({"action":"take","slot":1}).ok,"A full chest inventory requires a replacement decision")
 	check(full.command({"action":"take","slot":1,"replace":4}).ok,"Chest replacement preserves ten-slot capacity")
 	check(full.command({"action":"skip"}).ok and full.model.relics.items.size() == 10 and full.model.open_rewards.is_empty(),"Partial pickup then skip closes the chest without losing owned items")
 	# Controlled shop fixture exercises the production stock/economy without exposing cheat commands.
-	var shop = Session.new(19)
-	shop.model.stage = 3; shop.model.wave_kind = shop.model.WaveRewards.SHOP; shop.model._load_wave(); shop.model.blood_gems = 1000
+	var shop = make_session(19)
+	shop.model.stage = 2; shop.model.enemies.clear(); shop.model.at_shop = true; shop.model.blood_gems = 1000
 	shop._settle()
 	var state: Dictionary = shop.snapshot()
 	check(state.phase == "shop" and state.shop.size() == 9,"Shop includes six relics, two tarots and one bottle")
@@ -168,20 +178,20 @@ func rewards_and_shop() -> void:
 	check(not shop.command({"action":"divination"}).ok,"Keeper draw is once per visit")
 	check(shop.command({"action":"refresh"}).ok,"Refresh regenerates all stock at the shared price")
 	check(shop.command({"action":"leave"}).state.phase == "routes","Leaving shop offers next routes without a battle")
-	check(shop.command({"action":"route","slot":1}).state.wave == 5,"Shop consumes one wave")
-	var burn = Session.new(5); burn.model.enemies[0].hp = 1
+	check(shop.command({"action":"route","slot":1}).state.wave == 4,"Shop leaves the next battle intact")
+	var burn = make_session(5); burn.model.enemies = [burn.model.enemies[0]]; burn.model.enemies[0].hp = 1
 	burn.model.apply_enemy_status(0,Status.BURNING,1,false)
 	burn.model.apply_affliction(Status.BURNING,2)
 	burn.model.phase = "enemy"
 	for enemy in burn.model.enemies: enemy.acted = true
 	burn.model._begin_turn_end(); burn._settle()
-	check(burn.model.hp == 90 and burn.snapshot().phase == "closed_chest","Player burn fully resolves even when enemy burn clears the wave")
+	check(burn.model.hp == 900 and burn.snapshot().phase == "closed_chest","Player burn fully resolves even when enemy burn clears the wave")
 
 ## Exercise long natural games for deadlocks and identical seed/decision replay, not balance claims.
 func natural_runs() -> void:
 	for seed in [9,29,82]:
-		var a = Session.new(seed)
-		var b = Session.new(seed)
+		var a = make_session(seed)
+		var b = make_session(seed)
 		var ended := false
 		for step in range(3000):
 			var state: Dictionary = a.snapshot()
@@ -199,6 +209,7 @@ func natural_runs() -> void:
 				"roll":
 					if not state.combinations.is_empty(): request = {"action":"form","dice":state.combinations[0].dice}
 					elif "roll" in state.actions: request = {"action":"roll"}
+					elif "reroll" in state.actions: request = {"action":"reroll","die":state.dice.filter(func(d): return not d.locked).front().slot}
 					else: request = {"action":"end"}
 			if request.is_empty():
 				ended = not state.outcome.is_empty()
@@ -216,5 +227,9 @@ func _initialize() -> void:
 	tarot_choices()
 	rewards_and_shop()
 	natural_runs()
+	for session in sessions:
+		for signal_info in session.model.get_signal_list():
+			for connection in session.model.get_signal_connection_list(signal_info.name): session.model.disconnect(signal_info.name,connection.callable)
+	sessions.clear()
 	print("Playtest session: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

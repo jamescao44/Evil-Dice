@@ -1,5 +1,5 @@
 extends SceneTree
-## Regenerate the reel icon atlas from the same sourced sprites as inventory icons.
+## Render an optional art-review strip; live reels draw by ID and need no atlas rebuild.
 const Paint = preload("res://scripts/relics/relic_paint.gd")
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 
@@ -21,5 +21,6 @@ func render() -> void:
 	canvas.queue_redraw()
 	await process_frame
 	RenderingServer.force_draw()
-	viewport.get_texture().get_image().save_png("res://assets/art/relic_atlas.png")
+	DirAccess.make_dir_recursive_absolute("res://test-output")
+	viewport.get_texture().get_image().save_png("res://test-output/relic-atlas.png")
 	quit()

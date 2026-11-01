@@ -20,7 +20,7 @@ func seed_for_drop(wanted: bool) -> int:
 	return -1
 
 func rules() -> void:
-	for role in range(Enemy.ITEMS.size()):
+	for role in Enemy.ITEMS:
 		for elite in [false,true]:
 			for drops in [false,true]:
 				var m = Run.new(51)
@@ -87,7 +87,7 @@ func scene(portrait: bool, reduced: bool = false) -> void:
 	check(is_zero_approx(p.drops.pose(drop).angle) if reduced else absf(p.drops.pose(drop).angle) > 1,"Body card rotation respects reduced effects")
 	p.drops.advance(0.16)
 	p.advance(0)
-	check(p.cards.size() == 3 and p.drops.cards.size() == 1,"Three drops reveal together while excess drops remain on the ground")
+	check(p.cards.size() == 4 and p.drops.cards.is_empty(),"All simultaneous drops reveal together")
 	var receipt: Dictionary = p.cards[0]
 	var start: Dictionary = p.pose(receipt)
 	check(start.at.is_equal_approx(drop.ground) and start.size.is_equal_approx(p.drops.pose(drop).size),"Readable reveal starts at the exact body-drop pose without a teleport")
@@ -98,7 +98,7 @@ func scene(portrait: bool, reduced: bool = false) -> void:
 	check(not p.name_rect(revealed).intersects(p.name_rect(p.pose(p.cards[1]))),"Names remain separate in multi-drop reveals")
 	check(p.cards.map(func(card): return card.item.instance_id).all(func(id): return g.model.tarots.find_instance(id) >= 0),"Each reveal shows the actual already-granted tarot")
 	g.menu_open = true; p._process(0.5)
-	check(receipt.age == 0.4 and p.drops.cards.size() == 1,"Menus pause both revealing and queued body drops")
+	check(receipt.age == 0.4 and p.drops.cards.is_empty(),"Menus pause both revealing and queued body drops")
 	g.menu_open = false; p.visible = true
 	if "--capture" in OS.get_cmdline_user_args() and not reduced:
 		p.queue_redraw(); await process_frame; RenderingServer.force_draw()
@@ -106,7 +106,7 @@ func scene(portrait: bool, reduced: bool = false) -> void:
 	p.advance(0.7)
 	check(p.pose(receipt).flight > 0 and p.pose(receipt).at.distance_to(g.tarot_ui.icon_rect().get_center()) < revealed.at.distance_to(g.tarot_ui.icon_rect().get_center()),"Only revealed cards shrink and fly into inventory")
 	p.advance(0.6); p.advance(0)
-	check(p.cards.size() == 1 and p.drops.cards.is_empty() and p.pose(p.cards[0]).flight == 0,"Queued fourth drop receives its own full reveal")
+	check(p.cards.is_empty() and p.drops.cards.is_empty(),"All four drops complete together without a second reveal")
 	p.advance(1.7)
 	await process_frame
 	check(not p.active() and g.view_phase == "wave_reward","Chest appears only after every dropped card has landed")

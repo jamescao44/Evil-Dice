@@ -1,10 +1,13 @@
 extends Node2D
 ## Short level-up celebrations and stronger transformations at five-level milestones.
+const Sprite = preload("res://scripts/player/player_sprite.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Cards = preload("res://scripts/tarot/tarot_paint.gd")
 const DURATION := 1.8
 const REVEAL := 0.85
 const FORM_COUNT := 3
+# Opt individual character forms into the retained procedural advancing bounce.
+const ADVANCE_BOUNCE_FORMS := {"horror":[false,false,false]}
 const LEVEL_DURATION := 0.85
 const LEVEL_REVEAL := 0.08
 var battle
@@ -13,23 +16,17 @@ var target_level := 1
 var queued: Array = []
 var age := -1.0
 var forms: Array[Texture2D] = []
-var silhouettes: Array[Texture2D] = []
 var visible_bounds: Array[Rect2] = []
 
 ## Cache sprites and white silhouettes once, rather than rebuilding them during effects.
 func _ready() -> void:
-	z_index = 95
+	z_index = BattleLayers.EVOLUTION
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# Existing forms cover levels 1–4, 5–9 and 10+; later milestones retain the final art.
+	# All three gameplay evolutions share James's animated art for now.
 	for i in range(FORM_COUNT):
-		var texture: Texture2D = load("res://assets/art/player/flamelings/level-%d.png" % (i+2))
-		forms.append(texture)
-		var mask: Image = texture.get_image()
-		var used: Rect2 = Rect2(mask.get_used_rect())
-		visible_bounds.append(Rect2(used.position/Vector2(mask.get_size()),used.size/Vector2(mask.get_size())))
-		for y in range(mask.get_height()):
-			for x in range(mask.get_width()): mask.set_pixel(x,y,Color(1,1,1,mask.get_pixel(x,y).a))
-		silhouettes.append(ImageTexture.create_from_image(mask))
+		forms.append(Sprite.texture())
+		visible_bounds.append(Sprite.REST_BOUNDS)
+	Sprite.silhouette()
 	battle.model.character_leveled.connect(enqueue)
 
 ## Preserve every level celebration if one reward crosses several thresholds.
@@ -50,6 +47,12 @@ func reset() -> void:
 ## Map uncapped character levels to the available evolution artwork.
 func form_index(level: int) -> int:
 	return clampi(floori(level/float(battle.model.EVOLUTION_INTERVAL)),0,FORM_COUNT-1)
+
+## Walking sprites stay grounded; future characters/forms can explicitly enable the bounce.
+func advance_bounce_enabled() -> bool:
+	var settings: Array = ADVANCE_BOUNCE_FORMS.get(battle.selected_ancient_id,[])
+	if settings.is_empty(): return false
+	return settings[clampi(form_index(displayed_level),0,settings.size()-1)]
 
 func is_evolution() -> bool:
 	return target_level % battle.model.EVOLUTION_INTERVAL == 0
@@ -81,11 +84,11 @@ func _process(delta: float) -> void:
 ## Render the current form with an eased white silhouette at the transformation peak.
 func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
 	if forms.is_empty(): return
-	var index: int = form_index(displayed_level)
-	canvas.draw_texture_rect(forms[index],rect,false,tint)
+	var frame: int = battle.player_animation.frame_number()
+	Sprite.paint_actor(canvas,rect,frame,battle.clock_time,tint,battle.reduced)
 	if age < 0: return
 	var glow: float = smoothstep(0.15,REVEAL,age)*(1-smoothstep(REVEAL,1.3,age)) if is_evolution() else sin(clampf(age/LEVEL_DURATION,0,1)*PI)*0.32
-	canvas.draw_texture_rect(silhouettes[index],rect,false,Color(0.8,0.97,1,glow*0.95))
+	Sprite.paint(canvas,rect,frame,Color(0.8,0.97,1,glow*0.95*tint.a),true)
 
 ## Exclude transparent sprite padding when placing character-attached UI.
 func visible_rect(rect: Rect2) -> Rect2:

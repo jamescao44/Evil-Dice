@@ -1,5 +1,5 @@
 extends Node2D
-## Cosmetic receipts: banked rerolls light one meter diamond per arriving orb.
+## Cosmetic receipts: banked rerolls fill the treasure bar one point per arriving orb.
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const GOLD := Color("ffd773")
 const FLIGHT_TIME := 0.58
@@ -11,7 +11,7 @@ var impacts: Array = []
 var last_progress := 0
 
 func _ready() -> void:
-	z_index = 65
+	z_index = BattleLayers.TREASURE_PICKUP
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 ## Claims and restarts discard old receipts without touching the committed reward.
@@ -33,16 +33,16 @@ func progress_changed(previous: int, current: int) -> void:
 		orbs.append({"index":index,"origin":origin,"age":-STAGGER*(index-previous),"side":1 if index%2 == 0 else -1})
 	queue_redraw()
 
-## Show earned points as filled only when their receipt has reached the diamond.
+## Show earned points as filled only when their receipt has reached the bar.
 func displayed_progress() -> int:
 	return maxi(0,battle.model.reroll_progress-orbs.size())
 
-## A small rising curve accelerates into the exact destination diamond.
+## A small rising curve accelerates into the earned position on the bar.
 func position_of(orb: Dictionary, age: float = -INF) -> Vector2:
 	if age == -INF: age = orb.age
 	var t: float = clampf(age/FLIGHT_TIME,0,1)
 	var progress: float = t*t*(3-2*t)
-	var target: Vector2 = battle._diamond_center(orb.index)
+	var target: Vector2 = battle._treasure_point(orb.index)
 	var bow: float = (54 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 32)*sin(t*PI)
 	return orb.origin.lerp(target,progress)+Vector2(orb.side*bow*0.22,-bow if not battle.reduced else 0.0)
 
@@ -62,13 +62,13 @@ func advance(delta: float) -> void:
 		orb.age += delta
 		if orb.age >= FLIGHT_TIME:
 			impacts.append({"index":orb.index,"age":0.0})
-			battle._sound("item/crystal_collect",1.05+orb.index*0.035,-21)
+			battle._sound("item/crystal_collect",1.05+minf(orb.index,9)*0.035,-21)
 		else: pending.append(orb)
 	orbs = pending
 	battle.queue_redraw()
 	queue_redraw()
 
-## Shiny gold cores, fading trails and a diamond-shaped impact echo the meter.
+## Shiny gold cores, fading trails and a sparkling impact accent the meter.
 func _draw() -> void:
 	var scale_factor: float = battle._reward_scale()
 	for orb in orbs:
@@ -87,7 +87,7 @@ func _draw() -> void:
 			Pixel.line(self,at-Vector2(0,radius*1.4),at+Vector2(0,radius*1.4),Color("fff1b7",0.65),2)
 	for impact in impacts:
 		var t: float = impact.age/IMPACT_TIME
-		var at: Vector2 = battle._diamond_center(impact.index)
+		var at: Vector2 = battle._treasure_point(impact.index)
 		var radius: float = (10+(5 if battle.reduced else 24)*t)*scale_factor
 		Pixel.disc(self,at,radius,Color(GOLD,(1-t)*0.16),2)
 		var corners := [Vector2.UP,Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT]

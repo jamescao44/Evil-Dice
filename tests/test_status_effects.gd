@@ -86,10 +86,15 @@ func model_checks() -> void:
 	m = fresh(1)
 	m.enemies.append(Rules.make_enemy(1,1,true))
 	m.enemies.append(Rules.make_enemy(1,1,true))
+	# Freeze is now a reusable elite modifier rather than an inherent archer move.
+	for enemy in m.enemies:
+		enemy.modifier = "elemental"
+		enemy.element = Status.FROZEN
+		enemy.attribute = Status.Attribute.ICE
 	m.apply_affliction(Status.FROZEN,1)
 	m.phase = "round_end"
 	m.begin_round()
-	check(m.phase == "frozen" and m.enemies.all(func(e):return e.intent.type == "attack" and e.intent.attribute == Status.Attribute.NONE),"Every archer schedules an ordinary arrow while the player is frozen")
+	check(m.phase == "frozen" and m.enemies.all(func(e):return e.intent.get("status",-1) != Status.FROZEN),"Ice elites cannot schedule another freeze while the player is frozen")
 	for i in range(3): m.break_ice()
 	for i in m.living(): m.enemy_act(i)
 	m.end_round()
@@ -214,7 +219,7 @@ func layout_checks(g) -> void:
 				check(not badge.intersects(icon) and not health.intersects(icon) and not g._target_rect(i).intersects(icon),"All ten statuses fit clear of enemy targets, moves and health"+location+" status "+str(item.id))
 	g._restart()
 	g.model.enemies = [Rules.make_enemy(0),Rules.make_enemy(1,1,true),Rules.make_enemy(2,1,true)]
-	for e in g.model.enemies: e.damage = 0
+	for e in g.model.enemies: e.damage_percent = 0; e.damage = 0
 	g.model.phase = "new"
 	g._start_round()
 	for i in range(g.model.enemies.size()):

@@ -1,6 +1,8 @@
 extends RefCounted
+const Vitals = preload("res://scripts/combat/player_vitals.gd")
 ## Relic behavior lives here; inventory owns order/ownership and battle owns HP/turns.
-## Passive variants need only a STATS entry. New triggers belong in the matching
+## Passive variants use catalog stats; periodic generators use catalog metadata.
+## New triggers belong in the matching
 ## lifecycle hook, never in UI code. All hooks traverse inventory left to right.
 const Status = preload("res://scripts/status/status_effect.gd")
 const Skill = preload("res://scripts/combat/multi_hit_skill.gd")
@@ -10,46 +12,7 @@ const Attack = preload("res://scripts/relics/relic_attack.gd")
 const Conditions = preload("res://scripts/relics/relic_conditions.gd")
 const EMPTY := {}
 const Sets = preload("res://scripts/relics/relic_sets.gd")
-const STATS := {
-	"banana":{"damage_add":0.5},
-	"magic_banana":{"damage_factor":1.5},
-	"broken_blade":{"damage_add":0.3},
-	"steel_sword": {"damage_add":3.0},
-	"book_of_dead": {"max_hp_factor":3.0},
-	"glass_marble": {"three_straight_bonus":0.1},
-	"steel_marble": {"three_straight_bonus":0.2},
-	"gold_marble": {"three_straight_bonus":0.3},
-	"codex_page": {"damage_add":0.2},
-	"fries": {"damage_add":0.3},
-	"lemon_soda": {"auto_damage":5.0},
-	"oreo_sundae": {"base_damage":10.0},
-	"fried_chicken": {"damage_factor":1.1},
-	"hamburger": {"damage_add":0.6},
-	"worn_dagger": {"combo_uses_add":1,"base_damage":2.0},
-	"royal_dagger": {"combo_uses_add":3,"base_damage":10.0},
-	"magic_sword": {"base_damage":10.0},
-	"magic_slingshot": {"base_damage":5.0},
-	"contract": {"base_factor":1.2},
-	"runestone": {"base_damage":5.0},
-	"orange_stone": {"base_damage":5.0},
-	"blue_stone": {"base_damage":5.0},
-	"purple_stone": {"base_damage":5.0},
-	"yellow_stone": {"base_damage":5.0},
-	"green_stone": {"base_damage":5.0},
-	"black_stone": {"base_damage":5.0},
-	"prismatic_stone": {}, # Retain six five-point stones: 30 total, no extra flat bonus.
-	"heart": {"max_hp_factor":1.1},
-	"bracelet": {"base_damage":5.0},
-	"mithril_blade": {"damage_factor":2.0},
-	"armor": {"incoming_factor":0.9},
-	"ancient_codex": {"damage_factor":2.0},
-	"reaper_scythe": {"max_hp_factor":0.5,"damage_per_kill":0.05,"kill_damage_cap":2.0},
-	"twin_scythes": {"combo_uses_factor":2},
-	"cursed_bow": {"combo_uses_per_wave":1,"single_target_factor_per_wave":0.95},
-	"coin": {"wave_rubies":10},
-	"ancient_prophecy": {"tarot_repeat":true},
-	"cursed_watch": {"always_perfect":true,"no_ultimate":true,"no_treasure":true},
-}
+static var STATS: Dictionary = Catalog.effect_table("stats")
 const STONES := {
 	"orange_stone": {"immune":Status.BURNING,"status":Status.BURNING,"stacks":1,"chance":1.0},
 	"blue_stone": {"immune":Status.FROZEN,"status":Status.FROZEN,"stacks":1,"chance":0.3},
@@ -58,13 +21,10 @@ const STONES := {
 	"green_stone": {"immune":Status.CORROSION,"status":Status.CORROSION,"stacks":1,"chance":0.5},
 	"black_stone": {"status":Status.PLAGUE,"stacks":1,"chance":1.0},
 }
-const TURN_CHARGES := {
-	"magic_shield": {"period":6,"message":"SHIELD READY"},
-	"magic_sword": {"period":6,"message":"CRITICAL READY"},
-}
+static var TURN_CHARGES: Dictionary = Catalog.effect_table("turn_charge")
 const CRITICAL_FACTOR := 3.0
 const PERFECT_STRIKE_BASE := 100.0
-const TAROT_GENERATORS := {"fortune_cookie":5,"magician_hat":4}
+static var TAROT_GENERATORS: Dictionary = Catalog.effect_table("tarot_generator")
 
 ## Run a relic’s immediate acquisition effect after inventory insertion.
 static func acquired(model, id: String, batch: bool = false) -> void:
@@ -109,7 +69,8 @@ static func healing_amount(items: Array, amount: float) -> int:
 	return roundi(amount*(1.0+0.1*repeat_sources(items,"blood_bag").size()))
 
 static func _grant_generator_tarot(model, id: String) -> bool:
-	if id == "magician_hat": return not model.grant_tarot("magician").is_empty()
+	var card: String = TAROT_GENERATORS[id].get("card","")
+	if not card.is_empty(): return not model.grant_tarot(card).is_empty()
 	return not model.grant_random_tarots(1).is_empty()
 
 ## Tarot activation grants shields only on a committed card effect.
@@ -117,9 +78,9 @@ static func tarot_used(model, grow_eye: bool = true) -> Array:
 	if grow_eye: Conditions.tarot_used(model)
 	var events: Array = []
 	for entry in repeat_sources(model.relics.items,"bookmark"):
-		model.shield += 10
+		model.shield += Vitals.BOOKMARK_SHIELD
 		Sequence.activate(model,entry)
-		events.append(model.event(-1,10,"buff","SHIELD +10"))
+		events.append(model.event(-1,Vitals.BOOKMARK_SHIELD,"buff","SHIELD +%d" % Vitals.BOOKMARK_SHIELD))
 	return events
 
 ## Track real Perfect attempts, with one banked protection regardless of combo bonuses.
@@ -290,7 +251,7 @@ static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> 
 		if item.id == "bloodstone":
 			var cap: int = floori(model.max_hp*(0.05 if skill.is_combo_attack() or skill.pattern == "cleanup" else 0.1))
 			var budget: String = str(entry.activators)
-			var attempted: int = mini(maxi(0,cap-model.lifesteal_budgets.get(budget,0)),model.modified_healing(damage*0.2))
+			var attempted: int = mini(maxi(0,cap-model.lifesteal_budgets.get(budget,0)),model.modified_healing(damage*0.2*Vitals.SCALE))
 			var restored: int = model.heal(attempted,false)
 			# Overhealing spends the same capped recovery budget as restored HP.
 			model.lifesteal_budgets[budget] = model.lifesteal_budgets.get(budget,0)+(attempted if model.status_count(Status.DARKNESS) == 0 else 0)
@@ -356,7 +317,7 @@ static func turn_started(model) -> Array:
 static func turn_finished(model) -> Array:
 	var due: Array = []
 	for item in model.relics.items:
-		var period: int = TAROT_GENERATORS.get(item.id,TURN_CHARGES.get(item.id,EMPTY).get("period",0))
+		var period: int = TAROT_GENERATORS.get(item.id,TURN_CHARGES.get(item.id,EMPTY)).get("period",0)
 		if period == 0: continue
 		item.turns += 1
 		if item.turns >= period:
@@ -502,7 +463,7 @@ static func roll_actions(model, perfect: bool) -> Array:
 			"tissue_pack":
 				if not model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i])): amount = 10
 			"magic_slingshot", "enchanted_missile":
-				amount = model.dice_turn.unused().reduce(func(total,i): return total+model.dice_turn.values[i],0)*0.5
+				amount = model.dice_turn.unused().reduce(func(total,i): return total+model.dice_turn.values[i],0)*(0.35 if item.id == "magic_slingshot" else 0.5)
 			"pet_ghost": amount = 20; fixed = true; area = true
 			"pet_dragon": amount = 15; count = 3 if Sets.collection_complete(model.relics.items,"pets") else 2
 			"spiked_helmet":

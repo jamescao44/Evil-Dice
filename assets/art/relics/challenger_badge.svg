@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <path fill="#34233d" d="M8 21h7v9l-4-3-4 2zm9 0h7l1 8-4-2-4 3z"/>
+  <path fill="#9c426d" d="M9 22h4v5l-2-2-2 1zm10 0h4v4l-2-1-2 2z"/>
+  <path fill="#392b31" d="M9 2h14v3h4v4h3v14h-3v4h-4v3H9v-3H5v-4H2V9h3V5h4z"/>
+  <path fill="#e4aa62" d="M10 4h12v3h4v4h2v10h-2v4h-4v3H10v-3H6v-4H4V11h2V7h4z"/>
+  <path fill="#fff0b9" d="M10 4h12v2H10zM6 8h2v7H6zM4 11h2v10H4z"/>
+  <path fill="#61455b" d="M11 7h10v3h3v3h2v7h-3v3h-3v2h-8v-2H9v-3H7v-7h2v-3h2z"/>
+  <path fill="#ed7a70" d="M13 9h6v3h3v7h-3v3h-6v-3h-3v-7h3z"/>
+  <path fill="#412637" d="M14 12h4v2h2v4h-2v2h-4v-2h-2v-4h2z"/>
+  <path fill="#ffe5a0" d="M15 6h2v8h-2zm0 12h2v8h-2zM6 15h8v2H6zm12 0h8v2h-8z"/>
+  <path fill="#fff4d8" d="M15 15h2v2h-2z"/>
+</svg>

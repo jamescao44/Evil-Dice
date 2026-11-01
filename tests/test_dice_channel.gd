@@ -125,7 +125,7 @@ func test_layout(game) -> void:
 		check(game.damage_feedback.building and game._world_time_scale() == 1,"Damage buildup leaves the battle running before the impact beat")
 		var rng: int = game.model.rng.state
 		for repeat in range(4): tap(game,game._skill_center())
-		tap(game,game._diamond_center(14))
+		tap(game,game._treasure_point(14))
 		check(game.skill_bubble.used == 1 and game.model.rng.state == rng and game.model.open_rewards.is_empty(),"Spam cannot trigger a second chain or claim loot")
 		var deadline: int = Time.get_ticks_msec()+5000
 		var most_used: int = 1
@@ -180,19 +180,19 @@ func test_layout(game) -> void:
 	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[Waves.CITY_STAGE] == 288,"City Horror reaches the configured 288 destination size")
 	game._restart()
 	game.model.reroll_progress = 15
-	tap(game,game._diamond_center(2))
-	tap(game,game._diamond_center(7))
+	tap(game,game._treasure_point(2))
+	tap(game,game._treasure_point(7))
 	check(game.view_phase == "ready" and game.model.reroll_progress == 15,"Lower chest tiers cannot spend a full bank")
-	tap(game,game._diamond_center(14))
+	tap(game,game._treasure_point(14))
 	check(game.view_phase == "reward" and game.model.open_rewards.size() == 5 and game.model.reroll_progress == 0,"Full bank claims only the epic chest")
 	game._restart()
 	game.model.reroll_progress = 5
-	tap(game,game._diamond_center(7))
+	tap(game,game._treasure_point(7))
 	check(game.view_phase == "ready" and game.model.reroll_progress == 5,"Unfilled milestone cannot spend treasure")
 	game.model.reroll_progress = 8
-	tap(game,game._diamond_center(2))
+	tap(game,game._treasure_point(2))
 	check(game.view_phase == "ready" and game.model.reroll_progress == 8,"Common chest is unavailable once rare is earned")
-	tap(game,game._diamond_center(7))
+	tap(game,game._treasure_point(7))
 	check(game.model.open_rewards.size() == 3 and game.model.reroll_progress == 0,"Eighth diamond chooses Greed Chest and clears remainder")
 	game._restart()
 	game.model.stage = Waves.CITY_STAGE

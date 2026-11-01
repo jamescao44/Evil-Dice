@@ -2,7 +2,10 @@ extends RefCounted
 ## Test player: aims single-target skills; drags other skills onto the field.
 static func cast_pending(game) -> void:
 	if game.view_phase == "wave_reward":
-		game.wave_chest.click(game.wave_chest.action_rect().get_center())
+		if game.wave_chest.phase == "closed": game.wave_chest.click(game.wave_chest.chest_rect().get_center())
+		elif game.wave_chest.phase == "routes":
+			var route: int = 1 if game.wave_chest.options[0] == "shop" else 0
+			game.wave_chest.click(game.wave_chest.route_rect(route).get_center())
 		return
 	if game.view_phase == "reward":
 		if game.chest.roll_phase == "closed": game.chest.click(game.chest.closed_rect().get_center())

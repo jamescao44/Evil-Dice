@@ -49,7 +49,7 @@ func prepare(g, skill: bool = false) -> void:
 	g._restart()
 	g.model.stage = 1
 	g.model.enemies = [Rules.make_enemy(0),Rules.make_enemy(1),Rules.make_enemy(2)]
-	for e in g.model.enemies: e.damage = 0
+	for e in g.model.enemies: e.damage_percent = 0; e.damage = 0
 	g.model.phase = "new"
 	g.visual_stage = 1
 	g.monster_side = g.HORROR_SIZES[1]

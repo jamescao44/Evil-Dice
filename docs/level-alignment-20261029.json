@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-29",
+  "ordinary_growth": {
+    "hp": 1.14,
+    "damage": 1.1
+  },
+  "equal_level_normal_cannon_reference_hp_fraction": 0.5,
+  "fixed_spawn_stats": true,
+  "boss_curves_changed": false,
+  "controlled_conditions": {
+    "levels": [
+      1,
+      5,
+      10,
+      15
+    ],
+    "gaps": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "seeds_per_case": 4,
+    "total_encounters": 512,
+    "perfect_rate": 0.35,
+    "modest_build": [
+      "bracelet",
+      "mithril_blade"
+    ],
+    "tarots": false,
+    "kill_xp_enabled": true
+  },
+  "ordinary_pairs_modest_build": {
+    "0": {
+      "encounters": 32,
+      "clears": 32,
+      "mean_damage_taken_fraction": 0.115
+    },
+    "2": {
+      "encounters": 32,
+      "clears": 32,
+      "mean_damage_taken_fraction": 0.178
+    },
+    "4": {
+      "encounters": 32,
+      "clears": 31,
+      "mean_damage_taken_fraction": 0.26
+    },
+    "6": {
+      "encounters": 32,
+      "clears": 26,
+      "mean_damage_taken_fraction": 0.353
+    }
+  },
+  "campaign": {
+    "runs": 12,
+    "full_clears": 4,
+    "perfect_rate": 0.35,
+    "all_reward_tiers_collected": true,
+    "tarot_thresholds_use_player_hp_units": true
+  },
+  "limitations": "Small deterministic CLI samples; reward RNG diverges with combat decisions. Bosses and elite/special mechanics have separate difficulty budgets."
+}

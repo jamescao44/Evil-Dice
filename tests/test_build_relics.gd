@@ -47,6 +47,7 @@ func healing_checks() -> void:
 	check(m.hp == 1,"Book cannot kill the player")
 	m = fresh(["mysterious_seed"])
 	m.dice_turn.rolls_made = 1; m.dice_turn.values = [1,1,1,1,1,1]
+	for i in range(6): m.gemstones.add("healing"); m.gemstones.equip(i,"healing")
 	m.end_dice_turn(); events = m.apply_player()
 	check(events.any(func(e): return e.type == "damage" and e.amount == 12) and m.phase == "enemy","Leftover overheal fires before the enemy phase through normal End Turn")
 

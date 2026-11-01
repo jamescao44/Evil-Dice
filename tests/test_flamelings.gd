@@ -29,15 +29,15 @@ func form(m, indices: Array) -> MultiHitSkill:
 	return m.form_selected_skill()
 
 func _initialize() -> void:
-	# All matching sizes use count for hits, face for damage, and leave dice unspent.
+	# Matching sizes select distinct attacks, retain pip scaling and leave dice unspent.
 	for count in range(2,7):
 		for face in range(1,7):
 			var values: Array = []; values.resize(count); values.fill(face)
 			check(Patterns.classify(values).is_empty(),"Matching faces cannot be summoned, including six alike")
 			var groups: Array = Patterns.automatic_groups(values,range(count))
-			check(groups.size() == 1 and groups[0].skill.base_uses == count,"One automatic hit per matching die")
+			check(groups.size() == 1 and groups[0].skill.base_uses == (1 if count in [3,4] else count),"Matching count selects its attack profile")
 			var m = fresh()
-			check(is_equal_approx(m.attack_base(groups[0].skill),5*(0.5+face*0.05)*(8 if count == 6 else 4 if count == 5 else 1)),"Automatic base follows pip coefficient")
+			check(is_equal_approx(m.attack_base(groups[0].skill),5*(0.5+face*0.05)*(8 if count == 6 else 4 if count in [4,5] else 3 if count == 3 else 1)),"Automatic base follows pip coefficient")
 	for length in range(3,7):
 		for first in range(1,8-length):
 			var values: Array = range(first,first+length); values.reverse()
@@ -62,7 +62,7 @@ func _initialize() -> void:
 	m = fresh(); m.roll_pool(false,[1,2,3,4,4,6]); automatic(m)
 	form(m,[0,1,2]); m.apply_player(0)
 	check(m.roll_pool(false,[6,6,2]) == [3,4,5],"Rerolls only unused physical dice")
-	check(automatic(m).size() == 2,"Only newly rerolled matching dice fire")
+	check(automatic(m).is_empty(),"Rerolls never repeat matching attacks")
 	# Burning doubles read the status before the hit, and new stacks follow damage.
 	for length in [3,4,5,6]:
 		m = fresh(); m.pending = Patterns.classify(range(1,length+1)); m.phase = "player"
@@ -101,7 +101,7 @@ func _initialize() -> void:
 		m = fresh(); m.acquire_relic("pet_bat"); m.hp = 20; m.statuses[3].count = 2
 		m.pending = Patterns.classify(range(1,length+1)); m.phase = "player"
 		m.apply_player(0)
-		check(m.hp == 21 and m.statuses[3].count == 1,"Damage pulses trigger one 1%-HP bat heal and spend boon charges only once")
+		check(m.hp == 20+roundi(m.max_hp*0.01) and m.statuses[3].count == 1,"Damage pulses trigger one 1%-HP bat heal and spend boon charges only once")
 		m = fresh()
 		for enemy in m.enemies: enemy.hp = 1
 		m.pending = Patterns.classify(range(1,length+1)); m.phase = "player"
@@ -119,17 +119,19 @@ func _initialize() -> void:
 	check(m.enemies[0].hp <= 0 and m.has_living_enemies(),"First target dies but other enemies remain")
 	check(m.pending.is_empty() and m.phase == "roll" and m.bonus_turn_count == 1,"All pulses finish and six spent dice grant a playable bonus turn")
 	check(m.dice_turn.can_roll(),"Next throw remains available after Magician Brimstone")
-	# Leftovers heal once as a percentage, without consuming any attack modifier.
+	# Healing gems restore once as a percentage, without consuming attack modifiers.
 	m = fresh(); m.hp = 20; m.max_hp = 150
+	for i in range(6): m.gemstones.add("healing"); m.gemstones.equip(i,"healing")
 	m.roll_pool(false,[1,2,3,4,5,6]); m.tarot_effects.strength = 3; m.tarot_effects.extra_uses = 2; m.statuses[3].count = 2
-	check(m.leftover_total_healing() == 32,"21 pips heal 21% of 150 maximum HP, rounded once")
-	check(m.end_dice_turn(),"End Turn commits healing")
+	check(m.leftover_total_healing() == 0,"Unused gem dice no longer heal")
+	check(m.end_dice_turn(),"End Turn commits leftover dice")
 	var healing: Array = m.apply_player().filter(func(e): return e.type == "heal")
-	check(healing.size() == 1 and healing[0].amount == 32 and m.hp == 52,"Leftover healing resolves once before enemies act")
+	check(healing.is_empty() and m.hp == 20,"Leftovers resolve without recovery")
 	check(m.phase == "enemy" and m.bonus_turn_count == 0,"Healing does not grant a bonus turn")
 	check(m.tarot_effects.strength == 3 and m.tarot_effects.extra_uses == 2 and m.statuses[3].count == 2,"Healing preserves offensive charges")
 	m = fresh(); m.hp = 99; m.roll_pool(false,[1,2,3,4,5,6])
-	check(m.leftover_total_healing() == 1,"Healing preview clamps to missing health")
+	m.gemstones.add("healing"); m.gemstones.equip(0,"healing")
+	check(m.leftover_total_healing() == 0,"Equipping Healing does not enable leftover recovery")
 	m.apply_affliction(Status.DARKNESS,1); check(m.leftover_total_healing() == 0,"Darkness preview blocks healing")
 	m.end_dice_turn(); m.apply_player(); check(m.hp == 99,"Darkness blocks actual leftover healing")
 	m = fresh(); m.roll_pool(false,[1,2,3,1,2,3]); automatic(m)

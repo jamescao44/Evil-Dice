@@ -3,10 +3,12 @@ extends Node2D
 var battle
 var _snapshot: Array = []
 var revision: int = 0
+var _paving_texture: ImageTexture
 
 ## Place the static scenery behind the battle actors and controls.
 func _ready() -> void:
-	z_index = -1
+	z_index = BattleLayers.BACKDROP
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 
 ## Rebuild terrain only when growth, scrolling or layout changes its appearance.
 func _process(_delta: float) -> void:
@@ -83,16 +85,42 @@ func _draw_portrait() -> void:
 				_draw_building(Rect2(x, row - height, height * 0.7, height), Color("a1a184"), false)
 	draw_rect(battle.ARENA.grow(maxf(512,battle.ARENA.size.x)), Color(0.84, 0.85, 0.67, 0.13))
 
-## Tile both axes so diagonal travel never exposes a blank strip or resets at arrival.
+## Build the four-variant diagonal repeat once, independent of wave size or scrolling.
+func _paving_pattern() -> Texture2D:
+	if _paving_texture != null: return _paving_texture
+	var cells: Array[Image] = []
+	for i in range(4):
+		var cell: Image = battle.art["floor%d" % i].get_image()
+		if cell.is_compressed(): cell.decompress()
+		cell.convert(Image.FORMAT_RGBA8)
+		cells.append(cell)
+	var side: int = cells[0].get_width()
+	var pattern := Image.create(side*4,side*4,false,Image.FORMAT_RGBA8)
+	for row in range(4):
+		for column in range(4):
+			pattern.blit_rect(cells[(row+column)%4],Rect2i(0,0,side,side),Vector2i(column,row)*side)
+	_paving_texture = ImageTexture.create_from_image(pattern)
+	return _paving_texture
+
+## Repeat one stone pattern and one grass layer, preserving the original tile phase.
 func _draw_paving(tile: int, tint: Color, field: float) -> void:
 	var scroll := Vector2(battle.background_offset,battle.background_vertical_offset)
 	var origin: Vector2 = battle.ARENA.position-Vector2(fposmod(scroll.x,tile),fposmod(scroll.y,tile))
-	for row in range(ceili(battle.ARENA.size.y/tile)+1):
-		for column in range(ceili(battle.ARENA.size.x/tile)+1):
-			var at: Vector2 = origin+Vector2(column,row)*tile
-			var variant: int = posmod(floori((at.x+scroll.x)/tile)+floori((at.y+scroll.y)/tile),4)
-			if field < 1: _arena_art("floor%d" % variant,Rect2(at,Vector2.ONE*tile),tint)
-			if field > 0: _arena_art("grass",Rect2(at,Vector2.ONE*tile),Color(0.76,0.83,0.66,field))
+	var cells := Vector2(ceili(battle.ARENA.size.x/tile)+1,ceili(battle.ARENA.size.y/tile)+1)
+	var rect := Rect2(origin,cells*tile)
+	if field < 1:
+		var pattern: Texture2D = _paving_pattern()
+		var variant: int = posmod(floori((origin.x+scroll.x)/tile)+floori((origin.y+scroll.y)/tile),4)
+		_draw_repeated(pattern,rect,Vector2(variant/4.0,0),cells/4.0,tint)
+	if field > 0: _draw_repeated(battle.art.grass,rect,Vector2.ZERO,cells,Color(0.76,0.83,0.66,field))
+
+## Explicit repeating UVs retain tile scale without clipping UVs to an atlas region.
+func _draw_repeated(texture: Texture2D, rect: Rect2, uv: Vector2, repeats: Vector2, tint: Color) -> void:
+	# Keep nearest-neighbour samples off exact texel boundaries when tiles shrink.
+	uv += Vector2.ONE*0.000001
+	var vertices := PackedVector2Array([rect.position,Vector2(rect.end.x,rect.position.y),rect.end,Vector2(rect.position.x,rect.end.y)])
+	var coordinates := PackedVector2Array([uv,uv+Vector2(repeats.x,0),uv+repeats,uv+Vector2(0,repeats.y)])
+	draw_polygon(vertices,PackedColorArray([tint]),coordinates,texture)
 
 ## Repeat bounded rows of props using each layer's existing parallax speed.
 func _scenery_rows(anchor: float, parallax: float) -> Array:

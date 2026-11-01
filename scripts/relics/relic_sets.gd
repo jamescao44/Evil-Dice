@@ -1,4 +1,6 @@
 extends RefCounted
+const Instance = preload("res://scripts/relics/relic_instance.gd")
+const MAGIC_STONES := ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]
 ## Set recipes are data: ordered ingredients, replacement tier bonuses and composite art.
 const RECIPES := {
 	"remains": {
@@ -18,6 +20,7 @@ const RECIPES := {
 		"ingredients":["pet_bat","pet_lizard","pet_slime","pet_ghost","pet_dragon"],
 		"retain_effects":false,
 		"composite_art":false,
+		"activate_components":true,
 		"tiers":[{"id":"pet_orb","count":5,"stats":{}}],
 	},
 	"marbles": {
@@ -33,16 +36,16 @@ const RECIPES := {
 		"tiers":[
 			{"id":"budget_meal","count":2,"stats":{"damage_add":0.3}},
 			{"id":"happy_meal","count":3,"stats":{"damage_add":0.5}},
-			{"id":"deluxe_meal","count":4,"stats":{"base_damage":8.0,"damage_add":0.5}},
-			{"id":"super_meal","count":5,"stats":{"base_damage":15.0,"damage_factor":1.3}},
+			{"id":"deluxe_meal","count":4,"stats":{"base_damage":5.0,"damage_add":0.5}},
+			{"id":"super_meal","count":5,"stats":{"base_damage":5.0,"damage_add":1.5}},
 		],
 	},
 }
-const COLLECTIONS := {"pets":["pet_bat","pet_lizard","pet_slime","pet_ghost","pet_dragon"]}
+const COLLECTIONS := {"pets":RECIPES.pets.ingredients}
 
 ## Collection bonuses survive fusion and disappear when the fused item is sold.
 static func collection_complete(items: Array, id: String) -> bool:
-	return COLLECTIONS.get(id,[]).all(func(part): return items.any(func(item): return item.id == part or part in ingredients(item)))
+	return COLLECTIONS.has(id) and not COLLECTIONS[id].is_empty() and COLLECTIONS[id].all(func(part): return items.any(func(item): return item.id == part or part in ingredients(item)))
 
 static func uses_composite_art(id: String) -> bool:
 	return is_fused(id) and recipe_for(id).get("composite_art",true)
@@ -85,7 +88,7 @@ static func fuse(items: Array) -> void:
 		for i in range(items.size()):
 			if recipe_for(items[i].id) != recipe: continue
 			var parts: Array = ingredients(items[i])
-			if parts.is_empty(): continue
+			if parts.is_empty() or parts.all(func(id): return id in gathered): continue
 			slots.append(i)
 			for id in parts:
 				if id not in gathered: gathered.append(id)
@@ -96,13 +99,13 @@ static func fuse(items: Array) -> void:
 		var first: int = slots[0]
 		if slots.size() == 1 and items[first].id == tier.id: continue
 		for i in range(slots.size()-1,-1,-1): items.remove_at(slots[i])
-		items.insert(first,{"id":tier.id,"ingredients":gathered,"count":1,"turns":0,"charges":0,"kills":0,"waves":0})
+		items.insert(first,Instance.create(tier.id,{"ingredients":gathered}))
 
 ## Ingredients apply in their retained order; only the latest tier bonus follows them.
 static func modifiers(item: Dictionary, definitions: Dictionary) -> Array:
 	if item.id == "prismatic_stone":
 		var stones: Array = []
-		for id in ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]:
+		for id in MAGIC_STONES:
 			stones.append(definitions.get(id,{}))
 		stones.append(definitions.get("prismatic_stone",{}))
 		return stones
@@ -134,7 +137,37 @@ static func display_parts(id: String, item: Dictionary) -> Array:
 
 ## Resolve a localized set hint for components and their final fusion alike.
 static func set_label(id: String) -> String:
-	if id in ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone","prismatic_stone"]: return "Magic Stones"
+	if id in MAGIC_STONES or id == "prismatic_stone": return "Magic Stones"
 	if id in ["codex_page","ancient_codex"]: return "Codex"
 	var recipe: Dictionary = recipe_for(id)
 	return recipe.get("name", "")
+
+## Count currently owned components once, including those stored inside fused relics.
+static func collection_progress(id: String, items: Array) -> Vector2i:
+	var label: String = set_label(id)
+	if label.is_empty(): return Vector2i.ZERO
+	if label == "Codex":
+		var pages := 0
+		for item in items:
+			if item.id == "ancient_codex": return Vector2i(10,10)
+			if item.id == "codex_page": pages += item.get("count",1)
+		return Vector2i(mini(pages,10),10)
+	var parts: Array = MAGIC_STONES if label == "Magic Stones" else recipe_for(id).ingredients
+	var collected: Dictionary = {}
+	for item in items:
+		if label == "Magic Stones" and item.id == "prismatic_stone": return Vector2i(parts.size(),parts.size())
+		for part in ([item.id] if label == "Magic Stones" else ingredients(item)):
+			if part in parts: collected[part] = true
+	return Vector2i(collected.size(),parts.size())
+
+## Group missing, loot-eligible components by incomplete owned set, including partial fusions.
+static func missing_collections(inventory, definitions: Dictionary, disabled: Array) -> Dictionary:
+	var result: Dictionary = {}
+	for id in definitions:
+		if id in disabled or definitions[id].get("fusion",false) or not inventory.can_add(id): continue
+		var progress: Vector2i = collection_progress(id,inventory.items)
+		if progress.x <= 0 or progress.x >= progress.y: continue
+		var label: String = set_label(id)
+		if not result.has(label): result[label] = []
+		result[label].append(id)
+	return result
