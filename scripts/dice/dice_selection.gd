@@ -1,14 +1,17 @@
 extends Node2D
 ## Drag-to-connect presentation; the dice model owns locks, rolls and skill budgets.
 const Beam = preload("res://scripts/dice/dice_connection_beam.gd")
+const ConnectionCharge = preload("res://scripts/dice/dice_connection_charge.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const IdleFeedback = preload("res://scripts/dice/dice_idle_feedback.gd")
 const Style = preload("res://scripts/dice/dice_pattern_style.gd")
 const PromptPulse = preload("res://scripts/shared/prompt_pulse.gd")
 var idle_feedback := IdleFeedback.new()
+var connection_charge := ConnectionCharge.new()
 var battle
 var reroll_mode: bool = false
 var reroll_turn_id: int = -1
+var reroll_selected: Array = []
 var dragging: bool = false
 var moved: bool = false
 var press_origin := Vector2.ZERO
@@ -42,12 +45,33 @@ func available() -> bool:
 func confirm_center() -> Vector2:
 	return battle.DICE_CENTER-Vector2(0,32 if portrait() else 22)
 
+## Keep reroll selection separate from connected skills and their previews.
+func has_center_selection() -> bool:
+	return not (reroll_selected if reroll_mode else battle.model.dice_turn.selected).is_empty()
+
+## Both reroll modes share Done; only the batch experiment requires confirmation.
+func center_label() -> String:
+	if battle.view_phase == "charging": return "STOP!"
+	if battle.debug_split_controls and battle.model.dice_turn.has_rolled(): return "CANCEL"
+	if battle.debug_control_version == battle.ControlVersion.V4 and battle.model.dice_turn.has_rolled(): return "OK"
+	if has_center_selection(): return "OK"
+	if reroll_mode: return "DONE"
+	return "REROLL" if battle.model.dice_turn.has_rolled() else "ROLL"
+
+## V4 keeps center OK idle until the shared selection forms a playable skill.
+func center_enabled() -> bool:
+	if battle.view_phase == "charging": return true
+	if not available(): return false
+	if has_center_selection() and not reroll_mode: return not preview.is_empty() and battle.model.dice_turn.skills_allowed()
+	if battle.debug_control_version == battle.ControlVersion.V4 and battle.model.dice_turn.has_rolled(): return false
+	return battle.model.dice_turn.can_roll()
+
 ## Keep the center hit area clear of all six dice.
 func center_hit(point: Vector2) -> bool:
 	if battle.view_phase == "ready":
 		for index in range(battle.dice.size()):
 			if die_rect(index).has_point(point): return false
-	var at: Vector2 = confirm_center() if battle.view_phase == "ready" and not battle.model.dice_turn.selected.is_empty() else battle.DICE_CENTER
+	var at: Vector2 = confirm_center() if battle.view_phase == "ready" and has_center_selection() and not battle.debug_split_controls else battle.DICE_CENTER
 	return point.distance_to(at) <= (78 if portrait() else 48)
 
 ## A large text-only control clears tap selections without spending dice or rolls.
@@ -72,24 +96,52 @@ func die_center(index: int) -> Vector2:
 func stop_rerolls() -> void:
 	reroll_mode = false
 	reroll_turn_id = -1
+	reroll_selected.clear()
 	for die in battle.dice: die.reroll_hint = false
 
-## The first throw uses timing; subsequent center taps toggle single-die corrections.
+## Selecting one operation version clears transient selections without spending rolls.
+func set_control_version(version: int) -> void:
+	if version not in battle.ControlVersion.values() or version == battle.debug_control_version: return
+	stop_rerolls()
+	cancel_gesture()
+	battle.debug_control_version = version
+
+## Taps toggle any unused face; duplicate pips are valid for a reroll batch.
+func _toggle_reroll_die(index: int) -> void:
+	if index in reroll_selected: reroll_selected.erase(index)
+	else: reroll_selected.append(index)
+	battle._sound("ui/book",1.1,-24)
+	queue_redraw()
+
+## The first throw uses timing; later taps enter the current debug-selected reroll mode.
 func click(point: Vector2) -> bool:
 	if dragging: return true
 	if battle.view_phase == "charging" and not battle._menus_open() and center_hit(point):
 		battle._release_charge()
 		return true
 	if not available(): return false
+	if battle.debug_split_controls and center_hit(point):
+		if not battle.model.dice_turn.has_rolled():
+			if battle.model.dice_turn.can_roll(): battle._start_charge()
+		else: cancel_gesture()
+		return true
 	if reroll_mode:
-		if center_hit(point): stop_rerolls(); return true
+		if center_hit(point):
+			if battle.debug_batch_reroll and not reroll_selected.is_empty():
+				var indices: Array = reroll_selected.duplicate()
+				indices.sort()
+				battle._reroll_dice(indices)
+			else: stop_rerolls()
+			return true
 		for index in range(battle.dice.size()):
 			if die_rect(index).has_point(point):
-				if battle.model.dice_turn.can_reroll(index): battle._reroll_die(index)
+				if battle.model.dice_turn.can_reroll(index):
+					if battle.debug_batch_reroll: _toggle_reroll_die(index)
+					else: battle._reroll_die(index)
 				else: battle.dice[index].reject_selection()
 				return true
 		return false
-	if not battle.model.dice_turn.selected.is_empty() and cancel_rect().has_point(point):
+	if not battle.debug_split_controls and not battle.model.dice_turn.selected.is_empty() and cancel_rect().has_point(point):
 		cancel_gesture()
 		return true
 	if center_hit(point):
@@ -97,7 +149,7 @@ func click(point: Vector2) -> bool:
 			if not preview.is_empty():
 				battle._form_selected_skill()
 				_clear_preview()
-		elif battle.model.dice_turn.can_roll():
+		elif center_enabled():
 			if battle.model.dice_turn.has_rolled():
 				reroll_mode = true
 				reroll_turn_id = battle.model.dice_turn.turn_id
@@ -106,7 +158,7 @@ func click(point: Vector2) -> bool:
 		return true
 	for index in range(battle.model.DiceTurn.COUNT):
 		if die_rect(index).has_point(point):
-			if battle.model.dice_turn.select(index):
+			if _select_die(index):
 				dragging = true
 				moved = false
 				press_origin = point
@@ -116,6 +168,15 @@ func click(point: Vector2) -> bool:
 			else: battle.dice[index].reject_selection()
 			return true
 	return false
+
+## Split controls allow any unused dice for rerolling; only valid straights enable OK.
+func _select_die(index: int) -> bool:
+	var pool = battle.model.dice_turn
+	if not battle.dice_action_controls.shared_selection(): return pool.select(index)
+	if not pool.active or pool.has_pending_group() or not pool.has_rolled() or index not in pool.unused() or pool.cast_limit_reached(): return false
+	if index in pool.selected: pool.selected.erase(index)
+	else: pool.selected.append(index)
+	return true
 
 ## A full six-die chain can stretch before the final connection breaks.
 func break_distance() -> float:
@@ -148,7 +209,7 @@ func _visit_pointer(point: Vector2) -> void:
 				if pool.selected.size() == 1: pool.selected.clear()
 				_selection_changed()
 			elif previous < 0:
-				if pool.select(index): _selection_changed()
+				if _select_die(index): _selection_changed()
 				else: battle.dice[index].reject_selection()
 			break
 	if pool.selected.size() == pool.COUNT and point.distance_to(battle.DICE_POSITIONS[pool.selected[-1]]) > break_distance():
@@ -156,7 +217,7 @@ func _visit_pointer(point: Vector2) -> void:
 		_selection_changed()
 		# A new die may already be under the finger when the stretched link snaps.
 		if contact_die >= 0 and contact_die not in pool.selected and die_rect(contact_die).has_point(point):
-			if pool.select(contact_die): _selection_changed()
+			if _select_die(contact_die): _selection_changed()
 
 ## Both drag and tap selections stay editable until the center Confirm button is pressed.
 func release(point: Vector2) -> bool:
@@ -169,6 +230,7 @@ func release(point: Vector2) -> bool:
 func cancel_gesture() -> void:
 	dragging = false
 	contact_die = -1
+	reroll_selected.clear()
 	battle.model.dice_turn.selected.clear()
 	_clear_preview()
 
@@ -178,21 +240,25 @@ func _clear_preview() -> void:
 	damage_text = ""
 	status_preview.clear()
 	particles.clear()
+	connection_charge.clear()
 	emission_clock = 0
 	for die in battle.dice:
 		die.connection_glow = false
 		die.connection_fire = 0
+		die.connection_flash = 0
+		die.connection_color = Color.WHITE
 	queue_redraw()
 
 ## Refresh descriptions and total damage without drawing targets or consuming modifier charges.
 func _refresh_preview() -> void:
-	var selected: MultiHitSkill = battle.model.make_straight_skill(battle.model.dice_turn.selection_values())
+	var selected: MultiHitSkill = battle.model.make_straight_skill(battle.model.dice_turn.selection_values()) if battle.model.dice_turn.skills_allowed() else MultiHitSkill.new()
 	selected.perfect = battle.model.dice_turn.last_perfect
 	preview = battle.model.relic_skills.preview_upgrade(battle.model,selected)
 	preview.socket_gems = battle.model.gemstones.snapshot(battle.model.dice_turn.selected)
 	caption = {} if preview.is_empty() else battle._skill_caption(preview)
 	damage_text = "" if preview.is_empty() else battle.model.selection_damage_caption(preview)
 	status_preview = {} if preview.is_empty() else battle.model.selection_status_labels(preview)
+	connection_charge.sync(battle.model.dice_turn.selected,preview.dice,skill_color(),not preview.is_empty())
 	if preview.is_empty(): particles.clear()
 	preview_refresh = 0.1
 
@@ -208,6 +274,7 @@ func skill_color() -> Color:
 ## Prompt the first throw, or a usable reroll when the remaining pool has no straight.
 func should_prompt_roll() -> bool:
 	var pool = battle.model.dice_turn
+	if battle.debug_control_version == battle.ControlVersion.V4 and pool.has_rolled(): return false
 	return not reroll_mode and available() and pool.selected.is_empty() and pool.can_roll() and (not pool.has_rolled() or (not pool.skills_allowed() or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i]))))
 
 ## Animate a bounded stream of sparks while the valid pattern is selected.
@@ -217,9 +284,10 @@ func _process(delta: float) -> void:
 	clock_time += delta
 	var pool = battle.model.dice_turn
 	if reroll_mode and (reroll_turn_id != pool.turn_id or not pool.can_roll() or not battle.model.outcome().is_empty() or battle.view_phase in ["skill","targeting","frozen","advancing"]): stop_rerolls()
+	if reroll_mode: reroll_selected = reroll_selected.filter(func(index): return pool.can_reroll(index))
 	preview_refresh -= delta
 	if available() and not pool.selected.is_empty():
-		if not pool.skills_allowed(): cancel_gesture()
+		if not pool.skills_allowed() and not battle.dice_action_controls.shared_selection(): cancel_gesture()
 		elif preview_refresh <= 0: _refresh_preview()
 	if prompt_turn_id != pool.turn_id:
 		prompt_turn_id = pool.turn_id
@@ -229,14 +297,17 @@ func _process(delta: float) -> void:
 	if battle._can_end_turn() and pool.rolls_left == 0 and (not pool.skills_allowed() or not battle.model.Patterns.has_combination(pool.unused().map(func(i): return pool.values[i]))): end_turn_prompt_age += delta
 	else: end_turn_prompt_age = 0
 	idle_feedback.advance(delta,pool,available() and not reroll_mode,battle.reduced)
+	if available(): connection_charge.advance(delta,battle.reduced)
 	for index in range(battle.dice.size()):
 		var die = battle.dice[index]
+		var selected: bool = index in (reroll_selected if reroll_mode else pool.selected)
 		die.reroll_hint = reroll_mode and available() and pool.can_reroll(index)
 		die.idle_hint = idle_feedback.hint_pose(index)
-		die.selection_emphasis = move_toward(die.selection_emphasis,1.0 if index in pool.selected else 0.0,delta*12)
-		die.connection_glow = index in pool.selected
-		die.connection_color = skill_color()
-		die.connection_fire = Style.fire_level(preview) if index in pool.selected else 0
+		die.selection_emphasis = move_toward(die.selection_emphasis,1.0 if selected else 0.0,delta*12)
+		die.connection_glow = selected
+		die.connection_color = connection_charge.die_color(index)
+		die.connection_flash = connection_charge.flash(index) if selected else 0.0
+		die.connection_fire = Style.fire_level(preview) if index in pool.selected and connection_charge.reached(index) else 0
 	for spark in particles:
 		spark.life -= delta
 		spark.p += spark.v*delta
@@ -247,6 +318,7 @@ func _process(delta: float) -> void:
 			var level: int = Style.fire_level(preview)
 			emission_clock = 0.2 if battle.reduced else [0.14,0.10,0.09,0.07,0.065][level]
 			for index in pool.selected:
+				if not connection_charge.reached(index): continue
 				for burst in range(1 if battle.reduced else [1,1,2,2,3][level]):
 					if particles.size() >= 240: break
 					var direction := Vector2.from_angle(cosmetic.randf()*TAU)
@@ -256,7 +328,6 @@ func _process(delta: float) -> void:
 ## Draw connections with a compact skill summary, without repeating selected dice as tiny icons.
 func _draw() -> void:
 	var pool = battle.model.dice_turn
-	var color: Color = skill_color()
 	_draw_interactable_dice()
 	if not pool.selected.is_empty():
 		var points: Array = pool.selected.map(func(index): return die_center(index))
@@ -266,7 +337,10 @@ func _draw() -> void:
 			var edge: float = 48 if portrait() else 36
 			var from: Vector2 = points[index-1]+direction*edge
 			var to: Vector2 = points[index]-direction*(edge if index < pool.selected.size() else 0)
-			if (to-from).dot(direction) > 0: Beam.paint(self,from,to,color,clock_time,1.0 if portrait() else 0.7,battle.reduced)
+			if (to-from).dot(direction) <= 0: continue
+			if index < pool.selected.size():
+				Beam.paint_charge(self,from,to,connection_charge.color,connection_charge.segment_fill(index-1),clock_time,1.0 if portrait() else 0.7,battle.reduced)
+			else: Beam.paint(self,from,to,Color.WHITE,clock_time,1.0 if portrait() else 0.7,battle.reduced)
 		if not preview.is_empty(): _draw_preview()
 	for spark in particles:
 		var alpha: float = spark.life/0.65
@@ -331,6 +405,9 @@ func _draw_interactable_dice() -> void:
 func _draw_center() -> void:
 	if is_instance_valid(battle.tarot_cast) and battle.tarot_cast.choice_type == "magician": return
 	if battle.view_phase == "rolling": return
+	if battle.debug_split_controls and battle.model.dice_turn.has_rolled() and battle.view_phase != "charging":
+		_draw_cancel_center()
+		return
 	var at: Vector2 = battle.DICE_CENTER
 	var size: int = 46 if portrait() else 32
 	var cancelling: bool = battle._current_skill_selected()
@@ -344,17 +421,17 @@ func _draw_center() -> void:
 		battle._center(at+Vector2(0,68 if portrait() else 46),"CANCEL SKILL",38 if portrait() else 28,Color("ef9999",lerpf(0.28,1.0,proximity)),self)
 		return
 	var charging: bool = battle.view_phase == "charging"
-	var selected: bool = not battle.model.dice_turn.selected.is_empty()
+	var selected: bool = has_center_selection()
 	var reroll: bool = battle.model.dice_turn.has_rolled()
-	var enabled: bool = charging or (available() and (not preview.is_empty() if selected else battle.model.dice_turn.can_roll()))
-	var label: String = GameText.text("STOP!" if charging else "DONE" if reroll_mode else "OK" if selected else "REROLL" if reroll else "ROLL")
-	if selected:
+	var enabled: bool = center_enabled()
+	var label: String = GameText.text(center_label())
+	if selected or center_label() == "OK":
 		size = 60 if portrait() else 42
 		if not charging: at = confirm_center()
 		var width: float = battle.pixel_font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 		size = mini(size,floori(size*(156 if portrait() else 96)/maxf(1,width)))
-	var color: Color = battle.GOLD if enabled else Color("505156")
-	if not charging and not selected: at.y -= 12 if portrait() else 8
+	var color: Color = battle.dice_action_controls.action_color(center_label(),enabled) if enabled else Color("505156")
+	if not charging and not selected and center_label() != "OK": at.y -= 12 if portrait() else 8
 	var base: Vector2 = at+Vector2(0,18 if portrait() else 15)
 	# Rectified sine touches normal size briefly and eases around each crest.
 	var pop: float = 1.0
@@ -369,10 +446,19 @@ func _draw_center() -> void:
 		for outline in [8,4]: draw_string_outline(battle.pixel_font,base-Vector2(width/2,0),label,HORIZONTAL_ALIGNMENT_LEFT,-1,size,outline,Color(color,0.08*pulse))
 	battle._center(base,label,size,color,self)
 	draw_set_transform(Vector2.ZERO)
-	if reroll and not charging and not selected:
+	if reroll and not charging and (not selected or reroll_mode) and battle.debug_control_version != battle.ControlVersion.V4:
 		battle._center(at+Vector2(0,52 if portrait() else 41),str(battle.model.dice_turn.rolls_left),26 if portrait() else 20,color,self)
-	if selected and available():
+	if selected and available() and not reroll_mode:
 		var cancel_size: int = 34 if portrait() else 24
 		var width: float = battle.pixel_font.get_string_size(GameText.text("Deselect"),HORIZONTAL_ALIGNMENT_LEFT,-1,cancel_size).x
 		cancel_size = mini(cancel_size,floori(cancel_size*(156 if portrait() else 96)/maxf(1,width)))
 		battle._center(cancel_rect().get_center()+Vector2(0,8 if portrait() else 6),"Deselect",cancel_size,Color("df9696"),self)
+
+## In the alternate layout the center only deselects; it never consumes dice or rolls.
+func _draw_cancel_center() -> void:
+	var enabled: bool = available() and not battle.model.dice_turn.selected.is_empty()
+	var color := Color("efaaa2") if enabled else Color("505156")
+	var size: int = 44 if portrait() else 30
+	var text: String = GameText.text("CANCEL")
+	while size > 16 and battle.pixel_font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x > (162 if portrait() else 104): size -= 1
+	battle._center(battle.DICE_CENTER+Vector2(0,size*0.32),"CANCEL",size,color,self)

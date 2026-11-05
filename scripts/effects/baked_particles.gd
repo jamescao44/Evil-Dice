@@ -1,6 +1,7 @@
 extends RefCounted
 ## Shared immutable flipbooks: one textured quad replaces an entire particle group.
 const Library = preload("res://assets/art/fx/combat_particles/library.gd")
+const AMBIENT_OPACITY := 0.85
 
 ## Wrap without a duplicated endpoint; one-shot clips disappear after their last frame.
 static func frame_index(clip: Dictionary, age: float) -> int:
@@ -30,9 +31,11 @@ static func paint(canvas: CanvasItem, name: String, age: float, at: Vector2 = Ve
 
 ## Preserve the exact slow orbit continuously between baked shimmer frames.
 static func ring(canvas: CanvasItem, rect: Rect2, age: float, tint: Color, reduced: bool) -> void:
+	# Keep the baked palette; inherit visibility without multiplying actor RGB into the embers.
+	var particle_tint := Color(1,1,1,tint.a*AMBIENT_OPACITY)
 	for layer in range(1 if reduced else 3):
-		paint(canvas,"ring_orbit_%d" % layer,age,rect.get_center(),rect.size/128.0,tint,age*(0.18+layer*0.13))
-	var outward_tint := tint
+		paint(canvas,"ring_orbit_%d" % layer,age,rect.get_center(),rect.size/128.0,particle_tint,age*(0.18+layer*0.13))
+	var outward_tint := particle_tint
 	if reduced: outward_tint.a *= 0.3
 	paint(canvas,"ring_outward",age,rect.get_center(),rect.size/128.0,outward_tint,age*0.24)
 

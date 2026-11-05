@@ -41,7 +41,7 @@ func pressure_run(seed_value: int) -> Dictionary:
 	session.model.boss_changed.connect(phase_changed.bind(session))
 	var enemy_phases: Array = []; var level_ups: Array = []; var count := 0
 	while session.model.outcome() != "defeat" and count < 4000:
-		var state: Dictionary = session.snapshot()
+		var state: Dictionary = prepare_choice(session,session.snapshot())
 		var key := str(state.wave)
 		if not entries.has(key) and not session.model.at_shop:
 			var row: Dictionary = stamp(session)
@@ -85,7 +85,7 @@ func early_special(role: int, seed_value: int) -> Dictionary:
 	var timing := RandomNumberGenerator.new(); timing.seed = seed_value+19001
 	var shots := 0; var count := 0
 	while model.outcome().is_empty() and count < 600:
-		var command: Dictionary = choose(session.snapshot(),timing,false)
+		var command: Dictionary = choose(prepare_choice(session,session.snapshot()),timing,false)
 		if command.is_empty(): failures.append({"early_role":role,"seed":seed_value}); break
 		var result: Dictionary = session.command(command)
 		if not result.ok: failures.append({"command":command,"error":result.error}); break

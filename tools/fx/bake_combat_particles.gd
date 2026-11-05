@@ -1,6 +1,7 @@
 extends SceneTree
 ## Render the offline recipes at 60 Hz into tightly cropped, compressed sprite atlases.
 const Source = preload("res://tools/fx/combat_particle_source.gd")
+const BakeImage = preload("res://tools/fx/bake_image.gd")
 const OUTPUT := "res://assets/art/fx/combat_particles"
 const PAGE_SIZE := 2048
 var pages: Array[Image] = []
@@ -55,7 +56,7 @@ func bake() -> void:
 			var used := image.get_used_rect()
 			if used.size == Vector2i.ZERO: used = Rect2i(0,0,1,1)
 			# Cropping never cuts visible pixels; 2px atlas gutters handle filtering.
-			var packed := pack(image.get_region(used))
+			var packed := pack(BakeImage.straight_alpha(image.get_region(used)))
 			frames.append([packed[0],packed[1],spec.bounds.position+Vector2(used.position)/spec.resolution])
 		clips[spec.name] = {"duration":spec.duration,"loop":spec.loop,"resolution":spec.resolution,"frames":frames}
 		print("Baked %s: %d frames" % [spec.name,frames.size()])
@@ -67,10 +68,11 @@ func bake() -> void:
 		config.load(path+".import")
 		config.set_value("remap","importer","texture")
 		config.set_value("remap","type","CompressedTexture2D")
-		config.set_value("params","compress/mode",4)
+		config.set_value("params","compress/mode",0) # Lossless: preserve the baked orange/gold palette.
 		config.set_value("params","compress/lossy_quality",0.95)
 		config.set_value("params","mipmaps/generate",false)
 		config.set_value("params","process/fix_alpha_border",true)
+		config.set_value("params","process/premult_alpha",false)
 		config.save(path+".import")
 		script += "\tpreload(\"%s\"),\n" % path
 	script += "]\nconst CLIPS := "+var_to_str(clips)+"\n"

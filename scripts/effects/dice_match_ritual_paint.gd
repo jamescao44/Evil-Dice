@@ -32,6 +32,10 @@ static func wide_beam(r) -> void:
 	if r.beam_targets.is_empty(): return
 	var tint: Color = r.tint()
 	var strength: float = r.beam_strength
+	if r.style.size < 1.0:
+		for target in r.beam_targets:
+			laser(r,r.center,target,26*r.style.size,tint,strength*r.style.glow,r.age,r.battle.reduced)
+		return
 	var aim := Vector2.ZERO
 	for p in r.beam_targets: aim += p
 	aim /= r.beam_targets.size()
@@ -75,14 +79,14 @@ static func targeted_beam(r) -> void:
 	if r.beam_targets.is_empty(): return
 	var target: Vector2 = r.beam_targets[0]
 	if not r.previous_targets.is_empty(): target = r.previous_targets[0].lerp(target,smoothstep(0,0.09,r.shot_age))
-	laser(r,r.center,target,17,r.tint(),r.beam_strength,r.age,r.battle.reduced)
-	Pixel.disc(r,target,22,Color(r.tint(),0.22*r.beam_strength),4)
-	Pixel.circle(r,target,20,Color("fff4d8",r.beam_strength),3)
+	laser(r,r.center,target,17*r.style.size,r.tint(),r.beam_strength*r.style.glow,r.age,r.battle.reduced)
+	Pixel.disc(r,target,22*r.style.size,Color(r.tint(),0.22*r.beam_strength),4)
+	Pixel.circle(r,target,20*r.style.size,Color("fff4d8",r.beam_strength),3)
 
 ## Draw counter-rotating rune bands without changing the upright dice faces.
 static func sigil(r) -> void:
-	var s: float = r.FORMATION_SCALE
-	var a: float = r.aura
+	var s: float = r.FORMATION_SCALE*r.style.ritual
+	var a: float = r.aura*r.style.glow
 	var tint: Color = r.tint()
 	var ready: bool = r.phase in ["charge","fire","hold","return"]
 	var radius: float = r.radius

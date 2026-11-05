@@ -121,12 +121,9 @@ func draw_error(model, index: int) -> String:
 	if model.tarot_source.is_empty() or index < 0 or index >= model.tarot_choices.size(): return "Choose a tarot first."
 	if not pending_repeat.is_empty() or not pending_steps.is_empty(): return "Finish the tarot effect first."
 	var id: String = model.tarot_choices[index]
+	if not Catalog.immediate_reward(id): return "Keep this card for later."
 	if id in ["emperor","world"] and eligible_relics(model,id).is_empty(): return "No eligible relic is available."
-	var choice := {}
-	if id == "death":
-		var candidates: Array = targets(model,id)
-		if not candidates.is_empty(): choice.target = candidates.front()
-	return error(model,id,choice,false,true)
+	return error(model,id,{},false,true)
 
 ## Reward eligibility is shared by button previews and actual Emperor/World grants.
 func eligible_relics(model, id: String) -> Array:
@@ -229,6 +226,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			var pool: Array = Relics.ITEMS.keys().filter(func(key): return key not in original)
 			var replacements: Array = []
 			var rerolled = model.Relics.new()
+			rerolled.unlocks = model.relics.unlocks
 			for i in range(original.size()):
 				var replacement: String = Drops.draw(model.reward_rng,pool.filter(func(key): return model.RelicEffects.Conditions.loot_allowed(rerolled,key)),model.relic_drop_weights())
 				if replacement.is_empty(): return {"error":"No eligible relic is available."}

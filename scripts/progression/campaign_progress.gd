@@ -5,8 +5,8 @@ const LevelCurve = preload("res://scripts/progression/level_curve.gd")
 const VERSION := 3
 const Waves = preload("res://scripts/progression/wave_catalog.gd")
 const WAVES_PER_LEVEL := Waves.WAVES_PER_LEVEL
-const LEVEL_COUNT := 3
-const RUN_FIELDS := ["character_level","souls","base_max_hp","blood_gems","blood_gem_remainder","enemy_soul_remainder","summon_shards","reroll_progress","perfect_total","reward_base_damage","reward_damage_multiplier","route_history","reward_history","reward_weights"]
+const LEVEL_COUNT := Waves.LEVEL_COUNT
+const RUN_FIELDS := ["character_level","souls","base_max_hp","blood_gems","blood_gem_remainder","enemy_soul_remainder","summon_shards","reroll_progress","same_pip_rerolls","perfect_total","reward_base_damage","reward_damage_multiplier","route_history","reward_history","reward_weights"]
 var checkpoint: Dictionary = {}
 var save_path: String = ""
 var cleared_level: int = 0
@@ -34,7 +34,9 @@ func configure(path: String) -> void:
 
 ## Checkpoints contain only validated value data, never executable object instances.
 static func valid(data: Dictionary) -> bool:
-	if data.get("stage",-1) not in [WAVES_PER_LEVEL,2*WAVES_PER_LEVEL] or not data.get("run",null) is Dictionary or not data.get("relics",null) is Array or not data.get("tarots",null) is Array: return false
+	var stage = data.get("stage",-1)
+	if not stage is int or stage <= 0 or stage >= LEVEL_COUNT*WAVES_PER_LEVEL or stage%WAVES_PER_LEVEL != 0: return false
+	if not data.get("run",null) is Dictionary or not data.get("relics",null) is Array or not data.get("tarots",null) is Array: return false
 	if not data.get("rng",null) is int or not data.get("reward_rng",null) is int: return false
 	var growth = data.get("health_growth",1.10)
 	if (not growth is float and not growth is int) or not is_finite(float(growth)) or growth < 1.0: return false
@@ -45,11 +47,15 @@ static func capture(model) -> Dictionary:
 	var run: Dictionary = {}
 	for key in RUN_FIELDS: run[key] = model.get(key)
 	run["gemstones"] = model.gemstones.save()
+	run["relic_discoveries"] = {"chapter":model.relics.unlocks.chapter,"items":model.relics.unlocks.chapters.get(model.relics.unlocks.chapter,[]).duplicate()}
 	return {"health_growth":LevelCurve.HEALTH_GROWTH,"health_scale":Vitals.SCALE,"stage":model.level_number()*WAVES_PER_LEVEL,"run":run.duplicate(true),"relics":model.relics.items.duplicate(true),"tarots":model.tarots.items.filter(func(card): return not card.get("projection",false)).duplicate(true),"next_tarot":model.tarots.next_instance,"banned_tarots":model.tarot_effects.banned.duplicate(),"rng":model.rng.state,"reward_rng":model.reward_rng.state}
 
 ## Restore ownership directly; loading must not replay acquisition gifts or fusion effects.
 static func restore(model, data: Dictionary) -> bool:
 	if not valid(data): return false
+	var discoveries: Dictionary = data.run.get("relic_discoveries",{})
+	# A different chapter starts fresh rather than carrying this chapter's loadout forward.
+	if discoveries.get("chapter","chapter_1") != model.relics.unlocks.chapter: return false
 	model.reset_run()
 	for key in RUN_FIELDS:
 		if data.run.has(key): model.set(key,data.run[key].duplicate(true) if data.run[key] is Array or data.run[key] is Dictionary else data.run[key])
@@ -61,6 +67,11 @@ static func restore(model, data: Dictionary) -> bool:
 		var old_base: int = roundi(Vitals.STARTING_HEALTH*pow(saved_growth,model.character_level-1))
 		model.base_max_hp = maxi(1,model.base_max_hp-old_base+Vitals.base_health(model.character_level))
 	model.relics.items = data.relics.duplicate(true)
+	# Replaying an earlier level must also rewind Banana's replacement pool.
+	model.relics.unlocks.restore(discoveries.get("items",[]))
+	# Builds saved before chapter unlocks already earned their gated relics.
+	for item in model.relics.items:
+		if model.relics.Catalog.ITEMS.get(item.id,{}).get("requires_unlock",false): model.relics.unlocks.unlock(item.id)
 	model.gemstones.restore(data.run.get("gemstones",{}))
 	model.tarots.items = data.tarots.duplicate(true)
 	model.tarots.next_instance = int(data.get("next_tarot",1))
@@ -94,6 +105,7 @@ func complete(model) -> bool:
 ## Start retries from the entry build; completing all levels starts a fresh chapter.
 func start(model) -> void:
 	if not checkpoint.is_empty() and restore(model,checkpoint): return
+	model.relics.unlocks.restore([])
 	model.reset_run()
 	if cleared_level == LEVEL_COUNT:
 		cleared_level = 0

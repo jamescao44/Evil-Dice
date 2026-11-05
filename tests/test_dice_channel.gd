@@ -32,7 +32,7 @@ func prepare(game, values: Array) -> void:
 	game.model._load_wave()
 	game.model.enemies = [Rules.make_enemy(0),Rules.make_enemy(0),Rules.make_enemy(0)]
 	game.visual_stage = 1
-	game.monster_side = game.HORROR_SIZES[1]
+	game.evolution.reset()
 	game._start_round()
 	game.result = game.model.set_test_roll(values)
 	game.status_color = game.PURPLE
@@ -166,7 +166,7 @@ func test_layout(game) -> void:
 		game.model.stage = stage
 		game.model._load_wave()
 		game.visual_stage = stage
-		game.monster_side = game.HORROR_SIZES[stage]
+		game.evolution.reset()
 		game.model.set_status_counts({2:3,3:3,33:3,6:3})
 		for i in range(game.model.enemies.size()):
 			var rect: Rect2 = game._target_rect(i)
@@ -177,7 +177,7 @@ func test_layout(game) -> void:
 				check(not health.intersects(game._enemy_health_rect(j).grow(3)),"Health bar borders never overlap in any squad formation")
 			for item in game._active_statuses():
 				check(not rect.intersects(game._status_rect(item.id)),"Enemy target never overlaps Horror status input")
-	check(game.HORROR_SIZES[2] < 288 and game.HORROR_SIZES[6] < 320 and game.HORROR_SIZES[Waves.CITY_STAGE] == 288,"City Horror reaches the configured 288 destination size")
+	check(game.monster_side == game.ActorScale.player_size(game._display_form()),"Wave changes retain the displayed form size")
 	game._restart()
 	game.model.reroll_progress = 15
 	tap(game,game._treasure_point(2))

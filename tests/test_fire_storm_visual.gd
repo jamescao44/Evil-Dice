@@ -72,14 +72,16 @@ func capture(label: String) -> void:
 	root.get_texture().get_image().save_png("res://test-output/fire-storm-"+label+".png")
 
 ## Four visual cycles finish even on a wipe; damage and sound never hit dead targets.
-func scene(phone: bool, wipe: bool = false) -> void:
+func scene(phone: bool, wipe: bool = false, form: int = 2) -> void:
 	var g = HeardPortrait.new() if phone else HeardBattle.new()
 	root.add_child(g); g.muted = true; g.speed = 2; g.set_process_input(false)
+	g.model.character_level = [1,5,10][form]; g.evolution.reset()
 	g.model.enemies = [g.model.make_enemy(0),g.model.make_enemy(1),g.model.make_enemy(2)]
 	for e in g.model.enemies:
 		e.hp = 1 if wipe else 1000; e.max_hp = e.hp; e.shield = 0
 	g.model.roll_pool(false,[1,2,3,4,5,6])
 	g.model.dice_turn.selected = [0,1,2,3,4]; g.model.form_selected_skill()
+	var expected_damage: int = g.model.skill_damage_total(g.model.pending,0)
 	g._show_pending_skill(false); g._activate_skill(0)
 	var hp: int = g.model.enemies[0].hp
 	var hits := 0
@@ -88,7 +90,8 @@ func scene(phone: bool, wipe: bool = false) -> void:
 	var saw_sparks := false
 	var loop_finished_at := 0.0
 	var deadline: int = Time.get_ticks_msec()+10000
-	var prefix: String = ("portrait" if phone else "landscape")+("-wipe" if wipe else "")
+	var prefix: String = ("portrait" if phone else "landscape")+"-form-"+str(form)+("-wipe" if wipe else "")
+	var duration: float = Effects.AttackStyle.loop_timing(form,Storm.LOOP_FRAMES,Storm.LOOP_FPS,5).loop_duration
 	while Time.get_ticks_msec() < deadline:
 		if g.fx.spell.has("storm"):
 			var state: Dictionary = g.fx.spell.storm
@@ -109,9 +112,10 @@ func scene(phone: bool, wipe: bool = false) -> void:
 	check(saw_build and saw_fade,"Real cast includes both authored buildup and fade")
 	check(hits == (1 if wipe else 5),"Visual replacement preserves damage count and stops on dead targets")
 	check(g.impact_times.size() == hits,"Three targets still play only one shared impact sound per tick")
-	check(loop_finished_at >= Storm.LOOP_DURATION-0.05 and loop_finished_at < Storm.LOOP_DURATION+0.1,"All casts complete four loops before fading, including a wipe")
+	check(loop_finished_at >= duration-0.05 and loop_finished_at < duration+0.1,"All casts complete the form's visual cycles before fading, including a wipe")
 	if not wipe:
-		for tick in range(5): check(absf(g.impact_times[tick]-Storm.damage_tick_time(tick,5)) < 0.05,"Damage sounds land evenly across all four cycles")
+		for tick in range(5): check(absf(g.impact_times[tick]-duration*tick/4) < 0.08,"Damage sounds land evenly across the form's visual cycles")
+		check(1000-g.model.enemies[0].hp == expected_damage,"Shorter early-form visuals retain the full calculated damage")
 	if not wipe: check(saw_sparks,"Real sustained damage emits orange particles")
 	check(g.fx.finishing_spells.is_empty(),"Real cast leaves no stuck storm tail")
 	g.queue_free(); await process_frame
@@ -121,6 +125,7 @@ func run() -> void:
 	await scene(false)
 	await scene(true)
 	await scene(true,true)
+	for form in [0,1]: await scene(true,false,form)
 	print("Fire Storm visual: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)
 

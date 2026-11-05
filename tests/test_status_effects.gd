@@ -196,7 +196,7 @@ func layout_checks(g) -> void:
 		g.model.stage = stage
 		g.model._load_wave()
 		g.visual_stage = stage
-		g.monster_side = g.HORROR_SIZES[stage]
+		g.evolution.reset()
 		g._update_battlefield_view(1)
 		g.model.set_status_counts({2:3,3:3,33:3,6:3,Status.FROZEN:1,Status.BURNING:4,Status.STUNNED:1,Status.DARKNESS:3,Status.CORROSION:3,Status.PLAGUE:1})
 		for item in g._active_statuses():

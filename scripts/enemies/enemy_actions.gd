@@ -92,6 +92,7 @@ static func interrupt(enemy: Dictionary, cause: int = -1) -> void:
 	# Retain the commitment, but discard all progress: restart from charge one.
 	if enemy.get("charging",false):
 		enemy.charge = 0
+		Behaviors.StraightInterrupt.clear(enemy)
 		if enemy.get("boss",false) or Catalog.ITEMS[enemy.role].get("interruptible",false):
 			enemy.charging = false; enemy.break_marks = Catalog.ITEMS[enemy.role].break_casts
 

@@ -1,4 +1,9 @@
 keys,en,zh_CN
+Double,Double,两个一样
+Triple,Triple,三个一样
+Quadruple,Quadruple,四个一样
+Quintuple,Quintuple,五个一样
+Sextuple,Sextuple,六个一样
 Settings,Settings,设置
 SETTINGS,SETTINGS,设置
 LANGUAGE,LANGUAGE,语言
@@ -306,7 +311,7 @@ Base damage +5.,Base damage +5.,基础伤害+5。
 Rusty Armor,Rusty Armor,生锈护甲
 Take 10% less damage.,Take 10% less damage.,受到的伤害减少10%。
 Game Coin,Game Coin,游戏币
-Gain 10 blood gems after clearing a wave.,Gain 10 blood gems after clearing a wave.,每通关一波，获得10血宝石。
+Gain 67 blood gems after clearing a wave.,Gain 67 blood gems after clearing a wave.,每通关一波，获得67血宝石。
 Magic Shield,Magic Shield,魔盾
 "Every 6 completed turns, store a shield that blocks one whole hit.","Every 6 completed turns, store a shield that blocks one whole hit.",每完成6回合，储存一层可完全抵挡一次伤害的护盾。
 Magic Sword,Magic Sword,魔剑
@@ -538,7 +543,7 @@ Blood gem gains +15%. Fractional bonuses carry over.,Blood gem gains +15%. Fract
 Pet Lizard,Pet Lizard,宠物蜥蜴
 Apply 1 extra burning stack to enemies.,Apply 1 extra burning stack to enemies.,给敌人附加燃烧时，额外附加 1 层。
 Ice Rose,Ice Rose,冰玫瑰
-Freezing an enemy deals 10 base damage to it.,Freezing an enemy deals 10 base damage to it.,冰冻敌人时，对其造成 10 点基础伤害。
+Freezing an enemy deals 10 base damage to all enemies.,Freezing an enemy deals 10 base damage to all enemies.,冰冻敌人时，对所有敌人造成 10 点基础伤害。
 Pet Slime,Pet Slime,宠物史莱姆
 Corrosion on enemies becomes permanent.,Corrosion on enemies becomes permanent.,敌人的腐蚀状态变为永久。
 Spiked Helmet,Spiked Helmet,尖刺头盔
@@ -1160,3 +1165,40 @@ One throw + four single-die rerolls. One straight skill per turn.,One throw + fo
 Cast a %d-die straight to interrupt.,Cast a %d-die straight to interrupt.,施放%d连顺子打断蓄力。
 After wave %d-%d,After wave %d-%d,第%d-%d波之后
 Skip shuffle animation,Skip shuffle animation,跳过洗牌动画
+Cast a %d-die straight %d more times to interrupt.,Cast a %d-die straight %d more times to interrupt.,再施放%d连顺子%d次打断蓄力。
+Hour Hand,Hour Hand,时针
+Minute Hand,Minute Hand,分针
+Second Hand,Second Hand,秒针
+Handless Clock,Handless Clock,没有指针的钟
+Demon Clock,Demon Clock,恶魔时钟
+Clock,Clock,时钟
+Beast Fang,Beast Fang,野兽獠牙
+Firebird Feather,Firebird Feather,火鸟羽毛
+Snowball,Snowball,雪球
+Cursed Tentacle,Cursed Tentacle,诅咒触手
+"Every 3 completed turns, this relic gains +0.1 damage multiplier.","Every 3 completed turns, this relic gains +0.1 damage multiplier.",每3个完整回合，本法具累积+0.1伤害乘数。
+"Every 2 completed turns, this relic gains +0.1 damage multiplier.","Every 2 completed turns, this relic gains +0.1 damage multiplier.",每2个完整回合，本法具累积+0.1伤害乘数。
+"Every completed turn, this relic gains +0.1 damage multiplier.","Every completed turn, this relic gains +0.1 damage multiplier.",每个完整回合，本法具累积+0.1伤害乘数。
+A clock waiting for its hands.,A clock waiting for its hands.,等待指针的时钟。
+Combines all Clock effects and their growth. Damage multiplier +1.5.,Combines all Clock effects and their growth. Damage multiplier +1.5.,合并所有时钟效果及累积增益，伤害乘数+1.5。
+Base damage +2. Attacks have a 30% chance to apply 1 Plague.,Base damage +2. Attacks have a 30% chance to apply 1 Plague.,基础伤害+2，攻击有30%概率附加1层瘟疫。
+Base damage +2. Attacks have a 30% chance to apply 1 Burning.,Base damage +2. Attacks have a 30% chance to apply 1 Burning.,基础伤害+2，攻击有30%概率附加1层燃烧。
+Base damage +2. Attacks have a 10% chance to apply 1 Frozen.,Base damage +2. Attacks have a 10% chance to apply 1 Frozen.,基础伤害+2，攻击有10%概率附加1层冰冻。
+Gain 2 extra rolls each turn. Spent last; do not earn treasure progress.,Gain 2 extra rolls each turn. Spent last; do not earn treasure progress.,每回合额外2次投掷，最后消耗，不计入宝箱进度。
+A throw with no straight grants +10 damage multiplier until the next throw or turn end.,A throw with no straight grants +10 damage multiplier until the next throw or turn end.,投掷后无顺子时伤害乘数+10，持续至下次投掷或回合结束。
+"Retrigger the relic immediately to the left once, except Cursed Tentacle.","Retrigger the relic immediately to the left once, except Cursed Tentacle.",额外触发紧邻左侧的法具一次，诅咒触手除外。
+Retrigger every relic to the left once. Each extra activation costs 1% max HP and can kill you.,Retrigger every relic to the left once. Each extra activation costs 1% max HP and can kill you.,额外触发左侧所有法具一次。每次额外发动失去生命上限的1%，可致死。
+Basic Crystal,Basic Crystal,初级水晶
+Intermediate Crystal,Intermediate Crystal,中级水晶
+Master Crystal,Master Crystal,大师水晶
+Supreme Crystal,Supreme Crystal,至尊水晶
+Phoenix Feather,Phoenix Feather,凤凰羽毛
+Warrior Greatsword,Warrior Greatsword,勇士巨剑
+Base damage +10.,Base damage +10.,基础伤害+10。
+Base damage +20.,Base damage +20.,基础伤害+20。
+Damage multiplier +0.4.,Damage multiplier +0.4.,伤害乘数+0.4。
+Base damage x2.,Base damage x2.,基础伤害×2。
+Base damage +7. Meal ingredient.,Base damage +7. Meal ingredient.,基础伤害+7。套餐食材。
+"Base damage +5. At turn start, apply 2 Burning to a random enemy.","Base damage +5. At turn start, apply 2 Burning to a random enemy.",基础伤害+5。回合开始时，给随机敌人施加2层燃烧。
+"After each skill cast, attack a random enemy for 10 base damage.","After each skill cast, attack a random enemy for 10 base damage.",每次施放技能后，对随机敌人造成10基础伤害。
+"Damage multiplier +0.5. 20% chance to disappear at turn end, replaced by Magic Banana in future rewards.","Damage multiplier +0.5. 20% chance to disappear at turn end, replaced by Magic Banana in future rewards.",伤害乘数+0.5。回合结束时有20%概率消失，此后奖励中的香蕉替换为魔法香蕉。

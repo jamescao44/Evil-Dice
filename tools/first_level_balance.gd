@@ -41,7 +41,7 @@ func level_run(seed_value: int) -> Dictionary:
 	var entries: Dictionary = {}; var boss_start := {}; var count := 0
 	var minima: Dictionary = {}
 	while session.model.outcome() != "defeat" and count < 2000:
-		var state: Dictionary = session.snapshot()
+		var state: Dictionary = prepare_choice(session,session.snapshot())
 		if not entries.has(str(state.wave)):
 			entries[str(state.wave)] = stamp(session)
 			entries[str(state.wave)].enemies = state.enemies.duplicate(true)
@@ -72,7 +72,7 @@ func trait_probe(label: String, seed_value: int, build: String = "typical") -> D
 	var timing := RandomNumberGenerator.new(); timing.seed = seed_value+19001
 	var count := 0; var events: Dictionary = {}; var lowest: int = model.hp
 	while model.outcome().is_empty() and count < 600:
-		var command: Dictionary = choose(session.snapshot(),timing,false)
+		var command: Dictionary = choose(prepare_choice(session,session.snapshot()),timing,false)
 		if command.is_empty(): failures.append({"trait":label,"seed":seed_value,"state":session.snapshot()}); break
 		var result: Dictionary = session.command(command)
 		if not result.ok: failures.append({"trait":label,"command":command,"error":result.error}); break

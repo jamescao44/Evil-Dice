@@ -16,9 +16,13 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 	var attack_base: float = amount+model.RelicEffects.base_damage(model.relics.items,amount)
 	if options.has("base_scale"): attack_base = (model.character_base_damage()+model.relic_base_damage())*options.base_scale
 	var damage: int = maxi(0,floori(amount if fixed else attack_base*model.damage_multiplier(skill)+0.000001))
-	if fixed and not options.get("no_damage_modifiers",false): damage = floori(damage*pow(2,model.RelicEffects.repeat_sources(model.relics.items,"holy_grail").size()))
+	if fixed and not options.get("no_damage_modifiers",false):
+		for entry in model.RelicEffects.repeat_sources(model.relics.items,"holy_grail"):
+			damage *= 2
+			model.RelicEffects.Sequence.activate(model,entry)
 	if options.get("multiplier_only",false): damage = floori(amount*model.damage_multiplier(skill)+0.000001)
 	if not fixed or options.get("multiplier_only",false): model.RelicEffects.activate_damage_modifiers(model,skill)
+	if model.hp <= 0: return []
 	var guards: Array = model.taunting_enemies()
 	var events: Array = []
 	var old_lifesteal: int = model.lifesteal_used

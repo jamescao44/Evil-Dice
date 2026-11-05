@@ -35,6 +35,7 @@ var selection_emphasis: float = 0
 var connection_glow: bool = false
 var connection_color := Color.WHITE
 var connection_fire: int = 0
+var connection_flash: float = 0.0
 var effect_age: float = 0
 var rejection_age: float = 0.0
 var idle_hint := Vector2.ZERO # Extra scale and tilt supplied by idle dice feedback.
@@ -181,7 +182,8 @@ func _draw() -> void:
 	if connection_fire > 0: _draw_connection_fire()
 	if connection_glow:
 		for spread in range(4,0,-1):
-			draw_rect(Rect2(-55-spread*5,-57-spread*5,110+spread*10,114+spread*10),Color(1,1,1,0.065))
+			var padding: float = spread*(5+connection_flash*5)
+			draw_rect(Rect2(-55-padding,-57-padding,110+padding*2,114+padding*2),Color(connection_color.lightened(connection_flash*0.8),0.065+connection_flash*0.12))
 	if glow > 0:
 		for i in range(4, 0, -1):
 			var extent: float = 54 + i * 5
@@ -194,8 +196,11 @@ func _draw() -> void:
 		draw_rect(Rect2(-53,-55,106,109),Color(GemPaint.Gems.Catalog.color(socket_gem.id),0.6),false,3)
 		GemPaint.paint(self,Vector2(40,43),socket_gem,13,false)
 	if connection_glow:
-		draw_rect(Rect2(-53,-55,106,109),Color(1,1,1,0.18))
-		draw_rect(Rect2(-53,-55,106,109),Color.WHITE,false,3)
+		var charged_color: Color = connection_color.lightened(connection_flash)
+		# The face flashes white on arrival, then returns to its untinted artwork.
+		if connection_flash > 0:
+			draw_rect(Rect2(-53,-55,106,109),Color(1,1,1,connection_flash*0.5))
+		draw_rect(Rect2(-53,-55,106,109),charged_color,false,3+connection_flash*3)
 	if glow > 0.1:
 		draw_rect(Rect2(-53, -55, 106, 109), Color(tint, glow * 0.7), false, 3)
 	if auto_attack_active or auto_attack_pulse > 0:

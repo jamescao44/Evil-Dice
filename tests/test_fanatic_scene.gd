@@ -23,17 +23,17 @@ func check_visible(g):
 	for i in g.model.living():
 		check(g.ARENA.grow(2).encloses(g._enemy_sprite_rect(i)),"Live creature fits battlefield")
 		check(g.ARENA.encloses(g._enemy_health_rect(i)),"Live creature health bar fits battlefield")
-		check(g.ARENA.encloses(g._enemy_intent_rect(i)),"Live creature intention fits battlefield")
+		check(g.ARENA.encloses(g._enemy_intent_rect(i)),"Live creature intention fits battlefield: phone=%s name=%s rect=%s" % [g.fx.canvas_size.y > g.fx.canvas_size.x,g.model.enemies[i].name,g._enemy_intent_rect(i)])
 		check(not g.player_health_rect().grow(3).intersects(g._enemy_health_rect(i)),"Enemy health never covers player vitals")
 		for other in g.model.living():
 			if i == other: continue
-			check(not g._enemy_health_rect(i).intersects(g._enemy_health_rect(other)),"Living enemy health bars remain separate")
+			check(not g._enemy_health_rect(i).intersects(g._enemy_health_rect(other)),"Living enemy health bars remain separate: phone=%s %s=%s, %s=%s" % [g.fx.canvas_size.y > g.fx.canvas_size.x,g.model.enemies[i].name,g._enemy_health_rect(i),g.model.enemies[other].name,g._enemy_health_rect(other)])
 func run():
 	for phone in [false,true]:
 		root.content_scale_size = Vector2i(804,1748) if phone else Vector2i(1280,800)
 		root.size = root.content_scale_size
 		var g = Portrait.new() if phone else Battle.new()
-		root.add_child(g); g.muted = true; g.set_process_input(false); g._restart(30)
+		root.add_child(g); g.muted = true; g.set_process_input(false); g._restart(24)
 		g.model.character_level = 22; g.model.hp = g.model.max_hp; g.evolution.reset(); g.soul_pickup.reset()
 		Fanatic.summon(g.model,0)
 		Fanatic.split(g.model,0)
@@ -49,7 +49,7 @@ func run():
 		g.model.enemies[demon].intent = g.model.EnemyActions.intent(g.model,demon,"charge")
 		await settled(g)
 		check_visible(g)
-		check(g._enemy_intent_data(demon).description.contains("3") or g._enemy_intent_data(demon).description.contains("三"),"Demon inspection describes break marks")
+		check(g._enemy_intent_data(demon).description.contains(GameText.format("Cast a %d-die straight to interrupt.",g.model.enemies[demon].interrupt_straight)),"Demon inspection describes its current interruption shape")
 		await screenshot(g,"fanatic-demon-"+str(phone))
 		Fanatic.summon(g.model,0); Fanatic.split(g.model,0)
 		g.model.begin_round()

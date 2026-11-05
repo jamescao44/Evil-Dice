@@ -27,17 +27,18 @@ static func ring(canvas: CanvasItem, center: Vector2, radius: float, angle: floa
 
 ## Recovery shrinks the hand seal; ultimate channel grows, trembles, then flashes open.
 static func paint(canvas: CanvasItem, rect: Rect2, animation, reduced: bool, tint: Color) -> void:
-	if animation.action.is_empty() or animation.action == "pair": return
+	if animation.action.is_empty() or animation.action == "pair" or animation.emoting(): return
 	var active: bool = animation.phase in ["build","damage"]
-	var strength: float = 1.0 if active else clampf(animation.age*8,0,1) if animation.phase == "windup" else 1-clampf(animation.age*animation.FPS*animation.rate/6,0,1)
+	var strength: float = 1.0 if active else clampf(animation.age*8,0,1) if animation.phase == "windup" else 1-clampf(animation.age*animation.FPS/6,0,1)
 	var alpha: float = strength*tint.a
 	var angle: float = 0.0 if reduced else animation.total_age*1.8
 	var at: Vector2 = rect.position+animation.hand_uv()*rect.size
 	var radius: float = rect.size.x*0.22*lerpf(0.55,1,strength)
 	# Raised hands channel into one overhead seal; the hand seal opens on release.
-	if animation.action != "ultimate" or animation.frame_number() >= 92:
+	var clip: Dictionary = animation.clip_data()
+	if not clip.has("channel_end") or animation.frame_number() >= clip.release:
 		ring(canvas,at,radius,angle,alpha,reduced)
-	if animation.action != "ultimate": return
+	if not clip.has("channel_end"): return
 	var charging: bool = animation.phase in ["windup","build"]
 	var charge: float = clampf(animation.total_age/2.5,0,1)
 	var expansion: float = 1.0 if charging else 1.0+minf(animation.age*3,0.35)

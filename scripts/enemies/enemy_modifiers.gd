@@ -19,6 +19,10 @@ static func assign(enemy: Dictionary, rng: RandomNumberGenerator) -> void:
 		enemy.element = ELEMENTS[rng.randi_range(0,ELEMENTS.size()-1)]
 		enemy.attribute = ATTRIBUTES[enemy.element]
 
+## Reuse deterministic attack strength when debug levels change a locked move's damage.
+static func attack_factor(enemy: Dictionary) -> float:
+	return 2.0 if enemy.get("modifier","") == "manic" else 1.0
+
 ## Select friendly fire and elemental procs once per whole action, never per impact.
 static func decorate_intent(model, index: int, move: Dictionary) -> Dictionary:
 	var enemy: Dictionary = model.enemies[index]
@@ -33,12 +37,12 @@ static func decorate_intent(model, index: int, move: Dictionary) -> Dictionary:
 					move.status_once = true
 		"manic":
 			if move.type == "attack":
-				move.amount *= 2
+				move.amount = roundi(move.amount*attack_factor(enemy))
 				if model.rng.randf() < 0.3:
 					var allies: Array = model.living().filter(func(i): return i != index)
 					move.target = index if allies.is_empty() else allies[model.rng.randi_range(0,allies.size()-1)]
 					move.friendly_fire = true
-					move.amount = move.get("friendly_amount",move.amount/2)*2
+					move.amount = roundi(move.get("friendly_amount",move.amount/2)*attack_factor(enemy))
 			elif move.type in ["heal","team_heal"]:
 				move.heal_factor = 2.0
 				move.inverted = model.rng.randf() < 0.3

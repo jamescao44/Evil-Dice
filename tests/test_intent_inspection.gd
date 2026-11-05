@@ -52,7 +52,7 @@ func prepare(g, skill: bool = false) -> void:
 	for e in g.model.enemies: e.damage_percent = 0; e.damage = 0
 	g.model.phase = "new"
 	g.visual_stage = 1
-	g.monster_side = g.HORROR_SIZES[1]
+	g.evolution.reset()
 	g._start_round()
 	if skill:
 		g.result = g.model.set_test_roll([1,2,3])
@@ -135,7 +135,7 @@ func layout_checks(g) -> void:
 	g._begin_cast_cinematic(Rules.Kind.ULTIMATE)
 	g._process(0.05)
 	check(g._world_time_scale() == 0 and is_equal_approx(g.model.city_immunity_seconds(),3.45),"Cast anticipation pauses siege motion without stopping the real seconds countdown")
-	check(g.HORROR_SIZES[Waves.CITY_STAGE] == 288 and g.HORROR_SIZES[Waves.CITY_STAGE-1] < 288 and g.HUMAN_SIZES[Waves.CITY_STAGE-1] == 44 and g.HUMAN_SIZES[Waves.CITY_STAGE] == 20,"Final squad keeps the old wave nine size and the Horror grows to 288 at the city")
+	check(g.monster_side == g.ActorScale.player_size(g._display_form()),"Even dormant city views retain the displayed form size")
 	g.queue_free()
 	await process_frame
 

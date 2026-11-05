@@ -23,7 +23,7 @@ func probe(level: int, gap: int, lineup: String, equipped: bool, seed_value: int
 	var min_hp := 1.0
 	var count := 0
 	while model.outcome().is_empty() and count < 600:
-		var command: Dictionary = choose(session.snapshot(),timing,false)
+		var command: Dictionary = choose(prepare_choice(session,session.snapshot()),timing,false)
 		if command.is_empty(): failures.append({"level":level,"gap":gap,"lineup":lineup}); break
 		var response: Dictionary = session.command(command)
 		if not response.ok: failures.append({"command":command,"error":response.error}); break

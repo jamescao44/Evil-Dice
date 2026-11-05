@@ -41,6 +41,8 @@ func rules() -> void:
 		check(boss.boss_phase == 2 and boss.max_hp == m.EnemyCatalog.phase_health(boss,2) and boss.charge == 1 and boss.interrupt_straight == 4,"Boss retains phase and charge challenge, using its separate health curve")
 		for ally in m.enemies.slice(1):
 			check(ally.level == 12,"Existing reinforcements receive the encounter level")
+			if ally.role == m.EnemyCatalog.Role.PALADIN:
+				check(ally.max_hp == m.EnemyCatalog.make(ally.role,12).max_hp,"Releveling Paladin guards never restores the removed summon health penalty")
 			if ally.get("summoned",false): check(m.EnemyCatalog.soul_reward(ally) == 0,"Summons stay non-farmable after releveling")
 
 func scene(phone: bool) -> void:
@@ -51,11 +53,11 @@ func scene(phone: bool) -> void:
 	for tab in range(3):
 		g._handle_menu_page_click(ui.tab_rect(tab).get_center())
 		check(ui.page == tab,"Tab click selects its page")
-		check(g.debug_wave_input.visible == (tab == 1) and ui.level_input.visible == (tab == 1),"Native fields only appear on Battle tab")
+		check(g.debug_wave_input.visible == (tab == 1) and ui.level_input.visible == (tab == 1) and ui.character_input.visible == (tab == 1),"Native fields only appear on Battle tab")
 		var controls: Array = ui.buttons().map(func(row): return row[0])
 		if tab == 0:
 			for choice in [-1]+g.DEBUG_DICE_PRESETS.keys(): controls.append(ui.option_rect(choice))
-		elif tab == 1: controls.append_array([g.DEBUG_WAVE_INPUT,ui.level_rect])
+		elif tab == 1: controls.append_array([g.DEBUG_WAVE_INPUT,ui.level_rect,ui.character_rect])
 		for i in range(controls.size()):
 			check(Rect2(Vector2.ZERO,g.fx.canvas_size).encloses(controls[i]),"Every control fits the canvas")
 			for j in range(i): check(not controls[i].intersects(controls[j]),"Controls on a tab never overlap")
@@ -71,7 +73,7 @@ func scene(phone: bool) -> void:
 	g._handle_menu_page_click(g.DEBUG_TAROTS.get_center())
 	check(g.model.tarots.items.size() == before+22,"Existing reward shortcuts work on their own tab")
 	g._close_debug(false)
-	check(not ui.level_input.visible and not g.debug_wave_input.visible,"Closing Debug hides both native fields")
+	check(not ui.level_input.visible and not g.debug_wave_input.visible and not ui.character_input.visible,"Closing Debug hides all native fields")
 	g.queue_free(); await process_frame
 
 func run() -> void:

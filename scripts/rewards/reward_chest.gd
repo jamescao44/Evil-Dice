@@ -34,6 +34,7 @@ const Icons = preload("res://scripts/rewards/reward_icons.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const RelicPaint = preload("res://scripts/relics/relic_paint.gd")
+const RarityDisplay = preload("res://scripts/relics/relic_rarity_display.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
 var symbols: Array = Catalog.ITEMS.duplicate(true)
 var scroll_symbols: Array = []
@@ -585,14 +586,18 @@ func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 		var item_rect := Rect2(rect.get_center()-Vector2.ONE*side/2+Vector2(0,(row-scroll)*step),Vector2.ONE*side)
 		var clipped := item_rect.intersection(rect.grow(-8))
 		if not clipped.has_area(): continue
+		# Animate only the landed prize; moving filler cannot reveal its hidden outcome.
+		if revealed and shown.has("relic_id") and row == roundi(scroll): continue
 		var distance: float = absf(row-scroll)
 		_paint_symbol(item_index,item_rect,rect.grow(-8),Color(1,1,1,lerpf(1,0.35,clampf(distance,0,1))))
+	if revealed and shown.has("relic_id"):
+		RarityDisplay.paint(self,shown.relic_id,rect.get_center(),rect.size.x*0.61*(26.0/64.0),elapsed,reduced,0.5,elapsed-stop_time(reel))
 	draw_rect(band,Color(color,0.95),false,3)
 	for y in [rect.position.y,rect.end.y-16]: draw_rect(Rect2(rect.position.x,y,rect.size.x,16),Color(0.04,0.08,0.06,0.8))
 	draw_rect(rect,Color("626b69"),false,2)
 	if revealed and shown.has("relic_id"):
 		var label: String = Relics.RARITY_NAMES[Relics.ITEMS[shown.relic_id].rarity]
-		_text(Vector2(rect.get_center().x,rect.end.y-18),label,18 if size.y > size.x else 16,Color("d4d8d3"))
+		_text(Vector2(rect.get_center().x,rect.end.y-18),label,18 if size.y > size.x else 16,color.lightened(0.2))
 	var blink: float = clampf(1-(elapsed-stop_time(reel))*4,0,1) if elapsed >= stop_time(reel) else 0
 	if not reduced and blink > 0: draw_rect(band,Color(color,blink*0.35))
 	for direction in [-1,1]:

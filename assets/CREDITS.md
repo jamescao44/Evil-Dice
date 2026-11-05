@@ -159,10 +159,18 @@ Challenger's Badge (2026-10-27): original 32×32 pixel-style SVG drawn for this 
 `art/enemies/bomber.svg` is original code-drawn 48×48 pixel artwork for this project: a hooded sapper carrying a lit iron bomb. No external asset was used.
 
 ### Diablo player animation
-James supplied `art/player/diablo/diablo_3.png` (2026-10-31), copied unchanged. All three evolutions now use this 64×64, 20-column atlas: 109 frames in row-major order. The former Flamelings artwork is retained only as a legacy asset. Runtime sigils are drawn in code.
+James supplied `art/player/diablo/diablo_2.png` and the updated `diablo_3.png` (2026-11-05), copied unchanged. Both use 64×64 cells in 20-column, row-major atlases. Diablo 2 supplies forms one and two (cover frame 1, animation frames 2–64); Diablo 3 supplies the final form (frames 1–133). Both include tap-to-emote animations. The former Flamelings artwork is retained only as a legacy asset. Runtime sigils are drawn in code.
 
-James also supplied `art/player/diablo/divine_ring_FX.png`, copied unchanged: 48×48 cells, looping frames 2–12. This permanent ring is drawn at 70% width behind the character's upper back, with a runtime golden glow.
+James also supplied `art/player/diablo/divine_ring_FX.png`, copied unchanged: 48×48 cells, looping frames 2–12. This permanent ring is drawn at 70% width behind the final form's upper back, with a runtime golden glow; the first two forms have no ring.
 
 ### Baked chest confetti
 
 `art/fx/chest_confetti/` is generated from the project’s original procedural paper effect by `tools/fx/bake_chest_confetti.gd`. No external artwork is used.
+
+### Clock and status relics (2026-11-03)
+
+`art/relics/{hour_hand,minute_hand,second_hand,handless_clock,demon_clock,beast_fang,firebird_feather,snowball}.svg`: original 32×32 pixel-style vector icons drawn for this project. No external asset source.
+
+`art/fx/relic_rarity/{orbit,sigil,sunburst,curse}.svg`: original reusable rarity seals drawn for this project, animated behind shop merchandise and revealed chest prizes. No external asset source.
+
+`art/relics/{basic_crystal,intermediate_crystal,master_crystal,supreme_crystal,phoenix_feather,warrior_greatsword}.svg`: original 32×32 pixel-style crystal, feather and sword icons drawn for this project. No external asset source.

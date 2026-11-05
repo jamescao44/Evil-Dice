@@ -15,7 +15,7 @@ dest_files=["res://.godot/imported/particles_01.png-d454cfdc8f0b9cda4efbfdc6081e
 
 [params]
 
-compress/mode=4
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.95
 compress/uastc_level=0

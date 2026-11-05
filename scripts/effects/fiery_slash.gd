@@ -48,7 +48,7 @@ static func paint(canvas: CanvasItem, spell: Dictionary, reduced: bool) -> void:
 	var state: Dictionary = spell.fiery_slash
 	var strength: float = lerpf(0.1,1.0,smoothstep(0,state.build_duration,state.age)) if state.phase == "build" else 1.0-smoothstep(0,(FRAMES-IMPACT_FRAME)/state.damage_fps,state.age)
 	var rect := Rect2(-Vector2.ONE*SIDE*0.5,Vector2.ONE*SIDE)
-	var light: float = strength*(0.5 if reduced else 1.0)
+	var light: float = strength*(0.5 if reduced else 1.0)*spell.style.glow
 	canvas.draw_texture_rect(Glow.glow_texture(),rect.grow(24),false,Color(1,0.29,0.025,light*0.7))
 	var cell: int = frame(spell)
 	if not reduced:
@@ -59,7 +59,7 @@ static func paint(canvas: CanvasItem, spell: Dictionary, reduced: bool) -> void:
 	if state.phase != "build":
 		var progress: float = clampf(state.age*state.damage_fps/(FRAMES-IMPACT_FRAME),0,1)
 		# Sparks peel off the slash's curved blade as its damage frame arrives.
-		for i in range(18 if reduced else 104):
+		for i in range(maxi(4,roundi((18 if reduced else 104)*spell.style.particles))):
 			var delay: float = fposmod(i*0.754877,1.0)*0.16
 			if progress < delay: continue
 			var travel: float = (progress-delay)/(1-delay)

@@ -23,6 +23,15 @@ def source_fingerprint() -> str:
     return digest.hexdigest()
 
 
+def rules_fingerprint() -> str:
+    """Separate unchanged gameplay/CLI-adapter rules from the policy being compared."""
+    digest = hashlib.sha256()
+    for path in sorted([ROOT / "project.godot", *ROOT.glob("scripts/**/*.gd")]):
+        digest.update(str(path.relative_to(ROOT)).encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, help="New output directory; previous runs are never overwritten.")
@@ -43,7 +52,7 @@ def main() -> None:
     if args.paired:
         command.append("paired")
     fingerprint = source_fingerprint()
-    metadata = {"started_at": dt.datetime.now(dt.timezone.utc).isoformat(), "source_sha256": fingerprint, "command": command}
+    metadata = {"started_at": dt.datetime.now(dt.timezone.utc).isoformat(), "source_sha256": fingerprint, "rules_sha256": rules_fingerprint(), "command": command}
     metadata_path = folder / "metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2)+"\n")
     with (folder / "engine.log").open("w") as log:

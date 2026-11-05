@@ -37,8 +37,9 @@ func run() -> void:
 		g.model.tarot_effects.pending_repeat = {"id":"death","instance_id":-1}
 		check(not g.tarot_cast._continue_repeat() and g.model.tarot_effects.pending_repeat.is_empty(),"A repeat dismisses cleanly when only a boss remains")
 		g.model.base_max_hp = 10000; g.model.hp = 10000; g.model.phase = "enemy"
+		var heavy_damage: int = g.model.EnemyCatalog.Damage.base_hit(g.model.enemies[0],g.model.character_level)*3
 		await g._enemy_phase()
-		check(g.model.hp == 10000-g.model.enemies[0].damage*3 and g.view_phase == "ready" and not g.model.enemies[0].charging,"Final Commander charge animates and hits exactly once before returning control")
+		check(g.model.hp == 10000-heavy_damage and g.view_phase == "ready" and not g.model.enemies[0].charging,"Final Commander charge animates and hits exactly once before returning control")
 		g._restart(8)
 		g.model.hit_enemy(0,99999,true)
 		g.BattlefieldRender.register_arrivals(g)

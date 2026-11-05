@@ -66,9 +66,28 @@ func _initialize() -> void:
 	check(move.amount == 400,"Manic doubles the same percentage budget")
 	for level in [1,10,20]:
 		m = encounter(level,0,Enemy.Role.SPELLSWORD); m.apply_affliction(m.Status.CORROSION,3)
-		check(absf(float(attack(m,"dark_slash"))/m.max_hp-0.6) < 0.002,"Spellsword charged attack with Corrosion targets 60% at equal level")
+		check(absf(float(attack(m,"dark_slash"))/m.max_hp-0.3) < 0.002,"Base Spellsword charged attack with Corrosion deals 30% at equal level")
 		m = encounter(level,0,Enemy.Role.MAGIC_CANNON)
 		check(absf(float(attack(m,"cannon_shot"))/m.max_hp-0.5) < 0.001,"Normal cannon targets 50% at equal level")
+	for role in [Enemy.Role.COMMANDER,Enemy.Role.SPELLSWORD,Enemy.Role.BOUND_DEMON]:
+		var data: Dictionary = Enemy.ITEMS[role]
+		for level in [1,10,20]:
+			for gap in [0,5]:
+				for boss_phase in [1,2]:
+					m = encounter(level,gap,role)
+					var enemy: Dictionary = m.enemies[0]
+					enemy.boss_phase = boss_phase
+					enemy.charging = true; enemy.charge = data.charge_turns-1
+					enemy.intent = Actions.intent(m,0,"charge"); m.phase = "enemy"
+					var expected: int = Enemy.Damage.base_hit(enemy,m.character_level)
+					var before: int = m.hp
+					m.enemy_act(0)
+					check(before-m.hp == expected,"Every charged boss/demon release deals exactly its level-scaled base attack in either phase")
+					check(enemy.acted and enemy.charge == 0 and not enemy.charging,"Base-damage release still happens immediately on the final charge")
+					var charged_move: Dictionary = Actions.intent(m,0,data.release)
+					check(charged_move.friendly_amount == Enemy.Damage.friendly_base_hit(enemy),"Friendly attack budgets also omit the old charged multiplier")
+					if role == Enemy.Role.COMMANDER: check(m.status_count(m.Status.STUNNED) == 1,"Commander retains its one Stun stack")
+					if role == Enemy.Role.SPELLSWORD: check(m.status_count(m.Status.DARKNESS) == 2,"Spellsword retains its two Darkness stacks")
 	var standalone = Rules.new(17)
 	standalone.enemies = [Enemy.make(Enemy.Role.MAGE)]
 	check(standalone.character_level == 1 and attack(standalone) == 200,"Standalone battle models resolve percentage damage without campaign state")

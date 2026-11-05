@@ -2,6 +2,8 @@ extends Node2D
 const Run = preload("res://scripts/progression/run_rules.gd")
 ## Collection shell. Battles remain separate scenes with the same combat model.
 const PlayerSprite = preload("res://scripts/player/player_sprite.gd")
+const PlayerAnimation = preload("res://scripts/player/player_animation.gd")
+var player_animation = PlayerAnimation.new()
 const Catalog = preload("res://scripts/home/home_catalog.gd")
 const Rules = preload("res://scripts/combat/battle_rules.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
@@ -57,7 +59,8 @@ func _ready() -> void:
 		art[key] = load("res://assets/art/fantasy/" + key + ".png")
 	preload("res://scripts/enemies/enemy_visuals.gd").load_into(art)
 	# Match the opening portrait and collection thumbnails to the run's level-one form.
-	art.flameling = PlayerSprite.texture()
+	art.flameling = PlayerSprite.texture(1,0)
+	player_animation.set_form(0)
 	preview_die = Die.new()
 	preview_die.set_process(false)
 	add_child(preview_die)
@@ -140,6 +143,7 @@ func pager_rect(direction: int) -> Rect2:
 
 func _process(delta: float) -> void:
 	age += delta
+	player_animation.advance(delta)
 	reveal = move_toward(reveal, 1, delta * 5)
 	swipe_nudge = move_toward(swipe_nudge, 0, delta * 150)
 	if active_touch == -1 and not pointer_down: pointer = get_global_mouse_position()
@@ -149,6 +153,7 @@ func _process(delta: float) -> void:
 
 func _interactive(point: Vector2) -> bool:
 	if not modal.is_empty(): return modal_rect().has_point(point)
+	if _character_hit(point): return true
 	if settings_rect().has_point(point): return true
 	for i in range(5):
 		if tab_rect(i).has_point(point): return true
@@ -260,6 +265,9 @@ func _activate(point: Vector2) -> void:
 			_click()
 			_update_preview()
 			return
+	if _character_hit(point):
+		player_animation.play_emote()
+		return
 	match page:
 		2:
 			if play_rect().has_point(point): start_battle()
@@ -297,6 +305,7 @@ func start_battle() -> void:
 	active_touch = -1
 	battle = (PortraitBattle if portrait else LandscapeBattle).instantiate()
 	battle.campaign = campaign
+	if not battle.relic_unlocks_path.is_empty(): battle.model.relics.unlocks.configure(battle.relic_unlocks_path,battle.chapter_id)
 	campaign.start(battle.model)
 	battle.home_enabled = true
 	battle.selected_ancient_id = ancients[ancient_index].id
@@ -378,6 +387,20 @@ func _background() -> void:
 		var y: float = fposmod(i * 199.0 - age * (6 + i % 4), size.y - 160) + 80
 		draw_rect(Rect2(Vector2(x, y).snapped(Vector2.ONE * 4), Vector2.ONE * (2 if i % 3 else 4)), Color(GREEN, 0.09 + sin(age + i) * 0.04))
 
+## Use the visible body for taps, leaving the surrounding shrine and navigation untouched.
+func _shrine_sprite_rect() -> Rect2:
+	var rect := stage_rect()
+	var center := rect.get_center()+Vector2(swipe_nudge,0)
+	var side: float = 352 if portrait else 280
+	var lift: float = roundf(sin(age*1.6)*8)+(1-reveal)*18
+	return PlayerSprite.grounded_rect(Rect2(center.x-side/2,rect.end.y-84-side-20+lift,side,side),0)
+
+func _character_hit(point: Vector2) -> bool:
+	if not modal.is_empty() or page not in [1,2] or ancients[ancient_index].art != "flameling": return false
+	var rect := _shrine_sprite_rect()
+	var bounds := PlayerSprite.rest_bounds(0)
+	return Rect2(rect.position+bounds.position*rect.size,bounds.size*rect.size).grow(8).has_point(point)
+
 func _draw_shrine() -> void:
 	var rect := stage_rect()
 	var center := rect.get_center() + Vector2(swipe_nudge, 0)
@@ -388,9 +411,7 @@ func _draw_shrine() -> void:
 	var feet := Vector2(center.x, rect.end.y - 84)
 	Pixel.disc(self, feet, radius, Color("344333"), 6, 0.24)
 	_seal(feet, radius, 0.27, GREEN)
-	var side: float = 352 if portrait else 280
-	var lift: float = roundf(sin(age * 1.6) * 8) + (1 - reveal) * 18
-	var sprite := Rect2(center.x - side / 2, feet.y - side - 20 + lift, side, side)
+	var sprite := _shrine_sprite_rect()
 	_art(ancients[ancient_index].art, sprite.grow(6), Color(0.43, 0.7, 0.3, 0.08))
 	_art(ancients[ancient_index].art, sprite, Color(1, 1, 1, 0.55 + reveal * 0.45))
 	for i in range(9):
@@ -407,8 +428,11 @@ func _draw_play() -> void:
 	var y: float = 1128 if portrait else 348
 	var start: float = 78 if portrait else 702
 	var step: float = 90 if portrait else 65
-	for i in range(Run.PLAYABLE_WAVES):
-		var p := Vector2(start+(i%Run.Campaign.WAVES_PER_LEVEL)*step,y+floori(float(i)/Run.Campaign.WAVES_PER_LEVEL)*(64 if portrait else 52))
+	# Keep three map rows around the active level so longer chapters never cover Play.
+	var first_level: int = clampi(campaign.next_level()-2,0,maxi(0,Run.Campaign.LEVEL_COUNT-3))
+	var first_wave: int = first_level*Run.Campaign.WAVES_PER_LEVEL
+	for i in range(first_wave,mini(Run.PLAYABLE_WAVES,first_wave+3*Run.Campaign.WAVES_PER_LEVEL)):
+		var p := Vector2(start+(i%Run.Campaign.WAVES_PER_LEVEL)*step,y+floori(float(i-first_wave)/Run.Campaign.WAVES_PER_LEVEL)*(64 if portrait else 52))
 		if i%Run.Campaign.WAVES_PER_LEVEL < Run.Campaign.WAVES_PER_LEVEL-1: Pixel.line(self,p,p+Vector2(step,0),EDGE.darkened(0.4),3)
 		var marker: Dictionary = Run.Waves.map_marker(i)
 		var special: bool = marker.highlight
@@ -551,7 +575,7 @@ func _wrapped(at: Vector2, value: String, width: float, size: int, color: Color)
 
 func _art(key: String, rect: Rect2, color: Color = Color.WHITE) -> void:
 	if key == "flameling":
-		PlayerSprite.paint_actor(self,rect,PlayerSprite.idle_frame(age),age,color,reduced)
+		PlayerSprite.paint_actor(self,rect,player_animation.frame_number(),age,color,reduced,0)
 		return
 	if not art.has(key): art[key] = load("res://assets/art/fantasy/" + key + ".png")
 	draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, color)

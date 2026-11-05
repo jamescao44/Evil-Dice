@@ -3,6 +3,7 @@ const RelicRollRules = preload("res://scripts/relics/relic_roll_rules.gd")
 ## Deterministic battle model. Rendering and cosmetic randomness never alter it.
 signal relic_activated(id: String)
 signal relic_effect_activated(id: String)
+signal relic_cost_paid(events: Array)
 signal boss_changed(index: int, event_type: String)
 signal damage_redirected(source: int, target: int, damage: int, loss: int)
 const BossRules = preload("res://scripts/enemies/boss_rules.gd")
@@ -29,7 +30,9 @@ const CharacterSkills = preload("res://scripts/combat/flamelings_skills.gd")
 const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 const SAVED_SKILLS_ENABLED := false
 const DiceTurn = preload("res://scripts/dice/dice_turn.gd")
+const RerollRules = preload("res://scripts/dice/reroll_rules.gd")
 var dice_turn = DiceTurn.new()
+var same_pip_rerolls := 0
 const Gemstones = preload("res://scripts/dice/gemstone_inventory.gd")
 const GemEffects = preload("res://scripts/dice/gemstone_effects.gd")
 var gemstones = Gemstones.new()
@@ -121,6 +124,7 @@ func reset() -> void:
 	character_passive = FlamelingsPassive.new()
 	tarot_effects = TarotEffects.new()
 	dice_turn = DiceTurn.new()
+	same_pip_rerolls = 0
 	dice_turn.selection_rules = relics
 	skill_dice_indices.clear()
 	relics.clear()
@@ -276,16 +280,26 @@ func _match_values(triple: bool) -> Array:
 
 ## Correct one die without a timing test, retaining the current Perfect combo.
 func reroll_die(index: int, forced: Array = []) -> Array:
-	if not dice_turn.can_reroll(index): return []
-	return roll_pool(false,forced,false,[index])
+	return reroll_dice([index],forced)
+
+## A confirmed batch costs one correction and shares all existing reroll rules.
+func reroll_dice(indices: Array, forced: Array = []) -> Array:
+	if not dice_turn.can_reroll_dice(indices): return []
+	return roll_pool(false,forced,false,indices)
 
 ## Only opening throws activate roll relics and matching attacks; tarot face rules still apply to corrections.
 func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false, requested: Array = []) -> Array:
 	if phase != "roll" or not pending.is_empty() or not outcome().is_empty(): return []
 	perfect = (perfect or forces_perfect()) if requested.is_empty() else false
 	var opening_throw: bool = not dice_turn.has_rolled()
+	var previous_values: Array = dice_turn.values.duplicate()
 	var changed: Array = dice_turn.roll(rng, perfect, forced, free, requested)
 	if changed.is_empty(): return []
+	if not requested.is_empty():
+		for index in changed:
+			var raw_face: int = dice_turn.values[index]
+			dice_turn.values[index] = RerollRules.corrected_face(rng,previous_values[index],raw_face,same_pip_rerolls)
+			if raw_face == previous_values[index]: same_pip_rerolls += 1
 	if opening_throw: RelicRollRules.apply(self,changed)
 	tarot_effects.modify_pool(self,changed)
 	var cursed_sixes: bool = RelicRollRules.apply_curse(self) if opening_throw else false
@@ -576,6 +590,7 @@ func begin_player_cast(primary: int = -1) -> bool:
 	relic_skills.cast_started(self,pending)
 	_lock_gem_critical(pending)
 	phase = "executing"
+	RelicEffects.pay_damage_retriggers(self,pending)
 	return true
 
 static func hits_all(result: MultiHitSkill) -> bool:
@@ -1049,6 +1064,10 @@ func resolve_roll_attack_step() -> Array:
 	if skill.uses_spent == 0: lifesteal_used = 0
 	_lock_gem_critical(skill)
 	RelicEffects.activate_damage_modifiers(self,skill)
+	if hp <= 0:
+		roll_attacks.clear()
+		phase = "finished"
+		return []
 	var events: Array = _apply_gem_recovery(skill) if skill.uses_spent == 0 else []
 	# Four alike erupts once; six alike retains its six area pulses.
 	if skill.hits_all():
@@ -1083,6 +1102,7 @@ func _complete_skill_use(result: MultiHitSkill, events: Array) -> void:
 		pending.uses_spent = pending.use_count()
 	if pending.random_target_per_use(): pending.target = -1
 	if pending.uses_left() == 0 or not outcome().is_empty():
+		events.append_array(relic_skills.cast_finished(self,result))
 		# One charge covers the whole cast, including every multi-hit impact.
 		# Saving, skipping and immediate item effects never pass through here.
 		var bonus_follows: bool = outcome().is_empty() and (result.grants_bonus_fireballs or relic_skills.queued.any(func(entry): return entry.skill.cast_source == "character_bonus"))
@@ -1153,7 +1173,7 @@ func modified_healing(amount: float) -> int:
 	return RelicEffects.healing_amount(relics.items,amount*relic_recovery.healing_factor)
 
 func heal(amount: int, modify: bool = true) -> int:
-	if status_count(Status.DARKNESS) > 0: return 0
+	if hp <= 0 or status_count(Status.DARKNESS) > 0: return 0
 	if modify: amount = modified_healing(amount)
 	var actual: int = maxi(0, mini(max_hp - hp, amount))
 	hp += actual
@@ -1254,6 +1274,7 @@ func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> A
 	if status_count(Status.IMMUNITY) > 0 and not corroded: return [event(-1,0,"immune","INVINCIBLE")] + (RelicEffects.retaliation(self,attacker) if not burning else [])
 	var incoming: float = maxf(0, amount) * (1.5 if corroded else 1.0)
 	var defense: Dictionary = RelicEffects.incoming(relics.items,incoming,corroded,burning)
+	for activators in defense.costs: RelicEffects.Sequence.pay_retrigger_cost(self,activators)
 	for id in defense.activated: relic_activated.emit(id)
 	if defense.blocked: return [event(-1,0,"relic","SHIELD BLOCK")] + RelicEffects.retaliation(self,attacker)
 	incoming = defense.amount

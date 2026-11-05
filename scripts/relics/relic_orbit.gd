@@ -20,7 +20,7 @@ static func poses(battle) -> Array:
 	var radius: float = battle.relic_ui.battle_icon_radius()*ICON_SCALE
 	# Preserve the orbital spacing when changing decorative icon size.
 	var spacing: float = battle.relic_ui.battle_icon_radius()*2.0
-	var sprite := Rect2(battle._player_world_feet()-Vector2(battle.monster_side*0.5,battle.monster_side),Vector2.ONE*battle.monster_side)
+	var sprite: Rect2 = battle._player_world_sprite_rect()
 	var visible: Rect2 = battle.evolution.visible_rect(sprite)
 	# Side points sit one-third of the visible form's height above its feet.
 	var center: Vector2 = visible.position+visible.size*Vector2(0.5,2.0/3.0)

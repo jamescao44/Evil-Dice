@@ -27,7 +27,7 @@ func run() -> void:
 		for key in ["paladin","high_priest"]: check(g.art.has(key) and g.art[key].get_width() == 32,"New enemy sprite is loaded: "+key)
 		for wave in range(1,Waves.COUNT+1):
 			g._restart(wave)
-			check(g.model.stage == wave-1 and g.monster_side == Waves.player_size(wave-1),"Wave load matches player growth")
+			check(g.model.stage == wave-1 and g.monster_side == g.ActorScale.player_size(g._display_form()),"Wave load keeps the displayed form size")
 			if wave != 20:
 				for i in g.model.living():
 					var e: Dictionary = g.model.enemies[i]
@@ -61,7 +61,7 @@ func run() -> void:
 				preload("res://tests/scene_driver.gd").cast_pending(g)
 				await process_frame
 			check(g.view_phase == "ready" and g.model.stage == wave-1,"Feeding reaches the next wave exactly once")
-			check(is_equal_approx(g.monster_side,Waves.player_size(wave-1)) and g._player_growth_scale() == Vector2.ONE,"Growth settles at the configured size after each transition")
+			check(is_equal_approx(g.monster_side,g.ActorScale.player_size(g._display_form())) and g._player_growth_scale() == Vector2.ONE,"Wave transitions retain the displayed form size")
 		for role in [3,4]:
 			g._restart(14)
 			g.model.enemies = [g.Rules.make_enemy(role,1,true)]

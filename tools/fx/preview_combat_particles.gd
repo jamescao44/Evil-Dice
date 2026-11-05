@@ -102,15 +102,22 @@ func run() -> void:
 		for value in values: sum += value
 		print("%s particle draw submission: %.3f ms mean / %.3f ms p95" % ["procedural" if native else "baked",sum/values.size(),values[floori(values.size()*0.95)]])
 	canvas.draw.disconnect(paint_bench); canvas.draw.connect(paint_preview)
-	storm = {"targets":[Vector2.ZERO],"hold_damage":true}
+	var style: Dictionary = preload("res://scripts/player/attack_presentation.gd").for_form(2)
+	storm = {"targets":[Vector2.ZERO],"hold_damage":true,"form":2,"style":style,"ticks":5}
 	Storm.prepare(storm,rng); Storm.begin_damage(storm)
-	beam = {"world_targets":[Vector2.ZERO],"hold_damage":true}
+	beam = {"targets":[Vector2.ZERO],"world_targets":[Vector2.ZERO],"hold_damage":true,"form":2,"style":style,"ticks":10}
 	Beam.prepare(beam,false,rng); Beam.begin_damage(beam)
 	for frame in range(120):
 		clock = 3.0+frame/60.0
 		Storm.advance(storm,1.0/60); Beam.advance(beam,1.0/60)
 		canvas.queue_redraw(); await process_frame; RenderingServer.force_draw()
 		if frame == 70: root.get_texture().get_image().save_png("res://test-output/baked-particles/preview.png")
+	Storm.finish(storm)
+	for frame in range(36):
+		clock += 1.0/60
+		Storm.advance(storm,1.0/60)
+		canvas.queue_redraw(); await process_frame; RenderingServer.force_draw()
+		if frame in [5,18,30]: root.get_texture().get_image().save_png("res://test-output/baked-particles/storm-tail-%d.png" % frame)
 	print("Preloaded textures: %.1f MiB (whole preview, not incremental)" % (Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED)/1048576.0))
 	canvas.queue_free(); await process_frame
 	quit(1 if failures else 0)

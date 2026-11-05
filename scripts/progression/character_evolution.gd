@@ -22,11 +22,12 @@ var visible_bounds: Array[Rect2] = []
 func _ready() -> void:
 	z_index = BattleLayers.EVOLUTION
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# All three gameplay evolutions share James's animated art for now.
+	# Early evolutions share Diablo 2 until a dedicated first-form sheet is supplied.
 	for i in range(FORM_COUNT):
-		forms.append(Sprite.texture())
-		visible_bounds.append(Sprite.REST_BOUNDS)
-	Sprite.silhouette()
+		forms.append(Sprite.texture(1,i))
+		visible_bounds.append(Sprite.rest_bounds(i))
+		Sprite.silhouette(i)
+	battle.player_animation.set_form(form_index(displayed_level))
 	battle.model.character_leveled.connect(enqueue)
 
 ## Preserve every level celebration if one reward crosses several thresholds.
@@ -42,6 +43,7 @@ func reset() -> void:
 	age = -1
 	displayed_level = battle.model.character_level
 	target_level = displayed_level
+	battle.player_animation.set_form(form_index(displayed_level))
 	queue_redraw()
 
 ## Map uncapped character levels to the available evolution artwork.
@@ -77,6 +79,7 @@ func _process(delta: float) -> void:
 		age += delta
 		if previous < reveal_time() and age >= reveal_time():
 			displayed_level = target_level
+			battle.player_animation.set_form(form_index(displayed_level))
 			if is_evolution(): battle._sound("enemy/bell",1.1,-10)
 		if age >= duration(): age = -1
 	queue_redraw()
@@ -84,11 +87,14 @@ func _process(delta: float) -> void:
 ## Render the current form with an eased white silhouette at the transformation peak.
 func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
 	if forms.is_empty(): return
+	var form: int = form_index(displayed_level)
+	battle.player_animation.set_form(form)
 	var frame: int = battle.player_animation.frame_number()
-	Sprite.paint_actor(canvas,rect,frame,battle.clock_time,tint,battle.reduced)
+	var body: Rect2 = battle.player_animation.firing_rect(rect,battle.reduced)
+	Sprite.paint_actor(canvas,rect,frame,battle.clock_time,tint,battle.reduced,form,body)
 	if age < 0: return
 	var glow: float = smoothstep(0.15,REVEAL,age)*(1-smoothstep(REVEAL,1.3,age)) if is_evolution() else sin(clampf(age/LEVEL_DURATION,0,1)*PI)*0.32
-	Sprite.paint(canvas,rect,frame,Color(0.8,0.97,1,glow*0.95*tint.a),true)
+	Sprite.paint(canvas,body,frame,Color(0.8,0.97,1,glow*0.95*tint.a),true,form)
 
 ## Exclude transparent sprite padding when placing character-attached UI.
 func visible_rect(rect: Rect2) -> Rect2:

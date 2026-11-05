@@ -26,7 +26,7 @@ func rules() -> void:
 	check(cannon.hp == 500 and cannon.damage == 500,"Cannon uses documented level-one stats")
 	check(m.EnemyCatalog.soul_reward(cannon) == 20 and m.EnemyCatalog.crystal_reward(cannon) == 10,"Cannon earns normal special-unit rewards")
 	for turn in range(3):
-		check(cannon.interrupt_straight in [3,4,5],"Requirement is an eligible straight length")
+		check(cannon.get("interrupt_straight",0) == 0 if turn == 0 else cannon.interrupt_straight in [3,4,5],"Requirement appears only after the first charge")
 		var state: int = m.rng.state
 		var requirement: int = cannon.interrupt_straight
 		m.choose_intent(0); m.choose_intent(0)
@@ -36,16 +36,16 @@ func rules() -> void:
 	check(m.hp == 500 and cannon.charge == 0,"A full charge fires exactly one 500-damage attack")
 	for length in [3,4,5]:
 		for source in ["manual","character_bonus","enchanted_missile","echo","chip"]:
-			m = fresh(); cannon = m.enemies[0]; cannon.interrupt_straight = length; cannon.charge = 2
+			m = fresh(); cannon = m.enemies[0]; cannon.interrupt_straight = length; cannon.charge = 2; cannon.charging = true
 			m.pending = m.make_straight_skill(range(1,length+1)); m.pending.cast_source = source; m.phase = "player"
 			check(m.begin_player_cast(1),"A matching skill can cast toward a different foe")
-			check(cannon.charge == 0 and m.enemy_status_count(0,m.Status.IMMOBILIZED) == 1,"Every matching-length skill source interrupts once")
+			check(cannon.charge == 0 and m.enemy_status_count(0,m.Status.IMMOBILIZED) == 0 and not cannon.canceled,"Every matching-length skill source empties charge without immobilizing")
 			m.pending = MultiHitSkill.new()
 			var events: Array = enemy_turn(m)
-			check(events.any(func(e): return e.type == "skip") and cannon.charge == 0,"Interrupted cannon misses the next action")
+			check(events.any(func(e): return e.type == "charge") and not events.any(func(e): return e.type == "skip") and cannon.charge == 1,"Interrupted cannon immediately charges on its next action")
 			check(m.enemy_status_count(0,m.Status.IMMOBILIZED) == 0,"Immobilization lasts exactly one action")
-			enemy_turn(m); check(cannon.charge == 1,"Cannon starts its charge over afterward")
-	m = fresh(); cannon = m.enemies[0]; cannon.interrupt_straight = 4; cannon.charge = 1
+			enemy_turn(m); check(cannon.charge == 2,"Cannon continues charging without a skipped turn")
+	m = fresh(); cannon = m.enemies[0]; cannon.interrupt_straight = 4; cannon.charge = 1; cannon.charging = true
 	var wrong = m.make_straight_skill([1,2,3]); m.EnemyBehaviors.skill_cast(m,wrong)
 	check(cannon.charge == 1,"Shorter straights do not satisfy a larger requirement")
 	wrong = m.make_straight_skill([1,2,3,4,5]); m.EnemyBehaviors.skill_cast(m,wrong)
@@ -58,8 +58,8 @@ func rules() -> void:
 	var stages: Array = []
 	for stage in range(m.PLAYABLE_WAVES):
 		if m.Waves.SQUADS[stage].units.any(func(e): return e.role == m.EnemyCatalog.Role.MAGIC_CANNON): stages.append(stage+1)
-	check(stages == [12,19,22],"Cannon appears gradually in three authored encounters")
-	check(m.Waves.SQUADS[11].units.size() == 2 and m.Waves.requires_combat(11),"First cannon has one familiar supporter and cannot be skipped by a shop")
+	check(stages == [12,20],"Cannon appears gradually in two authored encounters")
+	check(m.Waves.SQUADS[11].units.size() == 2 and m.Waves.requires_combat(11),"First cannon has one supporter and cannot be skipped by a shop")
 	var session = Session.new(3); session.model.enemies = m.enemies
 	var snapshot: Dictionary = session.snapshot()
 	check(snapshot.enemies[0].has("interrupt_straight"),"CLI exposes the same public counter as the GUI")
@@ -72,11 +72,13 @@ func layout(phone: bool) -> void:
 	root.size = Vector2i(402,874) if phone else Vector2i(1280,800)
 	var g = Portrait.new() if phone else Battle.new()
 	root.add_child(g); g.muted = true; g.set_process_input(false)
-	for wave in [12,19,22]:
+	for wave in [12,20]:
 		g._restart(wave); g._update_battlefield_view(1); g.view_phase = "ready"
 		for i in range(g.model.enemies.size()):
 			if not Cannon.is_cannon(g.model.enemies[i]): continue
+			check(g.model.enemies[i].get("interrupt_straight",0) == 0,"Idle cannon has no interruption combo")
 			g.model.enemies[i].charge = 2
+			g.model.enemies[i].charging = true
 			g.model.enemies[i].interrupt_straight = 5
 			g._process(0.02)
 			var rect: Rect2 = g._enemy_intent_rect(i)
@@ -88,7 +90,7 @@ func layout(phone: bool) -> void:
 			for locale in ["en","zh_CN"]:
 				GameText.set_language(locale,false)
 				check(not g._enemy_intent_data(i).description.is_empty(),"Requirement has bilingual inspection text")
-			if "--capture" in OS.get_cmdline_user_args() and wave in [8,14]:
+			if "--capture" in OS.get_cmdline_user_args() and wave in [12,20]:
 				for frame in range(3): await process_frame
 				await RenderingServer.frame_post_draw
 				root.get_texture().get_image().save_png("res://test-output/cannon-%s-wave%d.png" % ["portrait" if phone else "landscape",wave])

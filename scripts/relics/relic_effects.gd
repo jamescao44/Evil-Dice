@@ -10,6 +10,7 @@ const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 const Attack = preload("res://scripts/relics/relic_attack.gd")
 const Conditions = preload("res://scripts/relics/relic_conditions.gd")
+const Growth = preload("res://scripts/relics/relic_growth.gd")
 const EMPTY := {}
 const Sets = preload("res://scripts/relics/relic_sets.gd")
 static var STATS: Dictionary = Catalog.effect_table("stats")
@@ -177,7 +178,7 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill, model
 			extra = "EXTRA HITS"
 			extra_values.clear()
 		if not is_equal_approx(before,value) or not extra.is_empty():
-			steps.append({"source":"relic","id":entry.source,"slot":slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0)),"base_factor":float(stats.get("base_factor",1.0)),"auto_bonus":float(stats.get("auto_damage",0.0)) if skill.pattern == "match_auto" else 0.0})
+			steps.append({"source":"relic","id":entry.source,"slot":slot,"origin":entry.origin,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":extra,"note_values":extra_values,"base_bonus":float(stats.get("base_damage",0.0)),"base_factor":float(stats.get("base_factor",1.0)),"auto_bonus":float(stats.get("auto_damage",0.0)) if skill.pattern == "match_auto" else 0.0})
 	var marble: float = 1.0
 	if skill.pattern == "straight" and skill.dice.size() == 3:
 		for entry in Sequence.entries(items):
@@ -186,14 +187,31 @@ static func attack_steps(items: Array, value: float, skill: MultiHitSkill, model
 			var before: float = value
 			value *= (marble+bonus)/marble
 			marble += bonus
-			steps.append({"source":"relic","id":entry.source,"slot":entry.slot,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":""})
+			steps.append({"source":"relic","id":entry.source,"slot":entry.slot,"origin":entry.origin,"activators":entry.activators,"speed":Sequence.animation_speed(entry),"before":before,"after":value,"note":""})
 	return steps
 
 ## Auto and relic attacks bypass the damage-build UI but still show contributing relics.
 static func activate_damage_modifiers(model, skill: MultiHitSkill) -> void:
+	if skill.inherited_damage >= 0: return
 	var start: float = model.damage_baseline()+model.reward_damage_multiplier+(model.attack_multiplier()-1.0)
+	var paid: Dictionary = {}
 	for step in attack_steps(model.relics.items,start,skill,model):
+		_pay_damage_step(model,step,paid)
 		Sequence.activate_ids(model,step.activators,step.speed)
+
+## Manual casts pay copied damage effects once; their animation remains presentation-only.
+static func pay_damage_retriggers(model, skill: MultiHitSkill) -> void:
+	if not skill.is_attack() or skill.inherited_damage >= 0 or model.is_instant_kill(skill): return
+	var start: float = model.damage_baseline()+model.reward_damage_multiplier+(model.attack_multiplier()-1.0)
+	var paid: Dictionary = {}
+	for step in attack_steps(model.relics.items,start,skill,model): _pay_damage_step(model,step,paid)
+
+## A relic contributing both base damage and a skill bonus is still one activation.
+static func _pay_damage_step(model, step: Dictionary, paid: Dictionary) -> void:
+	var key := "%d:%d:%s" % [step.slot,step.origin,str(step.activators)]
+	if paid.has(key): return
+	paid[key] = true
+	Sequence.pay_retrigger_cost(model,step.activators)
 
 ## Combine relic extra-hit rules with the skill’s existing use modifiers.
 static func use_modifiers(items: Array, skill: MultiHitSkill, modifiers: Dictionary) -> Dictionary:
@@ -245,6 +263,7 @@ static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> 
 	var runestones: Array = []
 	var extra_burning: int = 0
 	for entry in Sequence.entries(model.relics.items):
+		if model.hp <= 0: break
 		var item: Dictionary = entry.item
 		if item.id == "runestone": extra_stacks += 1; runestones.append(entry)
 		if item.id == "pet_lizard": extra_burning += 4 if Sets.collection_complete(model.relics.items,"pets") else 2; runestones.append(entry)
@@ -263,11 +282,15 @@ static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> 
 		var applied: Array = Conditions.after_hit(model,target,entry)
 		if item.id == "pet_slime" and skill.pattern == "straight" and Sets.collection_complete(model.relics.items,"pets"):
 			applied.append_array(model.apply_enemy_status(target,Status.CORROSION,1))
+		var stone_events: Array = []
 		if item.id == "prismatic_stone":
-			for stone in Catalog.STONES: applied.append_array(_apply_stone(model,target,STONES[stone],extra_stacks,extra_burning))
-		elif STONES.has(item.id): applied.append_array(_apply_stone(model,target,STONES[item.id],extra_stacks,extra_burning))
-		if not applied.is_empty():
+			for stone in Catalog.STONES: stone_events.append_array(_apply_stone(model,target,STONES[stone],extra_stacks,extra_burning))
+		elif STONES.has(item.id): stone_events.append_array(_apply_stone(model,target,STONES[item.id],extra_stacks,extra_burning))
+		# Stones precompute ordered stack bonuses; other procs activate them in apply_enemy_status.
+		if not stone_events.is_empty():
 			for source in runestones: Sequence.activate(model,source)
+			applied.append_array(stone_events)
+		if not applied.is_empty():
 			Sequence.activate(model,entry)
 			events.append_array(applied)
 	return events
@@ -281,17 +304,21 @@ static func _apply_stone(model, target: int, effect: Dictionary, extra: int, bur
 ## Calculate relic protection and consumed charges for one incoming hit.
 static func incoming(items: Array, amount: float, corroded: bool, burning: bool) -> Dictionary:
 	var activated: Array = []
+	var costs: Array = []
 	if not corroded:
 		for entry in Sequence.entries(items):
 			var item: Dictionary = entry.item
 			var before: float = amount
 			amount *= Sets.stats(item,STATS).get("incoming_factor",1.0)
-			if not is_equal_approx(amount,before): activated.append_array(entry.activators)
+			if not is_equal_approx(amount,before):
+				activated.append_array(entry.activators)
+				costs.append(entry.activators)
 			if item.id == "magic_shield" and item.charges > 0 and not burning:
 				item.charges -= 1
 				activated.append_array(entry.activators)
-				return {"amount":0.0,"blocked":true,"activated":activated}
-	return {"amount":amount,"blocked":false,"activated":activated}
+				costs.append(entry.activators)
+				return {"amount":0.0,"blocked":true,"activated":activated,"costs":costs}
+	return {"amount":amount,"blocked":false,"activated":activated,"costs":costs}
 
 ## Consume a qualifying survival relic when the player would die.
 static func prevent_death(model) -> Array:
@@ -302,19 +329,32 @@ static func prevent_death(model) -> Array:
 	model.hp = maxi(1,roundi(model.max_hp*0.6))
 	return [model.event(-1,model.hp,"relic","CONTRACT: REVIVED")]
 
-## Generate turn-only tarot in inventory order, including explicit copy effects.
+## Resolve turn-start grants and afflictions in inventory order, including copies.
 static func turn_started(model) -> Array:
 	var events: Array = []
-	for entry in repeat_sources(model.relics.items,"crystal_ball"):
-		var cards: Array = model.grant_random_tarots(1,true)
-		if not cards.is_empty():
-			Sequence.activate(model,entry)
-			events.append(model.event(-1,1,"relic","PROJECTION +1"))
+	for entry in Sequence.entries(model.relics.items):
+		if model.hp <= 0: break
+		if entry.item.id == "crystal_ball":
+			var cards: Array = model.grant_random_tarots(1,true)
+			if not cards.is_empty():
+				Sequence.activate(model,entry)
+				events.append(model.event(-1,1,"relic","PROJECTION +1"))
+		events.append_array(Conditions.turn_started(model,entry))
+	# A status trigger can cause a secondary explosion and complete a boss phase.
+	if not events.is_empty():
+		model.finish_attack_sequence()
+		events.append_array(model.player_end_events)
+		model.player_end_events.clear()
+	if not model.outcome().is_empty():
+		model.phase = "finished"
+		events.append_array(model._complete_relic_turn())
+		return events
 	model.relic_skills.turn_started(model)
 	return events
 
 ## Advance periodic relic counters and repeat their eligible payouts.
 static func turn_finished(model) -> Array:
+	Growth.turn_finished(model)
 	var due: Array = []
 	for item in model.relics.items:
 		var period: int = TAROT_GENERATORS.get(item.id,TURN_CHARGES.get(item.id,EMPTY)).get("period",0)
@@ -409,6 +449,7 @@ static func _include_face(model, values: Array, face: int) -> Array:
 static func attack_used(model) -> Array:
 	var events: Array = []
 	for entry in Sequence.entries(model.relics.items):
+		if model.hp <= 0: break
 		var item: Dictionary = entry.item
 		if item.id != "pet_bat": continue
 		var restored: int = model.heal(roundi(model.max_hp*(0.02 if Sets.collection_complete(model.relics.items,"pets") else 0.01)))
@@ -436,7 +477,7 @@ static func status_applied(model, target: int, status: int) -> Array:
 			Sequence.activate(model,entry)
 		if item.id == "ice_rose" and status == Status.FROZEN and item.id not in model.active_relic_procs:
 			Sequence.activate(model,entry)
-			events.append_array(Attack.apply(model,item.id,10,false,false,target))
+			events.append_array(Attack.apply(model,item.id,10,false,true))
 	if status == Status.BURNING: events.append_array(model.RelicCombat.burning_applied(model,target))
 	if status == Status.PLAGUE: events.append_array(Conditions.plague_applied(model,target))
 	return events

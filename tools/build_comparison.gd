@@ -62,7 +62,7 @@ func probe(name: String, ids: Array, targets: int, sample: int, level: int = 20)
 		elif "roll" in state.actions and (not state.has_rolled or (name != "one_roll_auto" and m.dice_turn.unused().size() >= 3)):
 			m.rng.seed = sample*100000+turn*1000+roll_ordinal*13+7
 			var timing := RandomNumberGenerator.new(); timing.seed = sample*100000+turn*1000+roll_ordinal*13+91007
-			command = {"action":"roll","perfect":timing.randf() < 0.35}
+			command = {"action":"roll","perfect":timing.randf() < 0.70}
 			roll_ordinal += 1; requested_rolls += 1
 		elif "end" in state.actions: command = {"action":"end"}
 		else:
@@ -99,6 +99,6 @@ func _initialize() -> void:
 			print("Compared ",name," / targets ",targets)
 	var path: String = args[0] if not args.is_empty() else "test-output/builds-20261025/builds.json"
 	var file := FileAccess.open(path,FileAccess.WRITE)
-	file.store_string(JSON.stringify({"conditions":{"turns":10,"level":20,"incoming_per_turn":30,"perfect_probability":0.35,"samples":40,"rarities":"1 common, 3 rare, 2 epic, 1 legendary/cursed","notes":"No tarot, rewards, XP or precharged counters. One-roll auto uses no manual skills. Damage sums all targets; targets have no shields, taunt or resistance."},"results":results,"failures":failures},"\t"))
+	file.store_string(JSON.stringify({"conditions":{"turns":10,"level":20,"incoming_per_turn":30,"perfect_probability":0.70,"samples":40,"rarities":"1 common, 3 rare, 2 epic, 1 legendary/cursed","notes":"No tarot, rewards, XP or precharged counters. One-roll auto uses no manual skills. Damage sums all targets; targets have no shields, taunt or resistance."},"results":results,"failures":failures},"\t"))
 	print("Saved ",path,"; failures=",failures.size())
 	quit(0 if failures.is_empty() else 1)

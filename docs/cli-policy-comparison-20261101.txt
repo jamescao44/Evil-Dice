@@ -1,0 +1,19 @@
+CLI decision comparison — 2026-11-01
+
+Same six seeds, 70% Perfect. Gameplay and boss balance unchanged (169 control files verified).
+
+Changes: two-reroll lookahead using real skill/socket previews; damage, Burning, bonus-counter and interrupt value; stable left-to-right relic ordering. Justice no longer cancels a valid skill the agent just formed. Shops and item acquisition rankings are unchanged.
+
+Campaign clears: 5/6 -> 6/6. Whole final-boss encounter turns:
+  112011: 10 -> 11 (clear)
+  112029: 30 (defeat) -> 7 (clear)
+  112047: 7 -> 9 (clear)
+  112083: 5 -> 3 (clear)
+  112109: 9 -> 14 (clear)
+  112157: 7 -> 11 (clear)
+
+Stronger control: replayed seed 112029 to the exact original final-boss entry (same inventory and starting HP), then changed only decisions. Result: 30-turn phase-one defeat -> 10-turn victory. Mask copies Happy Trio instead of Heart; 2 Brimstones and 3 Fire Storms were cast.
+
+Different campaign decisions change later rolls and loot, so same-seed runs are not identical-build comparisons. Both interim batches are retained; the exact-entry replay is the stronger evidence for the policy improvement. Six seeds do not establish a general win rate.
+
+Validation: 45 policy checks, 2255 adapter checks and 219 telemetry checks passed; final engine log clean. Health/Fireball, relic transactions/power spikes and individual skill/auto-attack charts are saved in: test-output/playtests/20261101-smart-policy-final-perfect70

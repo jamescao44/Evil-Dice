@@ -24,7 +24,7 @@ var tarot_choices: Array = []
 var tarot_source: String = ""
 var tarot_slot: int = -1
 const Waves = preload("res://scripts/progression/wave_catalog.gd")
-const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "MAGE PATROL", "CROSSROADS", "HOLY ESCORT", "SHADOW PATROL", "THE CHAMPION", "THE COMMANDER", "GOLDEN GUARD", "ELITE COMPANY", "THE HIGH PRIEST", "ARCANE BATTERY", "SACRED ALLIANCE", "FORBIDDEN RITE", "THE INNER SANCTUM", "THE SPELLSWORD", "ASHEN GATE", "COVEN ESCORT", "OBSIDIAN WATCH", "ABYSSAL GUARD", "DARK PROCESSION", "CATHEDRAL GUARD", "THE LAST WATCH", "THE FANATIC", "THE CITY"]
+const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "MAGE PATROL", "CROSSROADS", "HOLY ESCORT", "SHADOW PATROL", "THE CHAMPION", "THE COMMANDER", "GOLDEN GUARD", "ELITE COMPANY", "THE HIGH PRIEST", "ARCANE BATTERY", "SACRED ALLIANCE", "FORBIDDEN RITE", "THE INNER SANCTUM", "THE SPELLSWORD", "ASHEN GATE", "COVEN ESCORT", "OBSIDIAN WATCH", "ABYSSAL GUARD", "DARK PROCESSION", "CATHEDRAL GUARD", "THE LAST WATCH", "THE FANATIC", "OBSIDIAN WATCH", "ELITE COMPANY", "FORBIDDEN RITE", "ARCANE BATTERY", "HOLY ESCORT", "CATHEDRAL GUARD", "THE INNER SANCTUM", "THE CHAMPION", "GOLDEN GUARD", "SHADOW PATROL", "DARK PROCESSION", "ABYSSAL GUARD", "SACRED ALLIANCE", "COVEN ESCORT", "THE LAST WATCH", "THE CHAMPION", "THE CITY"]
 static var WAVE_COUNTS: Array = Waves.counts()
 static var WAVE_BOOSTS: Array = range(Waves.COUNT).map(func(stage): return 1.0 if stage < 2 else 1.5 if stage == 2 else 2.25)
 const CITY_FEVER_ENABLED := false
@@ -135,6 +135,7 @@ func sell_relic(index: int) -> int:
 func replacement_gem_preview(id: String, replace_index: int) -> int:
 	if replace_index < 0 or replace_index >= relics.items.size() or not relics.needs_slot(id): return 0
 	var candidate = Relics.new()
+	candidate.unlocks = relics.unlocks
 	candidate.items = relics.items.duplicate(true)
 	if not candidate.add(id,replace_index,true): return 0
 	var removed: Dictionary = relics.items[replace_index]

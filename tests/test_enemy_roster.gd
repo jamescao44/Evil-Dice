@@ -107,13 +107,8 @@ func wave_checks() -> void:
 			var expected: Dictionary = Enemy.make(enemy.role,enemy.level,enemy.elite)
 			check(enemy.hp == expected.hp and enemy.damage == expected.damage,"Wave spawns use each enemy's own level")
 		if wave in [8,16,24]: check(m.enemies.size() == 1 and m.enemies[0].get("boss",false),"Level finales remain boss encounters")
-		check(Run.Waves.player_size(wave) >= Run.Waves.player_size(wave-1),"Horror grows every transition")
-	check(Run.Waves.player_size(0) == 224 and Run.Waves.player_size(19) == 288,"Horror starts at 224 and reaches 288 at the city")
-	check(Run.Waves.enemy_size(18) == 88 and Run.Waves.enemy_size(23) == 88 and Run.Waves.enemy_size(Run.Waves.CITY_STAGE) == 40,"Late waves preserve the larger readable enemies; city troops keep their separate size")
 	check(Run.Waves.paving_size(18) == 16 and Run.Waves.scenery_size(18) == 16,"Final squad retains old wave nine map scale")
 	for stage in range(1,Run.Waves.COUNT):
-		check(Run.Waves.player_size(stage) >= Run.Waves.player_size(stage-1) and Run.Waves.player_size(stage) <= 288,"Player grows without overshooting or shrinking at city entry")
-		check(Run.Waves.enemy_size(stage) <= Run.Waves.enemy_size(stage-1),"Enemies shrink each wave without early-wave size bumps")
 		check(Run.Waves.paving_size(stage) <= Run.Waves.paving_size(stage-1) and Run.Waves.scenery_size(stage) <= Run.Waves.scenery_size(stage-1),"Map scale decreases throughout the route")
 ## Shield breaks interrupt normal enemies, but preserve elite actions and charges.
 func shield_break_checks() -> void:

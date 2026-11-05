@@ -1,5 +1,5 @@
 extends SceneTree
-## Shops are mandatory intermissions: all 24 battles, rewards and level checkpoints survive.
+## Shops are mandatory intermissions: all 40 battles, rewards and level checkpoints survive.
 const Run = preload("res://scripts/progression/run_rules.gd")
 const Session = preload("res://scripts/testing/playtest_session.gd")
 const Battle = preload("res://scripts/combat/battle.gd")
@@ -53,7 +53,7 @@ func progression() -> void:
 			check(routes.size() == 2 and routes[0] != routes[1] and m.WaveRewards.SHOP not in routes,"Two battle rewards appear after leaving a shop or an ordinary wave")
 			if m.route_history.size() >= 2 and m.route_history[-1] == m.route_history[-2]: check(m.route_history[-1] not in routes,"Shop stops do not break the two-reward streak limit")
 			check(m.choose_route(seed_value%2) and m.advance_wave() and m.stage == stage+1,"Next reward route advances exactly one battle")
-		check(shops == 6,"Each of three levels contains exactly two shop stops")
+		check(shops == Run.Campaign.LEVEL_COUNT*2,"Each level contains exactly two shop stops")
 
 func cli() -> void:
 	var s = Session.new(83)

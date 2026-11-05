@@ -62,11 +62,11 @@ func economy() -> void:
 					ids.append(o.id)
 				elif i < 8: check(o.kind == "tarot" and o.id not in m.Tarot.DISABLED,"Direct eligible tarot listing")
 				else:
-					check(o.kind == "soul_bottle" and o.souls*10 <= o.price and o.souls*20 >= o.price,"Bottle pays one soul per ten to twenty gems")
+					check(o.kind == "soul_bottle" and o.souls*10 <= o.price-Stock.ITEM_PRICE_INCREASE and o.souls*20 >= o.price-Stock.ITEM_PRICE_INCREASE,"Bottle contents retain their original budget despite the surcharge")
 					if not contents_by_price.has(o.price): contents_by_price[o.price] = []
 					if o.souls not in contents_by_price[o.price]: contents_by_price[o.price].append(o.souls)
 				var limits: Vector2i = Stock.PRICE_RANGES[Relics.ITEMS[o.id].rarity] if i < 6 else Stock.TAROT_PRICE if i < 8 else Stock.BOTTLE_PRICE
-				check(o.price >= roundi(limits.x*m.shop.price_multiplier()) and o.price <= roundi(limits.y*m.shop.price_multiplier()),"Random price stays in fixed base range")
+				check(o.price >= roundi(limits.x*m.shop.price_multiplier())+Stock.ITEM_PRICE_INCREASE and o.price <= roundi(limits.y*m.shop.price_multiplier())+Stock.ITEM_PRICE_INCREASE,"Every paid listing adds exactly the fixed 100-gem surcharge")
 			check(Relics.ITEMS[m.shop.offers[m.shop.guaranteed_slot].id].rarity == Relics.Rarity.RARE,"Every shop guarantees rare with no rarity escalation")
 			var snapshot: Array = m.shop.offers.duplicate(true)
 			check(not m.shop.open(m) and snapshot == m.shop.offers,"Opening twice cannot reroll stock")

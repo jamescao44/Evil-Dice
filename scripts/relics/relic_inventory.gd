@@ -4,6 +4,8 @@ const Drops = preload("res://scripts/relics/relic_drop_table.gd")
 const Conditions = preload("res://scripts/relics/relic_conditions.gd")
 const Sets = preload("res://scripts/relics/relic_sets.gd")
 const Instance = preload("res://scripts/relics/relic_instance.gd")
+const Unlocks = preload("res://scripts/relics/relic_unlocks.gd")
+var unlocks = Unlocks.new()
 var items: Array = []
 
 func clear() -> void:

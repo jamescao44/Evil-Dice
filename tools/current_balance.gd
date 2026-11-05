@@ -1,6 +1,18 @@
 extends "res://tools/balance_probe.gd"
 ## Current visible-state CLI policy: gems, natural random targeting and the revised tarot rules.
 var allow_tarots := true
+const StraightPlanner = preload("res://tools/policy/straight_planner.gd")
+const RelicOrder = preload("res://tools/policy/relic_order.gd")
+const TarotTactics = preload("res://tools/policy/tarot_tactics.gd")
+var straight_planner = StraightPlanner.new()
+var relic_order = RelicOrder.new()
+
+## Forecast only visible dice corrections using shared, read-only damage previews.
+func prepare_choice(session, state: Dictionary) -> Dictionary:
+	if state.phase == "roll" and state.has_rolled and state.manual_skills_left > 0 and state.outcome.is_empty():
+		state.policy_options = StraightPlanner.capture(session.model,state)
+		state.policy_decision = straight_planner.decide(state,state.policy_options)
+	return state
 
 ## Equip spare gems and upgrade matching sockets without changing already-committed actions.
 func gem_action(state: Dictionary) -> Dictionary:
@@ -43,21 +55,26 @@ func magician_choice(state: Dictionary) -> Dictionary:
 ## Use cards for concrete opportunities; no forced dice, secret rewards, or future knowledge.
 func tarot_action(state: Dictionary) -> Dictionary:
 	if not allow_tarots or "tarot" not in state.actions: return {}
+	var intended: Dictionary = state.get("skill",{})
+	if state.get("policy_decision",{}).get("action","") == "form":
+		for option in state.policy_options:
+			if option.dice == state.policy_decision.dice and straight_planner.fits(option,state.dice.map(func(d): return int(d.face))): intended = option; break
 	for card in state.tarots:
 		if not card.blocked_reason.is_empty(): continue
+		if not TarotTactics.tactical_context(state,card.id): continue
 		var use := false
+		if TarotTactics.Catalog.immediate_reward(card.id): return {"action":"tarot","instance":card.instance}
 		match card.id:
-			"empress","emperor","world","wheel": use = true
-			"sun": use = state.player.hp < state.player.max_hp*0.55
+			"sun": use = TarotTactics.sun(state)
 			"hierophant": use = state.player.statuses.any(func(s): return s.id in [100,101,102,103,104])
 			"moon": use = state.enemies.any(func(e): return not e.statuses.any(func(s): return s.id == 103))
 			"chariot": use = state.player.shield < Vitals.from_combat(30) and state.enemies.any(func(e): return e.intent.get("type","") == "attack" or e.charge >= 2)
-			"strength": use = state.combinations.any(func(s): return s.faces.size() >= 4) and state.tarot_modifiers.strength == 0
+			"strength": use = TarotTactics.strength(state,intended)
 			"star": use = "roll" in state.actions and state.tarot_modifiers.perfect_throws == 0
 			"lovers": use = "roll" in state.actions and state.combinations.is_empty() and not state.tarot_modifiers.lovers
 			"devil": use = "roll" in state.actions and state.combinations.is_empty() and state.tarot_modifiers.devil == 0 and not state.tarot_modifiers.lovers
 			"hermit": use = state.dice.filter(func(d): return d.spent).size() >= 3 and state.combinations.is_empty()
-			"justice","judgement": use = state.combinations.is_empty() and state.has_rolled and state.rolls_left == 0
+			"justice","judgement": use = StraightPlanner.needs_rescue_roll(state)
 			"death":
 				var foes: Array = state.enemies.filter(func(e): return e.boss_phase == 0 and e.name != "Bound Demon" and e.legal_target)
 				foes.sort_custom(func(a,b): return a.hp > b.hp)
@@ -82,10 +99,14 @@ func choose(state: Dictionary, timing: RandomNumberGenerator, use_tarots: bool =
 	if not state.has("choice") and not state.has("tarot_choices"):
 		var gem: Dictionary = gem_action(state)
 		if not gem.is_empty(): return gem
+		var order: Dictionary = relic_order.action(state)
+		if not order.is_empty(): return order
 	if state.phase == "shop" and state.has("free_gift"):
 		var slot: int = replacement(state.free_gift.id,state)
 		return {"action":"discard_gift"} if slot < 0 else {"action":"gift","replace":slot}
 	var result: Dictionary = super.choose(state,timing,use_tarots and allow_tarots,passive_only)
+	if not passive_only and state.has("policy_options") and result.get("action","") in ["form","reroll","end"]:
+		result = state.policy_decision
 	# The graphical character casts at random; do not grant the CLI extra target control.
 	if result.get("action","") == "cast": result.erase("target")
 	return result

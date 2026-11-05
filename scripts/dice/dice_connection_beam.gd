@@ -2,6 +2,17 @@ extends RefCounted
 ## Cached filament texture and moving highlights for the dice-connection laser.
 static var texture: Texture2D
 
+## Fill from the newest die backward, leaving the unreached beam white ahead of a hot tip.
+static func paint_charge(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color, progress: float, clock: float, scale: float, reduced: bool) -> void:
+	var fill: float = clampf(progress,0,1)
+	var tip: Vector2 = to.lerp(from,fill)
+	if fill < 1: paint(canvas,from,tip,Color.WHITE,clock,scale,reduced)
+	if fill > 0: paint(canvas,tip,to,color,clock,scale,reduced)
+	if fill <= 0 or fill >= 1 or reduced: return
+	for layer in range(3,0,-1):
+		canvas.draw_circle(tip,(5+layer*6)*scale,Color(color,0.12))
+	canvas.draw_circle(tip,5*scale,Color.WHITE)
+
 ## Generate the soft, noisy beam once without consuming gameplay randomness.
 static func _texture() -> Texture2D:
 	if texture != null: return texture

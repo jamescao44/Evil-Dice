@@ -26,7 +26,6 @@ static func set_level(model, level: int) -> bool:
 				health = Catalog.Level.scaled(Catalog.ITEMS[enemy.role].hp[0],Catalog.BossBalance.summon_health_scale(master.name,enemy.name,level))
 				stats.damage_percent = Catalog.BossBalance.summon_damage_percent(master.name,enemy.name,stats.damage_percent)
 				stats.damage = Catalog.Damage.base_hit(stats,level)
-			else: health = maxi(1,roundi(health*Catalog.BossBalance.summon_factor(master.name)))
 		var ratio: float = float(enemy.hp)/maxi(1,enemy.max_hp)
 		if enemy.has("healthy_max_hp"):
 			enemy.healthy_max_hp = health

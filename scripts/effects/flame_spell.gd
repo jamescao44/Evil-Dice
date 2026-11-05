@@ -66,7 +66,7 @@ static func paint(canvas: CanvasItem, spell: Dictionary, reduced: bool) -> void:
 				Pixel.disc(canvas,point,(7 if tier == 0 else 16)*(1-tail*0.12),Color(color,fade*(0.65-tail*0.08)),3)
 			ember(canvas,head,9 if tier == 0 else 22,color,t,fade)
 			if tier == 1:
-				Embers.trail(canvas,origin,target,travel,t,42,30,12 if reduced else 64,color,fade,true)
+				Embers.trail(canvas,origin,target,travel,t,42,30,maxi(4,roundi((12 if reduced else 64)*spell.style.particles)),color,fade,true)
 		elif tier == 2:
 			FierySlash.paint(canvas,spell,reduced)
 		elif tier == 3:

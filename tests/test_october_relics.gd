@@ -13,7 +13,9 @@ func fresh(ids: Array = []):
 	var m = Run.new(102525)
 	m.enemies = [m.make_enemy(0),m.make_enemy(0)]
 	for e in m.enemies: e.hp = 100000; e.max_hp = 100000
-	for id in ids: check(m.acquire_relic(id),"Acquire "+id)
+	for id in ids:
+		if C.ITEMS[id].get("requires_unlock",false): m.relics.unlocks.unlock(id)
+		check(m.acquire_relic(id),"Acquire "+id)
 	m.begin_round()
 	return m
 func settle_roll(m) -> void:
@@ -53,7 +55,7 @@ func set_checks() -> void:
 		check(Paint.textures[sprite] != null,"Artwork for "+id)
 	check(Paint.textures[Paint._load_sprite("witch_ghost")] == Paint.textures[Paint._load_sprite("unidentified_ring")],"Witch uses identical ring texture")
 func ordered_checks() -> void:
-	var m = fresh(["precognition_eye","mithril_blade"])
+	var m = fresh(["precognition_eye","ancient_codex"])
 	for i in range(4): m.RelicEffects.tarot_used(m)
 	check(is_equal_approx(m.damage_multiplier(),2.4),"Eye adds before rightward multiplier")
 	m.relics.move(0,1)
@@ -76,19 +78,20 @@ func ordered_checks() -> void:
 	check(m.RelicEffects.Attack.apply(m,"test",10,false,false,0)[0].amount == 31,"Item damage includes target vulnerabilities")
 func turn_checks() -> void:
 	var m = fresh(["ticket"])
-	check(m.dice_turn.rolls_left == 4 and m.dice_turn.ticket_rolls_left == 1,"Ticket grants fourth roll")
-	for i in range(3):
+	check(m.dice_turn.rolls_left == m.DiceTurn.ROLLS+2 and m.dice_turn.ticket_rolls_left == 2,"Ticket grants two additional rolls")
+	for i in range(m.DiceTurn.ROLLS):
 		m.roll_pool(false,[1,2,3,4,5,6]); settle_roll(m)
-	check(m.dice_turn.rolls_left == 1 and m.dice_turn.ticket_rolls_left == 1,"Ordinary rolls consumed first")
+	check(m.dice_turn.rolls_left == 2 and m.dice_turn.ticket_rolls_left == 2,"Ordinary rolls consumed first")
 	m._bank_unused_rolls(); check(m.reroll_progress == 0,"Ticket never banks treasure")
+	m.roll_pool(false,[1,2,3,4,5,6]); settle_roll(m)
 	m.roll_pool(false,[1,2,3,4,5,6]); settle_roll(m)
 	check(m.dice_turn.rolls_left == 0 and m.dice_turn.ticket_rolls_left == 0,"Ticket consumed last")
 	m._grant_dice_bonus_turn()
-	check(m.dice_turn.rolls_left == 3,"Bonus pool cannot refresh spent ticket")
+	check(m.dice_turn.rolls_left == m.DiceTurn.ROLLS,"Bonus pool cannot refresh spent ticket")
 	m.phase = "round_end"; m.begin_round()
-	check(m.dice_turn.rolls_left == 4,"Full turn refreshes ticket")
+	check(m.dice_turn.rolls_left == m.DiceTurn.ROLLS+2,"Full turn refreshes ticket")
 	m = fresh(["ticket"]); m.roll_pool(false,[1,2,3,4,5,6]); m._bank_unused_rolls()
-	check(m.reroll_progress == 2,"Unused ordinary rolls still count")
+	check(m.reroll_progress == m.DiceTurn.ROLLS-1,"Unused ordinary rolls still count")
 	m = fresh(["frozen_tilapia"]); m.roll_pool(false,[1,2,3,4,5,6]); m.end_dice_turn()
 	var events: Array = m.apply_player()
 	check(events.any(func(e): return e.type == "damage" and e.amount == 21),"Tilapia snapshots leftover pip sum before dice lock")
@@ -97,29 +100,29 @@ func turn_checks() -> void:
 	check(is_equal_approx(m.damage_multiplier(),2.25),"Banana addition precedes Magic Banana multiplier")
 	var removed := 0
 	for seed_value in range(200):
-		m.relics.clear(); m.relics.add("banana"); m.rng.seed = seed_value
+		m.relics.clear(); m.relics.unlocks.restore([]); m.relics.add("banana"); m.rng.seed = seed_value
 		Conditions.turn_finished(m)
 		if not m.relics.has("banana"): removed += 1
 	check(removed > 20 and removed < 65,"Banana disappearance samples near 20 percent")
 func chip_checks() -> void:
-	var m = fresh(["red_chip","blue_chip","echo_bell","magic_sword"])
+	var m = fresh(["black_chip","blue_chip","echo_bell","magic_sword"])
 	m.relics.items[3].charges = 1
 	m.tarot_effects.strength = 2
 	m.statuses[m.Status.MIGHT].apply(2)
 	m.roll_pool(false,[1,2,3,4,5,6])
-	check(m.roll_chip_casts.size() == 2 and m.roll_chip_casts[0].skill.dice == [1,2,3,4,5,6] and m.roll_chip_casts[1].skill.dice == [4,5,6],"Red longest, Blue shortest, high-pip tie")
+	check(m.roll_chip_casts.size() == 2 and m.roll_chip_casts[0].skill.dice == [1,2,3,4,5,6] and m.roll_chip_casts[1].skill.dice == [4,5,6],"Black longest, Blue shortest, high-pip tie")
 	var before: int = m.enemies[0].hp+m.enemies[1].hp
 	settle_roll(m)
 	check(m.phase == "roll" and m.pending.is_empty() and m.dice_turn.locked.is_empty(),"Chip casts return to same unspent dice pool")
 	check(m.enemies[0].hp+m.enemies[1].hp < before,"Chip casts actually damage enemies")
 	check(m.character_passive.charge == 0 and m.relics.items[2].get("casts",0) == 0,"Chip casts do not fill character or Echo counters")
 	check(m.relics.items[3].charges == 1 and m.tarot_effects.strength == 2 and m.statuses[m.Status.MIGHT].count == 2,"Chips preserve next-skill and attack-buff charges")
-	m = fresh(["black_chip"]); m.roll_pool(false,[1,1,3,3,5,5]); settle_roll(m)
-	check(m.damage_multiplier() == 6,"No straight activates Black Chip")
+	m = fresh(["red_chip"]); m.roll_pool(false,[1,1,3,3,5,5]); settle_roll(m)
+	check(m.damage_multiplier() == 11,"No straight activates Red Chip")
 	m.roll_pool(false,[1,2,3,4,5,6]); settle_roll(m)
-	check(m.damage_multiplier() == 1,"Next throw replaces Black Chip condition")
+	check(m.damage_multiplier() == 1,"Next throw replaces Red Chip condition")
 	m.roll_pool(false,[1,1,3,3,5,5]); settle_roll(m); m.RelicEffects.turn_finished(m)
-	check(m.damage_multiplier() == 1,"Black Chip expires at turn end")
+	check(m.damage_multiplier() == 1,"Red Chip expires at turn end")
 func potion_checks() -> void:
 	var m = fresh(["mystery_potion"])
 	var entry: Dictionary = m.RelicEffects.Sequence.entries(m.relics.items)[0]

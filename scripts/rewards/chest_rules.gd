@@ -3,7 +3,7 @@ extends RefCounted
 const NAMES := ["Normal Chest", "Perfect Chest", "Greed Chest", "Ultra Chest"]
 const COLORS := [Color("eee0b9"), Color("ffd773"), Color("ce82ff"), Color("ff6977")]
 const COUNTS := [1, 1, 3, 5]
-const CRYSTALS := [30, 50, 70, 100]
+const CRYSTALS := [15, 25, 35, 50]
 const REROLL_COST := 20
 const NO_CHEST := -1
 const REROLL_TIER := 0

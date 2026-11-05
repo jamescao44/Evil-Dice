@@ -3,6 +3,12 @@ const Instance = preload("res://scripts/relics/relic_instance.gd")
 const MAGIC_STONES := ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]
 ## Set recipes are data: ordered ingredients, replacement tier bonuses and composite art.
 const RECIPES := {
+	"clock": {
+		"name":"Clock",
+		"ingredients":["handless_clock","hour_hand","minute_hand","second_hand"],
+		"retain_component_state":true, "composite_art":false,
+		"tiers":[{"id":"demon_clock","count":4,"stats":{"damage_add":1.5}}],
+	},
 	"remains": {
 		"name":"Remains",
 		"ingredients":["unknown_arm","unknown_pelvis","unknown_leg","unknown_sternum","unknown_skull","unidentified_ring"],
@@ -85,11 +91,14 @@ static func fuse(items: Array) -> void:
 	for recipe in RECIPES.values():
 		var gathered: Array = []
 		var slots: Array = []
+		var states: Dictionary = {}
 		for i in range(items.size()):
 			if recipe_for(items[i].id) != recipe: continue
 			var parts: Array = ingredients(items[i])
 			if parts.is_empty() or parts.all(func(id): return id in gathered): continue
 			slots.append(i)
+			if recipe.get("retain_component_state",false):
+				for component in stateful_parts(items[i]): states[component.id] = component.duplicate(true)
 			for id in parts:
 				if id not in gathered: gathered.append(id)
 		var tier: Dictionary = {}
@@ -99,7 +108,17 @@ static func fuse(items: Array) -> void:
 		var first: int = slots[0]
 		if slots.size() == 1 and items[first].id == tier.id: continue
 		for i in range(slots.size()-1,-1,-1): items.remove_at(slots[i])
-		items.insert(first,Instance.create(tier.id,{"ingredients":gathered}))
+		var state: Dictionary = {"ingredients":gathered}
+		if recipe.get("retain_component_state",false): state.component_states = states
+		items.insert(first,Instance.create(tier.id,state))
+
+## Stateful fusions retain real component counters; other relics own one state dictionary.
+static func stateful_parts(item: Dictionary) -> Array:
+	if not is_fused(item.id) or not recipe_for(item.id).get("retain_component_state",false): return [item]
+	if not item.has("component_states"): item.component_states = {}
+	for id in ingredients(item):
+		if not item.component_states.has(id): item.component_states[id] = Instance.create(id)
+	return ingredients(item).map(func(id): return item.component_states[id])
 
 ## Ingredients apply in their retained order; only the latest tier bonus follows them.
 static func modifiers(item: Dictionary, definitions: Dictionary) -> Array:

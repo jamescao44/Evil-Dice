@@ -44,9 +44,9 @@ func check_replayed_level(saved: Dictionary) -> void:
 
 func run() -> void:
 	var m = Run.new(451)
-	for stage in range(24):
+	for stage in range(Run.PLAYABLE_WAVES):
 		m.stage = stage; m.enemies.clear(); m.phase = "finished"
-		check(m.outcome() == ("victory" if stage in [7,15,23] else "wave_clear"),"Only every eighth wave completes a level")
+		check(m.outcome() == ("victory" if (stage+1)%Run.Campaign.WAVES_PER_LEVEL == 0 else "wave_clear"),"Only every eighth wave completes a level")
 		check(m.level_number() == (stage/8+1) and m.level_wave() == stage%8+1,"Level display preserves internal wave identity")
 	m = Run.new(451)
 	for id in ["magician_hat","magic_sword","piggy_bank","fries","hamburger"]: m.acquire_relic(id)
@@ -98,8 +98,19 @@ func run() -> void:
 	var third_build = second.relics.items.duplicate(true)
 	second.hp = 0; reopened.start(second)
 	check(second.stage == 16 and second.relics.items == third_build,"Third-level defeat retries its entry build")
-	finish_level(second,23); check(reopened.complete(second) and reopened.next_level() == 1,"Chapter completion clears the next-level checkpoint")
-	reopened.start(second); check(second.stage == 0 and second.character_level == 1 and second.relics.items.is_empty(),"Start after all three levels begins a fresh chapter")
+	for completed in [3,4]:
+		var build: Array = second.relics.items.duplicate(true)
+		var cards: Array = second.tarots.items.duplicate(true)
+		finish_level(second,completed*8-1)
+		check(reopened.complete(second) and reopened.next_level() == completed+1,"New level unlocks after the preceding boss reward")
+		var reloaded = Run.Campaign.new(); reloaded.configure(path)
+		check(reloaded.next_level() == completed+1 and Run.Campaign.valid(reloaded.checkpoint),"New level checkpoint survives app restart")
+		reloaded.start(second)
+		check(second.stage == completed*8 and second.relics.items == build and second.tarots.items == cards,"New levels retain the exact inventory and tarots")
+		second.hp = 0; reloaded.start(second)
+		check(second.stage == completed*8 and second.hp == second.max_hp,"New level defeat retries its own entry build")
+	finish_level(second,39); check(reopened.complete(second) and reopened.next_level() == 1,"Chapter completion clears the next-level checkpoint")
+	reopened.start(second); check(second.stage == 0 and second.character_level == 1 and second.relics.items.is_empty(),"Start after all five levels begins a fresh chapter")
 	DirAccess.remove_absolute(path)
 	var session = Session.new(12)
 	finish_level(session.model); session._settle()

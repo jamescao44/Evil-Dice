@@ -54,8 +54,8 @@ func timeline() -> void:
 		check(Beam.frame(fx.spell) == i,"Buildup reads all twenty-four frames")
 	check(fx.flame_loop_shake() == Vector2.ZERO,"No beam rumble during buildup")
 	fx._process(0.16)
-	check(not fx.spell.brimstone.emitter.packets.is_empty(),"Golden particles already rise across the base during buildup")
-	check(fx.spell.brimstone.emitter.kind == "beam" and fx.spell.brimstone.emitter.packets.size() <= Beam.Emitter.MAX_PACKETS,"Sparks rise from the damaging beam's full width")
+	check(not fx.spell.brimstone.emitters[0].packets.is_empty(),"Golden particles already rise across the base during buildup")
+	check(fx.spell.brimstone.emitters[0].kind == "beam" and fx.spell.brimstone.emitters[0].packets.size() <= Beam.Emitter.MAX_PACKETS,"Sparks rise from the damaging beam's full width")
 	fx.begin_flame_damage()
 	for i in range(32):
 		fx.spell.brimstone.age = (i+0.1)/Beam.LOOP_FPS
@@ -100,30 +100,33 @@ func capture(label: String) -> void:
 	root.get_texture().get_image().save_png("res://test-output/brimstone-"+label+".png")
 
 ## Run the real cast against several enemies, including a first-tick wipe.
-func scene(phone: bool, wipe: bool = false) -> void:
+func scene(phone: bool, wipe: bool = false, form: int = 2) -> void:
 	root.content_scale_size = Vector2i(804,1748) if phone else Vector2i(1280,800)
 	root.size = Vector2i(402,874) if phone else Vector2i(1280,800)
 	var g = HeardPortrait.new() if phone else HeardBattle.new()
 	root.add_child(g); g.muted = true; g.speed = 2; g.set_process_input(false)
+	g.model.character_level = [1,5,10][form]; g.evolution.reset()
 	g.model.enemies = [g.model.make_enemy(0),g.model.make_enemy(1),g.model.make_enemy(2)]
 	for e in g.model.enemies:
 		e.hp = 1 if wipe else 1000; e.max_hp = e.hp; e.shield = 0
 	g.model.roll_pool(false,[1,2,3,4,5,6])
 	g.model.dice_turn.selected = [0,1,2,3,4,5]; g.model.form_selected_skill()
+	var expected_damage: int = g.model.skill_damage_total(g.model.pending,0)
 	g._show_pending_skill(false); g._activate_skill(0)
 	var hp: int = g.model.enemies[0].hp
 	var hits := 0
 	var saw_build := false; var saw_fade := false; var saw_small := false; var saw_late_fade := false
 	var final_age := 0.0
 	var deadline: int = Time.get_ticks_msec()+12000
-	var prefix: String = ("portrait" if phone else "landscape")+("-wipe" if wipe else "")
+	var prefix: String = ("portrait" if phone else "landscape")+"-form-"+str(form)+("-wipe" if wipe else "")
+	var duration: float = 1.8 if form < 2 else Beam.LOOP_DURATION
 	while Time.get_ticks_msec() < deadline:
 		if g.fx.spell.has("brimstone"):
 			var state: Dictionary = g.fx.spell.brimstone
 			if state.phase == "loop": final_age = state.age
-			if state.phase == "build" and state.age > Beam.EXPAND_DURATION*0.35 and not saw_small:
+			if state.phase == "build" and state.age > state.build_duration*float(Beam.EXPAND_FRAMES)/Beam.BUILD_FRAMES*0.35 and not saw_small:
 				saw_small = true; await capture(prefix+"-small")
-			if state.phase == "build" and state.age > Beam.BUILD_DURATION*0.65 and not saw_build:
+			if state.phase == "build" and state.age > state.build_duration*0.65 and not saw_build:
 				saw_build = true; await capture(prefix+"-build")
 		if g.model.enemies[0].hp < hp:
 			hits += 1; hp = g.model.enemies[0].hp
@@ -137,9 +140,12 @@ func scene(phone: bool, wipe: bool = false) -> void:
 	check(saw_build and saw_fade,"Real Brimstone has complete buildup and fade")
 	check(hits == (1 if wipe else 10),"Ten damage ticks are preserved and stop after a wipe")
 	check(g.impact_times.size() == hits,"Multiple enemies share one impact sound per tick")
-	check(final_age >= Beam.LOOP_DURATION-0.05 and final_age < Beam.LOOP_DURATION+0.15,"The beam completes four loops even on a wipe")
+	if wipe and form < 2:
+		check(final_age < 0.1,"Early lasers stop immediately after a wipe instead of waiting for invisible cycles")
+	else: check(final_age >= duration-0.05 and final_age < duration+0.2,"The beam completes the form's damage timeline")
 	if not wipe:
-		for tick in range(10): check(absf(g.impact_times[tick]-Beam.damage_tick_time(tick,10)) < 0.08,"Ten hits spread across all four authored loops")
+		for tick in range(10): check(absf(g.impact_times[tick]-duration*tick/9) < 0.12,"Ten hits spread across the form's visual cycles")
+		check(1000-g.model.enemies[0].hp == expected_damage,"Shorter early-form visuals retain the full calculated damage")
 	check(g.fx.damage_layer.layer > g.screen_ripple.layer,"Damage text renders above the ultimate ripple")
 	g.menu_open = true; await process_frame; await process_frame
 	check(not g.fx.damage_layer.visible,"Damage text hides behind menus along with other combat FX")
@@ -148,6 +154,8 @@ func scene(phone: bool, wipe: bool = false) -> void:
 func run() -> void:
 	timeline()
 	await scene(false); await scene(true); await scene(true,true)
+	for form in [0,1]: await scene(true,false,form)
+	await scene(true,true,0)
 	print("Brimstone visual: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)
 func _initialize() -> void: call_deferred("run")

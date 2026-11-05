@@ -7,7 +7,6 @@ func loadout(_wave: int, name: String) -> Array:
 
 ## Reuse the existing encounter policy, level-from-XP setup and live enemy progression.
 func _initialize() -> void:
-	perfect_rate = 0.35
 	var probes: Array = []
 	for wave in [24,30]:
 		for build in ["potion_x","hellfire","mithril_blade"]:

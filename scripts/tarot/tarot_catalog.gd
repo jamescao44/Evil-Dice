@@ -9,7 +9,13 @@ const ROLL_TRIGGERS: Array = []
 const NEXT_SKILL_MODIFIERS := ["strength"]
 # Persistent effects and out-of-combat rewards remain meaningful during a shop visit.
 const SHOP_USABLE := ["fool","empress","emperor","hierophant","lovers","strength","wheel","hanged_man","devil","star","sun","world"]
+# Acquisition shortcuts are reserved for rewards; owned combat cards remain tactical actions.
+const ACQUISITION_REWARDS := ["empress","emperor","wheel","world"]
 const Weighted = preload("res://scripts/shared/weighted_choice.gd")
+
+## Share reward-only quick use between drawing, shopping and automated play.
+static func immediate_reward(id: String) -> bool:
+	return id in ACQUISITION_REWARDS and id not in DISABLED
 
 static func effect_type(id: String) -> EffectType:
 	if id in ROLL_FACE_SETTINGS or id == "star": return EffectType.ROLL_SETTING

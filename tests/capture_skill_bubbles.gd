@@ -25,7 +25,7 @@ func run() -> void:
 	game.model.power = 9.0
 	game.model._load_wave()
 	game.visual_stage = 6
-	game.monster_side = game.HORROR_SIZES[6]
+	game.evolution.reset()
 	game._start_round()
 	game.model.set_status_counts({2:4,3:3,33:2,6:1})
 	game.model.reroll_progress = 9
@@ -116,7 +116,7 @@ func run() -> void:
 		game.model.stage = stage
 		game.model._load_wave()
 		game.visual_stage = stage
-		game.monster_side = game.HORROR_SIZES[stage]
+		game.evolution.reset()
 		game.view_phase = "ready"
 		await shot("enemy-bars-%d" % stage)
 	game._clear_skill()
@@ -136,7 +136,7 @@ func run() -> void:
 		game.model.city_hp = 0
 		game.model.reroll_progress = tier*3
 		game.visual_stage = Waves.CITY_STAGE
-		game.monster_side = game.HORROR_SIZES[9]
+		game.evolution.reset()
 		game._check_over()
 		game.auto_claim_remaining = 2.0
 		await shot("auto-claim-"+game.CHEST_NAMES[tier].to_lower())

@@ -78,10 +78,16 @@ static func relics(definitions: Dictionary) -> Array:
 		var item: Dictionary = definitions[id]
 		if item.get("rarity",-1) not in Relics.Rarity.values(): errors.append("Unknown relic rarity: "+id)
 		if item.get("requires_set_parts",false) and Relics.Sets.recipe_for(id).is_empty(): errors.append("Missing required set: "+id)
+		for field in ["vanish_unlock","excluded_after_unlock"]:
+			if item.has(field) and item[field] not in definitions: errors.append("Unknown relic unlock: "+id)
+		if item.has("after_skill_attack") and item.after_skill_attack <= 0: errors.append("Invalid after-skill attack: "+id)
 		for key in item.get("stats",{}):
 			if key not in STAT_KEYS: errors.append("Unknown passive stat "+key+": "+id)
 		for field in ["turn_charge","tarot_generator"]:
 			if item.has(field) and item[field].get("period",0) <= 0: errors.append("Invalid relic period: "+id)
+		if item.has("turn_start_status"):
+			var rule: Dictionary = item.turn_start_status
+			if rule.get("status",-1) not in Statuses.ENEMY_HARMFUL or rule.get("stacks",0) <= 0: errors.append("Invalid turn-start status: "+id)
 		var path: String = "res://assets/art/relics/"+item.get("sprite",id+".png")
 		if not Relics.Sets.uses_composite_art(id) and not ResourceLoader.exists(path): errors.append("Missing relic art: "+id)
 	return errors

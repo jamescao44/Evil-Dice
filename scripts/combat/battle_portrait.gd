@@ -179,7 +179,7 @@ func _draw_enemy_health(index: int) -> void:
 	var bar: Rect2 = _enemy_health_rect(index)
 	draw_rect(bar.grow(3),EDGE)
 	draw_rect(bar,INK)
-	_draw_health_fill(bar.grow(-2),human.hp,human.max_hp,human.shield,_elite_color(human) if human.elite else RED)
+	_draw_health_fill(bar.grow(-2),human.hp,human.max_hp,human.shield,_elite_color(human) if human.elite else RED,health_trails.value(index,human.hp))
 	_draw_enemy_health_text(index,bar,16 if human.get("summoned",false) and not Rules.EnemyCatalog.ITEMS[human.role].get("interruptible",false) else 22 if model.enemies.size() < 4 else 20)
 
 func _meter(rect: Rect2, ratio: float, color: Color) -> void:

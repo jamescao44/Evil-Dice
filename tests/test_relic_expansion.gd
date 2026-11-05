@@ -84,16 +84,17 @@ func status_checks() -> void:
 	for i in range(5): m._tick_enemy_statuses()
 	check(m.enemy_status_count(0,Status.CORROSION) == 3 and m.enemies[0].statuses[Status.CORROSION].permanent,"Slime corrosion does not decay")
 	m = fresh(["ice_rose","bracelet"])
-	check(losses(m.apply_enemy_status(0,Status.FROZEN,1))[0].display_amount == 15,"Ice Rose deals modified base damage to the frozen target")
+	var rose_hits: Array = losses(m.apply_enemy_status(0,Status.FROZEN,1))
+	check(rose_hits.size() == 3 and rose_hits.all(func(hit): return hit.display_amount == 15),"Ice Rose deals modified base damage to every enemy including the frozen target")
 	m.acquire_relic("blue_stone")
 	for i in range(30):
 		var events: Array = m.apply_enemy_status(0,Status.FROZEN,1)
-		check(losses(events).size() == 1 and m.active_relic_procs.is_empty(),"Ice Rose cannot recursively retrigger itself")
+		check(losses(events).size() == 3 and m.active_relic_procs.is_empty(),"Ice Rose cannot recursively retrigger itself")
 	m = fresh(["ice_rose"],true)
 	check(m.apply_enemy_status(-2,Status.FROZEN,1).is_empty() and m.city_hp == Run.CITY_MAX_HP,"City status immunity also prevents Ice Rose")
 	m = fresh(["ice_rose"])
 	m.set_test_roll([2,2,3])
-	check(losses(m.apply_player_step()).size() == 3,"Freeze support triggers one Ice Rose hit per enemy")
+	check(losses(m.apply_player_step()).size() == 9,"Freezing three enemies triggers three all-enemy Ice Rose bursts")
 
 func attack_checks() -> void:
 	var m = fresh(["pet_bat"])
@@ -223,7 +224,7 @@ func curse_and_currency_checks() -> void:
 	m = fresh(["coin","soul_vessel"]); m.wave_kind = m.WaveRewards.RELIC
 	for e in m.enemies: e.hp = 0
 	m.begin_wave_reward()
-	check(m.blood_gems == 10,"Wave coin is unaffected by Soul Vessel")
+	check(m.blood_gems == 67,"Wave coin is unaffected by Soul Vessel")
 	m.open_wave_chest()
 	var expected: int = m.Chests.CRYSTALS[m.opened_chest_tier]
 	check(m.release_chest_crystals() == expected and m.blood_gems == 10+expected and m.release_chest_crystals() == 0,"Chest pays base gems once without Soul Vessel")

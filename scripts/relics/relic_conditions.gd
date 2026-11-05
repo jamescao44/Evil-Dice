@@ -9,6 +9,9 @@ const RANDOM_STATUSES := [Status.BURNING,Status.FROZEN,Status.DARKNESS,Status.CO
 
 ## Gate conditional loot consistently in chests, shops, tarot grants and reel strips.
 static func loot_allowed(inventory, id: String) -> bool:
+	if Catalog.ITEMS.get(id,{}).get("requires_unlock",false) and not inventory.unlocks.has(id): return false
+	var exclusion: String = Catalog.ITEMS.get(id,{}).get("excluded_after_unlock","")
+	if not exclusion.is_empty() and inventory.unlocks.has(exclusion): return false
 	if not Catalog.ITEMS.get(id,{}).get("requires_set_parts",false): return true
 	var recipe: Dictionary = Catalog.Sets.recipe_for(id)
 	return not recipe.is_empty() and recipe.ingredients.all(func(part): return part == id or inventory.has(part))
@@ -22,8 +25,8 @@ static func tarot_used(model) -> void:
 
 ## Add conditional multipliers at this relic's position in the ordered inventory.
 static func damage_modifier(item: Dictionary, value: float, skill: MultiHitSkill) -> float:
-	if item.id == "precognition_eye": value += item.get("damage_growth",0.0)
-	if item.id == "black_chip" and item.get("no_straight",false): value += 5.0
+	for part in Catalog.Sets.stateful_parts(item): value += part.get("damage_growth",0.0)
+	if item.id == "red_chip" and item.get("no_straight",false): value += 10.0
 	if item.id == "holy_grail" and not skill.is_empty():
 		if skill.cast_source in ["relic","chip"]: value *= 2.0
 		elif skill.pattern != "match_auto" and skill.pattern != "cleanup": value *= 0.5
@@ -38,22 +41,22 @@ static func target_factor(model, target: int, activate: bool = false) -> float:
 			if activate: Sequence.activate(model,entry)
 	return factor
 
-## Any new roll expires the previous Black Chip bonus without activating it again.
+## Any new roll expires the previous Red Chip bonus without activating it again.
 static func clear_roll_bonuses(model) -> void:
 	for item in model.relics.items:
-		if item.id == "black_chip": item.no_straight = false
+		if item.id == "red_chip": item.no_straight = false
 
-## Opening throws set Black Chip's condition and snapshot free chip casts.
+## Opening throws set Red Chip's condition and snapshot free chip casts.
 static func rolled(model) -> Array:
 	var values: Array = model.dice_turn.unused().map(func(i): return model.dice_turn.values[i])
 	var no_straight: bool = not model.Patterns.has_combination(values)
 	for item in model.relics.items:
-		if item.id == "black_chip": item.no_straight = no_straight
+		if item.id == "red_chip": item.no_straight = no_straight
 	var casts: Array = []
 	for entry in Sequence.entries(model.relics.items):
-		if entry.item.id == "black_chip" and no_straight: Sequence.activate(model,entry)
-		if entry.item.id not in ["red_chip","blue_chip"] or no_straight: continue
-		var faces: Array = straight(values,entry.item.id == "red_chip")
+		if entry.item.id == "red_chip" and no_straight: Sequence.activate(model,entry)
+		if entry.item.id not in ["black_chip","blue_chip"] or no_straight: continue
+		var faces: Array = straight(values,entry.item.id == "black_chip")
 		var skill: MultiHitSkill = model.make_straight_skill(faces)
 		skill.cast_source = "chip"
 		skill.effect_multiplier = 0.3
@@ -72,15 +75,37 @@ static func straight(values: Array, longest: bool) -> Array:
 
 ## Ticket capacity refreshes only on a full turn; bonus pools retain any unspent ticket.
 static func begin_turn(model) -> void:
-	model.dice_turn.ticket_rolls_left = Sequence.entries(model.relics.items).filter(func(entry): return entry.item.id == "ticket").size()
+	model.dice_turn.ticket_rolls_left = 0
+	for entry in Sequence.entries(model.relics.items):
+		var extra: int = Catalog.ITEMS[entry.item.id].get("extra_rolls",0)
+		if extra <= 0: continue
+		model.dice_turn.ticket_rolls_left += extra
+		Sequence.activate(model,entry)
+
+## Apply catalog-defined opening afflictions once per full turn and copied source.
+static func turn_started(model, entry: Dictionary) -> Array:
+	var rule: Dictionary = Catalog.ITEMS[entry.item.id].get("turn_start_status",{})
+	if rule.is_empty() or model.is_city() or model.hp <= 0: return []
+	var targets: Array = model.living().filter(func(i): return not model.enemies[i].get("phase_transition_pending",false))
+	if targets.is_empty(): return []
+	Sequence.activate(model,entry)
+	if model.hp <= 0: return []
+	var target: int = targets[model.rng.randi_range(0,targets.size()-1)]
+	return model.apply_enemy_status(target,rule.status,rule.stacks)
 
 ## Random potion effects exclude enemy stun and action-lock bookkeeping.
 static func after_hit(model, target: int, entry: Dictionary) -> Array:
-	if entry.item.id != "mystery_potion" or not model.is_enemy_alive(target) or "mystery_potion" in model.active_relic_procs or model.rng.randf() >= 0.1: return []
-	Sequence.activate(model,entry)
-	model.active_relic_procs.append("mystery_potion")
-	var events: Array = model.apply_enemy_status(target,RANDOM_STATUSES[model.rng.randi_range(0,RANDOM_STATUSES.size()-1)],1)
+	var id: String = entry.item.id
+	if not model.is_enemy_alive(target) or id in model.active_relic_procs: return []
+	var rule: Dictionary = Catalog.ITEMS[id].get("hit_status",{})
+	if id == "mystery_potion": rule = {"chance":0.1,"stacks":1}
+	if rule.is_empty() or model.rng.randf() >= rule.chance: return []
+	var status: int = {"plague":Status.PLAGUE,"burning":Status.BURNING,"frozen":Status.FROZEN}.get(rule.get("status",""),-1)
+	if status < 0: status = RANDOM_STATUSES[model.rng.randi_range(0,RANDOM_STATUSES.size()-1)]
+	model.active_relic_procs.append(id)
+	var events: Array = model.apply_enemy_status(target,status,rule.stacks)
 	model.active_relic_procs.pop_back()
+	# The owner handles activation once, after a successful status application.
 	return events
 
 ## Trigger once per target or boss phase, preserving the plague stacks.
@@ -105,10 +130,12 @@ static func turn_finished(model) -> Array:
 	var events: Array = []
 	for i in range(model.relics.items.size()-1,-1,-1):
 		var item: Dictionary = model.relics.items[i]
-		if item.id == "black_chip": item.no_straight = false
-		var chance: float = 0.2 if item.id == "banana" else 0.01 if item.id == "magic_banana" else 0.0
+		if item.id == "red_chip": item.no_straight = false
+		var chance: float = Catalog.ITEMS[item.id].get("vanish_chance",0.0)
 		if chance > 0 and model.rng.randf() < chance:
 			model.relic_activated.emit(item.id)
+			var unlock: String = Catalog.ITEMS[item.id].get("vanish_unlock","")
+			if not unlock.is_empty(): model.relics.unlocks.unlock(unlock)
 			model.relics.remove(i)
 			events.append(model.event(-1,0,"relic","RELIC VANISHED"))
 	return events

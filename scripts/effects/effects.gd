@@ -5,6 +5,7 @@ const FlameSpell = preload("res://scripts/effects/flame_spell.gd")
 const FireStorm = preload("res://scripts/effects/fire_storm.gd")
 const FierySlash = preload("res://scripts/effects/fiery_slash.gd")
 const Brimstone = preload("res://scripts/effects/brimstone.gd")
+const AttackStyle = preload("res://scripts/player/attack_presentation.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 var particles: Array = []
 var rings: Array = []
@@ -157,20 +158,22 @@ func cast(face: int, from: Vector2, targets: Array, duration: float, track_targe
 			activate_circle(target + Vector2(0, 60), Color("efd394") if face == 6 else Color("c5a4de"), 70, duration,track_targets)
 
 ## Fire attacks reuse world tracking so camera zoom cannot detach their endpoints.
-func flame_cast(tier: int, from: Vector2, targets: Array, duration: float, damages: Array = [], feet: Array = [], health_bottoms: Array = []) -> void:
+func flame_cast(tier: int, from: Vector2, targets: Array, duration: float, damages: Array = [], feet: Array = [], health_bottoms: Array = [], form: int = 2, ticks: int = 1, target_widths: Array = []) -> void:
 	if tier == 3: duration = FireStorm.CAST_DURATION
 	elif tier == 4: duration = Brimstone.CAST_DURATION
 	spell = {"face":0,"flame_tier":clampi(tier,0,4),"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"scales":targets.map(func(_point): return 1.0)}
-	for i in range(mini(damages.size(),targets.size())): spell.scales[i] = damage_scale(damages[i],damage_stage)
+	spell.form = form; spell.ticks = ticks; spell.style = AttackStyle.for_form(form)
+	for i in range(targets.size()): spell.scales[i] = damage_scale(damages[i] if i < damages.size() else 0,damage_stage)*spell.style.size
 	if tier == 2: FierySlash.prepare(spell)
 	if tier == 3: FireStorm.prepare(spell,cosmetic)
 	if not feet.is_empty(): spell.world_feet = feet.map(func(point): return world_transform.affine_inverse()*point)
 	if not health_bottoms.is_empty(): spell.world_health_bottoms = health_bottoms.map(func(point): return world_transform.affine_inverse()*point)
+	if not target_widths.is_empty(): spell.world_target_widths = target_widths.map(func(width): return width/world_transform.x.length())
 	if tier == 4: Brimstone.prepare(spell,canvas_size.y > canvas_size.x,cosmetic)
 
 ## Automatic triple/quadruple effects retain the same camera tracking and battlefield clip.
-func match_cast(count: int, from: Vector2, targets: Array, feet: Array, duration: float, damages: Array) -> void:
-	spell = {"face":0,"match_count":count,"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"world_feet":feet.map(func(point): return world_transform.affine_inverse()*point),"scales":damages.map(func(damage): return damage_scale(damage,damage_stage))}
+func match_cast(count: int, from: Vector2, targets: Array, feet: Array, duration: float, damages: Array, form: int = 2) -> void:
+	spell = {"face":0,"match_count":count,"from":from,"targets":targets,"life":duration,"duration":duration,"world_from":world_transform.affine_inverse()*from,"world_targets":targets.map(func(point): return world_transform.affine_inverse()*point),"world_feet":feet.map(func(point): return world_transform.affine_inverse()*point),"scales":damages.map(func(damage): return damage_scale(damage,damage_stage)),"style":AttackStyle.for_form(form)}
 
 ## Share authored-sheet timing while keeping each effect's frame ranges independent.
 func flame_animation(cast_info: Dictionary):
@@ -182,13 +185,34 @@ func flame_animation(cast_info: Dictionary):
 func flame_state() -> Dictionary:
 	return spell.get("fiery_slash",spell.get("storm",spell.get("brimstone",{})))
 
+## Burn deaths wait for spell bodies and fading particle tails, never actor recovery or UI.
+func attack_visuals_active() -> bool:
+	return not spell.is_empty() or not finishing_spells.is_empty()
+
+## Read the captured form's loop duration, including minimum damage-tick spacing.
+func flame_loop_duration() -> float:
+	return flame_state().get("loop_duration",0.0)
+
+func flame_tick_time(tick: int, count: int) -> float:
+	return flame_loop_duration()*tick/maxi(1,count-1)
+
+## Fit the effect buildup to the character's release-to-impact interval, never the reverse.
+func sync_flame_buildup(seconds: float) -> void:
+	var state: Dictionary = flame_state()
+	if state.is_empty(): return
+	state.build_duration = maxf(seconds,0.001)
+	if spell.has("fiery_slash"):
+		state.fps = FierySlash.IMPACT_FRAME/state.build_duration
+		# Only the buildup follows the actor; retain the slash's slower fading trail.
+		state.damage_fps = FierySlash.FPS*FierySlash.DAMAGE_SPEED
+
 ## Six readable sways per second replace the high-frequency blur during damage loops.
 func flame_loop_shake() -> Vector2:
 	var state: Dictionary = flame_state()
 	if reduced or state.get("phase","") != "loop" or time_factor <= 0: return Vector2.ZERO
-	var duration: float = flame_animation(spell).LOOP_DURATION
+	var duration: float = flame_loop_duration()
 	var envelope: float = smoothstep(0,0.08,state.age)*smoothstep(0,0.1,duration-state.age)
-	var amplitude: float = 4.5 if spell.has("brimstone") else 1.5
+	var amplitude: float = (4.5 if spell.has("brimstone") else 1.5)*spell.style.shake
 	return Vector2(sin(state.age*TAU*6),sin(state.age*TAU*7.5+0.8))*amplitude*envelope
 
 ## Link authored loop frames to the first actual damage tick, not an estimated timer.
@@ -211,8 +235,8 @@ func finish_flame_damage() -> void:
 	else: spell.erase("hold_damage")
 
 ## Enlarge sparks and their spread without multiplying particle counts or changing timing.
-func attack_burst(at: Vector2, color: Color, damage: int, count: int, strength: float) -> void:
-	var size_scale: float = damage_scale(damage,damage_stage)
+func attack_burst(at: Vector2, color: Color, damage: int, count: int, strength: float, visual_scale: float = 1.0) -> void:
+	var size_scale: float = damage_scale(damage,damage_stage)*visual_scale
 	burst(at,color,count,strength*size_scale,size_scale)
 
 func slash(at: Vector2, heavy: bool = false, damage: int = 0) -> void:
@@ -483,8 +507,12 @@ func projected_spell(cast_info: Dictionary) -> Dictionary:
 	if cast_info.has("world_from"): projected.from = world_transform*cast_info.world_from
 	if cast_info.has("world_targets"): projected.targets = cast_info.world_targets.map(func(point): return world_transform*point)
 	if cast_info.has("world_feet"): projected.feet = cast_info.world_feet.map(func(point): return world_transform*point)
+	if cast_info.has("world_target_widths"): projected.target_widths = cast_info.world_target_widths.map(func(width): return width*world_transform.x.length())
 	# Only move the grounded anchor with the camera; the pillar's dimensions stay fixed.
 	if cast_info.has("world_brimstone_anchor"): projected.brimstone_anchor = world_transform*cast_info.world_brimstone_anchor+Vector2(0,Brimstone.FLOOR_PADDING)
+	if cast_info.has("world_brimstone_anchors"):
+		projected.brimstone_anchors = cast_info.world_brimstone_anchors.map(func(point): return world_transform*point+Vector2(0,8))
+		projected.brimstone_top = battlefield_rect.position.y
 	return projected
 
 func _draw_spell(cast_info: Dictionary, canvas: CanvasItem) -> void:

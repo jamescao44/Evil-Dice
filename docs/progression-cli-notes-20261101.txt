@@ -1,0 +1,42 @@
+Progression CLI notes — 2026-11-01
+
+Six seeded campaigns: 112011, 112029, 112047, 112083, 112109, 112157.
+Four cleared; one died at boss 2, one at boss 3. No engine/action errors.
+Gameplay source stayed unchanged throughout the test.
+
+Conditions: 35% Perfect initial throws; collect all chest tiers and prizes;
+use tarots and gemstones; prioritize food sets and ranked shop relics.
+The heuristic does not buy shop tarots/soul bottles or refresh shops.
+This is a small sample, not a paired before/after comparison or a test of
+animation feel. Skill counts include each individual cast, including bonuses.
+
+Observations
+- Paladin debut at 1-7 is a clear step: 2–5 turns (median 3.5), with damage
+  taken in 5/6 runs. The preceding wave usually took one turn.
+- High Priest + Cannon at 2-5 took 2–4 turns; Cannon + Bomber at 3-3 took
+  2–6. However, 4/6 and 4/5 runs respectively took no damage there. Cannons
+  fired only once across all six campaigns: interruption/killing still wins
+  reliably for this policy. Longer fights do not always mean more pressure.
+- Commander phase 1 took a median 4.5 turns. Phase 2 took 6–13 (median 8.5):
+  the full-strength Paladin reinforcements make this phase drag beyond the
+  roughly four-turn target. This is the first pacing adjustment I would make.
+- Boss 2's cleared phases had medians of 4.5 and 7 turns. Its fatal heavy hit
+  dealt 726 to a player with 600/1100 HP and Corrosion: not a full-health kill.
+- Boss 3's cleared phases had medians of 4.5 turns each, but the weakest run
+  died after 23 turns in phase 1. Late ordinary waves mostly took 1–2 turns.
+  Build variance remains large: all four clears finished with Super Meal;
+  the final-boss failure had Budget Meal. This does not prove the set is required.
+- Optional soul rewards shrink the intended level gaps. All six players
+  entered 1-7 at LV5 against LV5 enemies, above the kill-only LV3 reference.
+
+Suggested next pass: shorten Commander phase 2 first, then address weak-build
+boss attrition and low-risk late ordinary waves. Avoid a blanket enemy buff.
+No balance changes were made during this test.
+
+Recorded artifacts (repository-relative)
+test-output/playtests/20261101-special-spikes/runs-health-fireball.png
+test-output/playtests/20261101-special-spikes/runs-wave-actions.png
+test-output/playtests/20261101-special-spikes/runs-relic-events.csv
+test-output/playtests/20261101-special-spikes/runs-power-gains.csv
+test-output/playtests/20261101-special-spikes/runs.json
+test-output/playtests/20261101-special-spikes/metadata.json

@@ -24,7 +24,7 @@ func run() -> void:
 	g.muted = true
 	g.model.stage = 1
 	g.visual_stage = 1
-	g.monster_side = g.HORROR_SIZES[1]
+	g.evolution.reset()
 	g.model.enemies = [Rules.make_enemy(0,1,true),Rules.make_enemy(1,1,true),Rules.make_enemy(2,1,true)]
 	for e in g.model.enemies: e.intent = {"type":"attack","target":-1,"amount":e.damage,"attribute":e.attribute}
 	await shot("elite-moves")
@@ -54,7 +54,7 @@ func run() -> void:
 	g._cancel_charge()
 	g.model.stage = 8
 	g.visual_stage = 8
-	g.monster_side = g.HORROR_SIZES[8]
+	g.evolution.reset()
 	g.model.rng.seed = 928
 	g.model._load_wave()
 	g.model.begin_round()
@@ -72,7 +72,7 @@ func run() -> void:
 	g.model._load_wave()
 	g.model.begin_round()
 	g.visual_stage = Waves.CITY_STAGE
-	g.monster_side = g.HORROR_SIZES[9]
+	g.evolution.reset()
 	g.model.set_test_roll([6,6,4])
 	g.model.apply_player()
 	g.model.troops = 4

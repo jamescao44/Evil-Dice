@@ -4,6 +4,8 @@ const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Orb = preload("res://scripts/combat/skill_orb_paint.gd")
 const Rules = preload("res://scripts/combat/battle_rules.gd")
 const DragFeedback = preload("res://scripts/shared/cast_drag_feedback.gd")
+const TextBackdrop = preload("res://scripts/shared/soft_text_backdrop.gd")
+var caption_backdrop: Node2D
 var drag_feedback = DragFeedback.new()
 var battle
 var stored: bool = false
@@ -35,6 +37,12 @@ var fragments: Array = []
 
 func _ready() -> void:
 	z_index = BattleLayers.SKILL
+	# Separate caption opacity keeps the casting sprite transparent and its text readable.
+	caption_backdrop = Node2D.new()
+	caption_backdrop.z_index = 1
+	caption_backdrop.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	add_child(caption_backdrop)
+	caption_backdrop.draw.connect(_draw_caption_backdrop)
 
 func begin(value: MultiHitSkill) -> void:
 	aim_dock = 0
@@ -189,6 +197,8 @@ func _process(delta: float) -> void:
 		for pop in pops: pop.age += delta
 		pops = pops.filter(func(pop): return pop.age < 0.4)
 	self_modulate = Color(0.38,0.38,0.44,0.7) if is_suspended() or locked_saved else Color(1,1,1,CAST_OPACITY if is_casting() else 1.0)
+	caption_backdrop.visible = not roll.is_empty() and not dissolving and age >= formation and not battle._menus_open() and not battle.tarot_ui.inventory_visible() and (is_casting() or (selected and battle.view_phase == "targeting"))
+	caption_backdrop.queue_redraw()
 	queue_redraw()
 
 func _draw() -> void:
@@ -250,7 +260,7 @@ func _draw() -> void:
 		for target in battle._skill_targets(): _draw_target(target, target == battle.hover_target, color)
 	if progress >= 1:
 		if orb_count() > 1: _draw_uses(at, radius, color)
-		if not stored or aiming or casting: _draw_caption(at,radius,portrait,aiming,color)
+		if not stored and not aiming and not casting: _draw_caption(at,radius,portrait,aiming,color)
 
 func _draw_uses(at: Vector2, radius: float, color: Color) -> void:
 	var total: int = orb_count()
@@ -293,7 +303,7 @@ func value_text() -> String:
 func value_color() -> Color:
 	return Color("ff827c") if Rules.is_attack(roll) else Color("94eb9c")
 
-func _draw_value(at: Vector2, radius: float, portrait: bool) -> void:
+func _draw_value(at: Vector2, radius: float, portrait: bool, canvas: CanvasItem = null) -> void:
 	var value: String = value_text()
 	if value.is_empty(): return
 	var size: int = 30 if portrait else 20
@@ -301,13 +311,10 @@ func _draw_value(at: Vector2, radius: float, portrait: bool) -> void:
 	var baseline := Vector2(clampf(at.x,width/2+16,battle.fx.canvas_size.x-width/2-16),maxf(size+16,at.y-radius-(32 if portrait else 24)))
 	# Keep the larger resting skill's value below the treasure meter, inside its rim.
 	if not stored and not is_dragging() and not is_casting(): baseline.y = at.y-radius+(28 if portrait else 22)
-	_center(baseline,value,size,value_color(),true)
+	_center(baseline,value,size,value_color(),true,null,canvas)
 
-func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, color: Color) -> void:
-	_draw_value(at, radius, portrait)
-	if not aiming and not is_casting():
-		_center(at+Vector2(0,radius+30),GameText.text(caption.name),26 if portrait else 18,color)
-		return
+## Shared geometry keeps the soft backing aligned with wrapped translations.
+func _caption_layout(at: Vector2, radius: float, portrait: bool) -> Dictionary:
 	var description: String = GameText.text(description_text())
 	var title: String = GameText.text(caption.name)
 	var title_size: int = 32 if portrait else 24
@@ -323,19 +330,36 @@ func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, col
 	for line in lines: caption_width = maxf(caption_width,battle.description_font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,body_size).x)
 	for line in bonus_lines: caption_width = maxf(caption_width,battle.description_font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,bonus_size).x)
 	baseline.x = clampf(baseline.x,caption_width/2+16,battle.fx.canvas_size.x-caption_width/2-16)
-	_center(baseline,title,title_size,color,true)
 	var next: float = 40 if portrait else 32
-	if not description.is_empty():
-		for line in lines:
-			_center(baseline+Vector2(0,next),line,body_size,Color("eee0b9"),true,battle.description_font)
-			next += body_size+6
-	if not bonus.is_empty():
-		for line in bonus_lines:
-			_center(baseline+Vector2(0,next),line,bonus_size,battle.GOLD,true,battle.description_font)
-			next += bonus_size+6
+	var height: float = title_size+next+lines.size()*(body_size+6)+bonus_lines.size()*(bonus_size+6)
+	var rect := Rect2(baseline-Vector2(caption_width/2,title_size),Vector2(caption_width,height)).grow(12)
+	return {"baseline":baseline,"title":title,"title_size":title_size,"body_size":body_size,"lines":lines,"bonus_size":bonus_size,"bonus_lines":bonus_lines,"next":next,"rect":rect}
+
+## Draw beneath the dimmed caption without reducing the skill sprite's cast transparency.
+func _draw_caption_backdrop() -> void:
+	if roll.is_empty(): return
+	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
+	TextBackdrop.paint(caption_backdrop,_caption_layout(display_center(),display_radius(),portrait).rect)
+	_draw_caption(display_center(),display_radius(),portrait,battle.view_phase == "targeting",battle.PatternStyle.color(roll),caption_backdrop)
+
+func _draw_caption(at: Vector2, radius: float, portrait: bool, aiming: bool, color: Color, canvas: CanvasItem = null) -> void:
+	_draw_value(at, radius, portrait,canvas)
+	if not aiming and not is_casting():
+		_center(at+Vector2(0,radius+30),GameText.text(caption.name),26 if portrait else 18,color)
+		return
+	var layout: Dictionary = _caption_layout(at,radius,portrait)
+	var baseline: Vector2 = layout.baseline
+	_center(baseline,layout.title,layout.title_size,color,true,null,canvas)
+	var next: float = layout.next
+	for line in layout.lines:
+		_center(baseline+Vector2(0,next),line,layout.body_size,Color("eee0b9"),true,battle.description_font,canvas)
+		next += layout.body_size+6
+	for line in layout.bonus_lines:
+		_center(baseline+Vector2(0,next),line,layout.bonus_size,battle.GOLD,true,battle.description_font,canvas)
+		next += layout.bonus_size+6
 	if age < formation or battle.view_phase == "resolving" or battle.skill_dragging or is_suspended() or battle._current_skill_selected(): return
 	var hint: String = "CHOOSE A FOE" if aiming and battle._skill_needs_target(roll) else "TAP / DRAG TO AIM" if battle._skill_needs_target(roll) else "DRAG TO FIELD"
-	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font)
+	_center(baseline+Vector2(0,next),hint,24 if portrait else 20,Color("d2d1c9"),true,battle.description_font,canvas)
 
 func _draw_target(target: int, selected: bool, color: Color) -> void:
 	battle._draw_target_indicator(self,target,selected,color)
@@ -363,9 +387,11 @@ func _draw_icon(at: Vector2, side: float, tint: Color) -> void:
 func _mini_die(at: Vector2, face: int, half: float, alpha: float) -> void:
 	Pixel.mini_die(self,at,face,half,alpha)
 
-func _center(at: Vector2, value: String, size: int, color: Color, outline: bool = false, font: Font = null) -> void:
+func _center(at: Vector2, value: String, size: int, color: Color, outline: bool = false, font: Font = null, canvas: CanvasItem = null) -> void:
 	value = GameText.text(value)
 	if font == null: font = battle.pixel_font
+	if canvas == null: canvas = self
+	elif is_casting(): color = color.darkened(0.35)
 	var width: float = font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
-	if outline: draw_string_outline(font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,4 if font == battle.pixel_font else 2,Color("15151b"))
-	draw_string(font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)
+	if outline: canvas.draw_string_outline(font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,4 if font == battle.pixel_font else 2,Color("15151b"))
+	canvas.draw_string(font,(at-Vector2(width/2,0)).round(),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)

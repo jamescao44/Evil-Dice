@@ -31,9 +31,19 @@ static func _copy(items: Array, index: int, slot: int, chain: Array) -> Array:
 	return [{"item":item,"origin":index,"slot":slot,"source":items[slot].id,"activators":activators}]
 
 static func activate(model, entry: Dictionary) -> void:
+	pay_retrigger_cost(model,entry.activators)
 	activate_ids(model,entry.activators,animation_speed(entry))
 	# The effect's identity survives fusion and copying; companion visuals use this signal.
 	model.relic_effect_activated.emit(entry.item.id)
+
+## Only committed Tentacle copies pay HP; previews and cosmetic replays never do.
+static func pay_retrigger_cost(model, activators: Array) -> void:
+	if TENTACLE not in activators or model.hp <= 0: return
+	var loss: int = mini(model.hp,maxi(1,ceili(model.max_hp*0.01)))
+	model.hp -= loss
+	var events: Array = [model.damage_event(-1,loss,loss)]
+	if model.hp <= 0: events.append_array(model.RelicEffects.prevent_death(model))
+	model.relic_cost_paid.emit(events)
 
 ## Notify presentation without applying effects or advancing counters a second time.
 static func activate_ids(model, ids: Array, speed: float = 1.0) -> void:

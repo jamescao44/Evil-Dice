@@ -28,7 +28,7 @@ func progress_changed(previous: int, current: int) -> void:
 		last_progress = current
 		return
 	last_progress = current
-	var origin: Vector2 = battle._saved_slot_center()
+	var origin: Vector2 = battle._turn_end_center()
 	for index in range(previous,current):
 		orbs.append({"index":index,"origin":origin,"age":-STAGGER*(index-previous),"side":1 if index%2 == 0 else -1})
 	queue_redraw()

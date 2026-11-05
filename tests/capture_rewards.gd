@@ -27,7 +27,7 @@ func run() -> void:
 	game.model._load_wave()
 	game.model.enemies = [game.model.make_enemy(0,1,true)]
 	game.visual_stage = 2
-	game.monster_side = 288
+	game.evolution.reset()
 	game._start_round()
 	await capture("elite")
 	game.model.stage = 8
@@ -37,7 +37,7 @@ func run() -> void:
 	game.model.blood_gems = 300
 	game.model.summon_shards = 4
 	game.model.reroll_progress = 7
-	game.monster_side = 320
+	game.evolution.reset()
 	game._start_round()
 	await capture("wave-nine")
 	for id in [2,3,33,6]: game.model.statuses[id].count = 3

@@ -2,6 +2,7 @@ extends RefCounted
 ## Data from the Mandarin design document, including tarot-related relics.
 enum Rarity { COMMON, RARE, EPIC, LEGENDARY, CURSED }
 const Sets = preload("res://scripts/relics/relic_sets.gd")
+const Status = preload("res://scripts/status/status_effect.gd")
 const MAX_SLOTS := 10
 const SALVAGE_VALUES := [10,30,80,120,120]
 const RARITY_WEIGHTS := [58.0, 30.0, 10.0, 1.0, 1.0]
@@ -11,10 +12,24 @@ const STONES := Sets.MAGIC_STONES
 const CURSED_DICE := {"cursed_die":6,"cursed_die_5":5,"cursed_die_4":4,"cursed_die_3":3,"cursed_die_2":2,"cursed_die_1":1}
 const DISABLED := ["cursed_watch", "cursed_die_5", "cursed_die_4", "cursed_die_3", "cursed_die_2", "cursed_die_1"]
 const ITEMS := {
+	"basic_crystal": {"name":"Basic Crystal", "rarity":0, "icon":"basic_crystal", "text":"Base damage +5.", "stats":{"base_damage":5.0}, "sprite":"basic_crystal.svg"},
+	"warrior_greatsword": {"name":"Warrior Greatsword", "rarity":1, "icon":"warrior_greatsword", "text":"After each skill cast, attack a random enemy for 10 base damage.", "after_skill_attack":10.0, "sprite":"warrior_greatsword.svg"},
+	"intermediate_crystal": {"name":"Intermediate Crystal", "rarity":1, "icon":"intermediate_crystal", "text":"Base damage +10.", "stats":{"base_damage":10.0}, "sprite":"intermediate_crystal.svg"},
+	"master_crystal": {"name":"Master Crystal", "rarity":2, "icon":"master_crystal", "text":"Base damage +20.", "stats":{"base_damage":20.0}, "sprite":"master_crystal.svg"},
+	"supreme_crystal": {"name":"Supreme Crystal", "rarity":3, "icon":"supreme_crystal", "text":"Damage multiplier +3.", "stats":{"damage_add":3.0}, "sprite":"supreme_crystal.svg"},
+	"phoenix_feather": {"name":"Phoenix Feather", "rarity":2, "icon":"phoenix_feather", "text":"Base damage +5. At turn start, apply 2 Burning to a random enemy.", "stats":{"base_damage":5.0}, "turn_start_status":{"status":Status.BURNING,"stacks":2}, "sprite":"phoenix_feather.svg"},
+	"hour_hand": {"name":"Hour Hand", "rarity":0, "icon":"hour_hand", "text":"Every 3 completed turns, this relic gains +0.1 damage multiplier.", "turn_growth":{"period":3,"amount":0.1}, "sprite":"hour_hand.svg"},
+	"minute_hand": {"name":"Minute Hand", "rarity":1, "icon":"minute_hand", "text":"Every 2 completed turns, this relic gains +0.1 damage multiplier.", "turn_growth":{"period":2,"amount":0.1}, "sprite":"minute_hand.svg"},
+	"second_hand": {"name":"Second Hand", "rarity":2, "icon":"second_hand", "text":"Every completed turn, this relic gains +0.1 damage multiplier.", "turn_growth":{"period":1,"amount":0.1}, "sprite":"second_hand.svg"},
+	"handless_clock": {"name":"Handless Clock", "rarity":0, "icon":"handless_clock", "text":"A clock waiting for its hands.", "sprite":"handless_clock.svg"},
+	"demon_clock": {"name":"Demon Clock", "rarity":3, "icon":"demon_clock", "text":"Combines all Clock effects and their growth. Damage multiplier +1.5.", "fusion":true, "sprite":"demon_clock.svg"},
+	"beast_fang": {"name":"Beast Fang", "rarity":0, "icon":"beast_fang", "text":"Base damage +2. Attacks have a 30% chance to apply 1 Plague.", "stats":{"base_damage":2.0}, "hit_status":{"status":"plague","chance":0.3,"stacks":1}, "sprite":"beast_fang.svg"},
+	"firebird_feather": {"name":"Firebird Feather", "rarity":0, "icon":"firebird_feather", "text":"Base damage +2. Attacks have a 30% chance to apply 1 Burning.", "stats":{"base_damage":2.0}, "hit_status":{"status":"burning","chance":0.3,"stacks":1}, "sprite":"firebird_feather.svg"},
+	"snowball": {"name":"Snowball", "rarity":0, "icon":"snowball", "text":"Base damage +2. Attacks have a 10% chance to apply 1 Frozen.", "stats":{"base_damage":2.0}, "hit_status":{"status":"frozen","chance":0.1,"stacks":1}, "sprite":"snowball.svg"},
 	"challenger_badge": {"name":"Challenger's Badge", "rarity":2, "icon":"challenger_badge", "text":"Random attacks focus on the marked foe, ignoring taunt. Drag the mark to change targets.", "sprite":"challenger_badge.svg"},
 	"mystery_potion": {"name": "Mysterious Potion", "rarity": 0, "icon": "mystery_potion", "text": "Attacks have a 10% chance to apply 1 random status stack."},
-	"ticket": {"name": "Ticket", "rarity": 0, "icon": "ticket", "text": "Gain 1 extra roll each turn. Spent last; does not earn treasure progress.", "sprite":"ticket.svg"},
-	"banana": {"name": "Banana", "rarity": 0, "icon": "banana", "text": "Damage multiplier +0.5. 20% chance to disappear at turn end.", "stats":{"damage_add":0.5}},
+	"ticket": {"name": "Ticket", "rarity": 0, "icon": "ticket", "text": "Gain 2 extra rolls each turn. Spent last; do not earn treasure progress.", "extra_rolls":2, "sprite":"ticket.svg"},
+	"banana": {"name": "Banana", "rarity": 0, "icon": "banana", "text": "Damage multiplier +0.5. 20% chance to disappear at turn end, replaced by Magic Banana in future rewards.", "stats":{"damage_add":0.5}, "vanish_chance":0.2, "vanish_unlock":"magic_banana", "excluded_after_unlock":"magic_banana"},
 	"unknown_arm": {"name": "Unidentified Arm", "rarity": 0, "icon": "unknown_arm", "text": "After each throw, deal 5 base damage to a random enemy.", "sprite":"unknown_arm.svg"},
 	"unknown_pelvis": {"name": "Unidentified Pelvis", "rarity": 0, "icon": "unknown_pelvis", "text": "After each throw, deal 5 base damage to a random enemy.", "sprite":"unknown_pelvis.svg"},
 	"unknown_leg": {"name": "Unidentified Leg Bone", "rarity": 0, "icon": "unknown_leg", "text": "After each throw, deal 5 base damage to a random enemy.", "sprite":"unknown_leg.svg"},
@@ -24,11 +39,11 @@ const ITEMS := {
 	"frozen_tilapia": {"name": "Frozen Tilapia", "rarity": 1, "icon": "frozen_tilapia", "text": "At player-turn end, attack a random enemy for the leftover pip sum as base damage."},
 	"unknown_sternum": {"name": "Unidentified Sternum", "rarity": 1, "icon": "unknown_sternum", "text": "After each throw, deal 10 base damage to a random enemy.", "sprite":"unknown_sternum.svg"},
 	"unknown_skull": {"name": "Unidentified Skull", "rarity": 1, "icon": "unknown_skull", "text": "After each throw, deal 10 base damage to a random enemy.", "sprite":"unknown_skull.svg"},
-	"magic_banana": {"name": "Magic Banana", "rarity": 2, "icon": "magic_banana", "text": "Damage multiplier x1.5. 1% chance to disappear at turn end.", "stats":{"damage_factor":1.5}},
+	"magic_banana": {"name": "Magic Banana", "rarity": 2, "icon": "magic_banana", "text": "Damage multiplier x1.5. 1% chance to disappear at turn end.", "stats":{"damage_factor":1.5}, "vanish_chance":0.01, "requires_unlock":true},
 	"general_sword": {"name": "General's Sword", "rarity": 2, "icon": "general_sword", "text": "Fuse both broken sword parts. Damage multiplier +2.", "fusion": true},
-	"red_chip": {"name": "Enchanted Chip - Red", "rarity": 2, "icon": "red_chip", "text": "After a throw, cast its longest straight at 30% base damage without spending dice.", "sprite":"red_chip.svg"},
+	"red_chip": {"name": "Enchanted Chip - Red", "rarity": 2, "icon": "red_chip", "text": "A throw with no straight grants +10 damage multiplier until the next throw or turn end.", "sprite":"red_chip.svg"},
 	"blue_chip": {"name": "Enchanted Chip - Blue", "rarity": 2, "icon": "blue_chip", "text": "After a throw, cast its shortest straight at 30% base damage without spending dice.", "sprite":"blue_chip.svg"},
-	"black_chip": {"name": "Enchanted Chip - Black", "rarity": 2, "icon": "black_chip", "text": "A throw with no straight grants +5 damage multiplier until the next throw or turn end.", "sprite":"black_chip.svg"},
+	"black_chip": {"name": "Enchanted Chip - Black", "rarity": 3, "icon": "black_chip", "text": "After a throw, cast its longest straight at 30% base damage without spending dice.", "sprite":"black_chip.svg"},
 	"unidentified_ring": {"name": "Unidentified Ring", "rarity": 2, "icon": "unidentified_ring", "text": "Appears in rewards after gathering all five bones.", "requires_set_parts":true},
 	"hellfire": {"name": "Hellfire", "rarity": 3, "icon": "hellfire", "text": "Burning enemies take 30% more damage."},
 	"nightmare_totem": {"name": "Nightmare Totem", "rarity": 3, "icon": "nightmare_totem", "text": "Enemies in Darkness take 30% more damage.", "sprite":"nightmare_totem.svg"},
@@ -51,7 +66,7 @@ const ITEMS := {
 	"light_sword": {"name":"Light Sword", "rarity":1, "icon":"light_sword", "text":"Damage multiplier +2 while only one enemy remains."},
 	"steel_marble": {"name":"Steel Marble", "rarity":1, "icon":"steel_marble", "text":"Three-straight skill damage +20%. Marble bonuses add together.", "stats":{"three_straight_bonus":0.2}},
 	"perfectionist": {"counter":"charges", "name":"Perfectionism", "rarity":1, "icon":"perfectionist", "text":"Three consecutive Perfect throws protect your combo from one miss. Stores one protection."},
-	"overflow_prism": {"name":"Overflow Prism", "rarity":2, "icon":"overflow_prism", "text":"Transfer 50% of excess killing damage to a random enemy."},
+	"overflow_prism": {"name":"Overflow Prism", "rarity":3, "icon":"overflow_prism", "text":"Transfer 50% of excess killing damage to a random enemy."},
 	"gold_marble": {"name":"Golden Marble", "rarity":2, "icon":"gold_marble", "text":"Three-straight skill damage +30%. Marble bonuses add together.", "stats":{"three_straight_bonus":0.3}},
 	"powder_keg": {"name":"Powder Keg", "rarity":2, "icon":"powder_keg", "text":"At 10 Burning, consume 5 stacks and explode for 3x base damage to all enemies."},
 	"echo_bell": {"name":"Echo Bell", "rarity":2, "icon":"echo_bell", "text":"Every third skill repeats at 50% effect. The repeat does not count as a skill cast."},
@@ -60,7 +75,7 @@ const ITEMS := {
 	"royal_seal": {"name":"Royal Seal", "rarity":3, "icon":"royal_seal", "text":"Your first manual skill each wave casts one tier higher, up to a six-straight."},
 	"magician_hat": {"name":"Magician's Hat", "rarity":3, "icon":"magician_hat", "text":"Receive a Magician tarot immediately, then another every 4 completed turns.", "tarot_generator":{"period":4,"card":"magician"}},
 	"lemon_soda": {"name": "Lemon Soda", "rarity": 0, "icon": "lemon_soda", "text": "Auto-attack damage +5. Meal ingredient.", "stats":{"auto_damage":5.0}},
-	"oreo_sundae": {"name": "Cookie Sundae", "rarity": 1, "icon": "oreo_sundae", "text": "Base damage +10. Meal ingredient.", "stats":{"base_damage":10.0}, "sprite":"oreo_sundae.tres"},
+	"oreo_sundae": {"name": "Cookie Sundae", "rarity": 1, "icon": "oreo_sundae", "text": "Base damage +7. Meal ingredient.", "stats":{"base_damage":7.0}, "sprite":"oreo_sundae.tres"},
 	"fried_chicken": {"name": "Fried Chicken", "rarity": 1, "icon": "fried_chicken", "text": "Damage multiplier x1.1. Meal ingredient.", "stats":{"damage_factor":1.1}},
 	"budget_meal": {"name": "Budget Meal", "rarity": 0, "icon": "budget_meal", "text": "Combines two food effects, then adds +0.3 damage multiplier.", "fusion": true},
 	"happy_meal": {"name": "Happy Trio", "rarity": 1, "icon": "happy_meal", "text": "Combines three food effects, then adds +0.5 damage multiplier.", "fusion": true},
@@ -69,9 +84,9 @@ const ITEMS := {
 
 	"codex_page": {"counter":"count", "name":"Codex Page", "rarity":0, "icon":"page", "text":"DMG +0.2 per page. Pages share one slot; 10 fuse into an Ancient Codex.", "stats":{"damage_add":0.2}},
 	"heart": {"name":"Beating Heart", "rarity":0, "icon":"heart", "text":"Maximum health +10%.", "stats":{"max_hp_factor":1.1}},
-	"bracelet": {"name":"Spell Bracelet", "rarity":0, "icon":"bracelet", "text":"Base damage +5.", "stats":{"base_damage":5.0}},
+	"bracelet": {"name":"Spell Bracelet", "rarity":0, "icon":"bracelet", "text":"Damage multiplier +0.4.", "stats":{"damage_add":0.4}},
 	"armor": {"name":"Rusty Armor", "rarity":0, "icon":"armor", "text":"Take 10% less damage.", "stats":{"incoming_factor":0.9}},
-	"coin": {"name":"Game Coin", "rarity":0, "icon":"coin", "text":"Gain 10 blood gems after clearing a wave.", "stats":{"wave_rubies":10}},
+	"coin": {"name":"Game Coin", "rarity":0, "icon":"coin", "text":"Gain 67 blood gems after clearing a wave.", "stats":{"wave_rubies":67}},
 	"fortune_cookie": {"name":"Fortune Cookie", "rarity":0, "icon":"cookie", "text":"Receive a random tarot immediately, then another every 5 completed turns.", "tarot_generator":{"period":5,"card":""}},
 	"magic_shield": {"counter":"charges", "name":"Magic Shield", "rarity":1, "icon":"shield", "text":"Every 6 completed turns, store a shield that blocks one whole hit.", "turn_charge":{"period":6,"message":"SHIELD READY"}},
 	"magic_sword": {"counter":"charges", "name":"Magic Sword", "rarity":2, "icon":"sword", "text":"Base damage +10. Every 6 completed turns, store a 3x critical for the next attack skill and all its hits.", "stats":{"base_damage":10.0}, "turn_charge":{"period":6,"message":"CRITICAL READY"}},
@@ -79,7 +94,7 @@ const ITEMS := {
 	"lucky_die": {"name":"Lucky Die", "rarity":1, "icon":"die", "text":"After 10 throws, the next throw with at least four unused dice guarantees a four-straight. Tarot rules take priority."},
 	"bloodstone": {"name":"Bloodstone", "rarity":1, "icon":"blood", "text":"Heal for 200% of attack damage. Cap: 10% max HP, or 5% per combo hit."},
 	"twin_scythes": {"name":"Twin Scythes", "rarity":3, "icon":"scythes", "text":"Double the number of hits in combo skills.", "stats":{"combo_uses_factor":2}},
-	"contract": {"name":"Last Contract", "rarity":2, "icon":"contract", "text":"Base damage +20%. Prevent death once and restore 60% max HP. Consumed on use.", "stats":{"base_factor":1.2}},
+	"contract": {"name":"Last Contract", "rarity":2, "icon":"contract", "text":"Base damage +5. Prevent death once and restore 60% max HP. Consumed on use.", "stats":{"base_damage":5.0}},
 	"crystal_ball": {"name":"Crystal Ball", "rarity":3, "icon":"orb", "text":"At turn start, receive a random projection tarot. Unused projections vanish at turn end."},
 	"orange_stone": {"name":"Fire Stone", "rarity":2, "icon":"stone", "color":Color("ff9955"), "text":"Base damage +5. Immune to burning. Every attack applies 1 burning stack.", "stats":{"base_damage":5.0}, "sprite":"magic_gem.svg", "tint_sprite":true},
 	"blue_stone": {"name":"Ice Stone", "rarity":2, "icon":"stone", "color":Color("82dfff"), "text":"Base damage +5. Immune to freeze. Attacks have a 30% chance to freeze.", "stats":{"base_damage":5.0}, "sprite":"magic_gem.svg", "tint_sprite":true},
@@ -88,7 +103,7 @@ const ITEMS := {
 	"green_stone": {"name":"Corruption Stone", "rarity":2, "icon":"stone", "color":Color("8ad26a"), "text":"Base damage +5. Immune to corrosion. Attacks have a 50% chance to corrode.", "stats":{"base_damage":5.0}, "sprite":"magic_gem.svg", "tint_sprite":true},
 	"black_stone": {"name":"Plague Stone", "rarity":2, "icon":"stone", "color":Color("8b8599"), "text":"Base damage +5. Every attack applies plague.", "stats":{"base_damage":5.0}, "sprite":"magic_gem.svg", "tint_sprite":true},
 	"prismatic_stone": {"name":"Prismatic Stone", "rarity":3, "icon":"prism", "fusion":true, "text":"Base damage +30. All six stone effects. Each Perfect fires a 100-base-damage attack at a random foe.", "stats":{}, "sprite":"magic_gem.svg", "tint_sprite":true},
-	"mithril_blade": {"name":"Mithril Blade", "rarity":3, "icon":"blade", "text":"Damage multiplier x2 (+100%).", "stats":{"damage_factor":2.0}},
+	"mithril_blade": {"name":"Mithril Blade", "rarity":3, "icon":"blade", "text":"Base damage x2.", "stats":{"base_factor":2.0}},
 	"ancient_prophecy": {"name":"Ancient Prophecy", "rarity":3, "icon":"book", "text":"Each tarot activates twice. Make new choices when needed; normal stacking and overwrite rules apply.", "stats":{"tarot_repeat":true}},
 	"ancient_codex": {"name":"Ancient Codex", "rarity":3, "icon":"book", "fusion":true, "text":"Double damage independently. Made by combining 10 Codex Pages.", "stats":{"damage_factor":2.0}},
 	"cursed_skull": {"name":"Cursed Skull", "rarity":4, "icon":"skull", "text":"A skill containing 6 doubles DMG; without 6, halves DMG."},
@@ -107,14 +122,14 @@ const ITEMS := {
 	"hamburger": {"name": "Hamburger", "rarity": 1, "icon": "hamburger", "text": "Damage multiplier +0.6.", "stats":{"damage_add":0.6}, "sprite":"hamburger.tres"},
 	"soul_vessel": {"name": "Soul Vessel", "rarity": 1, "icon": "soul_vessel", "text": "Souls dropped by enemies +15%."},
 	"pet_lizard": {"name": "Pet Lizard", "rarity": 1, "icon": "pet_lizard", "text": "Apply 2 extra Burning stacks. With all five pets: 4.", "sprite":"pet_food_lizard.svg"},
-	"ice_rose": {"name": "Ice Rose", "rarity": 1, "icon": "ice_rose", "text": "Freezing an enemy deals 10 base damage to it.", "sprite":"ice_rose.svg"},
+	"ice_rose": {"name": "Ice Rose", "rarity": 1, "icon": "ice_rose", "text": "Freezing an enemy deals 10 base damage to all enemies.", "sprite":"ice_rose.svg"},
 	"pet_slime": {"name": "Pet Slime", "rarity": 1, "icon": "pet_slime", "text": "Enemy Corrosion becomes permanent. With all five pets: skill hits apply 1 Corrosion.", "sprite":"pet_food_slime.svg"},
 	"spiked_helmet": {"name": "Spiked Helmet", "rarity": 1, "icon": "spiked_helmet", "text": "Retaliate for 10 fixed damage when attacked. Each Perfect deals 10 base damage to a random enemy."},
 	"royal_dagger": {"name": "Royal Dagger", "rarity": 2, "icon": "royal_dagger", "text": "Base damage +10. Combo skills gain 3 extra hits.", "stats":{"combo_uses_add":3,"base_damage":10.0}},
-	"disguise_mask": {"name": "Disguise Mask", "rarity": 2, "icon": "disguise_mask", "text": "Retrigger the relic immediately to the left once, except Ancient Tentacle."},
+	"disguise_mask": {"name": "Disguise Mask", "rarity": 3, "icon": "disguise_mask", "text": "Retrigger the relic immediately to the left once, except Cursed Tentacle."},
 	"five_leaf_clover": {"name": "Five-leaf Clover", "rarity": 2, "icon": "five_leaf_clover", "text": "Each eligible throw has a 5% chance to guarantee at least a five-straight. Tarot rules take priority.", "sprite":"five_leaf_clover.svg"},
 	"pet_ghost": {"name": "Pet Ghost", "rarity": 2, "icon": "pet_ghost", "text": "After each throw, deal 20 fixed damage to all enemies. With all five pets: also use the damage multiplier.", "sprite":"pet_food_ghost.svg"},
-	"ancient_tentacle": {"name": "Ancient Tentacle", "rarity": 3, "icon": "ancient_tentacle", "text": "Retrigger every relic to the left once."},
+	"ancient_tentacle": {"name": "Cursed Tentacle", "rarity": 4, "icon": "ancient_tentacle", "text": "Retrigger every relic to the left once. Each extra activation costs 1% max HP and can kill you."},
 	"pet_dragon": {"name": "Pet Dragon", "rarity": 3, "icon": "pet_dragon", "text": "After each throw, fire two random 15-base attacks. With all five pets: three attacks, each applying 1 Burning.", "sprite":"pet_food_dragon.svg"},
 	"cursed_die_5": {"name": "Cursed Die - 5", "rarity": 4, "icon": "cursed_die_5", "text": "Perfect rolls always contain 5. Other rolls never contain 5.", "sprite":"cursed_die_5.svg"},
 	"cursed_die_4": {"name": "Cursed Die - 4", "rarity": 4, "icon": "cursed_die_4", "text": "Perfect rolls always contain 4. Other rolls never contain 4.", "sprite":"cursed_die_4.svg"},
@@ -166,11 +181,16 @@ static func description(item: Dictionary, translate: Callable = Callable(), owne
 	if item.id == "codex_page": text += "\n" + localize.call("Pages: %d / 10.") % item.get("count", 1)
 	if ITEMS[item.id].has("turn_charge"): text += "\n" + localize.call("Turns: %d / %d. Stored charges: %d.") % [item.get("turns",0),ITEMS[item.id].turn_charge.period,item.get("charges",0)]
 	if item.id == "lucky_die": text += "\n" + localize.call("Throws: %d / 10.") % item.get("throws",0)
-	if Sets.is_fused(item.id) and Sets.recipe_for(item.id).get("retain_effects",true):
+	if Sets.is_fused(item.id) and Sets.recipe_for(item.id).get("retain_effects",true) and not Sets.recipe_for(item.id).get("retain_component_state",false):
 		for id in Sets.ingredients(item): text += "\n" + localize.call(ITEMS[id].name) + ": " + localize.call(ITEMS[id].text)
 	if ITEMS[item.id].has("tarot_generator"): text += "\n" + localize.call("Turns: %d / %d.") % [item.get("turns",0),ITEMS[item.id].tarot_generator.period]
 	if item.id == "piggy_bank": text += "\n" + localize.call("Saved blood gems: %d.") % floori(item.get("savings",0.0))
 	if item.id == "precognition_eye": text += "\n" + localize.call("Stored multiplier: +%.2f.") % item.get("damage_growth",0.0)
+	for part in Sets.stateful_parts(item):
+		var growth: Dictionary = ITEMS[part.id].get("turn_growth",{})
+		if growth.is_empty(): continue
+		text += "\n" + localize.call(ITEMS[part.id].name) + ": " + localize.call("Stored multiplier: +%.2f.") % part.get("damage_growth",0.0)
+		text += " " + localize.call("Turns: %d / %d.") % [part.get("turns",0),growth.period]
 	if item.id == "echo_bell": text += "\n" + localize.call("Skills: %d / 3.") % item.get("casts",0)
 	if item.id == "reaper_scythe": text += "\n" + localize.call("Kills: %d.") % item.get("kills", 0)
 	if item.id == "cursed_bow":

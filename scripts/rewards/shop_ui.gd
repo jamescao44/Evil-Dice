@@ -2,7 +2,7 @@ extends Node2D
 ## Checkpoint storefront; stock, currency and grants belong to ShopStock.
 const Stock = preload("res://scripts/rewards/shop_stock.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
-const RelicPaint = preload("res://scripts/relics/relic_paint.gd")
+const RarityDisplay = preload("res://scripts/relics/relic_rarity_display.gd")
 const Cards = preload("res://scripts/tarot/tarot_paint.gd")
 const Icons = preload("res://scripts/rewards/reward_icons.gd")
 const KEEPER = preload("res://assets/art/shop/keeper.png")
@@ -133,13 +133,13 @@ func offer_art_rect(slot: int) -> Rect2:
 		var side: float = 116 if portrait() else 82
 		return Rect2(Vector2(rect.get_center().x,rect.position.y+(84 if portrait() else 34))-Vector2.ONE*side/2,Vector2.ONE*side)
 	var size: Vector2 = (Vector2(90,140) if portrait() else Vector2(76,118)) if tarot else Vector2.ONE*(92 if portrait() else 60)
-	var y: float = (84 if portrait() else 72) if tarot else (68 if portrait() else 30)
+	var y: float = (84 if portrait() else 72) if tarot else (48 if portrait() else 26)
 	return Rect2(Vector2(rect.get_center().x,rect.position.y+y)-size/2,size)
 
 ## Leave enough room for two-line item names without covering the sprite.
 func offer_name_rect(slot: int) -> Rect2:
 	var rect: Rect2 = offer_rect(slot)
-	var top: float = rect.size.y-90 if slot >= 6 else 116 if portrait() else 64
+	var top: float = rect.size.y-90 if slot >= 6 else 124 if portrait() else 74
 	return Rect2(rect.position+Vector2(8,top),Vector2(rect.size.x-16,64 if portrait() else 48))
 
 ## Fit long translated names into two lines, leaving the price unobstructed.
@@ -163,9 +163,9 @@ func detail_rect() -> Rect2:
 func purchase_rect() -> Rect2:
 	return Rect2(48,1464,708,162) if portrait() else Rect2(396,692,490,102)
 
-## Show quick use only for tarot merchandise, including unavailable cards dimmed.
+## Combat cards use the full-width Buy action; only reward cards offer immediate use.
 func shows_buy_and_use() -> bool:
-	return selected_offer().get("kind","") == "tarot"
+	return selected_offer().get("kind","") == "tarot" and Stock.Tarot.immediate_reward(selected_offer().get("id",""))
 
 func buy_rect() -> Rect2:
 	var rect := purchase_rect()
@@ -379,8 +379,8 @@ func _draw_divination() -> void:
 		if not battle.model.shop.gift.is_empty():
 			if not (dragging and pressed_offer == Stock.GIFT_SLOT):
 				var radius: float = 46 if portrait() else 36
-				RelicPaint.paint(keeper_overlay,battle.model.shop.gift.id,divination_deck_position(),radius,true)
-				Cards.text(keeper_overlay,battle.description_font,divination_deck_position()+Vector2(0,radius+22),"FREE",22 if portrait() else 18,GOLD)
+				RarityDisplay.paint(keeper_overlay,battle.model.shop.gift.id,divination_deck_position(),radius,age,battle.reduced,1.0 if selected_gift() else 0.0)
+				Cards.text(keeper_overlay,battle.description_font,divination_deck_position()+Vector2(0,radius+30),"FREE",22 if portrait() else 18,GOLD)
 		else:
 			for i in range(3,-1,-1):
 				Cards.card(keeper_overlay,"",divination_deck_position()+Vector2(i*3,-i*2),divination_deck_size(),0,1,0.35 if i == 0 else 0)
@@ -436,7 +436,7 @@ func _draw_held() -> void:
 	var offer: Dictionary = battle.model.shop.offer_at(pressed_offer)
 	if offer.is_empty(): return
 	var at: Vector2 = pointer-Vector2(0,36 if portrait() else 22)
-	if offer.kind == "relic": RelicPaint.paint(held_layer,offer.id,at,66 if portrait() else 52,true)
+	if offer.kind == "relic": RarityDisplay.paint(held_layer,offer.id,at,66 if portrait() else 52,age,battle.reduced,1.0)
 	elif offer.kind == "tarot": Cards.card(held_layer,offer.id,at,Vector2(108,168),0,1,0.4,0.86)
 	else: Icons.paint(held_layer,battle.chest.art,"soul_bottle",Rect2(at-Vector2.ONE*64,Vector2.ONE*128))
 
@@ -472,7 +472,8 @@ func _draw_offer(slot: int) -> void:
 	# Hide the shelf artwork for every item type while its held copy is drawn.
 	if not (dragging and pressed_offer == slot):
 		if offer.kind == "relic":
-			if not (battle.relic_ui.pickup.active and selected == slot): RelicPaint.paint(self,offer.id,artwork.get_center(),artwork.size.x/2,true)
+			if not (battle.relic_ui.pickup.active and selected == slot):
+				RarityDisplay.paint(self,offer.id,artwork.get_center(),artwork.size.x/2,age,battle.reduced,1.0 if selected == slot else 0.0)
 		elif offer.kind == "tarot":
 			draw_texture_rect(Cards.texture(offer.id),artwork,false,Color("d9cedd"))
 		else:

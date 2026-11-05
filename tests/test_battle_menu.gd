@@ -58,7 +58,7 @@ func scene_checks(portrait: bool) -> void:
 	g.muted = true
 	g.home_enabled = true
 	g._restart(Waves.COUNT)
-	check(g.model.is_city() and g.monster_side == 288 and g.model.hp == 100+Waves.CITY_STAGE*30 and g.model.phase == "roll","Scene prepares the requested city immediately")
+	check(g.model.is_city() and g.monster_side == g.ActorScale.player_size(g._display_form()) and g.model.hp == 100+Waves.CITY_STAGE*30 and g.model.phase == "roll","Scene prepares the requested city immediately")
 	g._start_charge()
 	g._handle_click(g.MENU_RECT.get_center())
 	var elapsed: float = g.throw_meter.elapsed
@@ -103,7 +103,7 @@ func scene_checks(portrait: bool) -> void:
 		check(g.debug_open and g.model.stage == Waves.CITY_STAGE and not g.debug_wave_error.is_empty(),"Invalid text shows an error without loading")
 	g.debug_wave_input.text = "4"
 	g._handle_click(g.DEBUG_WAVE_LOAD.get_center())
-	check(g.model.stage == 3 and g.visual_stage == 3 and g.monster_side == g.HORROR_SIZES[3] and g.model.phase == "roll","Load button prepares the selected fight and visuals")
+	check(g.model.stage == 3 and g.visual_stage == 3 and g.monster_side == g.ActorScale.player_size(g._display_form()) and g.model.phase == "roll","Load button prepares the selected fight and visuals")
 	check(not g._menus_open() and not g.debug_wave_input.visible and g.view_phase == "ready" and g.dice.all(func(d): return not d.charging and not d.rolling),"Loading exits menus and clears old dice motion")
 	g._open_debug()
 	for other in [g.DEBUG_TAROTS,g.DEBUG_REPEAT,g.DEBUG_PERFECT,g.DEBUG_WAVE_INPUT,g.DEBUG_WAVE_LOAD]:
@@ -173,7 +173,7 @@ func scene_checks(portrait: bool) -> void:
 	g.chest.audio_clock_enabled = true
 	for wave in range(1,Waves.COUNT):
 		g._restart(wave)
-		check(g._enemy_side() > g.HUMAN_SIZES[-1] and g._enemy_side() <= g.HUMAN_SIZES[0],"Squad display sizes remain between initial and city scales")
+		check(g._enemy_side() == g.ActorScale.enemy_size(g._display_form()),"Squad display sizes remain between initial and city scales")
 		for i in range(g.model.enemies.size()): check(g.ARENA.has_point(g._enemy_feet(i)),"Larger enemy feet stay inside the arena")
 		if wave in [4,7,9]: await snapshot(g,"wave-"+str(wave),portrait)
 	g._handle_click(g.MENU_RECT.get_center())

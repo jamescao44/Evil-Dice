@@ -11,6 +11,8 @@ const BOTTLE_COUNT := 1
 const OFFER_COUNT := RELIC_COUNT+TAROT_COUNT+BOTTLE_COUNT
 const GIFT_SLOT := OFFER_COUNT
 const REFRESH_PRICE := 50
+const ITEM_PRICE_INCREASE := 100
+const RARITY_APPROACH_RATE := 0.02
 const PRICE_RANGES := [Vector2i(100,150),Vector2i(180,230),Vector2i(280,320),Vector2i(400,500),Vector2i(400,500)]
 const TAROT_PRICE := Vector2i(100,150)
 const BOTTLE_PRICE := Vector2i(100,300)
@@ -86,13 +88,17 @@ func begin_divination(run) -> Array:
 func price_multiplier() -> float:
 	return 1.0
 
-## Roll an inclusive fixed price in Blood Gems.
-func _price(rng: RandomNumberGenerator, limits: Vector2i) -> int:
+## Preserve the underlying merchandise roll, including hidden bottle contents.
+func _base_price(rng: RandomNumberGenerator, limits: Vector2i) -> int:
 	return roundi(rng.randi_range(limits.x,limits.y)*price_multiplier())
+
+## Apply the flat surcharge only to paid merchandise, never the keeper's free gift.
+func _price(rng: RandomNumberGenerator, limits: Vector2i) -> int:
+	return _base_price(rng,limits)+ITEM_PRICE_INCREASE
 
 ## Start at the first possible shop, then approach equal rarity odds on later waves.
 static func rarity_weights(wave_number: int) -> Array:
-	var remaining: float = pow(0.96,maxi(0,wave_number-FIRST_SHOP_WAVE))
+	var remaining: float = pow(1.0-RARITY_APPROACH_RATE,maxi(0,wave_number-FIRST_SHOP_WAVE))
 	return Relics.RARITY_WEIGHTS.map(func(weight): return 20.0+(weight-20.0)*remaining)
 
 ## Reserve the guaranteed item from the six-slot budget so Rare does not stay overweight.
@@ -130,8 +136,9 @@ func _restock(run) -> void:
 		if not id.is_empty(): cards.append(id)
 		offers.append({"kind":"tarot","id":id,"price":_price(run.reward_rng,TAROT_PRICE),"sold":false})
 	# Lock hidden contents alongside the price; inspecting or buying never rerolls them.
-	var price := _price(run.reward_rng,BOTTLE_PRICE)
-	var souls: int = run.reward_rng.randi_range(ceili(price/20.0),floori(price/10.0))
+	var base_price := _base_price(run.reward_rng,BOTTLE_PRICE)
+	var price: int = base_price+ITEM_PRICE_INCREASE
+	var souls: int = run.reward_rng.randi_range(ceili(base_price/20.0),floori(base_price/10.0))
 	offers.append({"kind":"soul_bottle","id":"soul_bottle","price":price,"souls":souls,"sold":false})
 
 ## Validate stock, ownership and funds without spending or rerolling anything.
@@ -142,9 +149,9 @@ func can_buy(run, slot: int) -> bool:
 	if offer.sold or offer.id.is_empty() or not can_afford(run,offer.price): return false
 	return offer.kind in ["tarot","soul_bottle"] or run.relics.can_add(offer.id,-1,true)
 
-## Buy-and-use requires affordable unsold tarot stock and a meaningful shop effect.
+## Buy-and-use is limited to affordable reward cards; combat cards are kept for later.
 func can_buy_and_use(run, slot: int) -> bool:
-	return can_buy(run,slot) and offer_at(slot).kind == "tarot" and run.tarot_effects.shop_error(run,offer_at(slot).id).is_empty()
+	return can_buy(run,slot) and offer_at(slot).kind == "tarot" and Tarot.immediate_reward(offer_at(slot).id) and run.tarot_effects.shop_error(run,offer_at(slot).id).is_empty()
 
 ## Indicate when a purchase requires choosing an owned relic to replace.
 func needs_replacement(run, slot: int) -> bool:

@@ -47,7 +47,7 @@ func scene_checks(portrait: bool) -> void:
 		g.travel_progress = progress
 		var rect: Rect2 = g._player_sprite_rect(0,3)
 		check(is_equal_approx(rect.end.y,g._player_feet().y) and is_equal_approx(rect.get_center().x,g._player_feet().x),"Growth stays anchored at the feet in both layouts")
-		check(g.ARENA.encloses(rect) and g.monster_side == 288,"Cosmetic growth stays inside the arena without changing the set size")
+		check(g.ARENA.encloses(rect) and g.monster_side == g.ActorScale.player_size(g._display_form()),"Cosmetic growth stays inside the arena without changing the set size")
 	g._restart()
 	check(g._player_sprite_rect().size == Vector2.ONE*224,"Restart clears growth deformation")
 	g._show_events([Rules.damage_event(0,5,5),Rules.damage_event(-1,5,5),Rules.damage_event(-2,5,5)])

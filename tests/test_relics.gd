@@ -160,13 +160,13 @@ func _initialize() -> void:
 	m.enemies[0].hp = 0
 	m.begin_wave_reward()
 	var first: Array = m.open_rewards.duplicate()
-	check(m.blood_gems == 10 and m.relics.items[1].waves == 1,"Wave relics trigger before new relic is chosen")
-	check(m.begin_wave_reward() and m.open_rewards == first and m.blood_gems == 10,"Offers and wave rewards cannot reroll or duplicate")
+	check(m.blood_gems == 67 and m.relics.items[1].waves == 1,"Wave relics trigger before new relic is chosen")
+	check(m.begin_wave_reward() and m.open_rewards == first and m.blood_gems == 67,"Offers and wave rewards cannot reroll or duplicate")
 	check(not m.advance_wave(),"Wave waits for relic decision")
 	m.open_wave_chest()
 	var payout: int = m.Chests.CRYSTALS[m.wave_chest_tier]+m.unclaimed_relic_gems()
 	m.discard_unclaimed_rewards(); m.close_chest()
-	check(m.finish_wave_reward() and m.blood_gems == 10+payout and not m.finish_wave_reward(),"Chest pays crystals once even when all items are skipped")
+	check(m.finish_wave_reward() and m.blood_gems == 67+payout and not m.finish_wave_reward(),"Chest pays crystals once even when all items are skipped")
 	m.offer_routes(); m.choose_route(0)
 	check(m.advance_wave() and m.power == 1 and m.max_hp == 100,"Wave changes do not grant free health or damage")
 	for wave in range(1,Run.Waves.COUNT+1):

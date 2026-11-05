@@ -30,6 +30,10 @@ func _init(run_seed: int = 1) -> void:
 	model.character_leveled.connect(_leveled)
 	model.boss_changed.connect(_boss_changed)
 	model.damage_redirected.connect(func(source,target,damage,loss): events.append({"type":"redirect","source":source,"target":target,"amount":loss,"display_amount":damage}))
+	model.relic_cost_paid.connect(func(costs):
+		events.append_array(costs)
+		for cost in costs:
+			if cost.type == "damage": stats.damage_taken += cost.amount)
 	_settle()
 	metrics.capture(model,"session_start")
 
@@ -338,7 +342,7 @@ func snapshot() -> Dictionary:
 	var state := {"wave":model.stage+1,"wave_count":Run.PLAYABLE_WAVES,"reward_route":model.wave_kind,"phase":model.phase,"outcome":model.outcome(),"round":model.round_number,
 		"level":model.level_number(),"level_wave":model.level_wave(),
 		"player":{"hp":model.hp,"max_hp":model.max_hp,"shield":model.shield,"level":model.character_level,"xp":model.souls,"xp_needed":model.level_cost(),"base_damage":model.character_base_damage(),"combo_multiplier":model.combo_multiplier(),"blood_gems":model.blood_gems,"fireball_charges":model.character_passive.charge,"fireball_threshold":model.character_passive.charge_limit(model.character_evolution_stage()),"statuses":_statuses(model.statuses)},
-		"dice":[],"rolls_left":model.dice_turn.rolls_left,"has_rolled":model.dice_turn.has_rolled(),"manual_skills_left":maxi(0,model.dice_turn.MANUAL_SKILLS_PER_TURN-model.dice_turn.manual_casts),"bonus_turns":model.bonus_turn_count,"leftover_heal":model.leftover_total_healing() if model.dice_turn.has_rolled() else 0,
+		"dice":[],"rolls_left":model.dice_turn.rolls_left,"same_pip_rerolls":model.same_pip_rerolls,"has_rolled":model.dice_turn.has_rolled(),"manual_skills_left":maxi(0,model.dice_turn.MANUAL_SKILLS_PER_TURN-model.dice_turn.manual_casts),"bonus_turns":model.bonus_turn_count,"leftover_heal":model.leftover_total_healing() if model.dice_turn.has_rolled() else 0,
 		"enemies":[],"relics":[],"tarots":[],"combinations":[],"treasure":{"progress":model.reroll_progress,"tier":model.chest_tier()},"actions":[],"totals":stats.duplicate(),"wave_history":history.duplicate(true)}
 	state.gemstones = {"bag":range(model.gemstones.order.size()).map(func(i): return model.gemstones.bag_gem(i)),"sockets":model.gemstones.sockets.duplicate(true)}
 	for i in range(6): state.dice.append({"slot":i+1,"face":model.dice_turn.values[i] if model.dice_turn.has_rolled() else null,"spent":i in model.dice_turn.committed,"locked":i in model.dice_turn.locked})
@@ -347,7 +351,7 @@ func snapshot() -> Dictionary:
 		var intent: Dictionary = enemy.intent.duplicate()
 		if intent.get("friendly_fire",false): intent.amount = roundi(model.Vitals.to_combat(intent.amount))
 		if intent.has("target"): intent.target = "player" if intent.target == -1 else str(int(intent.target)+1)
-		state.enemies.append({"slot":i+1,"name":enemy.name,"level":enemy.get("level",1),"soul_reward":model.EnemyCatalog.soul_reward(enemy),"gem_reward":model.EnemyCatalog.crystal_reward(enemy),"elite":enemy.elite,"modifier":enemy.get("modifier",""),"element":enemy.get("element",-1),"swift":model.EnemyCatalog.ITEMS[enemy.role].get("swift",false),"hp":enemy.hp,"max_hp":enemy.max_hp,"shield":enemy.shield,"damage":model.EnemyCatalog.Damage.base_hit(enemy,model.character_level),"damage_percent":enemy.get("damage_percent",0),"intent":intent,"statuses":_statuses(enemy.get("statuses",{})),"attack_boost":enemy.attack_boost,"boss_phase":enemy.get("boss_phase",0),"charge":enemy.get("charge",0),"break_marks":enemy.get("break_marks",0),"interrupt_straight":enemy.get("interrupt_straight",0),"taunt":model.EnemyCatalog.taunts(enemy),"focused":i == model.RelicFocus.current(model),"legal_target":i in model.RelicFocus.targets(model)})
+		state.enemies.append({"slot":i+1,"name":enemy.name,"level":enemy.get("level",1),"soul_reward":model.EnemyCatalog.soul_reward(enemy),"gem_reward":model.EnemyCatalog.crystal_reward(enemy),"elite":enemy.elite,"modifier":enemy.get("modifier",""),"element":enemy.get("element",-1),"swift":model.EnemyCatalog.ITEMS[enemy.role].get("swift",false),"hp":enemy.hp,"max_hp":enemy.max_hp,"shield":enemy.shield,"damage":model.EnemyCatalog.Damage.base_hit(enemy,model.character_level),"damage_percent":enemy.get("damage_percent",0),"intent":intent,"statuses":_statuses(enemy.get("statuses",{})),"attack_boost":enemy.attack_boost,"boss_phase":enemy.get("boss_phase",0),"charge":enemy.get("charge",0),"break_marks":enemy.get("break_marks",0),"interrupt_straight":enemy.get("interrupt_straight",0),"interrupt_remaining":model.EnemyBehaviors.StraightInterrupt.remaining_casts(enemy),"taunt":model.EnemyCatalog.taunts(enemy),"focused":i == model.RelicFocus.current(model),"legal_target":i in model.RelicFocus.targets(model)})
 	for i in range(model.relics.items.size()):
 		var item: Dictionary = _relic(model.relics.items[i]); item.slot = i+1; state.relics.append(item)
 	for item in model.tarots.items:

@@ -48,27 +48,34 @@ func payouts() -> void:
 		check(gems.size() == 2 and souls.size() == 2 and m.blood_gems == 12,"Re-hitting corpses cannot duplicate either reward")
 	var m = Run.new(50); m.load_debug_wave(8)
 	var commander: Dictionary = m.enemies[0]
-	check(commander.level == 5 and commander.hp == Enemy.phase_health(commander,1),"First boss has its independent health budget")
+	check(commander.level == 9 and commander.hp == Enemy.phase_health(commander,1),"First boss has its independent health budget")
 	m.hit_enemy(0,99999,true)
 	check(commander.hp == Enemy.phase_health(commander,2) and m.blood_gems == 0,"Phase two restores its budget without premature loot")
-	check(m.enemies.slice(1).all(func(e): return e.level == 1 and e.hp == 40),"Commander reinforcements use their smaller encounter budget")
+	check(m.enemies.slice(1).all(func(e): return e.level == 1 and e.hp == 400),"Commander reinforcements use full level-one Paladin stats")
 	m.hit_enemy(0,99999,true)
 	check(m.blood_gems == Enemy.crystal_reward(commander),"Boss final death pays its level-scaled gems once")
 
-## Introduce one new identity at a time, without shops skipping its learning encounter.
+## New specials anchor pressure steps; normal versions precede their elite variants.
 func rosters() -> void:
 	var seen: Dictionary = {}
+	var first_specials: Dictionary = {}
+	var expected_debuts := {Enemy.Role.PALADIN:3,Enemy.Role.HIGH_PRIEST:11,Enemy.Role.MAGIC_CANNON:11,Enemy.Role.BOMBER:19}
 	for stage in range(Run.PLAYABLE_WAVES):
 		var row: Dictionary = Waves.SQUADS[stage]
 		var new_types: Array = []
 		var levels: Array = []
 		for entry in row.units:
+			var special: bool = Enemy.ITEMS[entry.role].get("reward_class","") == "special" and not Enemy.ITEMS[entry.role].get("boss",false)
+			if special and not first_specials.has(entry.role):
+				first_specials[entry.role] = stage
+				check(Waves.is_pressure_step(stage),"Every new special first appears on an actual pressure step")
+				check(not entry.get("elite",false),"New specials debut without an unfamiliar elite modifier")
 			var key := str(entry.role) if Enemy.ITEMS[entry.role].get("standard_elite",false) else "%d:%s" % [entry.role,entry.get("elite",false)]
 			if not seen.has(key) and key not in new_types: new_types.append(key)
 			if entry.get("elite",false) and not Enemy.ITEMS[entry.role].get("boss",false):
 				check(seen.has(str(entry.role)) if Enemy.ITEMS[entry.role].get("standard_elite",false) else seen.has("%d:false" % entry.role),"An elite always follows an earlier normal version")
 			if entry.level not in levels: levels.append(entry.level)
-		check(new_types.size() <= 1,"No wave introduces two unfamiliar enemy identities")
+		check(new_types.size() <= (2 if Waves.is_pressure_step(stage) else 1),"Only a pressure step can introduce a pair of unfamiliar enemies")
 		check(row.units.size() <= 4,"Authored squads stay small enough to read")
 		if not new_types.is_empty():
 			check(Waves.requires_combat(stage),"First appearance cannot be replaced by a shop")
@@ -78,7 +85,9 @@ func rosters() -> void:
 			var actual: Array = Waves.create(stage,rng).map(func(e): return "%d:%d:%s" % [e.role,e.level,e.elite])
 			var expected: Array = row.units.map(func(e): return "%d:%d:%s" % [e.role,e.level,e.get("elite",false)])
 			actual.sort(); expected.sort()
-			check(actual == expected,"Seeds can change positions, never authored identities or levels")
+			if row.units[0].has("random_roles"):
+				check(actual.size() == 1 and row.units[0].random_roles.any(func(role): return actual[0] == "%d:%d:true" % [role,row.units[0].level]),"Random finales retain their authored level and boss pool")
+			else: check(actual == expected,"Seeds can change positions, never authored identities or levels")
 			if stage > 0 and stage % 8 != 0:
 				var m = Run.new(seed_value); m.load_debug_wave(stage)
 				for e in m.enemies: e.hp = 0
@@ -86,6 +95,8 @@ func rosters() -> void:
 				var options: Array = m.offer_routes()
 				if not Waves.has_shop_after(m.stage): check("shop" not in options,"Shops appear only after scheduled checkpoints")
 	check(seen.size() == 12,"Five basic classes, four specials and three bosses appear")
+	check(first_specials == expected_debuts,"Specials debut on local wave 4: Paladin, High Priest/Cannon, Bomber")
+	check(Waves.SQUADS[3].units.size() == 2 and Waves.SQUADS[3].units.any(func(e): return e.role == Enemy.Role.MAGE),"The first Paladin has only one familiar companion")
 	var session = Session.new(50)
 	session.model.enemies = [Enemy.make(0,1),Enemy.make(0,5)]
 	var state: Dictionary = session.snapshot()

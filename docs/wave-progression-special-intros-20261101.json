@@ -1,0 +1,505 @@
+{
+  "assumptions": "Kill-only XP; no soul chests, bottles or Soul Vessel. All 24 battles are retained; shops after local waves 3/6 grant no combat XP and consume no wave. Commander guards pay once; Fanatic summons pay nothing. Fixed enemy levels follow the 24 authored reference gaps, with pressure steps at battles 7/13/19 (minimum LV.1). Special debuts: Paladin at 1-7, High Priest and Magic Cannon at 2-5, normal Bomber at 3-3. Bosses remain expected entry level +3; Commander guards are full-stat LV.3 Paladins.",
+  "planned": false,
+  "rows": [
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Vanguard"
+        }
+      ],
+      "kill_souls": 5,
+      "player_after": 1,
+      "player_before": 1,
+      "shop_after": false,
+      "target_gap": 0,
+      "total_souls": 5,
+      "wave": "1-1"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Elf Archer"
+        },
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Vanguard"
+        }
+      ],
+      "kill_souls": 10,
+      "player_after": 2,
+      "player_before": 1,
+      "shop_after": false,
+      "target_gap": 0,
+      "total_souls": 15,
+      "wave": "1-2"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Mage"
+        },
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Vanguard"
+        }
+      ],
+      "kill_souls": 10,
+      "player_after": 2,
+      "player_before": 2,
+      "shop_after": true,
+      "target_gap": -1,
+      "total_souls": 25,
+      "wave": "1-3"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Elf Archer"
+        },
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Mage"
+        }
+      ],
+      "kill_souls": 10,
+      "player_after": 3,
+      "player_before": 2,
+      "shop_after": false,
+      "target_gap": -1,
+      "total_souls": 35,
+      "wave": "1-4"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Cleric"
+        },
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Vanguard"
+        }
+      ],
+      "kill_souls": 10,
+      "player_after": 3,
+      "player_before": 3,
+      "shop_after": false,
+      "target_gap": -2,
+      "total_souls": 45,
+      "wave": "1-5"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Assassin"
+        },
+        {
+          "elite": false,
+          "level": 1,
+          "name": "Elf Archer"
+        }
+      ],
+      "kill_souls": 10,
+      "player_after": 3,
+      "player_before": 3,
+      "shop_after": true,
+      "target_gap": -2,
+      "total_souls": 55,
+      "wave": "1-6"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 5,
+          "name": "Paladin"
+        },
+        {
+          "elite": false,
+          "level": 5,
+          "name": "Mage"
+        }
+      ],
+      "kill_souls": 33,
+      "player_after": 4,
+      "player_before": 3,
+      "shop_after": false,
+      "target_gap": 2,
+      "total_souls": 88,
+      "wave": "1-7"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 7,
+          "name": "Knight Commander"
+        }
+      ],
+      "kill_souls": 120,
+      "player_after": 6,
+      "player_before": 4,
+      "shop_after": false,
+      "target_gap": 3,
+      "total_souls": 208,
+      "wave": "1-8"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Paladin"
+        },
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Elf Archer"
+        }
+      ],
+      "kill_souls": 37,
+      "player_after": 7,
+      "player_before": 6,
+      "shop_after": false,
+      "target_gap": 1,
+      "total_souls": 245,
+      "wave": "2-1"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 7,
+          "name": "Cleric"
+        },
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Assassin"
+        }
+      ],
+      "kill_souls": 22,
+      "player_after": 7,
+      "player_before": 7,
+      "shop_after": false,
+      "target_gap": 0,
+      "total_souls": 267,
+      "wave": "2-2"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Mage"
+        },
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Vanguard"
+        }
+      ],
+      "kill_souls": 14,
+      "player_after": 8,
+      "player_before": 7,
+      "shop_after": true,
+      "target_gap": 0,
+      "total_souls": 281,
+      "wave": "2-3"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Vanguard"
+        },
+        {
+          "elite": false,
+          "level": 7,
+          "name": "Mage"
+        }
+      ],
+      "kill_souls": 14,
+      "player_after": 8,
+      "player_before": 8,
+      "shop_after": false,
+      "target_gap": -1,
+      "total_souls": 295,
+      "wave": "2-4"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 11,
+          "name": "High Priest"
+        },
+        {
+          "elite": false,
+          "level": 11,
+          "name": "Magic Cannon"
+        }
+      ],
+      "kill_souls": 72,
+      "player_after": 9,
+      "player_before": 8,
+      "shop_after": false,
+      "target_gap": 3,
+      "total_souls": 367,
+      "wave": "2-5"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 11,
+          "name": "High Priest"
+        },
+        {
+          "elite": false,
+          "level": 11,
+          "name": "Elf Archer"
+        }
+      ],
+      "kill_souls": 99,
+      "player_after": 10,
+      "player_before": 9,
+      "shop_after": true,
+      "target_gap": 2,
+      "total_souls": 466,
+      "wave": "2-6"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 11,
+          "name": "Cleric"
+        },
+        {
+          "elite": true,
+          "level": 11,
+          "name": "Mage"
+        }
+      ],
+      "kill_souls": 36,
+      "player_after": 10,
+      "player_before": 10,
+      "shop_after": false,
+      "target_gap": 1,
+      "total_souls": 502,
+      "wave": "2-7"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 13,
+          "name": "Elf Spellsword"
+        }
+      ],
+      "kill_souls": 98,
+      "player_after": 11,
+      "player_before": 10,
+      "shop_after": false,
+      "target_gap": 3,
+      "total_souls": 600,
+      "wave": "2-8"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 10,
+          "name": "Paladin"
+        },
+        {
+          "elite": false,
+          "level": 10,
+          "name": "Mage"
+        }
+      ],
+      "kill_souls": 95,
+      "player_after": 12,
+      "player_before": 11,
+      "shop_after": false,
+      "target_gap": -1,
+      "total_souls": 695,
+      "wave": "3-1"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 10,
+          "name": "Cleric"
+        },
+        {
+          "elite": true,
+          "level": 10,
+          "name": "Assassin"
+        },
+        {
+          "elite": false,
+          "level": 10,
+          "name": "Vanguard"
+        }
+      ],
+      "kill_souls": 43,
+      "player_after": 12,
+      "player_before": 12,
+      "shop_after": false,
+      "target_gap": -2,
+      "total_souls": 738,
+      "wave": "3-2"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 15,
+          "name": "Magic Cannon"
+        },
+        {
+          "elite": false,
+          "level": 15,
+          "name": "Bomber"
+        }
+      ],
+      "kill_souls": 84,
+      "player_after": 13,
+      "player_before": 12,
+      "shop_after": true,
+      "target_gap": 3,
+      "total_souls": 822,
+      "wave": "3-3"
+    },
+    {
+      "enemies": [
+        {
+          "elite": false,
+          "level": 15,
+          "name": "Vanguard"
+        },
+        {
+          "elite": true,
+          "level": 15,
+          "name": "Mage"
+        }
+      ],
+      "kill_souls": 32,
+      "player_after": 13,
+      "player_before": 13,
+      "shop_after": false,
+      "target_gap": 2,
+      "total_souls": 854,
+      "wave": "3-4"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 14,
+          "name": "High Priest"
+        },
+        {
+          "elite": true,
+          "level": 14,
+          "name": "Elf Archer"
+        },
+        {
+          "elite": false,
+          "level": 14,
+          "name": "Assassin"
+        }
+      ],
+      "kill_souls": 132,
+      "player_after": 14,
+      "player_before": 13,
+      "shop_after": false,
+      "target_gap": 1,
+      "total_souls": 986,
+      "wave": "3-5"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 14,
+          "name": "Bomber"
+        },
+        {
+          "elite": true,
+          "level": 14,
+          "name": "Cleric"
+        }
+      ],
+      "kill_souls": 122,
+      "player_after": 15,
+      "player_before": 14,
+      "shop_after": true,
+      "target_gap": 0,
+      "total_souls": 1108,
+      "wave": "3-6"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 14,
+          "name": "Vanguard"
+        },
+        {
+          "elite": true,
+          "level": 14,
+          "name": "Mage"
+        },
+        {
+          "elite": true,
+          "level": 14,
+          "name": "Assassin"
+        }
+      ],
+      "kill_souls": 60,
+      "player_after": 15,
+      "player_before": 15,
+      "shop_after": false,
+      "target_gap": -1,
+      "total_souls": 1168,
+      "wave": "3-7"
+    },
+    {
+      "enemies": [
+        {
+          "elite": true,
+          "level": 18,
+          "name": "Fanatical Mage"
+        }
+      ],
+      "kill_souls": 118,
+      "player_after": 16,
+      "player_before": 15,
+      "shop_after": false,
+      "target_gap": 3,
+      "total_souls": 1286,
+      "wave": "3-8"
+    }
+  ]
+}

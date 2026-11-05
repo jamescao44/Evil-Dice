@@ -4,7 +4,6 @@ const Paint = preload("res://scripts/effects/dice_match_ritual_paint.gd")
 const GATHER_TIME := 0.45
 const RISE_TIME := 0.35
 const TRAVEL_TIME := 0.65
-const CHARGE_TIME := 0.42
 const SHOT_TIME := 0.34
 const RETURN_TIME := 0.52
 const SIX_HOLD_TIME := 1.0
@@ -23,6 +22,7 @@ var serial := 0
 var indices: Array = []
 var snapshots: Array = []
 var count := 0
+var style: Dictionary = preload("res://scripts/player/attack_presentation.gd").for_form(2)
 var center := Vector2.ZERO
 var radius := 0.0
 var gather_center := Vector2.ZERO
@@ -83,10 +83,11 @@ func play(group: Dictionary, token: int) -> bool:
 	active = true
 	indices = group.indices.duplicate()
 	count = indices.size()
+	style = battle.fx.AttackStyle.for_form(battle.player_animation.form)
 	shots_fired = 0; age = 0; rotation_angle = 0; sparks_clock = 0
 	var phone: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
-	gather_radius = (120 if phone else 86)*FORMATION_SCALE
-	cast_radius = (88 if phone else 66)*FORMATION_SCALE
+	gather_radius = (120 if phone else 86)*FORMATION_SCALE*style.ritual
+	cast_radius = (88 if phone else 66)*FORMATION_SCALE*style.ritual
 	gather_center = battle.DICE_CENTER-Vector2(0,battle.DICE_RADIUS*0.2)
 	raised_center = gather_center-Vector2(0,battle.DICE_RADIUS*0.7)
 	cast_center = destination()
@@ -98,13 +99,17 @@ func play(group: Dictionary, token: int) -> bool:
 		die.auto_attack_active = true
 		die.auto_attack_pulse = 0
 	battle._sound("player/bell",0.85 if count == 6 else 1.1,-13)
-	battle.player_animation.begin("ultimate",battle._roll_speed())
+	battle.player_animation.begin("ultimate")
 	if not await _animate("gather",GATHER_TIME,token,stamp): return false
 	if not await _animate("rise",RISE_TIME,token,stamp): return false
 	if not await _animate("travel",TRAVEL_TIME,token,stamp): return false
 	battle._sound("player/rumble",0.75 if count == 6 else 1.1,-15)
-	battle.player_animation.launch(CHARGE_TIME/battle._roll_speed())
-	if not await _animate("charge",CHARGE_TIME,token,stamp): return false
+	if not await battle._wait_player_launch(token): return false
+	var buildup: float = battle.player_animation.impact_delay()
+	battle.player_animation.launch()
+	# First beam travel completes at the actor's damaging-loop cue.
+	var charge: float = maxf(0,buildup*battle._roll_speed()-SHOT_TIME*0.4)
+	if not await _animate("charge",charge,token,stamp): return false
 	var skill: MultiHitSkill = group.skill
 	for shot in range(count):
 		if battle.model.roll_attacks.is_empty() or battle.model.roll_attacks[0].skill != skill or not battle.model.has_living_enemies(): break
@@ -124,19 +129,21 @@ func play(group: Dictionary, token: int) -> bool:
 		for hit in hits:
 			var at: Vector2 = battle._enemy_impact_point(hit.target)
 			burst(at,56 if count == 6 else 36,190)
-			battle.fx.attack_burst(at,tint(),hit.damage,8 if battle.reduced else (72 if count == 6 else 48),170)
+			var amount: int = 8 if battle.reduced else (72 if count == 6 else 48)
+			battle.fx.attack_burst(at,tint(),hit.damage,maxi(2,roundi(amount*style.particles)),170,style.size)
 		shots_fired += 1
 		if shots_fired == 1: battle.player_animation.damage()
 		battle._show_events(battle.model.resolve_roll_attack_step())
-		battle.shake = 0 if battle.reduced else (4.5 if count == 6 else 2.5)*battle.ATTACK_SHAKE_SCALE
+		battle.shake = 0 if battle.reduced else (4.5 if count == 6 else 2.5)*battle.ATTACK_SHAKE_SCALE*style.shake
 		battle._sound("player/crash" if count == 6 else "player/hit",0.85+shot*0.025,-18)
 		if not await _animate("fire",SHOT_TIME*0.6,token,stamp): return false
 		if not battle.model.has_living_enemies(): break
 	beam_strength = 0
 	battle.player_animation.finish()
-	# Six alike lingers for one real second, independent of 1x/2x speed and kill slowmo.
-	if count == 6 and not await _animate("hold",SIX_HOLD_TIME,token,stamp,true): return false
+	# Final-form six alike lingers a full second; early forms have shorter afterglows.
+	if count == 6 and not await _animate("hold",SIX_HOLD_TIME*style.glow,token,stamp,true): return false
 	if not await _animate("return",RETURN_TIME,token,stamp): return false
+	if not await battle._wait_player_recovery(token): return false
 	clear()
 	return battle._valid_turn(token)
 
@@ -162,21 +169,21 @@ func _pose() -> void:
 	var t: float = smoothstep(0,1,progress)
 	center = gather_center
 	radius = gather_radius
-	var shrink: float = GATHER_DICE_SCALE
+	var shrink: float = GATHER_DICE_SCALE*style.ritual
 	aura = 1.0
 	match phase:
 		"gather":
 			aura = t
-			shrink = lerpf(1,GATHER_DICE_SCALE,t)
+			shrink = lerpf(1,GATHER_DICE_SCALE*style.ritual,t)
 		"rise": center = gather_center.lerp(raised_center,t)
 		"travel":
 			center = raised_center.lerp(cast_center,t)-Vector2(0,sin(t*PI)*55)
 			radius = lerpf(gather_radius,cast_radius,t)
-			shrink = lerpf(GATHER_DICE_SCALE,CAST_DICE_SCALE,t)
+			shrink = lerpf(GATHER_DICE_SCALE,CAST_DICE_SCALE,t)*style.ritual
 		"charge","fire","hold","return":
 			center = cast_center
 			radius = cast_radius
-			shrink = CAST_DICE_SCALE
+			shrink = CAST_DICE_SCALE*style.ritual
 			if phase == "return": aura = 1-t
 	points.clear()
 	for i in range(count):
@@ -186,7 +193,7 @@ func _pose() -> void:
 		if phase == "gather": point = saved.position.lerp(point,t)-Vector2(0,sin(t*PI)*18)
 		elif phase == "return": point = point.lerp(saved.position,t)-Vector2(0,sin(t*PI)*60)
 		var size: Vector2 = saved.scale*shrink
-		if phase == "return": size = (saved.scale*CAST_DICE_SCALE).lerp(saved.scale,t)
+		if phase == "return": size = (saved.scale*CAST_DICE_SCALE*style.ritual).lerp(saved.scale,t)
 		if not battle.reduced and phase in ["charge","fire","hold"]:
 			point += direction*sin(age*TAU*1.1)*2
 			size *= 1+sin(age*TAU*1.4)*0.025
@@ -201,6 +208,8 @@ func tint() -> Color:
 
 ## Bounded local sparks avoid flooding the general battlefield particle pool.
 func burst(at: Vector2, amount: int, force: float) -> void:
+	amount = maxi(1,roundi(amount*style.particles))
+	force *= style.ritual
 	if battle.reduced: amount = mini(amount,3)
 	for i in range(amount):
 		if particles.size() >= SPARK_LIMIT: break

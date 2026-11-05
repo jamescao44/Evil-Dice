@@ -26,13 +26,15 @@ func spawn(index: int, enemy: Dictionary, sprite: Rect2, texture: Texture2D) -> 
 	bodies[index] = {"rect":Rect2(origin,Vector2.ONE*CELL*scale_factor),"wait":HOLD,"age":0.0,"playing":false,"done":false}
 	return true
 
-## Hold until the attack sequence stops, then wait half a second before dissolving.
+## Hold the first cell for at least half a second; dissolve as soon as attack FX are gone.
 func advance(delta: float, attacking: bool) -> void:
 	for body in bodies.values():
 		if body.done: continue
 		if not body.playing:
-			if attacking: body.wait = HOLD; continue
 			body.wait -= delta
+			if attacking:
+				body.wait = maxf(0,body.wait)
+				continue
 			if body.wait > 0: continue
 			body.playing = true
 			body.age = -body.wait

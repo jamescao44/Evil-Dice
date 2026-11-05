@@ -10,8 +10,12 @@ const WAVES := [1,3,5,7,8,9,11,13,15,16,17,19,21,23,24]
 const RANK := {"bracelet":90,"oreo_sundae":85,"magic_sword":85,"orange_stone":90,"fries":70,"hamburger":85,"lemon_soda":75,"fried_chicken":70,"mithril_blade":110,"pet_dragon":105,"pet_ghost":95,"runestone":85,"disguise_mask":95,"ancient_tentacle":110,"crystal_ball":90,"bloodstone":80,"armor":65,"heart":55,"blue_stone":85,"green_stone":90,"black_stone":90,"purple_stone":80,"yellow_stone":65,"contract":90,"clover":80,"five_leaf_clover":95,"ancient_prophecy":85,"fortune_cookie":75,"pet_slime":70,"reaper_scythe":35}
 var decisions: Array = []
 var failures: Array = []
-var perfect_rate := 0.35
+var perfect_rate := 0.70
 var last_wave: int = 0
+
+## Derived policies attach read-only forecasts without expanding the public CLI response.
+func prepare_choice(_session, state: Dictionary) -> Dictionary:
+	return state
 
 ## Score a skill using visible damage, kills, burning and imminent charge interruption.
 func best_skill(state: Dictionary) -> Dictionary:
@@ -188,7 +192,7 @@ func encounter(wave: int, build: String, seed_value: int, passive_only: bool = f
 	var timing := RandomNumberGenerator.new(); timing.seed = seed_value+19001
 	var count := 0; var min_hp := 1.0
 	while model.outcome().is_empty() and count < 600:
-		var state: Dictionary = session.snapshot()
+		var state: Dictionary = prepare_choice(session,session.snapshot())
 		var command: Dictionary = choose(state,timing,false,passive_only)
 		if command.is_empty(): failures.append({"wave":wave,"build":build,"state":state}); break
 		var result: Dictionary = session.command(command)
@@ -206,7 +210,7 @@ func full_run(seed_value: int) -> Dictionary:
 	var actions: Array = []; var count := 0
 	var wave_min_hp: Dictionary = {}
 	while session.model.outcome() != "defeat" and count < 3000:
-		var state: Dictionary = session.snapshot()
+		var state: Dictionary = prepare_choice(session,session.snapshot())
 		if state.outcome == "victory" and session.model.stage >= (last_wave-1 if last_wave > 0 else Session.Run.LAST_PLAYABLE_STAGE): break
 		var command: Dictionary = choose(state,timing)
 		if command.is_empty(): failures.append({"seed":seed_value,"state":state}); break

@@ -45,7 +45,7 @@ func capture(portrait: bool) -> void:
 	game.model.hp = 220
 	game.model._load_wave()
 	game.visual_stage = Waves.CITY_STAGE
-	game.monster_side = 320
+	game.evolution.reset()
 	game._start_round()
 	frozen_charge(0.6)
 	await snapshot("city")

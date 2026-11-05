@@ -50,13 +50,14 @@ func scene(phone: bool) -> void:
 	check(not g.inventory_page.close_rect().intersects(g.MENU_RECT),"Inventory close stays clear of the menu shortcut")
 	g.inventory_page.opened = false
 	# The charge timer resumes, rather than silently canceling or jumping ahead.
+	var rolls_before: int = g.model.dice_turn.rolls_left
 	g._start_charge(); await create_timer(0.05).timeout
 	open_menu(g)
 	var elapsed: float = g.throw_meter.elapsed
 	await create_timer(0.12).timeout
 	check(g.view_phase == "charging" and is_equal_approx(g.throw_meter.elapsed,elapsed),"Perfect timer freezes without canceling the throw")
 	resume(g); await create_timer(0.05).timeout
-	check(g.throw_meter.elapsed > elapsed and g.model.dice_turn.rolls_left == 3,"Perfect timer resumes without spending a roll")
+	check(g.throw_meter.elapsed > elapsed and g.model.dice_turn.rolls_left == rolls_before,"Perfect timer resumes without spending a roll")
 	g._cancel_charge()
 	# Dice animation and combat waits use the same pause barrier.
 	g.view_phase = "rolling"; g.dice[0].reroll_to(5,1)
@@ -76,8 +77,10 @@ func scene(phone: bool) -> void:
 	g.transition_tween.tween_property(g,"travel_progress",1.0,0.18)
 	open_menu(g); await create_timer(0.24).timeout
 	check(g.transition_tween.is_valid() and not g.transition_tween.is_running() and g.travel_progress == 0,"Route travel stays pending while paused")
+	check(g.player_animation.walk_progress == 0,"Paused travel cannot advance the walking cycle")
 	resume(g); await create_timer(0.25).timeout
 	check(is_equal_approx(g.travel_progress,1) and not g.transition_tween.is_valid(),"Route travel completes after resume")
+	check(g.player_animation.walk_progress == 1 and g.player_animation.frame_number() == 22,"Walking finishes its second loop with the movement after resuming")
 	# System menus pause even an unskippable Ultra, with its audio and outcomes intact.
 	g.view_phase = "reward"
 	g.chest.start([0,1,2,3,4],g.fx.canvas_size,g.pixel_font,false,[],3)

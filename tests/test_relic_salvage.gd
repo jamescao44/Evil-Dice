@@ -63,11 +63,13 @@ func economy() -> void:
 	m = Run.new(86); m.acquire_relic("soul_vessel"); m.acquire_relic("disguise_mask")
 	quote = m.relic_sale_preview(0)
 	check(m.sell_relic(0) == quote and m.blood_gems == quote,"Selling a currency source quotes the resulting inventory correctly")
-	m = Run.new(87); m.acquire_relic("heart"); m.hp = 110
-	check(m.sell_relic(0) == 10 and m.hp == 100 and m.max_hp == 100,"Selling health relic clamps current health")
+	m = Run.new(87)
+	var baseline_hp: int = m.max_hp
+	m.acquire_relic("heart"); m.hp = m.max_hp
+	check(m.sell_relic(0) == 10 and m.hp == baseline_hp and m.max_hp == baseline_hp,"Selling health relic clamps current health")
 	m = Run.new(88); m.acquire_relic("reaper_scythe"); m.hp = 15
 	m.sell_relic(0)
-	check(m.hp == 15 and m.max_hp == 100,"Selling the half-health curse does not grant free healing")
+	check(m.hp == 15 and m.max_hp == baseline_hp,"Selling the half-health curse does not grant free healing")
 	for card_id in ["emperor","world"]:
 		m = Run.new(89); m.begin_round()
 		for id in OWNED: m.acquire_relic(id)

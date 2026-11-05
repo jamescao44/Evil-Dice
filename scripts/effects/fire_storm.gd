@@ -1,6 +1,7 @@
 extends RefCounted
 ## Authored 64px storm frames; combat owns the loop's start and end.
 const Emitter = preload("res://scripts/effects/baked_emitter.gd")
+const AttackStyle = preload("res://scripts/player/attack_presentation.gd")
 const SHEET = preload("res://assets/art/fx/fire_storm.png")
 const CELL := 64
 const BUILD_FRAMES := 7
@@ -28,8 +29,9 @@ static func prepare(spell: Dictionary, rng: RandomNumberGenerator) -> void:
 	for i in range(spell.targets.size()):
 		if bag.is_empty(): bag = range(LOOP_FRAMES)
 		offsets.append(bag.pop_at(rng.randi_range(0,bag.size()-1)))
-		emitters.append(Emitter.create("storm",seed_value+i))
+		emitters.append(Emitter.create("storm",seed_value+i,spell.style.particles))
 	spell.storm = {"phase":"build","age":0.0,"total_age":0.0,"build_duration":BUILD_DURATION,"offsets":offsets,"pulse":0.0,"emitters":emitters}
+	spell.storm.merge(AttackStyle.loop_timing(spell.form,LOOP_FRAMES,LOOP_FPS,spell.ticks))
 
 ## Distribute all five damage pulses across the same four-cycle animation clock.
 static func damage_tick_time(tick: int, count: int) -> float:
@@ -42,7 +44,7 @@ static func begin_damage(spell: Dictionary) -> void:
 	spell.storm.age = 0.0
 	spell.storm.pulse = 1.0
 
-## Play every authored closing frame once after the four complete loops.
+## Play every authored closing frame once after the form's complete loops.
 static func finish(spell: Dictionary) -> void:
 	if not spell.has("storm") or spell.storm.phase == "fade": return
 	spell.storm.phase = "fade"
@@ -58,7 +60,7 @@ static func advance(spell: Dictionary, delta: float, _reduced: bool = false) -> 
 	# Standalone previews can use the ordinary duration without a combat controller.
 	if not spell.get("hold_damage",false):
 		if state.phase == "build" and state.age >= state.build_duration: begin_damage(spell)
-		elif state.phase == "loop" and state.age >= LOOP_DURATION: finish(spell)
+		elif state.phase == "loop" and state.age >= state.loop_duration: finish(spell)
 	for emitter in state.emitters: Emitter.advance(emitter,delta,state.phase == "loop")
 	return state.phase == "fade" and state.age >= FADE_DURATION and state.emitters.all(func(emitter): return emitter.packets.is_empty())
 
@@ -67,7 +69,7 @@ static func frame(spell: Dictionary, target: int) -> int:
 	var state: Dictionary = spell.storm
 	match state.phase:
 		"build": return mini(BUILD_FRAMES-1,floori(state.age/maxf(0.001,state.build_duration)*BUILD_FRAMES))
-		"loop": return LOOP_FIRST+(state.offsets[target]+mini(LOOP_FRAMES*LOOP_REPEATS-1,floori(state.age*LOOP_FPS)))%LOOP_FRAMES
+		"loop": return LOOP_FIRST+(state.offsets[target]+mini(state.loop_frames-1,floori(state.age*state.loop_fps)))%LOOP_FRAMES
 		_: return FADE_FIRST+mini(FADE_FRAMES-1,floori(state.age*FADE_FPS))
 
 ## Clip each cell to prevent bright neighboring frames bleeding into the sprite.
@@ -96,7 +98,7 @@ static func paint(canvas: CanvasItem, spell: Dictionary, target: int, reduced: b
 	if state.phase == "fade": strength = 1-smoothstep(0,FADE_DURATION,state.age)
 	var pulse: float = 1.0 if reduced else 0.94+sin(age*17)*0.06+state.pulse*0.18
 	var rect := Rect2(Vector2(-SIDE*0.5,-SIDE*0.6),Vector2.ONE*SIDE)
-	var light: float = strength*(0.55 if reduced else 1.0)
+	var light: float = strength*(0.55 if reduced else 1.0)*spell.style.glow
 	canvas.draw_texture_rect(glow_texture(),rect.grow(42),false,Color(1,0.62,0.035,light*pulse))
 	canvas.draw_texture_rect(glow_texture(),rect.grow(8),false,Color(1,0.8,0.23,light*0.8))
 	var visible_sprite: bool = state.phase != "fade" or state.age < FADE_DURATION

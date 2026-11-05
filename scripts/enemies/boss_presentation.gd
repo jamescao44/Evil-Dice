@@ -17,6 +17,8 @@ static func feet(battle, index: int) -> Vector2:
 	if commander: boss_y -= 40 if portrait else 24
 	var fanatic: bool = battle.model.enemies[0].role == Catalog.Role.FANATIC
 	if fanatic: boss_y = 535 if portrait else 275
+	elif portrait and not commander:
+		boss_y = maxf(boss_y,battle.ARENA.position.y+boss_side+180)
 	if battle.model.enemies[index].get("boss",false):
 		return Vector2(610 if fanatic else 530,boss_y) if portrait else Vector2(1240 if fanatic else 910,boss_y)
 	if battle.model.enemies[index].get("summoned",false):
@@ -27,16 +29,19 @@ static func feet(battle, index: int) -> Vector2:
 	var slot: int = index-1
 	var guard_y: float = boss_y+boss_side*0.22
 	if commander: guard_y -= 48 if portrait else 20
-	return Vector2(390+slot*300 if portrait else 630+slot*530,guard_y)
+	var guard_x: float = 390+slot*300 if portrait else 630+slot*530
+	var margin: float = battle._enemy_unit_side(index)/2+18
+	guard_x = clampf(guard_x,battle.ARENA.position.x+margin,battle.ARENA.end.x-margin)
+	return Vector2(guard_x,guard_y)
 
-## Zoom the entire world out only when a giant body cannot fit the available height.
+## Frame oversized boss formations with their HUD, preserving every world's proportions.
 static func rest_transform(battle, bounds: Rect2) -> Transform2D:
 	if not present(battle.model): return Transform2D.IDENTITY
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
-	if portrait: return Transform2D.IDENTITY
+	if portrait and battle.model.enemies[0].role != Catalog.Role.FANATIC: return Transform2D.IDENTITY
 	var full: Rect2 = bounds.merge(battle._player_world_sprite_rect())
 	# Reserve the full charging HUD even while idle, so starting a charge never pans.
-	var frame: Rect2 = Rect2(battle.ARENA.position+Vector2(28,150),battle.ARENA.size-Vector2(56,194))
+	var frame: Rect2 = Rect2(battle.ARENA.position+Vector2(14,180),battle.ARENA.size-Vector2(28,216)) if portrait else Rect2(battle.ARENA.position+Vector2(28,178),battle.ARENA.size-Vector2(56,222))
 	var factor: float = minf(1,minf(frame.size.x/full.size.x,frame.size.y/full.size.y))
 	return Transform2D(0,Vector2.ONE*factor,0,frame.get_center()-full.get_center()*factor)
 
@@ -44,7 +49,11 @@ static func rest_transform(battle, bounds: Rect2) -> Transform2D:
 static func health_rect(battle, index: int) -> Rect2:
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	var width: float = 270 if portrait else 220
-	if battle.model.enemies[index].role == Catalog.Role.BOUND_DEMON: width = 220 if portrait else 190
+	if battle.model.enemies[index].role == Catalog.Role.BOUND_DEMON:
+		# Screen-space bars need their own gutter when a crowded formation zooms out.
+		var owner: int = battle.model.enemies[index].get("summoner",0)
+		var gap: float = absf(battle._enemy_feet(index).x-battle._enemy_feet(owner).x)
+		width = minf(220 if portrait else 190,maxf(100,(gap-width/2-12)*2))
 	var head: Vector2 = battle._enemy_feet(index)-Vector2(0,battle._enemy_unit_side(index)*battle.battlefield_view.zoom)
 	# Reserve the status row and its stack labels between the bar and the sprite.
 	return Rect2(head-Vector2(width/2,62 if portrait else 54),Vector2(width,20))

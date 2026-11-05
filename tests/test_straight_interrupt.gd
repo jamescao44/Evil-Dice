@@ -1,5 +1,5 @@
 extends SceneTree
-## One shared per-turn shape challenge covers bosses, the Demon and the Cannon.
+## Shared shape challenges preserve cast progress and species-specific interruption rules.
 const Run = preload("res://scripts/progression/run_rules.gd")
 const Rules = preload("res://scripts/enemies/straight_interrupt.gd")
 const Battle = preload("res://scripts/combat/battle.gd")
@@ -36,11 +36,19 @@ func rules() -> void:
 			check(e.charge == 1 and e.charging,"A different straight tier does not interrupt")
 			var correct = m.make_straight_skill(range(1,length+1))
 			m.EnemyBehaviors.skill_cast(m,correct)
-			check(e.charge == 0 and not e.charging and e.interrupt_straight == 0 and m.enemy_status_count(0,m.Status.IMMOBILIZED) == 1,"Correct shape resets charge and skips one action")
+			if role == m.EnemyCatalog.Role.COMMANDER:
+				check(e.charge == 1 and e.charging and Rules.remaining_casts(e) == 1,"Three-charge boss keeps charging after its first matching cast")
+				m.round_number += 1; Rules.prepare_turn(m,0)
+				check(Rules.remaining_casts(e) == 1,"New turn changes the shape without resetting partial interruption progress")
+				correct = m.make_straight_skill(range(1,e.interrupt_straight+1))
+				m.EnemyBehaviors.skill_cast(m,correct)
+			var lock: int = 0 if role == m.EnemyCatalog.Role.MAGIC_CANNON else 1
+			check(e.charge == 0 and not e.charging and e.interrupt_straight == 0 and m.enemy_status_count(0,m.Status.IMMOBILIZED) == lock,"Matching casts clear charge and apply only the species' intended action lock")
 			m.EnemyBehaviors.skill_cast(m,correct)
-			check(m.enemy_status_count(0,m.Status.IMMOBILIZED) == 1,"Repeat uses cannot stack skipped turns")
+			check(m.enemy_status_count(0,m.Status.IMMOBILIZED) == lock,"Repeat uses cannot stack skipped turns")
 			m.phase = "enemy"; e.acted = false
-			check(m.enemy_act(0).any(func(event): return event.type == "skip") and m.enemy_status_count(0,m.Status.IMMOBILIZED) == 0,"Interrupted enemy loses exactly its next action")
+			var events: Array = m.enemy_act(0)
+			check(events.any(func(event): return event.type == ("charge" if lock == 0 else "skip")) and m.enemy_status_count(0,m.Status.IMMOBILIZED) == 0,"Boss loses one action; cannon charges immediately")
 		m = fresh(role); e = m.enemies[0]; e.charging = true; e.charge = 1; e.interrupt_straight = 3
 		var auto = m.make_straight_skill([1,2,3]); auto.pattern = "match_auto"
 		m.EnemyBehaviors.skill_cast(m,auto)
@@ -53,11 +61,24 @@ func rules() -> void:
 		m = fresh(role); e = m.enemies[0]; e.charging = true; e.charge = 1; e.interrupt_straight = 3
 		m.enemies.append(m.make_enemy(0)); m.enemies[1].hp = 9999; m.enemies[1].taunt = true
 		m.pending = m.make_straight_skill([3,4,5]); m.pending.cast_source = "character_bonus"; m.phase = "player"
-		check(m.begin_player_cast(1) and not e.charging,"A bonus skill matching the shape interrupts even when its target is elsewhere")
+		check(m.begin_player_cast(1),"Bonus skill can target another enemy")
+		check(Rules.remaining_casts(e) == 1 if role == 5 else not e.charging,"Bonus skill counts exactly once toward the charge requirement")
 		if role in [5,6]:
 			m = fresh(role); e = m.enemies[0]; e.interrupt_straight = 5; e.charging = true; e.charge = 1
 			m.hit_enemy(0,e.hp,true)
 			check(e.boss_phase == 2 and e.interrupt_straight == 0 and not e.has("interrupt_warning_round"),"Phase transition clears the old shape")
+	# One multi-use skill is still one cast; its individual damage hits cannot remove both marks.
+	var m = fresh(5); var boss: Dictionary = m.enemies[0]
+	boss.charging = true; boss.charge = 1; boss.interrupt_straight = 3
+	m.pending = m.make_straight_skill([3,4,5]); m.pending.cast_source = "manual"
+	m.pending.base_uses = 3; m.phase = "player"
+	check(m.begin_player_cast(0) and Rules.remaining_casts(boss) == 1,"One multi-use cast removes only one interruption mark")
+	while m.phase == "executing": m.apply_player_step(0)
+	check(boss.charging and Rules.remaining_casts(boss) == 1,"Damage ticks and extra uses do not satisfy the second mark")
+	m.EnemyBehaviors.released(m,0)
+	check(not boss.has("interrupt_remaining"),"Releasing an attack discards partial interruption progress")
+	boss.charge = 1; boss.charging = true; Rules.prepare_turn(m,0)
+	check(Rules.remaining_casts(boss) == 2,"A new charge sequence restores both interruption marks")
 
 func scene(phone: bool) -> void:
 	root.content_scale_size = Vector2i(804,1748) if phone else Vector2i(1280,800)
@@ -72,12 +93,18 @@ func scene(phone: bool) -> void:
 			g.clock_time += 1
 		var e: Dictionary = g.model.enemies[index]
 		e.charging = true; e.charge = 1; e.acted = false; e.interrupt_straight = 5
+		e.interrupt_remaining = Rules.required_casts(e)
 		e.intent = g.model.EnemyActions.intent(g.model,index,"charge")
 		g._update_battlefield_view(1)
 		var rect: Rect2 = g.BossPresentation.challenge_rect(g,index)
 		check(g.ARENA.encloses(rect),"Boss challenge fits the battlefield in both layouts")
 		check(not rect.intersects(g._enemy_health_rect(index)) and not rect.intersects(g._enemy_intent_rect(index)),"Linked-dice shape clears health and intent icons")
 		check(g._enemy_intent_data(index).description.contains("5"),"Inspection exposes the current required shape")
+		if wave == 8 and "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless":
+			g.queue_redraw(); g.arena_actors.queue_redraw()
+			for frame in range(3): await process_frame
+			await RenderingServer.frame_post_draw
+			root.get_texture().get_image().save_png("res://test-output/interrupt-counter-%s.png" % ["portrait" if phone else "landscape"])
 	g.queue_free(); await process_frame
 
 func run() -> void:

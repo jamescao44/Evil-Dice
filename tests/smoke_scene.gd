@@ -121,7 +121,7 @@ func run() -> void:
 	check(game._in_dice_range(game.DICE_CENTER), "Space between dice is clickable")
 	check(not game._in_dice_range(game.DICE_CENTER + Vector2.ONE * game.DICE_RADIUS * 0.8), "Circle excludes bounding-box corner")
 	await ultimate_wave()
-	check(game.model.stage == 1 and game.model.enemies.size() == 2 and game.monster_side == Waves.player_size(1), "First feeding and pan reach wave two with gradual growth")
+	check(game.model.stage == 1 and game.model.enemies.size() == 2 and game.monster_side == game.ActorScale.player_size(game._display_form()), "First feeding and pan reach wave two without resizing the form")
 	for enemy in game.model.enemies:
 		enemy.hp = 1
 		enemy.shield = 0
@@ -146,7 +146,7 @@ func run() -> void:
 	await Driver.resolve_held(game)
 	check(game.model.phase == "roll" and game.model.round_number == party_round+1, "All four acted and the next round prepared successfully")
 	for stage in range(3,Waves.CITY_STAGE): await ultimate_wave()
-	check(game.model.is_city() and game.model.stage == Waves.CITY_STAGE and game.monster_side == 288 and game.model.max_hp == 100+30*Waves.CITY_STAGE, "Final transition reaches the full city size without reducing player health")
+	check(game.model.is_city() and game.model.stage == Waves.CITY_STAGE and game.monster_side == game.ActorScale.player_size(game._display_form()) and game.model.max_hp == 100+30*Waves.CITY_STAGE, "Final transition reaches the full city size without reducing player health")
 	if not game.menu_open: game._handle_click(game.MENU_RECT.get_center())
 	game._handle_click(game.DEBUG_RECT.get_center())
 	var city_clock: float = game.model.volley_clock

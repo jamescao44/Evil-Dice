@@ -54,10 +54,19 @@ func has_pending_group() -> bool:
 func can_reroll(index: int) -> bool:
 	return can_roll() and has_rolled() and index >= 0 and index < COUNT and index not in locked
 
+## Validate an entire correction batch before spending a roll or touching any die.
+func can_reroll_dice(indices: Array) -> bool:
+	if indices.is_empty() or indices.size() > COUNT: return false
+	var seen: Array = []
+	for index in indices:
+		if not index is int or index in seen or not can_reroll(index): return false
+		seen.append(index)
+	return true
+
 ## Roll requested unused dice; empty scope retains full-pool throws for opening rolls and tarot.
 func roll(rng: RandomNumberGenerator, perfect: bool, forced: Array = [], free: bool = false, requested: Array = []) -> Array:
 	if not can_roll(free): return []
-	if not requested.is_empty() and (requested.size() != 1 or not has_rolled() or not requested[0] is int or requested[0] not in unused()): return []
+	if not requested.is_empty() and not can_reroll_dice(requested): return []
 	var indices: Array = unused() if requested.is_empty() else requested.duplicate()
 	if not forced.is_empty() and (forced.size() != indices.size() or forced.any(func(face): return not face is int or face < 1 or face > 6)): return []
 	for offset in range(indices.size()):
