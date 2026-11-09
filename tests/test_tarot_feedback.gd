@@ -62,7 +62,7 @@ func run() -> void:
 			check(g.dice_selection.preview_rect().position.x > g._perfect_combo_center().x+g._saved_slot_radius(),"Skill preview stays between the moved controls")
 		var inspect = ui.inspection
 		var phase_before: String = g.model.phase
-		for stage in ["ready","enemy","resolving","transition","wave_reward","over"]:
+		for stage in ["ready","enemy","resolving","transition","wave_reward"]:
 			g.view_phase = stage
 			ui._process(0)
 			check(ui.visible and ui.shown(),"Effect layer persists during "+stage)
@@ -77,6 +77,11 @@ func run() -> void:
 			check(inspect.opened and inspect.status_id == Rules.Status.MIGHT,"Statuses remain inspectable during "+stage)
 			g._handle_release(Vector2.ZERO)
 			g._handle_click(inspect.close_rect().get_center()); g._handle_release(Vector2.ZERO)
+		g.view_phase = "over"; ui._process(0)
+		check(ui.visible and ui.z_index < g.z_index,"Victory and defeat backdrop cover the retained status and tarot badges")
+		check(not inspect.hit(g._status_center(Rules.Status.MIGHT)) and not inspect.hit(ui.indicator_center("strength","skill")),"Covered effects cannot open inspection through the ending screen")
+		g.view_phase = "ready"; ui._process(0)
+		check(ui.z_index == BattleLayers.STATUS and effects.strength == 2,"Returning to battle restores badge depth without consuming effects")
 		check(g.model.rng.state == rng and effects.strength == 2,"Inspection never changes random state or pending effects")
 		g.view_phase = "enemy"; g._process(0)
 		check(ui.roll_tint() == g.dice[0].self_modulate and ui.roll_tint().r < 1,"Pending roll effects dim with the disabled dice")
@@ -144,7 +149,7 @@ func run() -> void:
 		for index in range(g.dice.size()):
 			g.dice[index].stop_charge()
 			g.dice[index].face = g.model.dice_turn.values[index]
-		check(g._can_end_turn() and g.model.dice_turn.rolls_left == 2,"End-turn caption fixture displays two unused rolls")
+		check(g._can_end_turn() and g.model.dice_turn.rolls_left == Rules.DiceTurn.REROLLS,"End-turn caption fixture displays the remaining rerolls")
 		await capture(g,("phone" if phone else "desktop")+"-end-turn")
 		GameText.set_language("en",false)
 		await capture(g,("phone" if phone else "desktop")+"-end-turn-en")
@@ -156,6 +161,7 @@ func run() -> void:
 			g._restart(wave)
 			g.model.tarot_effects.strength = 2
 			var before := Vector2.ZERO
+			var before_anchor := Vector2.ZERO
 			for level in [5,10]:
 				g.model.character_level = level
 				g.evolution.reset()
@@ -163,8 +169,11 @@ func run() -> void:
 				var point: Vector2 = ui.indicator_center("strength","skill")
 				var head: Vector2 = g.battlefield_view.transform*g._character_counter_center()
 				check(absf(point.y-maxf(g.ARENA.position.y+64,head.y-(60 if phone else 42))) < 1,"Strength follows the current form without enemy-avoidance row jumps")
-				if level == 10: check(absf(point.y-before.y) < 45,"Evolving moves the badge only by the change in character height")
+				var anchor := Vector2(head.x,maxf(g.ARENA.position.y+64,head.y-(60 if phone else 42)))
+				if level == 10: check(is_equal_approx(point.y-before.y,anchor.y-before_anchor.y),"Evolving moves the badge only with the current head anchor")
+				check(absf(point.x-head.x) < 1,"Pending tarot stays horizontally centered above the character")
 				before = point
+				before_anchor = anchor
 				check(g.model.tarot_effects.strength == 2,"Evolution preserves pending Strength stacks")
 		g.queue_free(); await process_frame
 	print("Tarot feedback: %d checks, %d failures" % [checks,failures])

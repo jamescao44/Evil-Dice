@@ -38,12 +38,12 @@ func finish_player_turn(model) -> Array:
 	for entry in Sequence.entries(model.relics.items):
 		if entry.item.id == "frozen_tilapia" and leftover_sum > 0:
 			Sequence.activate(model,entry)
-			events.append_array(Attack.apply(model,entry.item.id,leftover_sum))
+			events.append_array(Attack.apply(model,entry.item.id,leftover_sum,false,false,-1,Sequence.attack_options(entry)))
 		if entry.item.id != "mysterious_seed": continue
 		var amount: int = floori(stored.get(str(entry.activators),0.0))
 		if amount <= 0: continue
 		Sequence.activate(model,entry)
-		events.append_array(Attack.apply(model,entry.item.id,amount))
+		events.append_array(Attack.apply(model,entry.item.id,amount,false,false,-1,Sequence.attack_options(entry)))
 	stored.clear()
 	releasing = false
 	return events

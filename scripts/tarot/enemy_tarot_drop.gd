@@ -27,7 +27,8 @@ func reset() -> void:
 
 ## Share the receipt controller's pause/transition rules, including simultaneous deaths.
 func advance(delta: float) -> void:
-	for card in cards: card.age += delta
+	for card in cards:
+		if not ui.battle.relic_attacks.holds(card.item.enemy_index): card.age += delta
 	queue_redraw()
 
 ## Transfer only cards that can be shown now; queued drops stay visible on the ground.
@@ -61,6 +62,7 @@ func pose(card: Dictionary) -> Dictionary:
 ## White card halos and staggered pixel stars distinguish tarot from blood gems.
 func _draw() -> void:
 	for card in cards:
+		if ui.battle.relic_attacks.holds(card.item.enemy_index): continue
 		var p: Dictionary = pose(card)
 		draw_set_transform(p.at,p.angle)
 		var rect := Rect2(-p.size*0.5,p.size)

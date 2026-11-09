@@ -3,6 +3,15 @@ const Instance = preload("res://scripts/relics/relic_instance.gd")
 const MAGIC_STONES := ["orange_stone","blue_stone","purple_stone","yellow_stone","green_stone","black_stone"]
 ## Set recipes are data: ordered ingredients, replacement tier bonuses and composite art.
 const RECIPES := {
+	"warrior": {
+		"name":"Warrior", "ingredients":["armor","worn_spear","rusty_round_shield","spiked_helmet","enchanted_core"],
+		"retain_effects":false, "composite_art":false,
+		"tiers":[{"id":"golden_warrior","count":5,"stats":{}}],
+	},
+	"teishoku": {
+		"name":"Teishoku", "ingredients":["rice","miso_soup","salad","pickles","tempura"],
+		"tiers":[{"id":"teishoku","count":5,"stats":{"base_damage":20.0}}],
+	},
 	"clock": {
 		"name":"Clock",
 		"ingredients":["handless_clock","hour_hand","minute_hand","second_hand"],

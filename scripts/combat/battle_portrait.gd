@@ -119,7 +119,7 @@ func _draw() -> void:
 	if view_phase == "over":
 		_draw_ending()
 		_draw_reward_progress(REWARD_CENTER,1.5)
-	if not _menus_open(): _draw_tooltips()
+	if not _menus_open() and view_phase != "over": _draw_tooltips()
 
 func _button(rect: Rect2, value: String, enabled: bool = true, canvas: CanvasItem = null) -> void:
 	if canvas == null: canvas = self

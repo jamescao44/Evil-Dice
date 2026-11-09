@@ -22,7 +22,7 @@ static func classify(values: Array) -> MultiHitSkill:
 	skill.damage_ticks = preload("res://scripts/combat/flamelings_skills.gd").damage_tick_count(values.size())
 	return skill
 
-## Snapshot matching groups from newly rolled indices only, highest pip first.
+## Larger alike groups fire first; equal-sized groups retain highest-pip priority.
 static func automatic_groups(values: Array, indices: Array) -> Array:
 	var groups: Array = []
 	for face in range(6,0,-1):
@@ -32,6 +32,9 @@ static func automatic_groups(values: Array, indices: Array) -> Array:
 		skill.pattern = "match_auto"
 		skill.amplifier_locked = true
 		groups.append({"skill":skill,"indices":sources})
+	groups.sort_custom(func(a,b):
+		if a.indices.size() != b.indices.size(): return a.indices.size() > b.indices.size()
+		return a.skill.face > b.skill.face)
 	return groups
 
 ## Reject partial selections that cannot complete a pattern with the unused dice.

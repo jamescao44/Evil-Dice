@@ -38,7 +38,7 @@ func run() -> void:
 			for wave in range(1,41):
 				g._restart(wave)
 				g.model.character_level = [1,5,10][form]; g.evolution.reset()
-				var expected: float = 224+64*(4.0 if form == 2 else 11.0)/19
+				var expected: float = (224+64*(4.0 if form == 2 else 11.0)/19)*[1.3,1.1,1.0][form]
 				check(is_equal_approx(g.monster_side,expected),"Actor uses its form size on every wave")
 				check(is_equal_approx(g._enemy_side(),g.ActorScale.enemy_size(form)),"Enemies use the revealed evolution")
 				var context: String = "%s form%d wave%d" % [phone,form,wave]

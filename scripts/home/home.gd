@@ -391,13 +391,13 @@ func _background() -> void:
 func _shrine_sprite_rect() -> Rect2:
 	var rect := stage_rect()
 	var center := rect.get_center()+Vector2(swipe_nudge,0)
-	var side: float = 352 if portrait else 280
+	var side: float = (352 if portrait else 280)*1.3
 	var lift: float = roundf(sin(age*1.6)*8)+(1-reveal)*18
 	return PlayerSprite.grounded_rect(Rect2(center.x-side/2,rect.end.y-84-side-20+lift,side,side),0)
 
 func _character_hit(point: Vector2) -> bool:
 	if not modal.is_empty() or page not in [1,2] or ancients[ancient_index].art != "flameling": return false
-	var rect := _shrine_sprite_rect()
+	var rect: Rect2 = player_animation.body_rect(_shrine_sprite_rect(),reduced)
 	var bounds := PlayerSprite.rest_bounds(0)
 	return Rect2(rect.position+bounds.position*rect.size,bounds.size*rect.size).grow(8).has_point(point)
 
@@ -575,7 +575,7 @@ func _wrapped(at: Vector2, value: String, width: float, size: int, color: Color)
 
 func _art(key: String, rect: Rect2, color: Color = Color.WHITE) -> void:
 	if key == "flameling":
-		PlayerSprite.paint_actor(self,rect,player_animation.frame_number(),age,color,reduced,0)
+		PlayerSprite.paint_actor(self,rect,player_animation.frame_number(),age,color,reduced,0,player_animation.body_rect(rect,reduced))
 		return
 	if not art.has(key): art[key] = load("res://assets/art/fantasy/" + key + ".png")
 	draw_texture_rect(art[key], Rect2(rect.position.round(), rect.size), false, color)

@@ -20,9 +20,9 @@ func hit_display_checks() -> void:
 	check(Battle.DamageFeedback.number(1.25,true) == "1.25", "Multiplier display retains its decimal precision")
 	for sample in [[0,30],[1,30],[20,30],[200,38],[2000,45],[20000,48]]:
 		check(Battle.Effects.damage_font_size(sample[0]) == sample[1],"Damage font follows log10 with a regular-size floor")
-	for sample in [[0,0],[99,0],[100,0],[1000,4],[10000,8],[100000000,12]]:
-		check(is_equal_approx(Battle.DamageFeedback.damage_tremble_amplitude(sample[0]),sample[1]),"Damage tremble has a silent threshold, logarithmic growth, and readable cap")
-	check(Battle.DamageFeedback.damage_tremble_amplitude(101) > 0 and Battle.DamageFeedback.damage_tremble_amplitude(101) < 0.02,"Tremble starts smoothly just above 100 damage")
+	for sample in [[0,0],[100,0],[1000,0],[1600,0],[16000,12],[100000000,12]]:
+		check(is_equal_approx(Battle.DamageFeedback.damage_tremble_amplitude(sample[0],2000),sample[1]),"Damage tremble has a health-relative threshold, logarithmic growth, and readable cap")
+	check(Battle.DamageFeedback.damage_tremble_amplitude(1601,2000) > 0 and Battle.DamageFeedback.damage_tremble_amplitude(1601,2000) < 0.03,"Tremble starts smoothly just above eighty percent of target health")
 	for values in [[1,2,3],[1,1,2],[4,4,4],[5,5,5]]:
 		var m = Run.new(13)
 		m.begin_round()
@@ -208,15 +208,16 @@ func motion_checks(g) -> void:
 	panel.active = true
 	panel.show()
 	panel.phase = "steps"
+	panel.tremble_health = 2000
 	panel._impact(100,1,Color.WHITE)
 	panel.tremble_age = 0.1
-	check(panel.number_tremble(4) == Vector2.ZERO,"Exactly 100 combined damage never trembles")
+	check(panel.number_tremble(4) == Vector2.ZERO,"Damage at five percent of target health stays still")
 	panel._impact(100,100,Color.WHITE)
 	panel.impact_age = 0.16
 	var formula: String = panel.formula_label()
 	check(panel.formula_glyph_motion(0,formula.length()).y < 0 and panel.formula_glyph_motion(formula.find("x"),formula.length()).y < 0,"DMG letters and multiplication sign join the formula wave")
 	var tremble: Vector2 = panel.number_tremble(4)
-	check(tremble != Vector2.ZERO and tremble.abs().x <= 8 and tremble.abs().y <= 8,"Combined damage drives the number tremble even when base alone is 100")
+	check(tremble != Vector2.ZERO and tremble.abs().x <= 12 and tremble.abs().y <= 12,"Combined damage relative to target health drives the capped tremble")
 	await capture(g,"formula-wave-tremble")
 	g.menu_open = true
 	panel._process(1)
@@ -325,10 +326,10 @@ func scene_checks(portrait: bool) -> void:
 	panel._process(0.075)
 	var glyph_count: int = panel.label().length()
 	check(panel.result_glyph_motion(0,glyph_count).y < 0 and panel.result_glyph_motion(glyph_count-1,glyph_count) == Vector2.ZERO,"Final wave starts at the D in DMG and reaches the final digit from left to right")
-	check(panel.result_glyph_scale(0,glyph_count) > 1.2,"Final letters and numbers enlarge during their wave")
+	check(panel.result_glyph_scale(0,glyph_count) > panel.result_size_factor(),"Final letters and numbers enlarge during their wave")
 	await capture(g,"final-wave")
 	g.reduced = true
-	check(panel.result_glyph_motion(0,3) == Vector2.ZERO and is_equal_approx(panel.result_glyph_scale(0,3),1.2),"Reduced effects keep the enlarged result without bobbing")
+	check(panel.result_glyph_motion(0,3) == Vector2.ZERO and is_equal_approx(panel.result_glyph_scale(0,3),panel.result_size_factor()),"Reduced effects keep the enlarged result without bobbing")
 	check(g.model.rng.state == rng and g.model.reward_rng.state == reward_rng and g.model.enemies[0].hp == hp,"Presentation never executes the attack or consumes RNG")
 	panel.sync_hit(7.5,8)
 	check(panel.base_value == 7.5 and panel.label() == "DMG 8","A leftover die displays its own base and damage including fractional carry")
@@ -344,7 +345,7 @@ func scene_checks(portrait: bool) -> void:
 	panel._process(0.1); g.speed = 1; g.reduced = false
 	check(panel.active and panel.return_progress() > 0,"Held result begins a shrink instead of snapping back")
 	panel._process(0.13)
-	check(is_equal_approx(panel.result_glyph_scale(0,3),1.1),"Halfway through return the result has smoothly shrunk halfway to normal size")
+	check(is_equal_approx(panel.result_glyph_scale(0,3),lerpf(panel.result_size_factor(),1,0.5)),"Halfway through return the result has smoothly shrunk halfway to normal size")
 	var result_anchor: Vector2 = panel.anchor()
 	var origin: Vector2 = panel.result_glyph_origin(0,"D",1.2)
 	var ascent: float = g.pixel_font.get_ascent(panel.text_size())

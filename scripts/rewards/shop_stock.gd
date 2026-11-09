@@ -117,7 +117,8 @@ func _restock(run) -> void:
 	var weights: Array = rarity_weights(run.stage+1)
 	var exact: Array = [0.0,0.0,0.0,0.0,0.0]
 	exact[rarity] = 1.0
-	var guaranteed: String = run.relics.draw_one(run.reward_rng,ids,exact,0,item_weights)
+	var guaranteed: String = SetOffers.roll_stock_piece(run.reward_rng,item_weights,ids,weights,rarity)
+	if guaranteed.is_empty(): guaranteed = run.relics.draw_one(run.reward_rng,ids,exact,0,item_weights)
 	# If every item of that rarity is owned, prefer an eligible higher rarity.
 	if guaranteed.is_empty(): guaranteed = run.relics.draw_one(run.reward_rng,ids,weights,rarity,item_weights)
 	guaranteed_slot = run.reward_rng.randi_range(0,RELIC_COUNT-1)
@@ -125,7 +126,10 @@ func _restock(run) -> void:
 		ids.append(guaranteed)
 		weights = random_slot_weights(run.stage+1,Relics.ITEMS[guaranteed].rarity)
 	for slot in range(RELIC_COUNT):
-		var id: String = guaranteed if slot == guaranteed_slot else run.relics.draw_one(run.reward_rng,ids,weights,0,item_weights)
+		var id: String = guaranteed
+		if slot != guaranteed_slot:
+			id = SetOffers.roll_stock_piece(run.reward_rng,item_weights,ids,weights)
+			if id.is_empty(): id = run.relics.draw_one(run.reward_rng,ids,weights,0,item_weights)
 		if not id.is_empty() and id != "codex_page" and slot != guaranteed_slot: ids.append(id)
 		offers.append({"kind":"relic","id":id,"price":0 if id.is_empty() else _price(run.reward_rng,PRICE_RANGES[Relics.ITEMS[id].rarity]),"sold":false})
 	var cards: Array = []

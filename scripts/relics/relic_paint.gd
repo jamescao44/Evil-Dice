@@ -9,7 +9,8 @@ static var silhouettes: Dictionary = {}
 
 static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow: bool = true, item: Dictionary = {}, clip: Rect2 = Rect2(), tint: Color = Color.WHITE) -> void:
 	if glow: Glow.paint(node,at,radius,Catalog.rarity_color(id),clip,tint.a)
-	if id == "witch_ghost": Glow.paint(node,at,radius*0.92,Color("bc8bff"),clip,tint.a)
+	var aura: Color = Catalog.ITEMS[id].get("icon_aura",Color.TRANSPARENT)
+	if aura.a > 0: Glow.paint(node,at,radius*0.92,aura,clip,tint.a)
 	if Catalog.Sets.uses_composite_art(id):
 		for part in _set_parts(id,item,at,radius): paint(node,part.id,part.at,part.radius,false,{},clip,tint)
 		return
@@ -20,13 +21,13 @@ static func paint(node: CanvasItem, id: String, at: Vector2, radius: float, glow
 	var rect := Rect2((at-size/2).round(),size)
 	var visible_rect: Rect2 = rect.intersection(clip) if clip.has_area() else rect
 	if not visible_rect.has_area(): return
-	if id == "witch_ghost":
+	if aura.a > 0:
 		for direction in range(8):
 			var aura_rect := Rect2(rect.position+Vector2.from_angle(direction*TAU/8)*maxf(1,radius*0.08),rect.size)
 			var aura_visible := aura_rect.intersection(clip) if clip.has_area() else aura_rect
 			if not aura_visible.has_area(): continue
 			var aura_source := Rect2(source.position+(aura_visible.position-aura_rect.position)/aura_rect.size*source.size,aura_visible.size/aura_rect.size*source.size)
-			node.draw_texture_rect_region(textures[sprite],aura_visible,aura_source,Color(0.8,0.5,1,0.3)*tint)
+			node.draw_texture_rect_region(textures[sprite],aura_visible,aura_source,Color(aura,0.3)*tint)
 	var fraction := Rect2((visible_rect.position-rect.position)/rect.size,visible_rect.size/rect.size)
 	var cropped := Rect2(source.position+fraction.position*source.size,fraction.size*source.size)
 	if id == "prismatic_stone":

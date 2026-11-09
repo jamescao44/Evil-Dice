@@ -43,7 +43,7 @@ func enqueue(target: int, amount: int) -> void:
 		var ground: Vector2 = feet+offset
 		ground = ground.clamp(battle.ARENA.position+Vector2(18,18),battle.ARENA.end-Vector2(18,18))
 		var share: int = floori(float(amount)*(i+1)/count)-floori(float(amount)*i/count)
-		gems.append({"origin":origin,"impact":feet.lerp(ground,0.72),"ground":ground,"age":0.0,"delay":i*0.075,"amount":share,"spin":rng.randf_range(-0.7,0.7),"height":rng.randf_range(38,66),"side":30.0 if portrait else 23.0})
+		gems.append({"origin":origin,"impact":feet.lerp(ground,0.72),"ground":ground,"age":0.0,"target":target,"delay":i*0.075,"amount":share,"spin":rng.randf_range(-0.7,0.7),"height":rng.randf_range(38,66),"side":30.0 if portrait else 23.0})
 	pending_total += amount
 	if drop_cooldown <= 0 and not paused():
 		battle._sound("enemy/crystal_drop",rng.randf_range(0.94,1.06),-17)
@@ -105,6 +105,9 @@ func advance(delta: float) -> void:
 	collect_cooldown = maxf(0,collect_cooldown-delta)
 	var remaining: Array = []
 	for gem in gems:
+		if battle.relic_attacks.holds(gem.get("target",-3)):
+			remaining.append(gem)
+			continue
 		gem.age += delta*gem.get("speed",1.0)
 		if gem.age >= FLIGHT_START+gem.delay+FLIGHT_TIME:
 			pending_total -= gem.amount
@@ -129,6 +132,7 @@ func _sparkle(at: Vector2, size: float, alpha: float) -> void:
 
 func _draw() -> void:
 	for gem in gems:
+		if battle.relic_attacks.holds(gem.get("target",-3)): continue
 		var p: Dictionary = pose(gem)
 		if p.grounded:
 			draw_set_transform(p.shadow+Vector2(0,8),0,Vector2(1,0.3))

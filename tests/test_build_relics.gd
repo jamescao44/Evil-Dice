@@ -59,12 +59,12 @@ func skill_checks() -> void:
 	m = fresh(["split_arrow"])
 	var skill = m.Patterns.classify([3,4,5])
 	check(m.skill_use_count(skill) == 2 and skill.random_target_per_use(),"Single-target skills split into two random uses")
-	check(is_equal_approx(m.raw_attack_damage(skill),10.5),"Each split hit is half the original 21 damage")
+	check(is_equal_approx(m.raw_attack_damage(skill),12.6),"Each split hit is 60 percent of the original 21 damage")
 	check(m.skill_use_count(skill) == 2,"Repeated previews never split again")
 	m.acquire_relic("worn_dagger"); m.acquire_relic("twin_scythes")
 	check(m.skill_use_count(skill) == 6,"Split hits receive ordered extra-hit relics")
 	var bonus = m.Patterns.classify([3,4,5]); bonus.cast_source = "character_bonus"; bonus.inherited_damage = 100
-	check(m.skill_use_count(bonus) == 6 and m.raw_attack_damage(bonus) == 50,"Bonus Fireballs split inherited damage and receive extra hits")
+	check(m.skill_use_count(bonus) == 6 and m.raw_attack_damage(bonus) == 60,"Bonus Fireballs split inherited damage and receive extra hits")
 	var area = m.Patterns.classify([2,3,4,5])
 	check(m.skill_use_count(area) == 1 and not area.split_attack,"Area skills are unchanged")
 	var auto = m.Patterns.automatic_groups([4,4,1,2,3,5],range(6))[0].skill

@@ -65,7 +65,7 @@ func status_checks() -> void:
 	for id in ["beast_fang","firebird_feather","snowball"]:
 		var m = fresh([id])
 		var status: int = {"beast_fang":m.Status.PLAGUE,"firebird_feather":m.Status.BURNING,"snowball":m.Status.FROZEN}[id]
-		check(m.relic_base_damage() == 2,"Flat base bonus for "+id)
+		check(m.relic_base_damage() == 3,"Flat base bonus for "+id)
 		var entry: Dictionary = m.RelicEffects.Sequence.entries(m.relics.items)[0]
 		var successes := 0
 		for seed_value in range(2000):
@@ -101,7 +101,7 @@ func ice_rose_checks() -> void:
 	var m = fresh(["ice_rose","basic_crystal"])
 	var hits: Array = m.apply_enemy_status(0,m.Status.FROZEN,1).filter(func(e): return e.type == "damage")
 	check(hits.size() == 2 and hits.map(func(e): return e.target) == [0,1],"Ice Rose hits every living enemy including the frozen target")
-	check(hits.all(func(e): return e.display_amount == 15),"Ice Rose applies base-damage relic bonuses to its whole burst")
+	check(hits.all(func(e): return e.display_amount == 25),"Ice Rose applies base-damage relic bonuses to its whole burst")
 	check(m.enemy_status_count(1,m.Status.FROZEN) == 0,"Ice Rose damage alone does not spread freeze")
 	m.acquire_relic("blue_stone")
 	for seed_value in range(30):

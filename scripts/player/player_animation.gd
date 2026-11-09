@@ -2,8 +2,7 @@ extends RefCounted
 ## Character frames own release timing; effects never retime or skip actor poses.
 const Sprite = preload("res://scripts/player/player_sprite.gd")
 const FPS := Sprite.IDLE_FPS
-const WALK_FIRST := 12
-const WALK_FRAMES := 9
+const WALK_CLIPS := [{"first":10,"count":6},{},{"first":12,"count":9}]
 const CLIPS := {
 	"pair":{"first":8,"launch":9,"impact":10,"last":11},
 	"fireball":{"first":21,"launch":26,"impact":29,"last":29},
@@ -18,7 +17,14 @@ const EARLY_CLIPS := {
 	"storm":{"first":24,"launch":28,"impact":32,"loop_end":36,"last":43},
 	"ultimate":{"first":24,"launch":28,"impact":32,"loop_end":36,"last":43}
 }
-const EMOTES := [{"first":44,"last":64},{"first":44,"last":64},{"first":108,"last":133}]
+const FIRST_CLIPS := {
+	"pair":{"first":16,"launch":19,"impact":19,"last":21},
+	"fireball":{"first":16,"launch":19,"impact":19,"last":21},
+	"slash":{"first":22,"launch":27,"impact":29,"last":31},
+	"storm":{"first":32,"launch":32,"impact":38,"loop_end":38,"last":43},
+	"ultimate":{"first":32,"launch":32,"impact":38,"loop_end":38,"last":43}
+}
+const EMOTES := [{"first":44,"last":49,"jump_land":49},{"first":44,"last":64},{"first":108,"last":133}]
 var form := 2
 var emote_age := -1.0
 var action := ""
@@ -50,6 +56,10 @@ func clear_action() -> void:
 func play_emote() -> void:
 	emote_age = 0
 
+## An authored entrance takes over from any emote already in progress.
+func cancel_emote() -> void:
+	emote_age = -1
+
 func emoting() -> bool:
 	return emote_age >= 0
 
@@ -62,7 +72,7 @@ func set_form(value: int) -> void:
 	if emoting(): emote_age = 0
 
 func clips() -> Dictionary:
-	return CLIPS if form >= 2 else EARLY_CLIPS
+	return [FIRST_CLIPS,EARLY_CLIPS,CLIPS][form]
 
 func clip_data() -> Dictionary:
 	return clips().get(action,{})
@@ -89,6 +99,17 @@ func firing_rect(rect: Rect2, reduced: bool = false) -> Rect2:
 	var feet: Vector2 = rect.position+rect.size*pivot
 	var lift := Vector2(0,-sin(t*PI)*rect.size.y*0.018)
 	return Rect2(feet-size*pivot+lift,size)
+
+## Lift the first form's emote along an arc; its final authored frame lands exactly.
+func body_rect(rect: Rect2, reduced: bool = false) -> Rect2:
+	if not emoting(): return firing_rect(rect,reduced)
+	var clip: Dictionary = EMOTES[form]
+	if not clip.has("jump_land"): return rect
+	var duration: float = (clip.jump_land-clip.first)/FPS
+	var t: float = clampf(emote_age/duration,0,1)
+	if t >= 1: return rect
+	var height: float = rect.size.y*Sprite.rest_bounds(form).size.y*(0.30 if reduced else 0.85)
+	return Rect2(rect.position-Vector2(0,sin(t*PI)*height),rect.size)
 
 ## Combat waits for the actual authored release frame before creating an attack.
 func ready() -> bool:
@@ -118,7 +139,8 @@ func damage() -> void:
 func finish() -> void:
 	if action.is_empty() or not clip_data().has("loop_end") or phase == "recover": return
 	recovery_first = action_frame_number()
-	age = fposmod(age,1.0/FPS)
+	# Match frame sampling at exact boundaries so recovery cannot skip the held pose.
+	age = maxf(0,age-floori(age*FPS+0.00001)/FPS)
 	phase = "recover"
 
 ## Idle, attacks, walking and emotes share one frame duration and battle slow motion.
@@ -152,7 +174,8 @@ func frame_number() -> int:
 ## Walk and cast loops use elapsed time, never effect clocks or travel interpolation.
 func action_frame_number() -> int:
 	if action.is_empty():
-		if walking and form >= 2: return WALK_FIRST+posmod(floori(walk_age*FPS+0.00001),WALK_FRAMES)
+		var walk: Dictionary = WALK_CLIPS[form]
+		if walking and not walk.is_empty(): return walk.first+posmod(floori(walk_age*FPS+0.00001),walk.count)
 		return Sprite.idle_frame(idle_age,form)
 	var clip: Dictionary = clip_data()
 	var step: int = floori(age*FPS+0.00001)
@@ -166,6 +189,8 @@ func action_frame_number() -> int:
 ## Locate the emitting hand within the fixed cell, including the low slashing pose.
 func hand_uv() -> Vector2:
 	var frame: int = action_frame_number()
+	if form == 0:
+		return Vector2(0.70,0.56) if action == "slash" else Vector2(0.58,0.40) if action in ["storm","ultimate"] else Vector2(0.60,0.55)
 	if form < 2: return Vector2(0.76,0.53) if action == "slash" else Vector2(0.79,0.43)
 	if frame >= 8 and frame <= 11: return Vector2(0.80,0.27) if frame in [9,10] else Vector2(0.84,0.40)
 	if frame >= 31 and frame <= 52: return Vector2(0.86,0.80) if frame >= 38 else Vector2(0.84,0.48)

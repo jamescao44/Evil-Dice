@@ -541,9 +541,23 @@ func _draw() -> void:
 	for burst in landing_bursts: RewardBurst.paint(self,burst,elapsed,reduced)
 	_draw_celebrations(true)
 	confetti.paint(self)
+	_draw_featured_reveals()
 	for reel in range(visible_reel_count()):
-		if reward_prompt_visible(reel): RewardPrompt.paint(self,reel_rect(reel),elapsed,portrait,reduced)
+		if reward_prompt_visible(reel) and not _featured_reveal(reel): RewardPrompt.paint(self,reel_rect(reel),elapsed,portrait,reduced)
 	draw_skip_button(self)
+
+## Keep the enlarged winner above every neighboring reel and the reveal confetti.
+func _draw_featured_reveals() -> void:
+	for reel in stop_order():
+		if reel >= visible_reel_count() or reel in collected or not _featured_reveal(reel): continue
+		var item: Dictionary = symbols[rewards[reel]]
+		var rect: Rect2 = reel_rect(reel)
+		RarityDisplay.paint(self,item.relic_id,rect.get_center(),rect.size.x*0.61*(26.0/64.0),elapsed,reduced,0.5,elapsed-stop_time(reel))
+
+## Use each reel's own stop cue, preserving simultaneous prizes and skip timing.
+func _featured_reveal(reel: int) -> bool:
+	var item: Dictionary = symbols[rewards[reel]]
+	return item.has("relic_id") and RarityDisplay.featured_reveal(Relics.ITEMS[item.relic_id].rarity,elapsed-stop_time(reel),reduced)
 
 ## Multi-prize payouts label each reel instead of focusing a single description.
 func _draw_reward_name(reel: int) -> void:
@@ -590,7 +604,7 @@ func _draw_reel(reel: int, rect: Rect2, gold: Color) -> void:
 		if revealed and shown.has("relic_id") and row == roundi(scroll): continue
 		var distance: float = absf(row-scroll)
 		_paint_symbol(item_index,item_rect,rect.grow(-8),Color(1,1,1,lerpf(1,0.35,clampf(distance,0,1))))
-	if revealed and shown.has("relic_id"):
+	if revealed and shown.has("relic_id") and not _featured_reveal(reel):
 		RarityDisplay.paint(self,shown.relic_id,rect.get_center(),rect.size.x*0.61*(26.0/64.0),elapsed,reduced,0.5,elapsed-stop_time(reel))
 	draw_rect(band,Color(color,0.95),false,3)
 	for y in [rect.position.y,rect.end.y-16]: draw_rect(Rect2(rect.position.x,y,rect.size.x,16),Color(0.04,0.08,0.06,0.8))

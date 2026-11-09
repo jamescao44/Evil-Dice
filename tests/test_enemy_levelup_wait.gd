@@ -44,7 +44,7 @@ func run() -> void:
 		g.evolution._process(0.1)
 		await process_frame
 		check(not g.model.enemies[0].acted,"Enemy stays idle throughout level %d animation" % level)
-		g.evolution._process(2)
+		g.evolution._process(g.evolution.duration())
 		if level < 5:
 			await process_frame
 			check(not g.model.enemies[0].acted,"Additional queued levels cannot be skipped")

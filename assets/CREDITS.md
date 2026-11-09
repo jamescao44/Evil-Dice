@@ -94,6 +94,8 @@ Reward currency icons also use unchanged CC0 DCSS tiles: `item/amulet/crystal_re
 
 ## User-provided finished sound effects
 
+`audio/dice/combos_2.wav` through `combos_6.wav` are split from James's `outs-FXs/combos.wav`, with only 2 ms edge fades. These authored chords play at their original pitch and tempo for alike rolls and confirmed skills, and are separate from the CC0 sound packs.
+
 `audio/item/arcade_slot_roll.wav`, `arcade_slot_roll2.wav`, and `audio/item/reward_level1.wav` through `reward_level3.wav` are copied unchanged from the user's `outs-FXs` folder. These are user-provided project audio, separate from the CC0 packs. Chest presentation uses the original 160 BPM timing; all five import as uncompressed 48 kHz stereo PCM.
 
 `audio/item/card_draw.wav`, `audio/item/deck_flip.wav`, and `audio/item/deck_flip2.wav` are copied unchanged from the same user-owned `outs-FXs` folder. Card draw plays on a successful fan pick; one of the two single-card flips is selected with equal probability at each card's visual departure during shuffling, with a quieter mix for the faster reduced-effects animation. All three import as uncompressed PCM and are separate from the Kenney packs.
@@ -159,7 +161,7 @@ Challenger's Badge (2026-10-27): original 32×32 pixel-style SVG drawn for this 
 `art/enemies/bomber.svg` is original code-drawn 48×48 pixel artwork for this project: a hooded sapper carrying a lit iron bomb. No external asset was used.
 
 ### Diablo player animation
-James supplied `art/player/diablo/diablo_2.png` and the updated `diablo_3.png` (2026-11-05), copied unchanged. Both use 64×64 cells in 20-column, row-major atlases. Diablo 2 supplies forms one and two (cover frame 1, animation frames 2–64); Diablo 3 supplies the final form (frames 1–133). Both include tap-to-emote animations. The former Flamelings artwork is retained only as a legacy asset. Runtime sigils are drawn in code.
+James supplied `art/player/diablo/diablo_1.png` (2026-11-06), `diablo_2.png` and `diablo_3.png` (updated 2026-11-06), copied unchanged. All use 64×64 cells in 20-column, row-major atlases. Each supplies its matching evolution: Diablo 1 has cover frame 1 and animation frames 2–63, including walking frames 10–15; Diablo 2 has cover frame 1 and animation frames 2–96; Diablo 3 uses frames 1–149. All include tap-to-emote animations; Diablo 1's jumping emote adds a runtime arc that lands on frame 49. The former Flamelings artwork is retained only as a legacy asset. Entrance clips play at level start and evolution, with runtime summoning sigils, upward light, white silhouette particles and a final-form ring flash.
 
 James also supplied `art/player/diablo/divine_ring_FX.png`, copied unchanged: 48×48 cells, looping frames 2–12. This permanent ring is drawn at 70% width behind the final form's upper back, with a runtime golden glow; the first two forms have no ring.
 
@@ -174,3 +176,7 @@ James also supplied `art/player/diablo/divine_ring_FX.png`, copied unchanged: 48
 `art/fx/relic_rarity/{orbit,sigil,sunburst,curse}.svg`: original reusable rarity seals drawn for this project, animated behind shop merchandise and revealed chest prizes. No external asset source.
 
 `art/relics/{basic_crystal,intermediate_crystal,master_crystal,supreme_crystal,phoenix_feather,warrior_greatsword}.svg`: original 32×32 pixel-style crystal, feather and sword icons drawn for this project. No external asset source.
+
+- Teishoku food, spear, hammer, trident, chain, resonance stone, crown and candle placeholder icons: original project SVG artwork (2026-11-08).
+
+- Warrior set (2026-11-09): original project pixel-style SVGs for the rusty round shield, enchanted core, and Golden Warrior companion. No external asset source.

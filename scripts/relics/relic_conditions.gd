@@ -3,7 +3,6 @@ extends RefCounted
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Status = preload("res://scripts/status/status_effect.gd")
-const ROLL_DAMAGE := {"unknown_arm":5,"unknown_pelvis":5,"unknown_leg":5,"unknown_sternum":10,"unknown_skull":10,"witch_ghost":50}
 const VULNERABILITIES := {"hellfire":Status.BURNING,"nightmare_totem":Status.DARKNESS,"corrupt_crystal":Status.CORROSION}
 const RANDOM_STATUSES := [Status.BURNING,Status.FROZEN,Status.DARKNESS,Status.CORROSION,Status.PLAGUE]
 

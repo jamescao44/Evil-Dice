@@ -34,7 +34,9 @@ static func color_for_amount(amount: int) -> Color:
 ## Start each kill receipt at the defeated actor, including legacy city troops.
 func enqueue_enemy(target: int, amount: int) -> void:
 	var origin: Vector2 = battle._enemy_point(target) if target >= 0 else battle._troop_point(-3-target)
+	var first: int = orbs.size()
 	enqueue(origin,amount)
+	for index in range(first,orbs.size()): orbs[index].target = target
 
 ## Scatter a bounded cloud, retaining earlier drops when several enemies die together.
 func enqueue(origin: Vector2, amount: int) -> void:
@@ -82,6 +84,9 @@ func advance(delta: float) -> void:
 	sound_cooldown = maxf(0,sound_cooldown-delta)
 	var remaining: Array = []
 	for orb in orbs:
+		if battle.relic_attacks.holds(orb.get("target",-3)):
+			remaining.append(orb)
+			continue
 		orb.age += delta
 		if orb.age >= FLIGHT_START+orb.delay+FLIGHT_TIME:
 			pending_total -= orb.amount
@@ -98,6 +103,7 @@ func advance(delta: float) -> void:
 ## White cores and colored comet tails converge on a soft, expanding power-up aura.
 func _draw() -> void:
 	for orb in orbs:
+		if battle.relic_attacks.holds(orb.get("target",-3)): continue
 		var at := position_of(orb)
 		var tint: Color = orb.tint
 		if orb.age > FLIGHT_START+orb.delay and not battle.reduced:

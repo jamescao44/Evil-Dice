@@ -1,28 +1,28 @@
 extends RefCounted
-## Flattened rotating sigils attach to the hand and overhead channel in world coordinates.
+## Perspective sigils attach to the hand and overhead channel in world coordinates.
 const GOLD := Color("ffd46a")
 const HOT := Color("fff1b1")
 
-## Project every point onto an ellipse; rotation happens within that tilted plane.
-static func point(center: Vector2, radius: float, angle: float) -> Vector2:
-	return center+Vector2(cos(angle),sin(angle)*0.32)*radius
+## Project runes into a floor ellipse or an upright casting plane without changing their rotation.
+static func point(center: Vector2, radius: float, angle: float, plane: Vector2 = Vector2(1,0.32)) -> Vector2:
+	return center+Vector2(cos(angle),sin(angle))*plane*radius
 
 ## Bounded geometry gives the circle an orange halo, gold runes and a bright inner seal.
-static func ring(canvas: CanvasItem, center: Vector2, radius: float, angle: float, alpha: float, reduced: bool) -> void:
+static func ring(canvas: CanvasItem, center: Vector2, radius: float, angle: float, alpha: float, reduced: bool, plane: Vector2 = Vector2(1,0.32)) -> void:
 	var points := PackedVector2Array()
-	for i in range(49): points.append(point(center,radius,i*TAU/48))
+	for i in range(49): points.append(point(center,radius,i*TAU/48,plane))
 	for width in [10.0,5.0,1.7]: canvas.draw_polyline(points,Color(GOLD,alpha*(0.09 if width > 5 else 0.22 if width > 2 else 0.95)),width,true)
 	for inset in [0.72,0.86]:
 		var inner := PackedVector2Array()
-		for i in range(33): inner.append(point(center,radius*inset,i*TAU/32))
+		for i in range(33): inner.append(point(center,radius*inset,i*TAU/32,plane))
 		canvas.draw_polyline(inner,Color(GOLD,alpha*0.65),1.2,true)
 	for i in range(6):
 		var a: float = angle+i*TAU/6
-		canvas.draw_line(point(center,radius*0.7,a),point(center,radius*0.7,a+TAU/3),Color(HOT,alpha*0.7),1.4,true)
-		canvas.draw_line(point(center,radius*0.89,a),point(center,radius*1.04,a+0.06),Color(HOT,alpha),2,true)
+		canvas.draw_line(point(center,radius*0.7,a,plane),point(center,radius*0.7,a+TAU/3,plane),Color(HOT,alpha*0.7),1.4,true)
+		canvas.draw_line(point(center,radius*0.89,a,plane),point(center,radius*1.04,a+0.06,plane),Color(HOT,alpha),2,true)
 	if not reduced:
 		for i in range(8):
-			var p: Vector2 = point(center,radius*(0.95+0.13*sin(angle*3+i)),angle*1.4+i*TAU/8)
+			var p: Vector2 = point(center,radius*(0.95+0.13*sin(angle*3+i)),angle*1.4+i*TAU/8,plane)
 			canvas.draw_rect(Rect2(p-Vector2.ONE*1.5,Vector2.ONE*3),Color(HOT,alpha*0.85))
 
 ## Recovery shrinks the hand seal; ultimate channel grows, trembles, then flashes open.
@@ -37,7 +37,8 @@ static func paint(canvas: CanvasItem, rect: Rect2, animation, reduced: bool, tin
 	# Raised hands channel into one overhead seal; the hand seal opens on release.
 	var clip: Dictionary = animation.clip_data()
 	if not clip.has("channel_end") or animation.frame_number() >= clip.release:
-		ring(canvas,at,radius,angle,alpha,reduced)
+		var plane := Vector2(0.42,1) if animation.action == "fireball" else Vector2(1,0.32)
+		ring(canvas,at,radius,angle,alpha,reduced,plane)
 	if not clip.has("channel_end"): return
 	var charging: bool = animation.phase in ["windup","build"]
 	var charge: float = clampf(animation.total_age/2.5,0,1)

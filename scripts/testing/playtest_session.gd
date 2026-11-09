@@ -283,8 +283,8 @@ func _settle() -> void:
 			chest_source = ""
 		if chest_source == "wave_closed": return
 		if model.phase == "turn_end": _record(model.end_round()); continue
-		if model.perfect_relic_ready: _record(model.resolve_roll_relic_step()); continue
 		if model.phase == "roll_attacks": _record(_apply_auto_step()); continue
+		if model.perfect_relic_ready: _record(model.resolve_roll_relic_step()); continue
 		if model.start_roll_chip_casts(): continue
 		if model.phase == "player" and model.pending.cast_source != "manual": _record(_apply_player()); continue
 		if not model.tarot_effects.pending_repeat.is_empty():

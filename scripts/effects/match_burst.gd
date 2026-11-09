@@ -20,7 +20,7 @@ static func play(battle, group: Dictionary, token: int) -> bool:
 	var destinations: Array = hits.map(func(hit): return battle._enemy_impact_point(hit.target))
 	var feet: Array = hits.map(func(hit): return battle._enemy_feet(hit.target))
 	var seconds: float = DURATIONS[skill.dice.size()]
-	battle.damage_feedback.show_attack(skill)
+	battle.damage_feedback.show_attack(skill,target)
 	battle.player_animation.begin("fireball" if skill.dice.size() == 3 else "storm")
 	if not await battle._wait_player_launch(token): return false
 	var buildup: float = battle.player_animation.impact_delay()

@@ -21,7 +21,7 @@ func capture(g, label: String) -> void:
 	root.get_texture().get_image().save_png("res://test-output/growth-cap-"+label+".png")
 
 func run() -> void:
-	check(is_equal_approx(Battle.ActorScale.player_size(1),224+64*11.0/19),"Second form retains the previous wave-12 player size")
+	check(is_equal_approx(Battle.ActorScale.player_size(1),(224+64*11.0/19)*1.1),"Second form adds ten percent to its fixed size")
 	check(is_equal_approx(Battle.ActorScale.enemy_size(2),192-104*11.0/18),"Final evolution retains the previous wave-12 enemy size")
 	for phone in [false,true]:
 		root.content_scale_size = Vector2i(804,1748) if phone else Vector2i(1280,800)

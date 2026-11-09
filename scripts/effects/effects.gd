@@ -102,13 +102,22 @@ const DAMAGE_REFERENCES := [20.0,100.0,300.0]
 const DAMAGE_GROWTH := 0.25
 const ATTACK_SIZE_CAP := 1.4
 const NUMBER_SIZE_CAP := 1.6
+const OVERKILL_SIZE_CAP := 3.0
+const BOSS_NUMBER_MAX_HEALTH_FRACTION := 0.2
 
 static func damage_scale(damage: int, stage: int = 0, cap: float = ATTACK_SIZE_CAP) -> float:
 	var reference: float = DAMAGE_REFERENCES[clampi(floori(float(stage)/CampaignWaves.WAVES_PER_LEVEL),0,DAMAGE_REFERENCES.size()-1)]
 	return clampf(1.0+DAMAGE_GROWTH*log(maxf(1.0,damage/reference))/log(10.0),1.0,cap)
 
-static func damage_font_size(damage: int, stage: int = 0) -> int:
-	return roundi(DAMAGE_FONT_SIZE*damage_scale(damage,stage,NUMBER_SIZE_CAP))
+## Grow quickly with health lost; normal-enemy overkills get a larger, softly capped flourish.
+static func damage_font_size(damage: int, stage: int = 0, target_max_hp: float = 0.0, boss: bool = false) -> int:
+	if target_max_hp <= 0: return roundi(DAMAGE_FONT_SIZE*damage_scale(damage,stage,NUMBER_SIZE_CAP))
+	var threshold: float = target_max_hp*(BOSS_NUMBER_MAX_HEALTH_FRACTION if boss else 1.0)
+	var health_fraction: float = maxf(0,float(damage)/threshold)
+	var scale: float = lerpf(1.0,NUMBER_SIZE_CAP,pow(minf(health_fraction,1.0),0.35))
+	if not boss and health_fraction > 1:
+		scale += (OVERKILL_SIZE_CAP-NUMBER_SIZE_CAP)*(1-exp(-(health_fraction-1)/3.0))
+	return roundi(DAMAGE_FONT_SIZE*scale)
 
 func floating(at: Vector2, text: String, color: Color, size: int = FLOAT_FONT_SIZE, ui_effect: bool = false) -> void:
 	floats.append({"p": at, "text": text, "color": color, "life": 1.3,"size":size,"ui":ui_effect})
@@ -122,7 +131,7 @@ func damage_number(at: Vector2, text: String, color: Color, size: int = DAMAGE_F
 	elif at.x > canvas_size.x-120: side = -1
 	var movement: float = 0.25 if reduced else 1.0
 	var spread: float = clampf(sqrt(float(size)/DAMAGE_FONT_SIZE),1.0,1.6)
-	var velocity := Vector2(side*cosmetic.randf_range(150,250)*spread*0.65,cosmetic.randf_range(-380,-170))*movement
+	var velocity := Vector2(side*cosmetic.randf_range(150,250)*spread*0.65,cosmetic.randf_range(-380,-170)*1.3)*movement
 	var offset := Vector2(cosmetic.randf_range(-9,9),cosmetic.randf_range(-5,4))*movement
 	floats.append({"p":at+offset,"text":text,"color":color,"life":1.15,"size":size,"velocity":velocity,"gravity":480.0*movement,"speed":1.2,"damage":true})
 

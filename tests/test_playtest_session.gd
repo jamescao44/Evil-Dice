@@ -23,8 +23,8 @@ func durable(m) -> void:
 
 ## Resolve roll procs in the same order as Battle._resolve_roll_triggers().
 func roll_procs(m) -> void:
-	while m.perfect_relic_ready: m.resolve_roll_relic_step()
 	while not m.roll_attacks.is_empty(): m.resolve_roll_attack_step()
+	while m.perfect_relic_ready: m.resolve_roll_relic_step()
 
 ## Compare gameplay state and both RNG streams without presentation-specific objects.
 func signature(m) -> String:

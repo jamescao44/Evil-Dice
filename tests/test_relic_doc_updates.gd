@@ -41,7 +41,7 @@ func damage_checks() -> void:
 	for id in ["pet_ghost","pet_dragon"]:
 		m = fresh(); m.acquire_relic(id); m.begin_round(); m.roll_pool(false,[1,2,3,4,5,6])
 		var events: Array = m.resolve_perfect_relic().filter(func(e): return e.type == "damage")
-		check(events.size() == (2 if id == "pet_dragon" else 1) and events.all(func(e): return e.display_amount == (15 if id == "pet_dragon" else 20)),"Pet uses the revised balance value: "+id)
+		check(events.size() == (2 if id == "pet_dragon" else 1) and events.all(func(e): return e.display_amount == (7 if id == "pet_dragon" else 20)),"Pet uses the revised balance value: "+id)
 
 func projection_checks() -> void:
 	var m = fresh(); only_strength(m); m.acquire_relic("crystal_ball")

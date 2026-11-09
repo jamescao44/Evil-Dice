@@ -9,13 +9,14 @@ const Modifiers = preload("res://scripts/enemies/enemy_modifiers.gd")
 static func can_apply(model) -> bool:
 	return model.hp > 0 and model.phase in ["new","roll","player","frozen","round_end","shop"] and not model.perfect_relic_ready
 
-## Set the requested level, start its XP bar empty and heal as a normal level-up would.
+## Replace pending levels and use the same celebration-timed heal as earned levels.
 static func set_level(model, level: int) -> bool:
 	if level < 1 or level > MAX_LEVEL or not can_apply(model): return false
 	model.character_level = level
 	model.souls = 0
 	model.base_max_hp = model.Vitals.base_health(level)
-	model.hp = model.max_hp
+	model.pending_level_heals.clear()
+	model.request_level_heal(level)
 	# Keep chosen enemy moves and targets, but update their player-level damage budgets.
 	for index in model.living():
 		var enemy: Dictionary = model.enemies[index]

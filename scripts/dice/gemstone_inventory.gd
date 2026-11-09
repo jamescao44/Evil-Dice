@@ -7,6 +7,29 @@ var bag: Dictionary = {}
 var order: Array = []
 var sockets: Array = _empty_sockets()
 var revision: int = 0
+# Presentation metadata follows individual copies without changing combat snapshots or saves.
+var unseen_bag: Array = []
+var unseen_sockets: Array = range(SOCKETS).map(func(_i): return false)
+
+func is_new(location: Dictionary) -> bool:
+	var flags: Array = unseen_sockets if location.has("socket") else unseen_bag
+	var index: int = int(location.get("socket",location.get("bag",-1)))
+	return index >= 0 and index < flags.size() and flags[index]
+
+## Keep navigation notices separate from the copies that still need inspection.
+func has_new() -> bool:
+	return true in unseen_bag or true in unseen_sockets
+
+## Touching one copy acknowledges it without changing identical gems elsewhere.
+func acknowledge(location: Dictionary) -> void:
+	var flags: Array = unseen_sockets if location.has("socket") else unseen_bag
+	var index: int = int(location.get("socket",location.get("bag",-1)))
+	if index >= 0 and index < flags.size(): flags[index] = false
+
+## Clear cosmetic metadata independently of gemstone ownership.
+func acknowledge_new() -> void:
+	unseen_bag.fill(false)
+	unseen_sockets.fill(false)
 
 ## Stable keys keep duplicates stacked without imposing another inventory limit.
 static func key(id: String, level: int) -> String:
@@ -23,35 +46,40 @@ func count(id: String, level: int = 1) -> int:
 	return int(bag.get(key(id,level),0))
 
 ## Grant spare gems without changing any equipped die.
-func add(id: String, level: int = 1, amount: int = 1) -> bool:
+func add(id: String, level: int = 1, amount: int = 1, newly_found: bool = false) -> bool:
 	if not valid_gem({"id":id,"level":level}) or amount <= 0: return false
 	bag[key(id,level)] = count(id,level)+amount
-	for i in range(amount): order.append(key(id,level))
+	for i in range(amount):
+		order.append(key(id,level))
+		unseen_bag.append(newly_found)
 	revision += 1
 	return true
 
-func _remove(id: String, level: int) -> void:
-	_remove_at(order.find(key(id,level)))
+func _remove(id: String, level: int) -> bool:
+	return _remove_at(order.find(key(id,level)))
 
-func _remove_at(index: int) -> Dictionary:
-	if index < 0 or index >= order.size(): return {}
+func _remove_at(index: int) -> bool:
+	if index < 0 or index >= order.size(): return false
 	var gem: Dictionary = bag_gem(index)
+	var unseen: bool = unseen_bag.pop_at(index)
 	order.remove_at(index)
 	var id: String = gem.id
 	var level: int = gem.level
 	var name: String = key(id,level)
 	bag[name] = count(id,level)-1
 	if bag[name] <= 0: bag.erase(name)
-	return gem
+	return unseen
 
 func bag_gem(index: int) -> Dictionary:
 	if index < 0 or index >= order.size(): return {}
 	var parts: PackedStringArray = str(order[index]).split(":")
 	return {"id":parts[0],"level":int(parts[1])}
 
-func _insert(index: int, gem: Dictionary) -> void:
-	add(gem.id,gem.level)
+func _insert(index: int, gem: Dictionary, newly_found: bool = false) -> void:
+	add(gem.id,gem.level,1,newly_found)
 	order.pop_back()
+	unseen_bag.pop_back()
+	unseen_bag.insert(clampi(index,0,order.size()),newly_found)
 	order.insert(clampi(index,0,order.size()),key(gem.id,gem.level))
 
 ## A drag merges matching tiers; otherwise it reorders the bag or swaps dice sockets.
@@ -66,35 +94,45 @@ func transfer(source: Dictionary, destination: Dictionary) -> bool:
 	var a: Dictionary = sockets[start] if from_socket else bag_gem(start)
 	var b: Dictionary = sockets[end] if to_socket else bag_gem(end)
 	if a.is_empty(): return false
+	var new_a: bool = is_new(source)
+	var new_b: bool = is_new(destination)
 	var combine: bool = a == b and Catalog.can_merge(a)
 	if from_socket and to_socket:
 		sockets[start] = {} if combine else b
 		sockets[end] = {"id":a.id,"level":int(a.level)+1} if combine else a
+		unseen_sockets[start] = false if combine else new_b
+		unseen_sockets[end] = new_a or (combine and new_b)
 	elif not from_socket and not to_socket:
 		if combine:
 			_remove_at(maxi(start,end)); _remove_at(mini(start,end))
-			_insert(end-(1 if start < end else 0),{"id":a.id,"level":int(a.level)+1})
+			_insert(end-(1 if start < end else 0),{"id":a.id,"level":int(a.level)+1},new_a or new_b)
 		else:
 			var value: Variant = order.pop_at(start)
+			unseen_bag.insert(mini(end,order.size()),unseen_bag.pop_at(start))
 			order.insert(mini(end,order.size()),value)
 	elif from_socket:
 		sockets[start] = {} if combine else b
+		unseen_sockets[start] = false if combine else new_b
 		if not b.is_empty(): _remove_at(end)
-		_insert(end,{"id":a.id,"level":int(a.level)+1} if combine else a)
+		_insert(end,{"id":a.id,"level":int(a.level)+1} if combine else a,new_a or (combine and new_b))
 	else:
 		_remove_at(start)
 		sockets[end] = {"id":a.id,"level":int(a.level)+1} if combine else a
-		if not combine and not b.is_empty(): _insert(start,b)
+		unseen_sockets[end] = new_a or (combine and new_b)
+		if not combine and not b.is_empty(): _insert(start,b,new_b)
 	revision += 1
 	return true
 
 ## Swapping returns the old gemstone to the bag, even on a spent or rolling die.
-func equip(index: int, id: String, level: int = 1) -> bool:
+func equip(index: int, id: String, level: int = 1, bag_index: int = -1) -> bool:
 	if index < 0 or index >= SOCKETS or count(id,level) <= 0: return false
+	var source: int = order.find(key(id,level)) if bag_index < 0 else bag_index
+	if bag_gem(source) != {"id":id,"level":level}: return false
 	var previous: Dictionary = sockets[index]
-	_remove(id,level)
+	var previous_new: bool = unseen_sockets[index]
+	unseen_sockets[index] = _remove_at(source)
 	sockets[index] = {"id":id,"level":level}
-	if not previous.is_empty(): add(previous.id,previous.level)
+	if not previous.is_empty(): add(previous.id,previous.level,1,previous_new)
 	revision += 1
 	return true
 
@@ -103,7 +141,8 @@ func unequip(index: int) -> bool:
 	if index < 0 or index >= SOCKETS or sockets[index].is_empty(): return false
 	var gem: Dictionary = sockets[index]
 	sockets[index] = {}
-	add(gem.id,gem.level)
+	add(gem.id,gem.level,1,unseen_sockets[index])
+	unseen_sockets[index] = false
 	return true
 
 ## Prefer spare copies before touching another socket when looking for a merge partner.
@@ -118,16 +157,28 @@ func merge_partner(gem: Dictionary, socket: int = -1) -> int:
 	return -3
 
 ## Merge two identical gems atomically and retain the selected gem's bag/socket location.
-func merge(gem: Dictionary, socket: int = -1) -> bool:
+func merge(gem: Dictionary, socket: int = -1, bag_index: int = -1) -> bool:
 	var partner: int = merge_partner(gem,socket)
 	if partner == -3: return false
+	var source: int = order.find(key(gem.id,gem.level)) if bag_index < 0 else bag_index
+	if socket < 0 and bag_gem(source) != gem: return false
 	var upgraded := {"id":gem.id,"level":int(gem.level)+1}
-	if partner == -1: _remove(gem.id,gem.level)
-	else: sockets[partner] = {}
-	if socket >= 0: sockets[socket] = upgraded
+	var newly_found: bool
+	if partner == -1:
+		var partner_index: int = order.find(key(gem.id,gem.level))
+		if socket < 0 and partner_index == source: partner_index = order.find(key(gem.id,gem.level),source+1)
+		newly_found = _remove_at(partner_index)
+		if socket < 0 and partner_index < source: source -= 1
 	else:
-		_remove(gem.id,gem.level)
-		add(upgraded.id,upgraded.level)
+		newly_found = unseen_sockets[partner]
+		sockets[partner] = {}
+		unseen_sockets[partner] = false
+	if socket >= 0:
+		sockets[socket] = upgraded
+		unseen_sockets[socket] = unseen_sockets[socket] or newly_found
+	else:
+		var source_new: bool = _remove_at(source)
+		add(upgraded.id,upgraded.level,1,source_new or newly_found)
 	revision += 1
 	return true
 
@@ -145,6 +196,8 @@ func save() -> Dictionary:
 func restore(data: Dictionary) -> void:
 	bag.clear()
 	order.clear()
+	unseen_bag.clear()
+	unseen_sockets.fill(false)
 	sockets = _empty_sockets()
 	var stored_bag: Variant = data.get("bag",{})
 	if stored_bag is Dictionary:

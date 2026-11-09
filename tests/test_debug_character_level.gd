@@ -54,11 +54,23 @@ func scene(phone: bool) -> void:
 	g._handle_menu_page_click(ui.tab_rect(ui.Page.BATTLE).get_center())
 	check(ui.character_input.visible and ui.character_input.text == str(g.model.character_level),"Opening Battle tab shows the current character level")
 	g.evolution.queued = [2,3,4]; g.soul_pickup.pending_total = 20
+	g.evolution.set_process(false)
 	for level in [5,10,1]:
+		var previous: int = g.evolution.displayed_level
 		ui.character_input.text = str(level)
 		g._handle_menu_page_click(ui.character_apply_rect.get_center())
 		var form: int = mini(2,floori(level/5.0))
-		check(g.model.character_level == level and g.evolution.displayed_level == level and g.player_animation.form == form,"Apply changes both level and visible form immediately")
+		check(g.model.character_level == level and g.evolution.displayed_level == previous,"Debug changes stats but holds the old visual while the menu is open")
+		g.evolution._process(5)
+		check(g.evolution.displayed_level == previous and g.evolution.age < 0,"Open menus defer the whole transformation")
+		g._close_debug(false); g.menu_open = false
+		g.evolution._process(0.1)
+		check(g.evolution.source_form == g.evolution.form_index(previous),"Debug evolution begins with the previous form")
+		g.evolution._process(0.8)
+		check(g.evolution.displayed_level == level and g.player_animation.form == form and g.evolution.entrance.active(),"Menu close starts the destination entrance clip")
+		g.evolution._process(4)
+		g._open_debug()
+		g._handle_menu_page_click(ui.tab_rect(ui.Page.BATTLE).get_center())
 		check(not g.evolution.active() and g.soul_pickup.counter_state().level == level,"Stale XP receipts and queued transformations cannot restore an old form")
 		check(g.player_animation.Sprite.has_divine_ring(form) == (level >= 10),"Divine ring follows evolution")
 		check(is_equal_approx(g.damage_feedback.base_value,g.model.standing_damage_values().x),"Damage readout updates with the level")

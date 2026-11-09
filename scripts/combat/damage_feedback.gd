@@ -13,11 +13,16 @@ const IMPACT_TIME := 0.38
 const COMBINE_TIME := 0.28
 const WAVE_TIME := 0.22
 const WAVE_SPREAD := 0.14
-const TREMBLE_THRESHOLD := 100.0
-const TREMBLE_PER_DECADE := 4.0
+const TREMBLE_HEALTH_THRESHOLD := 0.8
+const MIN_PULSE_HZ := 0.4
+const MAX_PULSE_HZ := 2.0
+const PULSE_SCALE := 0.08
+const TREMBLE_PER_DECADE := 12.0
 const MAX_TREMBLE := 12.0
 const RESULT_HOLD := 2.2
-const RESULT_SIZE_FACTOR := 1.2
+const MIN_RESULT_SCALE := 1.05
+const MAX_RESULT_SCALE := 2.0
+const RESULT_SCALE_HEALTH_CAP := 4.0
 const RETURN_TIME := 0.28
 var battle
 var active: bool = false
@@ -31,6 +36,7 @@ var phase: String = ""
 var age: float = 0
 var result_age: float = 0
 var tremble_age: float = 0
+var pulse_phase: float = 0
 var impact_age: float = IMPACT_TIME
 var impact_speed: float = 1.0
 var impact_direction: int = 0
@@ -42,6 +48,7 @@ var flight_from := Vector2.ZERO
 var landed: bool = false
 var hit_damage: int = -1
 var damage_ticks: int = 1
+var tremble_health: float = 0.0
 
 func _ready() -> void:
 	z_index = BattleLayers.DAMAGE_READOUT
@@ -54,6 +61,7 @@ func should_show() -> bool:
 
 ## Track standing stats without consuming a buff, selecting a skill or rolling an effect.
 func _refresh_standing(animate: bool = false) -> void:
+	_capture_tremble_health()
 	var standing: Vector2 = battle.model.standing_damage_values()
 	if animate and (not is_equal_approx(base_value,standing.x) or not is_equal_approx(value,standing.y)):
 		_impact(standing.x,standing.y,Color.WHITE)
@@ -62,8 +70,9 @@ func _refresh_standing(animate: bool = false) -> void:
 		value = standing.y
 
 ## Automatic attacks update the same formula without adding delays to their volley.
-func show_attack(skill: MultiHitSkill) -> void:
+func show_attack(skill: MultiHitSkill, target: int = -1) -> void:
 	if battle.model.is_instant_kill(skill): return
+	_capture_tremble_health(skill,target)
 	active = true
 	building = false
 	phase = "attack"
@@ -75,6 +84,7 @@ func show_attack(skill: MultiHitSkill) -> void:
 
 ## Hold a generated skill's inherited total without replaying modifier buildup.
 func retain_result(total: int) -> void:
+	_capture_tremble_health(battle.model.pending)
 	active = true
 	building = false
 	phase = "result"
@@ -86,6 +96,7 @@ func retain_result(total: int) -> void:
 func start(values: Array) -> void:
 	clear()
 	if values.is_empty(): return
+	_capture_tremble_health(battle.model.pending)
 	steps = values.duplicate(true)
 	damage_ticks = maxi(1,int(steps.back().get("damage_ticks",1)))
 	base_value = steps[0].base_before
@@ -110,6 +121,7 @@ func clear(preserve_result: bool = false) -> void:
 	age = 0
 	result_age = 0
 	tremble_age = 0
+	pulse_phase = 0
 	impact_age = IMPACT_TIME
 	impact_speed = 1.0
 	impact_direction = 0
@@ -150,7 +162,7 @@ func text_size() -> int:
 	var available: float = battle.ARENA.size.x - 64
 	var width: float = battle.pixel_font.get_string_size(formula_label(),HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 	var fitted_width: float = width*1.35
-	if phase == "result": fitted_width = battle.pixel_font.get_string_size(label(),HORIZONTAL_ALIGNMENT_LEFT,-1,size).x*(RESULT_SIZE_FACTOR+0.1)
+	if phase == "result": fitted_width = battle.pixel_font.get_string_size(label(),HORIZONTAL_ALIGNMENT_LEFT,-1,size).x*(result_size_factor()+0.35)*(1+PULSE_SCALE)
 	return maxi(14,floori(size * minf(1.0,available/maxf(1,fitted_width))))
 
 func _width(text: String) -> float:
@@ -245,7 +257,9 @@ func _process(delta: float) -> void:
 	if not active: _refresh_standing(true)
 	var elapsed: float = delta*clampf(battle._roll_speed(),1,2)
 	impact_age += elapsed*impact_speed
-	tremble_age += elapsed
+	# Readout motion uses real seconds so fast combat never exceeds two pulses per second.
+	tremble_age += delta
+	pulse_phase = fposmod(pulse_phase+delta*damage_pulse_frequency(combined_damage(),tremble_health),1.0)
 	if phase == "result": result_age += elapsed
 	if fade_age >= 0:
 		# Final-result readability uses real seconds, independent of battle speed.
@@ -287,8 +301,17 @@ func result_glyph_motion(index: int, count: int) -> Vector2:
 	return _wave_motion(index,count,result_age,12)
 
 func result_glyph_scale(index: int, count: int) -> float:
-	if battle.reduced: return RESULT_SIZE_FACTOR
-	return lerpf(RESULT_SIZE_FACTOR+absf(result_glyph_motion(index,count).y)/12.0*0.25,1.0,return_progress())
+	var wave: float = absf(result_glyph_motion(index,count).y)/12.0*0.25
+	return lerpf(result_size_factor()+wave,1.0,return_progress())
+
+## Final totals grow with their share of level-scaled enemy HP, with a readable overkill cap.
+static func damage_result_scale(damage: float, target_health: float) -> float:
+	if target_health <= 0: return MIN_RESULT_SCALE
+	var ratio: float = clampf(damage/target_health,0,RESULT_SCALE_HEALTH_CAP)
+	return lerpf(MIN_RESULT_SCALE,MAX_RESULT_SCALE,log(1+ratio*3)/log(1+RESULT_SCALE_HEALTH_CAP*3))
+
+func result_size_factor() -> float:
+	return damage_result_scale(combined_damage(),tremble_health)
 
 ## Shrink into the live standing formula after the hold, using menu-paused real time.
 func return_progress() -> float:
@@ -298,20 +321,58 @@ func return_progress() -> float:
 func result_glyph_origin(x: float, character: String, scale_value: float) -> Vector2:
 	return anchor()+Vector2(x+_width(character)*(scale_value-1)*0.5,battle.pixel_font.get_ascent(text_size())*(scale_value-1))
 
-static func damage_tremble_amplitude(damage: float) -> float:
-	if damage <= TREMBLE_THRESHOLD: return 0.0
-	return minf(MAX_TREMBLE,log(damage/TREMBLE_THRESHOLD)/log(10.0)*TREMBLE_PER_DECADE)
+## Use scaled max HP, never remaining HP or raw damage, to compare attacks across levels.
+## Area/unknown targets use the strongest affected enemy; weak adds cannot inflate the shake.
+func _capture_tremble_health(skill: MultiHitSkill = null, target: int = -1) -> void:
+	tremble_health = 0.0
+	if battle.model.is_city():
+		tremble_health = battle.model.CITY_MAX_HP*battle.Effects.BOSS_NUMBER_MAX_HEALTH_FRACTION
+		return
+	var targets: Array = battle.model.living()
+	if skill != null and not skill.is_empty() and not skill.hits_all():
+		if target < 0: target = skill.target
+		targets = [target] if target >= 0 and target < battle.model.enemies.size() else battle.model.RelicFocus.targets(battle.model)
+	for index in targets:
+		var enemy: Dictionary = battle.model.enemies[index]
+		var reference: float = enemy.max_hp
+		if enemy.get("boss",false): reference *= battle.Effects.BOSS_NUMBER_MAX_HEALTH_FRACTION
+		tremble_health = maxf(tremble_health,reference)
+
+## Pulse slowly for light hits, reaching exactly two pulses per second at eighty percent HP.
+static func damage_pulse_frequency(damage: float, target_health: float) -> float:
+	if damage <= 0 or target_health <= 0: return 0.0
+	var ratio: float = damage/target_health
+	if ratio > TREMBLE_HEALTH_THRESHOLD: return 0.0
+	return lerpf(MIN_PULSE_HZ,MAX_PULSE_HZ,ratio/TREMBLE_HEALTH_THRESHOLD)
+
+## Pulse each numeric value as one block, independently of the DMG label and multiplication sign.
+func number_pulse_scale() -> float:
+	if battle.reduced or not active or damage_pulse_frequency(combined_damage(),tremble_health) <= 0: return 1.0
+	return 1.0+(1-cos(pulse_phase*TAU))*0.5*PULSE_SCALE*(1-return_progress())
+
+## Tremble takes over above eighty percent HP and grows smoothly to a capped overkill shake.
+static func damage_tremble_amplitude(damage: float, target_health: float) -> float:
+	if target_health <= 0: return 0.0
+	var ratio: float = maxf(0,damage)/target_health
+	if ratio <= TREMBLE_HEALTH_THRESHOLD: return 0.0
+	return minf(MAX_TREMBLE,log(ratio/TREMBLE_HEALTH_THRESHOLD)/log(10.0)*TREMBLE_PER_DECADE)
 
 func number_tremble(index: int) -> Vector2:
 	if battle.reduced: return Vector2.ZERO
 	if not active and impact_age >= IMPACT_TIME: return Vector2.ZERO
-	var amplitude: float = damage_tremble_amplitude(combined_damage())
+	var amplitude: float = damage_tremble_amplitude(combined_damage(),tremble_health)
 	# Match the dice's charging frequencies without consuming combat randomness.
 	return Vector2(sin(tremble_age*71+index*2.1),cos(tremble_age*83+index*1.7))*amplitude
 
-func _glyph(at: Vector2, character: String, scale_value: float, opacity: float) -> void:
+## Find a number's visual center, including the larger result's baseline and spacing.
+func number_pulse_center(x: float, width: float, scale_value: float = 1.0) -> Vector2:
+	var ascent: float = battle.pixel_font.get_ascent(text_size())
+	var descent: float = battle.pixel_font.get_descent(text_size())
+	return anchor()+Vector2(x+width*0.5,ascent*(scale_value-1)+(descent-ascent)*scale_value*0.5)
+
+func _glyph(at: Vector2, character: String, scale_value: float, opacity: float, pulse: float = 1.0, pivot: Vector2 = Vector2.ZERO) -> void:
 	var width: float = _width(character)
-	draw_set_transform(at+Vector2(width*0.5,0),0,Vector2.ONE*scale_value)
+	draw_set_transform(pivot+(at+Vector2(width*0.5,0)-pivot)*pulse,0,Vector2.ONE*scale_value*pulse)
 	draw_string(battle.pixel_font,Vector2(-width*0.5+2,2),character,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size(),Color(0.04,0.06,0.05,opacity))
 	draw_string(battle.pixel_font,Vector2(-width*0.5,0),character,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size(),Color(1,1,1,opacity))
 	draw_set_transform(Vector2.ZERO)
@@ -322,8 +383,11 @@ func _draw_formula(opacity: float) -> void:
 	var count: int = formula_label().length()
 	var merge: float = clampf(age/COMBINE_TIME,0,1) if phase == "combine" else 0.0
 	var center: float = _width(formula_label())*0.5
+	var pulse: float = number_pulse_scale()
 	for part in [["DMG ",0,false],[number(base_value),base_direction,true],[" x ",0,false],[number(value,true),mult_direction,true]]:
 		var direction: int = part[1]
+		var pivot: Vector2 = number_pulse_center(x,_width(part[0]))
+		pivot.x = lerpf(pivot.x,anchor().x+center,merge*0.55)
 		# Each numeric value trembles together so its digits remain readable.
 		var tremble: Vector2 = number_tremble(index) if part[2] else Vector2.ZERO
 		for character in part[0]:
@@ -332,7 +396,7 @@ func _draw_formula(opacity: float) -> void:
 			var at: Vector2 = anchor()+Vector2(lerpf(x,center,merge*0.55),0)+wave
 			if direction < 0: at += motion(direction)
 			at += tremble
-			_glyph(at,character,1+bump,opacity*(1-merge))
+			_glyph(at,character,1+bump,opacity*(1-merge),pulse if part[2] else 1.0,pivot)
 			x += _width(character)
 			index += 1
 
@@ -340,12 +404,17 @@ func _draw_result(opacity: float) -> void:
 	var x: float = 0
 	var text: String = label()
 	var returning: float = return_progress()
-	var spacing: float = lerpf(RESULT_SIZE_FACTOR+0.1,1.0,returning)
+	var spacing: float = lerpf(result_size_factor()+0.1,1.0,returning)
+	var pulse: float = number_pulse_scale()
+	var base_scale: float = lerpf(result_size_factor(),1.0,returning)
+	var last_width: float = _width(text.right(1))
+	var number_width: float = (_width(text.substr(4))-last_width)*spacing+last_width*base_scale
+	var pivot: Vector2 = number_pulse_center(_width("DMG ")*spacing,number_width,base_scale)
 	for i in range(text.length()):
 		var offset: Vector2 = result_glyph_motion(i,text.length())
 		if i >= 4: offset += number_tremble(4)
 		var glyph_scale: float = result_glyph_scale(i,text.length())
-		_glyph(result_glyph_origin(x,text[i],glyph_scale)+offset*(1-returning),text[i],glyph_scale,opacity*(1-returning))
+		_glyph(result_glyph_origin(x,text[i],glyph_scale)+offset*(1-returning),text[i],glyph_scale,opacity*(1-returning),pulse if i >= 4 else 1.0,pivot)
 		x += _width(text[i])*spacing
 	if returning > 0: _draw_standing(returning*opacity)
 

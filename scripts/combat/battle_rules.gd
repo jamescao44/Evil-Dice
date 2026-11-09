@@ -3,6 +3,7 @@ const RelicRollRules = preload("res://scripts/relics/relic_roll_rules.gd")
 ## Deterministic battle model. Rendering and cosmetic randomness never alter it.
 signal relic_activated(id: String)
 signal relic_effect_activated(id: String)
+signal relic_attack_started(receipt: Dictionary)
 signal relic_cost_paid(events: Array)
 signal boss_changed(index: int, event_type: String)
 signal damage_redirected(source: int, target: int, damage: int, loss: int)
@@ -20,6 +21,8 @@ const RelicFocus = preload("res://scripts/relics/relic_focus.gd")
 var relic_skills = RelicSkills.new()
 const RelicRecovery = preload("res://scripts/relics/relic_recovery.gd")
 var relic_recovery = RelicRecovery.new()
+const RelicProtection = preload("res://scripts/relics/relic_protection.gd")
+var relic_protection = RelicProtection.new()
 var player_end_events: Array = []
 const AreaAttack = preload("res://scripts/combat/area_attack.gd")
 const TarotEffects = preload("res://scripts/tarot/tarot_effects.gd")
@@ -121,6 +124,7 @@ func reset() -> void:
 	relic_recovery = RelicRecovery.new()
 	player_end_events.clear()
 	relic_skills = RelicSkills.new()
+	relic_protection = RelicProtection.new()
 	character_passive = FlamelingsPassive.new()
 	tarot_effects = TarotEffects.new()
 	dice_turn = DiceTurn.new()
@@ -309,7 +313,9 @@ func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false, re
 	for group in roll_attacks:
 		group.skill.socket_gems = gemstones.snapshot(group.indices)
 		group.skill.begin_cast(RelicEffects.use_modifiers(relics.items,group.skill,{}))
-	if not roll_attacks.is_empty(): phase = "roll_attacks"
+	if not roll_attacks.is_empty():
+		phase = "roll_attacks"
+		perfect_relic_ready = false # Opening item attacks wait for every alike group.
 	statuses[Status.STUNNED].consume()
 	return range(DiceTurn.COUNT) if cursed_sixes else changed
 
@@ -696,7 +702,7 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 		steps.append({"source":"gem","id":"","slot":-1,"before":value,"after":value,"base_before":base,"base_after":base*gem_base,"note":""})
 		base *= gem_base
 	# Multiply the accumulated level and relic base only after all ordered relics.
-	var skill_base: float = attack_base_with_bonus(result,base_bonus)*gem_base*GemEffects.factor(result.socket_gems,"potency")*result.damage_ticks*(0.5 if result.split_attack else 1.0)
+	var skill_base: float = attack_base_with_bonus(result,base_bonus)*gem_base*GemEffects.factor(result.socket_gems,"potency")*result.damage_ticks*(relic_skills.SPLIT_DAMAGE_FACTOR if result.split_attack else 1.0)
 	steps.append({"source":"skill","id":"","slot":-1,"before":value,"after":value,"base_before":base,"base_after":skill_base,"note":""})
 	base = skill_base
 	var strength_base: float = base
@@ -728,11 +734,11 @@ func is_instant_kill(result: MultiHitSkill) -> bool:
 ## Keep fractional damage until target-specific bonuses have been applied.
 func raw_attack_damage(result: MultiHitSkill) -> float:
 	relic_skills.configure_split(self,result)
-	if result.inherited_damage >= 0: return float(result.inherited_damage)*(0.5 if result.split_attack else 1.0)
+	if result.inherited_damage >= 0: return float(result.inherited_damage)*(relic_skills.SPLIT_DAMAGE_FACTOR if result.split_attack else 1.0)
 	var critical: bool = result.critical or (result.pattern != "match_auto" and result.cast_source != "chip" and phase != "executing" and RelicEffects.has_critical(relics.items))
 	var evaluated: MultiHitSkill = result.duplicate(true)
 	evaluated.critical = critical
-	return attack_base(result)*damage_multiplier(evaluated)*(0.5 if result.split_attack else 1.0)
+	return attack_base(result)*damage_multiplier(evaluated)*(relic_skills.SPLIT_DAMAGE_FACTOR if result.split_attack else 1.0)
 
 ## Combine base damage, multiplier and critical before target defenses.
 func unmitigated_damage(result: MultiHitSkill) -> int:
@@ -757,30 +763,15 @@ func skill_damage_total(result: MultiHitSkill, target: int = -1, protection: flo
 		total += floori(_target_damage(result,damage,target,ignites and tick > 0)*protection)
 	return total
 
-## Count all uses, including the skill's own guaranteed Burning before later uses.
-func skill_preview_total(result: MultiHitSkill, target: int, protection: float, uses: int) -> int:
-	var first: int = skill_damage_total(result,target,protection)
-	if uses <= 1: return first
-	var later: int = first
-	if CharacterSkills.burning_stacks(result,character_evolution_stage()) > 0:
-		later = floori(_target_damage(result,unmitigated_damage(result),target,true)*protection)*result.damage_ticks
-	return first+later*(uses-1)
+## Describe one use before enemy statuses, defenses or Burning from earlier uses.
+func skill_description_damage(result: MultiHitSkill) -> int:
+	return unmitigated_damage(result)*result.damage_ticks
 
-## Preview total direct damage per enemy, with a range for differing defenses and a hit count.
-func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
+## Show a stable skill total and hit count without inspecting the target's condition.
+func damage_caption(result: MultiHitSkill, _primary: int = -1) -> String:
 	if not is_attack(result) or is_instant_kill(result): return ""
 	var uses: int = skill_use_count(result)
-	var targets: Array = living() if hits_all(result) else [primary] if primary in RelicFocus.targets(self) else RelicFocus.targets(self)
-	var guards: Array = taunting_enemies()
-	if targets.is_empty(): return ""
-	var low: int = skill_preview_total(result,targets[0],area_damage_factor(targets[0],guards) if hits_all(result) else 1.0,uses)
-	var high: int = low
-	for target in targets:
-		var damage: int = skill_preview_total(result,target,area_damage_factor(target,guards) if hits_all(result) else 1.0,uses)
-		low = mini(low,damage)
-		high = maxi(high,damage)
-	var total: String = str(low) if low == high else "%d–%d" % [low,high]
-	var text: String = GameText.format("%s damage",total)
+	var text: String = GameText.format("%s damage",str(skill_description_damage(result)*uses))
 	var hits: int = result.damage_ticks*uses
 	return text+GameText.format(" (%d hits)",hits) if hits > 1 else text
 
@@ -788,15 +779,7 @@ func damage_caption(result: MultiHitSkill, primary: int = -1) -> String:
 func selection_damage_caption(result: MultiHitSkill) -> String:
 	if not is_attack(result) or is_instant_kill(result): return ""
 	var uses: int = skill_use_count(result)
-	var targets: Array = living() if hits_all(result) else RelicFocus.targets(self)
-	var guards: Array = taunting_enemies()
-	var low: int = 0
-	var high: int = 0
-	for target in targets:
-		var damage: int = skill_damage_total(result,target,area_damage_factor(target,guards) if hits_all(result) else 1.0)
-		low = damage if target == targets[0] else mini(low,damage)
-		high = maxi(high,damage)
-	var total: String = str(low) if low == high else "%d–%d" % [low,high]
+	var total: String = str(skill_description_damage(result))
 	return GameText.format("%s damage",total)+GameText.format(" (%d use)" if uses == 1 else " (%d uses)",uses)
 
 ## Report guaranteed skill/socket statuses without activating relics or drawing random effects.
@@ -1013,7 +996,7 @@ func _apply_attack_hit(result: MultiHitSkill, hit: Dictionary) -> Array:
 	if burning > 0 and not CharacterSkills.burning_after_cast(result):
 		events.append_array(apply_enemy_status(hit.target,Status.BURNING,burning,true,result.relic_effect_scale))
 	if loss > 0: events.append_array(_attack_relic_effects(hit.target,loss,result))
-	events.append_array(RelicCombat.overflow(self,hit.target,hit.damage,previous_hp,shielded,hit.ignore))
+	events.append_array(RelicCombat.overflow(self,hit.target,hit.damage,previous_hp,shielded,hit.ignore,result.hits_all()))
 	return events
 
 ## Lock random damage once per use; UI previews never call this method.
@@ -1058,6 +1041,8 @@ func resolve_roll_attack_step() -> Array:
 	var target: int = roll_attack_target()
 	if target < 0 or not outcome().is_empty():
 		roll_attacks.clear()
+		roll_relic_actions.clear()
+		perfect_relic_ready = false
 		phase = "finished" if not outcome().is_empty() else "roll"
 		return []
 	var skill: MultiHitSkill = roll_attacks[0].skill
@@ -1066,6 +1051,8 @@ func resolve_roll_attack_step() -> Array:
 	RelicEffects.activate_damage_modifiers(self,skill)
 	if hp <= 0:
 		roll_attacks.clear()
+		roll_relic_actions.clear()
+		perfect_relic_ready = false
 		phase = "finished"
 		return []
 	var events: Array = _apply_gem_recovery(skill) if skill.uses_spent == 0 else []
@@ -1089,9 +1076,13 @@ func resolve_roll_attack_step() -> Array:
 		player_end_events.clear()
 	if not outcome().is_empty():
 		roll_attacks.clear()
+		roll_relic_actions.clear()
+		perfect_relic_ready = false
 		phase = "finished"
 		events.append_array(_complete_relic_turn())
-	elif roll_attacks.is_empty(): phase = "roll"
+	elif roll_attacks.is_empty():
+		phase = "roll"
+		perfect_relic_ready = not roll_relic_actions.is_empty()
 	return events
 
 func _complete_skill_use(result: MultiHitSkill, events: Array) -> void:
@@ -1263,6 +1254,7 @@ func grant_tarot(_id: String, _enemy_index: int = -1, _projection: bool = false)
 
 func refresh_relic_health(old_max: int) -> void:
 	RelicFocus.sync(self)
+	RelicProtection.sync_guardians(self)
 	for status in Status.HARMFUL:
 		if relic_immune(status): statuses[status].count = 0
 	hp = clampi(hp + maxi(0, max_hp - old_max), 0, max_hp)
@@ -1282,13 +1274,20 @@ func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> A
 	if not corroded and not burning:
 		var blocked: int = mini(shield, loss)
 		shield -= blocked
+		relic_protection.shield_spent(blocked)
 		loss -= blocked
+	var protection: Dictionary = relic_protection.absorb(self,loss) if not burning else {"damage":loss,"events":[],"counters":[]}
+	loss = protection.damage
 	var hit_damage: int = loss
 	loss = mini(hp, loss)
 	hp -= loss
 	var events: Array = [damage_event(-1,loss,hit_damage,"burn" if burning else "damage")]
+	events.append_array(protection.events)
 	if hp <= 0: events.append_array(RelicEffects.prevent_death(self))
-	if not burning: events.append_array(RelicEffects.retaliation(self,attacker))
+	events.append_array(relic_protection.after_hp_loss(self,loss))
+	if not burning:
+		events.append_array(RelicProtection.retaliate(self,attacker,protection.counters))
+		events.append_array(RelicEffects.retaliation(self,attacker))
 	return events
 
 func _complete_relic_turn() -> Array:
@@ -1325,7 +1324,7 @@ func apply_enemy_status(index: int, id: int, amount: int, modify_stacks: bool = 
 	if added <= 0: return RelicEffects.status_applied(self,index,id) if amount > 0 else []
 	if id == Status.PLAGUE:
 		if not enemy.has("healthy_max_hp"): enemy.healthy_max_hp = enemy.max_hp
-		enemy.max_hp = maxi(1, enemy.healthy_max_hp - enemy.statuses[id].count * 10)
+		enemy.max_hp = Status.plague_max_hp(enemy.healthy_max_hp,enemy.statuses[id].count,enemy.get("boss",false))
 		enemy.hp = mini(enemy.hp, enemy.max_hp)
 	var effect: Dictionary = event(index, added, "status", status_label(id, added))
 	effect.status = id
@@ -1365,6 +1364,7 @@ func roll_relic_animation_speed() -> float:
 	return RelicEffects.Sequence.animation_speed(roll_relic_actions[0].activation) if not roll_relic_actions.is_empty() else 1.0
 
 func resolve_roll_relic_step() -> Array:
+	if not roll_attacks.is_empty(): return []
 	if roll_relic_actions.is_empty():
 		perfect_relic_ready = false
 		return []
@@ -1374,7 +1374,9 @@ func resolve_roll_relic_step() -> Array:
 		return []
 	var action: Dictionary = roll_relic_actions.pop_front()
 	RelicEffects.Sequence.activate(self,action.activation)
-	var options: Dictionary = {}
+	var options: Dictionary = action.get("options",{}).duplicate()
+	options.animation_speed = RelicEffects.Sequence.animation_speed(action.activation)
+	options.origin = action.activation.origin
 	if RelicEffects.Sets.collection_complete(relics.items,"pets"):
 		if action.id == "pet_ghost": options.multiplier_only = true
 		if action.id == "pet_dragon": options.burning = 1
@@ -1395,6 +1397,7 @@ func resolve_roll_relic_step() -> Array:
 
 func resolve_perfect_relic() -> Array:
 	# Compatibility for model simulations; presentation resolves one proc at a time.
+	if not roll_attacks.is_empty(): return []
 	if perfect_relic_ready and roll_relic_actions.is_empty(): roll_relic_actions = RelicEffects.roll_actions(self,true)
 	var events: Array = []
 	while not roll_relic_actions.is_empty(): events.append_array(resolve_roll_relic_step())

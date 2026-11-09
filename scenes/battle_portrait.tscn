@@ -6,3 +6,4 @@
 script = ExtResource("1")
 chest_pity_path = "user://chest_pity.cfg"
 relic_unlocks_path = "user://relic_unlocks.cfg"
+level_entrance_enabled = true

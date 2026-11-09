@@ -34,12 +34,12 @@ func set_checks() -> void:
 	for id in bones: m.acquire_relic(id)
 	check(m.relics.items.size() == 5 and m.relics.can_add("unidentified_ring"),"Five bones wait for ring")
 	var actions: Array = m.RelicEffects.roll_actions(m,false)
-	check(actions.map(func(a): return int(a.amount)) == [5,5,5,10,10],"Bones produce five individual attacks")
+	check(actions.map(func(a): return a.options.base_scale) == [0.5,0.5,0.5,1.0,1.0],"Bones produce five individual attacks")
 	check(m.relics.draw_one(m.reward_rng,[],[0,0,1,0,0]) != "witch_ghost","Fusion never drops directly")
 	m.acquire_relic("unidentified_ring")
 	check(m.relics.items.size() == 1 and m.relics.has("witch_ghost"),"Six remains fuse into one Witch")
 	actions = m.RelicEffects.roll_actions(m,false)
-	check(actions.size() == 1 and actions[0].amount == 50,"Witch replaces component attacks with 50 base")
+	check(actions.size() == 1 and actions[0].options.base_scale == 5.0,"Witch replaces component attacks with five times current base")
 	check(bones.all(func(id): return m.relics.has(id) and not m.relics.can_add(id)),"Fusion preserves component exclusion")
 	m.sell_relic(0)
 	check(not m.relics.can_add("unidentified_ring"),"Selling Witch closes ring pool")
@@ -149,9 +149,9 @@ func plague_checks() -> void:
 	var e: Dictionary = m.enemies[0]
 	e.hp = 10000; e.max_hp = 10000
 	m.apply_enemy_status(0,m.Status.PLAGUE,10,false)
-	check(e.hp == 6930,"Boss loses 30 percent current HP once, even with copy relic")
+	check(e.hp == 5600,"Boss loses 30 percent current HP after Plague reduces its maximum by 20 percent")
 	m.apply_enemy_status(0,m.Status.PLAGUE,1,false)
-	check(e.hp == 6930,"Extra stacks do not retrigger same phase")
+	check(e.hp == 5600,"Extra stacks do not retrigger same phase")
 	m.apply_enemy_status(0,m.Status.BURNING,5,false); m.apply_enemy_status(0,m.Status.FROZEN,1,false)
 	m.phase = "executing"; m.direct_enemy_hp_damage(0,e.hp)
 	check(e.get("phase_transition_pending",false),"Boss transition waits for sequence end")
@@ -159,7 +159,8 @@ func plague_checks() -> void:
 	check(e.boss_phase == 2 and e.get("statuses",{}).is_empty(),"New boss phase clears old statuses")
 	var before: int = e.hp
 	m.apply_enemy_status(0,m.Status.PLAGUE,10,false)
-	check(e.hp == before-100-floori((before-100)*0.3),"Fresh phase can trigger Potion X once again")
+	var plagued: int = m.Status.plague_max_hp(before,10,true)
+	check(e.hp == plagued-floori(plagued*0.3),"Fresh phase can trigger Potion X once again")
 func companion_checks() -> void:
 	var m = fresh()
 	var ghost = preload("res://scripts/relics/witch_companion.gd").new()

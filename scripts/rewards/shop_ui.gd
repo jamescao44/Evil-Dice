@@ -5,6 +5,7 @@ const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const RarityDisplay = preload("res://scripts/relics/relic_rarity_display.gd")
 const Cards = preload("res://scripts/tarot/tarot_paint.gd")
 const Icons = preload("res://scripts/rewards/reward_icons.gd")
+const Resonance = preload("res://scripts/rewards/shop_set_resonance.gd")
 const KEEPER = preload("res://assets/art/shop/keeper.png")
 const GOLD := Color("dfc78d")
 const SOUL_COLOR := Color("a5e4ef")
@@ -20,7 +21,11 @@ var pointer := Vector2.ZERO
 var held_layer: Node2D
 var keeper_sprite: Sprite2D
 var keeper_overlay: Node2D
+var reveal_layer: Node2D
+var reveals: Array[Dictionary] = []
+var reveal_clock: float = 0.0
 var dialogue_time: float = 0.0
+var resonance = Resonance.new()
 
 ## Keep merchandise below pickups, held relics and settings pages.
 func _ready() -> void:
@@ -37,6 +42,10 @@ func _ready() -> void:
 	keeper_overlay.z_index = 1
 	keeper_overlay.draw.connect(_draw_divination)
 	add_child(keeper_overlay)
+	reveal_layer = Node2D.new()
+	reveal_layer.z_index = 2
+	reveal_layer.draw.connect(_draw_reveals)
+	add_child(reveal_layer)
 	held_layer = Node2D.new()
 	held_layer.z_as_relative = false
 	held_layer.z_index = battle.HELD_ITEM_Z
@@ -51,13 +60,53 @@ func open() -> void:
 	replacing = false
 	age = 0
 	dialogue_time = 0
+	_queue_reveals(true)
 	show()
 	queue_redraw()
 
 ## Clear presentation when leaving or restarting a run.
 func cancel() -> void:
 	cancel_purchase()
+	reveals.clear()
+	resonance.reset()
 	hide()
+
+## Introduce new Legendary stock one at a time using the chest's spin, slam and rebound.
+func _queue_reveals(include_gift: bool = false) -> void:
+	reveals.clear()
+	resonance.reset()
+	reveal_clock = 0
+	if battle.reduced: return
+	var slots: Array = range(battle.model.shop.offers.size())
+	if include_gift and not battle.model.shop.divination_used: slots.append(Stock.GIFT_SLOT)
+	for slot in slots:
+		var offer: Dictionary = battle.model.shop.offer_at(slot)
+		if offer.get("kind","") != "relic" or offer.get("sold",false): continue
+		if not Relics.ITEMS.has(offer.id) or Relics.ITEMS[offer.id].rarity != Relics.Rarity.LEGENDARY: continue
+		reveals.append({"slot":slot,"offer":offer,"start":reveals.size()*RarityDisplay.REVEAL_DURATION})
+
+## Reject sold or replaced listings so refreshes and purchases cannot leave a ghost item.
+func _reveal_age(slot: int) -> float:
+	if battle.reduced: return -1.0
+	var offer: Dictionary = battle.model.shop.offer_at(slot)
+	if offer.is_empty() or offer.get("sold",false): return -1.0
+	if slot == Stock.GIFT_SLOT and battle.model.shop.divination_used: return -1.0
+	for entry in reveals:
+		if entry.slot != slot or not is_same(entry.offer,offer): continue
+		var elapsed: float = reveal_clock-entry.start
+		if RarityDisplay.featured_reveal(Relics.Rarity.LEGENDARY,elapsed): return elapsed
+	return -1.0
+
+## Enlarged merchandise clears adjacent shelf icons while staying below pickups and menus.
+func _draw_reveals() -> void:
+	if not visible: return
+	for entry in reveals:
+		var elapsed := _reveal_age(entry.slot)
+		if elapsed < 0: continue
+		var gift: bool = entry.slot == Stock.GIFT_SLOT
+		var at: Vector2 = divination_deck_position() if gift else offer_art_rect(entry.slot).get_center()
+		var radius: float = (46 if portrait() else 36) if gift else offer_art_rect(entry.slot).size.x/2
+		RarityDisplay.paint(reveal_layer,entry.offer.id,at,radius,age,battle.reduced,1.0 if selected == entry.slot else 0.0,elapsed)
 
 ## Abandon a pending purchase completely without changing stock, funds or owned items.
 func cancel_purchase() -> void:
@@ -221,6 +270,7 @@ func click(at: Vector2) -> bool:
 	if refresh_rect().has_point(at):
 		if stock.refresh(battle.model):
 			selected = -1
+			_queue_reveals()
 			refresh_flash = 0.3
 			battle._sound("item/book",1.1,-14)
 		return true
@@ -240,6 +290,8 @@ func click(at: Vector2) -> bool:
 
 ## Share the same drag gesture for shelf merchandise and the keeper's free gift.
 func _begin_drag(slot: int, at: Vector2) -> void:
+	# Inspection or dragging takes over immediately without a second floating copy.
+	reveals = reveals.filter(func(entry): return entry.slot != slot)
 	pressed_offer = slot
 	press_at = at
 	pointer = at
@@ -308,14 +360,32 @@ func discard_gift() -> void:
 	battle._sound("item/confirmation_002",1,-12)
 	cancel_purchase()
 
-## Animate only small storefront accents; random stock never changes here.
+## Hint only while both merchandise and the owned-item rail are visible.
+func _resonance_available() -> bool:
+	if not visible or battle.view_phase != "shop" or not battle.model.shop.active or modulate.a < 0.99: return false
+	if busy() or battle.pause_menu.active() or battle.tarot_ui.ceremony.active(): return false
+	if pressed_offer >= 0 or battle.relic_ui.pressed >= 0 or battle.tarot_quick.inspected >= 0 or battle.tarot_feedback.inspection.opened: return false
+	if battle.inventory_page.opened: return false
+	return not replacing and not reveals.any(func(entry): return _reveal_age(entry.slot) >= 0)
+
+## Shared queries keep shelf, keeper gift and the visible owned-item rail synchronized.
+func set_hint_for_offer(slot: int) -> Vector3:
+	return resonance.offer_pose(slot) if _resonance_available() else Vector3.ZERO
+
+func set_hint_for_owned(index: int) -> Vector3:
+	return resonance.owned_pose(index) if _resonance_available() else Vector3.ZERO
+
+## Pause reveal timing behind menus and wait until the shop has finished fading in.
 func _process(delta: float) -> void:
 	if not visible: return
+	resonance.advance(delta,battle.model.shop,battle.model.relics.items,_resonance_available(),battle.reduced)
 	held_layer.visible = dragging and not battle._menus_open()
 	held_layer.queue_redraw()
 	keeper_overlay.queue_redraw()
+	reveal_layer.queue_redraw()
 	if battle._menus_open(): return
 	age += delta
+	if modulate.a >= 0.99: reveal_clock += delta
 	dialogue_time = maxf(0,dialogue_time-delta)
 	refresh_flash = maxf(0,refresh_flash-delta)
 	queue_redraw()
@@ -379,7 +449,8 @@ func _draw_divination() -> void:
 		if not battle.model.shop.gift.is_empty():
 			if not (dragging and pressed_offer == Stock.GIFT_SLOT):
 				var radius: float = 46 if portrait() else 36
-				RarityDisplay.paint(keeper_overlay,battle.model.shop.gift.id,divination_deck_position(),radius,age,battle.reduced,1.0 if selected_gift() else 0.0)
+				if _reveal_age(Stock.GIFT_SLOT) < 0:
+					RarityDisplay.paint(keeper_overlay,battle.model.shop.gift.id,divination_deck_position(),radius,age,battle.reduced,1.0 if selected_gift() else 0.0,-1.0,{},set_hint_for_offer(Stock.GIFT_SLOT))
 				Cards.text(keeper_overlay,battle.description_font,divination_deck_position()+Vector2(0,radius+30),"FREE",22 if portrait() else 18,GOLD)
 		else:
 			for i in range(3,-1,-1):
@@ -472,8 +543,8 @@ func _draw_offer(slot: int) -> void:
 	# Hide the shelf artwork for every item type while its held copy is drawn.
 	if not (dragging and pressed_offer == slot):
 		if offer.kind == "relic":
-			if not (battle.relic_ui.pickup.active and selected == slot):
-				RarityDisplay.paint(self,offer.id,artwork.get_center(),artwork.size.x/2,age,battle.reduced,1.0 if selected == slot else 0.0)
+			if _reveal_age(slot) < 0 and not (battle.relic_ui.pickup.active and selected == slot):
+				RarityDisplay.paint(self,offer.id,artwork.get_center(),artwork.size.x/2,age,battle.reduced,1.0 if selected == slot else 0.0,-1.0,{},set_hint_for_offer(slot))
 		elif offer.kind == "tarot":
 			draw_texture_rect(Cards.texture(offer.id),artwork,false,Color("d9cedd"))
 		else:

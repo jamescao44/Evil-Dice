@@ -5,7 +5,7 @@ const Enemies = preload("res://scripts/enemies/enemy_catalog.gd")
 const Moves = preload("res://scripts/enemies/enemy_skill_catalog.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const Statuses = preload("res://scripts/status/status_effect.gd")
-const STAT_KEYS := ["damage_add","damage_factor","max_hp_factor","base_damage","base_factor","auto_damage","incoming_factor","three_straight_bonus","combo_uses_add","combo_uses_factor","combo_uses_per_wave","single_target_factor_per_wave","damage_per_kill","kill_damage_cap","wave_rubies","tarot_repeat","always_perfect","no_ultimate","no_treasure"]
+const STAT_KEYS := ["area_factor","damage_add","damage_factor","max_hp_factor","base_damage","base_factor","auto_damage","incoming_factor","three_straight_bonus","combo_uses_add","combo_uses_factor","combo_uses_per_wave","single_target_factor_per_wave","damage_per_kill","kill_damage_cap","wave_rubies","tarot_repeat","always_perfect","no_ultimate","no_treasure"]
 const ACTION_TYPES := ["attack","shield","heal","team_shield","team_heal","empower","team_empower","charge","rest","affliction","summon_minions","split_minions","corrosive_heal"]
 
 ## Validation is read-only and uses no combat, reward or cosmetic random numbers.
@@ -80,7 +80,16 @@ static func relics(definitions: Dictionary) -> Array:
 		if item.get("requires_set_parts",false) and Relics.Sets.recipe_for(id).is_empty(): errors.append("Missing required set: "+id)
 		for field in ["vanish_unlock","excluded_after_unlock"]:
 			if item.has(field) and item[field] not in definitions: errors.append("Unknown relic unlock: "+id)
-		if item.has("after_skill_attack") and item.after_skill_attack <= 0: errors.append("Invalid after-skill attack: "+id)
+		for field in ["after_skill_attack","roll_attack"]:
+			if not item.has(field): continue
+			var rule: Dictionary = item[field]
+			if rule.get("amount",0.0) <= 0 and rule.get("base_scale",0.0) <= 0: errors.append("Invalid relic attack: "+id)
+			if rule.get("count",1) < 1: errors.append("Invalid relic hit count: "+id)
+		if item.has("guardian"):
+			var rule: Dictionary = item.guardian
+			if rule.get("health_ratio",0.0) <= 0 or rule.get("share",0.0) <= 0 or rule.get("share",0.0) > 1: errors.append("Invalid guardian capacity: "+id)
+			if rule.get("recovery_turns",0) <= 0 or rule.get("counter_scale",0.0) <= 0 or rule.get("perfect_hits",0) <= 0: errors.append("Invalid guardian cycle: "+id)
+		if item.has("reactive_shield") and item.reactive_shield <= 0: errors.append("Invalid reactive shield: "+id)
 		for key in item.get("stats",{}):
 			if key not in STAT_KEYS: errors.append("Unknown passive stat "+key+": "+id)
 		for field in ["turn_charge","tarot_generator"]:

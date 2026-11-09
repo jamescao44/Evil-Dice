@@ -32,6 +32,6 @@ static func _resolve(model, damage: int, skill: MultiHitSkill, fixed: bool) -> A
 			if shielded: hit.text = "SHIELD BREAK" if model.enemies[target].shield == 0 else "BLOCKED"
 			events.append(hit)
 			if loss > 0: events.append_array(model._attack_relic_effects(target,loss,skill))
-			events.append_array(model.RelicCombat.overflow(model,target,amount,hp_before,shielded))
+			events.append_array(model.RelicCombat.overflow(model,target,amount,hp_before,shielded,false,true))
 	events.append_array(model.RelicEffects.attack_used(model))
 	return events

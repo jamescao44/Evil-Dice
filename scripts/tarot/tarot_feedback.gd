@@ -85,6 +85,9 @@ func shown() -> bool:
 
 func _process(delta: float) -> void:
 	bind_effects()
+	# Victory/defeat is drawn on the battle canvas; its backdrop must cover these badges.
+	z_index = BattleLayers.BACKDROP if battle.view_phase == "over" else BattleLayers.STATUS
+	if battle.view_phase == "over" and inspection.opened: inspection.close()
 	visible = shown()
 	if not visible: return
 	age += 0 if battle._menus_open() else delta

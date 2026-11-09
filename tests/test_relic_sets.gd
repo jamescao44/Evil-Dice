@@ -114,7 +114,7 @@ func _initialize() -> void:
 	m=fresh();m.acquire_relic("tissue_pack");m.acquire_relic("magic_slingshot");m.acquire_relic("worn_bow")
 	m.dice_turn.values=[6,6,6,6,6,6]
 	var actions: Array=Effects.roll_actions(m,false)
-	check(actions.size()==3 and actions[0].amount==10 and is_equal_approx(actions[1].amount,12.6) and not actions[2].fixed,"Roll damage rules")
+	check(actions.size()==3 and actions[0].options.base_scale==1.0 and is_equal_approx(actions[1].amount,18.0) and not actions[2].fixed,"Roll damage rules")
 	m.dice_turn.values=[1,2,3,4,5,6]
 	check(Effects.roll_actions(m,false).size()==2,"No tissue with available straight")
 	print("Relic sets: %d checks, %d failures" % [checks,failures])

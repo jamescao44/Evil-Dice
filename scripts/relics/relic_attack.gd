@@ -20,11 +20,19 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 		for entry in model.RelicEffects.repeat_sources(model.relics.items,"holy_grail"):
 			damage *= 2
 			model.RelicEffects.Sequence.activate(model,entry)
+	if fixed and all_targets and not options.get("multiplier_only",false) and not options.get("no_damage_modifiers",false):
+		for entry in model.RelicEffects.repeat_sources(model.relics.items,"diamond_crown"):
+			damage = floori(damage*1.2)
+			model.RelicEffects.Sequence.activate(model,entry)
 	if options.get("multiplier_only",false): damage = floori(amount*model.damage_multiplier(skill)+0.000001)
 	if not fixed or options.get("multiplier_only",false): model.RelicEffects.activate_damage_modifiers(model,skill)
 	if model.hp <= 0: return []
 	var guards: Array = model.taunting_enemies()
 	var events: Array = []
+	# One receipt per attack keeps cosmetic travel separate from synchronous combat/CLI rules.
+	var flight: Dictionary = {"source":source,"targets":targets.duplicate(),"area":all_targets,
+		"speed":options.get("animation_speed",1.0),"origin":options.get("origin",-1)}
+	model.relic_attack_started.emit(flight)
 	var old_lifesteal: int = model.lifesteal_used
 	var old_budgets: Dictionary = model.lifesteal_budgets.duplicate()
 	model.lifesteal_used = 0
@@ -51,9 +59,12 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 		if loss > 0: events.append_array(model._attack_relic_effects(index,loss,skill))
 		if index >= 0:
 			if options.get("burning",0) > 0: events.append_array(model.apply_enemy_status(index,Status.BURNING,options.burning))
-			events.append_array(model.RelicCombat.overflow(model,index,hit_damage,hp_before,blocked))
+			events.append_array(model.RelicCombat.overflow(model,index,hit_damage,hp_before,blocked,false,all_targets))
 	events.append_array(model.RelicEffects.attack_used(model))
 	model.active_relic_procs.pop_back()
 	model.lifesteal_used = old_lifesteal
 	model.lifesteal_budgets = old_budgets
+	# Preserve nested attacks' own origins rather than attaching them to this weapon.
+	for event in events:
+		if not event.has("relic_flight"): event.relic_flight = flight
 	return events

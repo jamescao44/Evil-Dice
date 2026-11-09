@@ -23,8 +23,8 @@ func capture() -> Image:
 func check_combat_overlays(g) -> void:
 	g.fx.damage_number(g.ARENA.get_center(),"-123",Color.RED)
 	g.screen_ripple.trigger(g.ARENA.get_center())
-	for mode in ["ready","shop","reward","inventory","inspection","tarot","menu","ready"]:
-		g.view_phase = mode if mode in ["shop","reward"] else "ready"
+	for mode in ["ready","shop","reward","over","inventory","inspection","tarot","menu","ready"]:
+		g.view_phase = mode if mode in ["shop","reward","over"] else "ready"
 		g.inventory_page.opened = mode == "inventory"
 		g.inspecting_enemy = 0 if mode == "inspection" else -1
 		g.menu_open = mode == "menu"

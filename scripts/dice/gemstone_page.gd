@@ -56,6 +56,12 @@ func gem_at(location: Dictionary) -> Dictionary:
 	return model().bag_gem(int(location.get("bag",-1)))
 
 func location_at(at: Vector2, include_empty: bool = false) -> Dictionary:
+	# Corner dots extend beyond the cells but remain tappable and draggable.
+	for index in range(Gems.SOCKETS):
+		if model().is_new({"socket":index}) and page.gem_notice_hit(socket_rect(index),at,true): return {"socket":index}
+	for i in range(PER_PAGE):
+		var index: int = bag_page*PER_PAGE+i
+		if model().is_new({"bag":index}) and page.gem_notice_hit(bag_rect(i),at,true): return {"bag":index}
 	for index in range(Gems.SOCKETS):
 		if socket_rect(index).has_point(at): return {"socket":index}
 	for i in range(PER_PAGE):
@@ -73,7 +79,7 @@ func click(at: Vector2) -> void:
 		return
 	if merge_rect().has_point(at):
 		var gem: Dictionary = gem_at(selected)
-		if not gem.is_empty() and model().merge(gem,int(selected.get("socket",-1))):
+		if not gem.is_empty() and model().merge(gem,int(selected.get("socket",-1)),int(selected.get("bag",-1))):
 			if selected.has("bag"): selected = {"bag":model().order.find(Gems.key(gem.id,int(gem.level)+1))}
 			feedback()
 		return
@@ -84,7 +90,9 @@ func click(at: Vector2) -> void:
 
 func motion(at: Vector2) -> void:
 	pointer = at
-	if not pressed.is_empty() and not gem_at(pressed).is_empty() and at.distance_to(origin) > (14 if portrait() else 8): dragging = true
+	if not pressed.is_empty() and not gem_at(pressed).is_empty() and at.distance_to(origin) > (14 if portrait() else 8):
+		dragging = true
+		model().acknowledge(pressed)
 
 ## Invalid drops leave equipment intact; different gems move instead of being consumed.
 func release(at: Vector2) -> void:
@@ -99,10 +107,11 @@ func release(at: Vector2) -> void:
 			if selected.has("bag"): selected.bag = mini(selected.bag-(1 if shift else 0),model().order.size()-1)
 			feedback()
 	elif location_at(at) == pressed:
+		model().acknowledge(pressed)
 		if selected.has("bag") and pressed.has("socket") and not gem_at(selected).is_empty():
 			var gem: Dictionary = gem_at(selected)
 			# A tap equips; only an explicit merge/drop consumes two gems.
-			if model().equip(pressed.socket,gem.id,gem.level): feedback()
+			if model().equip(pressed.socket,gem.id,gem.level,selected.bag): feedback()
 		selected = pressed.duplicate()
 	cancel_drag()
 
@@ -173,7 +182,9 @@ func draw() -> void:
 		_draw_cell(bag_rect(i),{"bag":index},gem,Gems.Catalog.color(gem.id) if not gem.is_empty() else Color("414752"))
 	draw_details()
 	if dragging:
-		Paint.paint(page,pointer,gem_at(pressed),42 if portrait() else 34)
+		var radius: float = 42 if portrait() else 34
+		Paint.paint(page,pointer,gem_at(pressed),radius)
+		page._draw_gem_notice(Rect2(pointer-Vector2.ONE*radius,Vector2.ONE*radius*2),model().is_new(pressed),true)
 
 ## Hover feedback distinguishes a merge from an ordinary move without adding confirmation.
 func _draw_cell(rect: Rect2, location: Dictionary, gem: Dictionary, color: Color) -> void:
@@ -184,6 +195,7 @@ func _draw_cell(rect: Rect2, location: Dictionary, gem: Dictionary, color: Color
 		page.draw_line(rect.get_center()-Vector2(8,0),rect.get_center()+Vector2(8,0),color,2)
 		return
 	if not dragging or pressed != location: Paint.paint(page,rect.get_center()-Vector2(0,8 if location.has("bag") else 0),gem,(24 if portrait() else 22) if location.has("bag") else (30 if portrait() else 25))
+	if not dragging or pressed != location: page._draw_gem_notice(rect,model().is_new(location),true)
 	if location.has("bag"): page._text(Vector2(rect.get_center().x,rect.end.y-7),"LV.%d" % gem.level,17 if portrait() else 14,color)
 	if dragging and hover == location and pressed != location and gem == gem_at(pressed) and Gems.Catalog.can_merge(gem):
 		page._text(rect.get_center()+Vector2(0,8),"MERGE",23 if portrait() else 19,Color("fff2c6"))

@@ -294,6 +294,11 @@ func scene(phone: bool) -> void:
 	g._restart(); g.queue_free(); await process_frame
 
 func run() -> void:
+	if "--inventory-only" in OS.get_cmdline_user_args():
+		inventory_rules()
+		print("Gemstone inventory: %d checks, %d failures" % [checks,failures])
+		quit(1 if failures else 0)
+		return
 	GameText.initialize(); GameText.set_language("en",false)
 	inventory_rules(); combat_rules(); probability_rules(); rewards_and_save()
 	await scene(false); await scene(true)

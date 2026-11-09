@@ -24,7 +24,6 @@ const STONES := {
 }
 static var TURN_CHARGES: Dictionary = Catalog.effect_table("turn_charge")
 const CRITICAL_FACTOR := 3.0
-const PERFECT_STRIKE_BASE := 100.0
 static var TAROT_GENERATORS: Dictionary = Catalog.effect_table("tarot_generator")
 
 ## Run a relic’s immediate acquisition effect after inventory insertion.
@@ -100,6 +99,16 @@ static func protect_perfect(model, perfect: bool, preserve_combo: bool) -> bool:
 				item.charges = 0
 				protected = true
 				model.relic_activated.emit(item.id)
+	# A chain protects only an existing combo, after Perfectionism has had first refusal.
+	if not perfect and not protected and model.perfect_combo > 0:
+		for i in range(model.relics.items.size()):
+			var item: Dictionary = model.relics.items[i]
+			if item.id != "iron_chain" or item.charges <= 0: continue
+			item.charges -= 1
+			model.relic_activated.emit(item.id)
+			if item.charges == 0: model.relics.remove(i)
+			protected = true
+			break
 	return protected
 
 static func has_flag(items: Array, flag: String) -> bool:
@@ -140,6 +149,10 @@ static func apply_damage_modifier(item: Dictionary, value: float, skill: MultiHi
 		value += part.get("damage_add",0.0)*item.count
 		value *= part.get("damage_factor",1.0)
 	value = Conditions.damage_modifier(item,value,skill)
+	if item.id == "resonance_stone" and model != null:
+		var stones: int = Catalog.STONES.filter(func(id): return model.relics.has_stone(id)).size()
+		value += floori(stones/2.0)
+	if not skill.is_empty() and skill.hits_all(): value *= stats.get("area_factor",1.0)
 	if item.id == "magic_sword" and skill.critical: value *= CRITICAL_FACTOR
 	if stats.has("damage_per_kill"): value *= 1.0+minf(stats.kill_damage_cap,stats.damage_per_kill*item.kills)
 	if not skill.is_empty():
@@ -354,6 +367,7 @@ static func turn_started(model) -> Array:
 
 ## Advance periodic relic counters and repeat their eligible payouts.
 static func turn_finished(model) -> Array:
+	var protection_events: Array = model.relic_protection.turn_finished(model)
 	Growth.turn_finished(model)
 	var due: Array = []
 	for item in model.relics.items:
@@ -362,17 +376,17 @@ static func turn_finished(model) -> Array:
 		item.turns += 1
 		if item.turns >= period:
 			item.turns = 0
-			due.append(item.id)
-	var events: Array = []
+			due.append(item)
+	var events: Array = protection_events
 	for entry in Sequence.entries(model.relics.items):
 		var item: Dictionary = entry.item
-		if item.id not in due: continue
+		if not due.any(func(owner): return is_same(owner,item)): continue
 		if TAROT_GENERATORS.has(item.id):
 			if _grant_generator_tarot(model,item.id):
 				Sequence.activate(model,entry)
 				events.append(model.event(-1,1,"relic","TAROT +1"))
-		elif TURN_CHARGES.has(item.id):
-			item.charges += 1
+		elif TURN_CHARGES.has(item.id) and item.charges <= 0:
+			item.charges = 1
 			Sequence.activate(model,entry)
 			events.append(model.event(-1,1,"relic",TURN_CHARGES[item.id].message))
 	events.append_array(model.relic_recovery.full_turn_finished(model))
@@ -477,7 +491,7 @@ static func status_applied(model, target: int, status: int) -> Array:
 			Sequence.activate(model,entry)
 		if item.id == "ice_rose" and status == Status.FROZEN and item.id not in model.active_relic_procs:
 			Sequence.activate(model,entry)
-			events.append_array(Attack.apply(model,item.id,10,false,true))
+			events.append_array(Attack.apply(model,item.id,20,false,true,-1,Sequence.attack_options(entry)))
 	if status == Status.BURNING: events.append_array(model.RelicCombat.burning_applied(model,target))
 	if status == Status.PLAGUE: events.append_array(Conditions.plague_applied(model,target))
 	return events
@@ -488,31 +502,35 @@ static func retaliation(model, target: int) -> Array:
 		var item: Dictionary = entry.item
 		if item.id != "spiked_helmet": continue
 		Sequence.activate(model,entry)
-		events.append_array(Attack.apply(model,item.id,10,true,false,target))
+		events.append_array(Attack.apply(model,item.id,10,true,false,target,Sequence.attack_options(entry)))
 	return events
 
+## Build opening-throw attacks from catalog rules; base ratios resolve at impact.
 static func roll_actions(model, perfect: bool) -> Array:
+	model.RelicProtection.sync_guardians(model)
 	var actions: Array = []
 	for entry in Sequence.entries(model.relics.items):
 		var item: Dictionary = entry.item
-		var amount: float = Conditions.ROLL_DAMAGE.get(item.id,0)
-		var fixed: bool = false
-		var area: bool = false
-		var count: int = 1
+		var rule: Dictionary = Catalog.ITEMS[item.id].get("roll_attack",{}).duplicate(true)
+		if rule.get("perfect",false) and not perfect: continue
+		var guardian: Dictionary = Catalog.ITEMS[item.id].get("guardian",{})
+		if not guardian.is_empty():
+			if not model.RelicProtection.guardian_active(item): continue
+			if perfect: rule.count = guardian.perfect_hits
 		match item.id:
-			"worn_bow": amount = 5
+			"worn_bow": rule = {"base_scale":0.5}
 			"tissue_pack":
-				if not model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i])): amount = 10
+				if not model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i])): rule = {"base_scale":1.0}
 			"magic_slingshot", "enchanted_missile":
-				amount = model.dice_turn.unused().reduce(func(total,i): return total+model.dice_turn.values[i],0)*(0.35 if item.id == "magic_slingshot" else 0.5)
-			"pet_ghost": amount = 20; fixed = true; area = true
-			"pet_dragon": amount = 15; count = 3 if Sets.collection_complete(model.relics.items,"pets") else 2
-			"spiked_helmet":
-				if perfect: amount = 10
-			"prismatic_stone":
-				if perfect: amount = PERFECT_STRIKE_BASE
-		if amount > 0:
-			for i in range(count): actions.append({"id":item.id,"activation":entry,"amount":amount,"fixed":fixed,"area":area})
+				rule = {"amount":model.dice_turn.unused().reduce(func(total,i): return total+model.dice_turn.values[i],0)*0.5}
+			"pet_ghost": rule = {"amount":20.0,"fixed":true,"area":true}
+			"pet_dragon":
+				if Sets.collection_complete(model.relics.items,"pets"): rule.count = 3
+		if rule.is_empty(): continue
+		var options: Dictionary = {}
+		if rule.has("base_scale"): options.base_scale = rule.base_scale
+		for i in range(rule.get("count",1)):
+			actions.append({"id":item.id,"activation":entry,"amount":rule.get("amount",0.0),"fixed":rule.get("fixed",false),"area":rule.get("area",false),"options":options.duplicate()})
 	return actions
 
 ## Roll-trigger relics no longer trigger a second time when a skill is formed.

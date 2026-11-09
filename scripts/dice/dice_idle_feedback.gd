@@ -1,9 +1,10 @@
 extends RefCounted
 ## Presentation clocks for selectable-die waves and available straight hints.
 const WAVE_PERIOD := 2.0
-const HINT_DURATION := 1.15
-const GROUP_GAP := 0.15
-const CYCLE_REST := 0.65
+const Hint = preload("res://scripts/shared/combination_hint.gd")
+const HINT_DURATION := Hint.DURATION
+const GROUP_GAP := Hint.GAP
+const CYCLE_REST := Hint.REST
 const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 var wave_age: float = 0.0
 var hint_age: float = 0.0
@@ -69,6 +70,5 @@ func hint_pose(index: int) -> Vector2:
 	var slot: int = floori((hint_age-CYCLE_REST)/(HINT_DURATION+GROUP_GAP))
 	var age: float = fmod(hint_age-CYCLE_REST,HINT_DURATION+GROUP_GAP)
 	if slot >= groups.size() or index not in groups[slot] or age >= HINT_DURATION: return Vector2.ZERO
-	var t: float = age/HINT_DURATION
-	var envelope: float = smoothstep(0.0,0.18,t)*(1.0-smoothstep(0.80,1.0,t))
-	return Vector2(0.10*envelope,sin(t*TAU*2)*0.12*envelope)
+	var pose: Vector3 = Hint.sample(age)
+	return Vector2(pose.x,pose.y)

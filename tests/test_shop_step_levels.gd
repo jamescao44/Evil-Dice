@@ -48,7 +48,7 @@ func _initialize() -> void:
 	check(commander.enemies.size() == 3,"Commander phase two summons exactly two guards")
 	for guard in commander.enemies.slice(1):
 		check(guard.role == Enemy.Role.PALADIN and guard.level == 1 and not guard.elite,"Guards are ordinary LV.1 Paladins")
-		check(guard.hp == 400 and guard.hp == paladin.hp and guard.max_hp == paladin.max_hp,"Guards retain full catalog health without a hidden summon penalty")
+		check(guard.hp == 280 and guard.hp == paladin.hp and guard.max_hp == paladin.max_hp,"Guards retain full catalog health without a hidden summon penalty")
 		check(guard.damage_percent == paladin.damage_percent and guard.shield_cap == paladin.shield_cap,"Guard damage and shield capacity use normal LV.1 rules")
 		check(Enemy.soul_reward(guard) == Enemy.soul_reward(paladin) and Enemy.crystal_reward(guard) == Enemy.crystal_reward(paladin),"Guard drops agree with their actual level")
 		check(guard.acted,"Guards still wait until the next enemy phase to act")

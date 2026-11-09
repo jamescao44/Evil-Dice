@@ -51,7 +51,7 @@ func payouts() -> void:
 	check(commander.level == 9 and commander.hp == Enemy.phase_health(commander,1),"First boss has its independent health budget")
 	m.hit_enemy(0,99999,true)
 	check(commander.hp == Enemy.phase_health(commander,2) and m.blood_gems == 0,"Phase two restores its budget without premature loot")
-	check(m.enemies.slice(1).all(func(e): return e.level == 1 and e.hp == 400),"Commander reinforcements use full level-one Paladin stats")
+	check(m.enemies.slice(1).all(func(e): return e.level == 1 and e.hp == 280),"Commander reinforcements use full level-one Paladin stats")
 	m.hit_enemy(0,99999,true)
 	check(m.blood_gems == Enemy.crystal_reward(commander),"Boss final death pays its level-scaled gems once")
 

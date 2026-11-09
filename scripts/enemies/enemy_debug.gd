@@ -29,7 +29,7 @@ static func set_level(model, level: int) -> bool:
 		var ratio: float = float(enemy.hp)/maxi(1,enemy.max_hp)
 		if enemy.has("healthy_max_hp"):
 			enemy.healthy_max_hp = health
-			health = maxi(1,health-model.enemy_status_count(index,model.Status.PLAGUE)*10)
+			health = model.Status.plague_max_hp(health,model.enemy_status_count(index,model.Status.PLAGUE),enemy.get("boss",false))
 		if enemy.intent.get("type","") == "attack":
 			var friendly: bool = enemy.intent.get("friendly_fire",false)
 			var before: int = Catalog.Damage.friendly_base_hit(enemy) if friendly else Catalog.Damage.base_hit(enemy,model.character_level)

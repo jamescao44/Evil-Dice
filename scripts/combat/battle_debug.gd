@@ -76,7 +76,7 @@ func open() -> void:
 func can_apply_character_level() -> bool:
 	return Character.can_apply(battle.model) and battle.view_phase in ["ready","charging","skill","targeting","frozen","wave_reward","reward","shop"]
 
-## Synchronize stats, evolution, XP and previews immediately, including when lowering a level.
+## Apply stats now and queue the visual transition until the menu closes.
 func apply_character_level(value: String) -> void:
 	if not battle.debug_open or page != Page.BATTLE: return
 	var text: String = value.strip_edges()
@@ -88,7 +88,7 @@ func apply_character_level(value: String) -> void:
 		return
 	battle.player_animation.reset()
 	battle.soul_pickup.reset()
-	battle.evolution.reset()
+	battle.evolution.queue_debug_level(battle.model.character_level)
 	battle.health_trails.reset(battle.model)
 	battle.damage_feedback.clear()
 	battle.dice_selection._refresh_preview()

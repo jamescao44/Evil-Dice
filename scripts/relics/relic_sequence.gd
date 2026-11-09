@@ -54,3 +54,10 @@ static func activate_ids(model, ids: Array, speed: float = 1.0) -> void:
 
 static func animation_speed(entry: Dictionary) -> float:
 	return RETRIGGER_SPEED if entry.origin != entry.slot else 1.0
+
+## Preserve the real weapon slot and faster copy timing for any direct-damage hook.
+static func attack_options(entry: Dictionary, options: Dictionary = {}) -> Dictionary:
+	var result: Dictionary = options.duplicate()
+	result.origin = entry.origin
+	result.animation_speed = animation_speed(entry)
+	return result

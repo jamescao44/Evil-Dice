@@ -26,7 +26,7 @@ func _ready() -> void:
 
 ## Full-page interfaces own their own taps; exposed battlefield stages keep inspection.
 func available() -> bool:
-	return not battle._menus_open() and battle.inspecting_enemy < 0 and battle.view_phase not in ["shop","reward"] and not battle.tarot_cast.active() and battle.tarot_ui.inspected < 0 and not battle.skill_pressed and not battle.dice_selection.dragging and not battle.focus_mark.dragging
+	return not battle._menus_open() and battle.inspecting_enemy < 0 and battle.view_phase not in ["shop","reward","over"] and not battle.tarot_cast.active() and battle.tarot_ui.inspected < 0 and not battle.skill_pressed and not battle.dice_selection.dragging and not battle.focus_mark.dragging
 
 func hit(point: Vector2) -> bool:
 	if opened: return true

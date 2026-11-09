@@ -24,7 +24,7 @@ func run() -> void:
 		g.reduced = true
 		for level in [1,5,10]:
 			g.evolution.displayed_level = level
-			var sprite := Rect2(g._player_world_feet()-Vector2(g.monster_side*0.5,g.monster_side),Vector2.ONE*g.monster_side)
+			var sprite: Rect2 = g._player_world_sprite_rect()
 			var visible: Rect2 = g.evolution.visible_rect(sprite)
 			for pose in Orbit.poses(g):
 				if pose.slot in [1,3]:

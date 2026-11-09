@@ -121,9 +121,12 @@ func roll_sequence(wave: int, faces: Array, with_relic: bool = false) -> void:
 	m.begin_round(); m.roll_pool(false,faces)
 	var remaining_rolls: int = m.dice_turn.rolls_left
 	var gems: int = m.blood_gems
-	if with_relic: m.resolve_perfect_relic()
-	else: m.resolve_roll_attack_step()
-	check(e.boss_phase == 1 and e.hp == 0 and m.is_enemy_alive(0),"Opening automatic hit holds the first phase")
+	if with_relic: check(m.resolve_perfect_relic().is_empty(),"Item attacks wait for alike groups")
+	m.resolve_roll_attack_step()
+	if not m.roll_attacks.is_empty():
+		check(e.boss_phase == 1 and e.hp == 0 and m.is_enemy_alive(0),"Remaining automatic hits hold the first phase")
+	else:
+		check(e.boss_phase == 2 and e.hp == e.max_hp,"A one-impact match completes its phase handoff immediately")
 	var guard := 0
 	while not m.roll_attacks.is_empty() and guard < 30:
 		guard += 1
@@ -131,6 +134,8 @@ func roll_sequence(wave: int, faces: Array, with_relic: bool = false) -> void:
 	check(guard < 30 and m.phase == "roll" and m.outcome().is_empty(),"Automatic queue returns control without finishing the wave")
 	check(e.boss_phase == 2 and e.hp == e.max_hp and m.blood_gems == gems,"Neither six-alike pulses nor another match group damages phase two")
 	check(m.dice_turn.rolls_left == remaining_rolls and m.dice_turn.unused().size() == 6,"Phase handoff preserves the current dice and rerolls")
+	if with_relic:
+		check(m.perfect_relic_ready and not m.resolve_perfect_relic().is_empty(),"Queued items attack after the completed auto sequence and phase handoff")
 
 func _initialize() -> void:
 	for wave in [8,16]:

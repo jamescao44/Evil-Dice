@@ -17,7 +17,7 @@ func enqueue(gem: Dictionary, target: int) -> void:
 	var origin: Vector2 = battle._enemy_point(target) if target >= 0 else battle._troop_point(-3-target)
 	var feet: Vector2 = battle._enemy_feet(target) if target >= 0 else origin
 	var rest: Vector2 = (feet+Vector2(cosmetic.randf_range(-48,48),0)).clamp(battle.ARENA.position+Vector2(24,30),battle.ARENA.end-Vector2(24,30))
-	drops.append({"gem":gem.duplicate(),"origin":origin,"rest":rest,"age":0.0,"seed":cosmetic.randf()*TAU})
+	drops.append({"gem":gem.duplicate(),"target":target,"origin":origin,"rest":rest,"age":0.0,"seed":cosmetic.randf()*TAU})
 
 func reset() -> void:
 	drops.clear()
@@ -30,6 +30,7 @@ func _process(delta: float) -> void:
 	if not visible: return
 	sound_cooldown = maxf(0,sound_cooldown-delta)
 	for drop in drops:
+		if battle.relic_attacks.holds(drop.target): continue
 		drop.age += delta*clampf(battle.speed,1,2)
 		if drop.age >= DURATION and sound_cooldown <= 0:
 			battle._sound("item/crystal_collect",1.05,-18)
@@ -39,6 +40,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	for drop in drops:
+		if battle.relic_attacks.holds(drop.target): continue
 		var t: float = clampf(drop.age/0.42,0,1)
 		var flight: float = clampf((drop.age-1.0)/(DURATION-1.0),0,1)
 		var at: Vector2 = drop.origin.lerp(drop.rest,t)

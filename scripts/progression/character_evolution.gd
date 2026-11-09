@@ -3,7 +3,7 @@ extends Node2D
 const Sprite = preload("res://scripts/player/player_sprite.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Cards = preload("res://scripts/tarot/tarot_paint.gd")
-const DURATION := 1.8
+const Entrance = preload("res://scripts/player/player_entrance.gd")
 const REVEAL := 0.85
 const FORM_COUNT := 3
 # Opt individual character forms into the retained procedural advancing bounce.
@@ -17,17 +17,23 @@ var queued: Array = []
 var age := -1.0
 var forms: Array[Texture2D] = []
 var visible_bounds: Array[Rect2] = []
+var entrance = Entrance.new()
+var source_form := 0
+var source_frame := 2
+var source_rect := Rect2()
+var transforming := false
 
 ## Cache sprites and white silhouettes once, rather than rebuilding them during effects.
 func _ready() -> void:
 	z_index = BattleLayers.EVOLUTION
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# Early evolutions share Diablo 2 until a dedicated first-form sheet is supplied.
+	# Keep previews and silhouette masks separate for all three authored forms.
 	for i in range(FORM_COUNT):
 		forms.append(Sprite.texture(1,i))
 		visible_bounds.append(Sprite.rest_bounds(i))
 		Sprite.silhouette(i)
 	battle.player_animation.set_form(form_index(displayed_level))
+	battle.model.defer_level_healing = true
 	battle.model.character_leveled.connect(enqueue)
 
 ## Preserve every level celebration if one reward crosses several thresholds.
@@ -35,15 +41,35 @@ func enqueue(level: int) -> void:
 	queued.append(level)
 
 func active() -> bool:
-	return age >= 0 or not queued.is_empty()
+	return age >= 0 or not queued.is_empty() or entrance.active()
 
 ## Reset presentation alongside the run, including an interrupted transformation.
 func reset() -> void:
 	queued.clear()
 	age = -1
+	entrance.reset()
+	source_rect = Rect2()
+	transforming = false
 	displayed_level = battle.model.character_level
 	target_level = displayed_level
 	battle.player_animation.set_form(form_index(displayed_level))
+	queue_redraw()
+
+## Summon the checkpoint's current form once on entering a level, before opening effects.
+func start_entrance() -> void:
+	reset()
+	battle.player_animation.cancel_emote()
+	entrance.start(form_index(displayed_level))
+
+## Debug updates replace pending celebrations but preserve the currently visible form.
+func queue_debug_level(level: int) -> void:
+	queued.clear()
+	age = -1
+	entrance.reset()
+	source_rect = Rect2()
+	transforming = false
+	if level != displayed_level: queued.append(level)
+	else: battle.model.complete_level_heal(level) # Reapplying the same debug level has no animation.
 	queue_redraw()
 
 ## Map uncapped character levels to the available evolution artwork.
@@ -57,32 +83,52 @@ func advance_bounce_enabled() -> bool:
 	return settings[clampi(form_index(displayed_level),0,settings.size()-1)]
 
 func is_evolution() -> bool:
-	return target_level % battle.model.EVOLUTION_INTERVAL == 0
+	return transforming
 
 func reveal_time() -> float:
 	return REVEAL if is_evolution() else LEVEL_REVEAL
 
 func duration() -> float:
-	return DURATION if is_evolution() else LEVEL_DURATION
+	if not is_evolution(): return LEVEL_DURATION
+	var clip: Dictionary = Entrance.CLIPS[form_index(target_level)]
+	return REVEAL+float(clip.last-clip.first+1)/Sprite.IDLE_FPS+Entrance.FADE
 
 ## Celebrate once XP reaches the bar; menus and shops defer only the visual.
 func _process(delta: float) -> void:
 	visible = not battle._menus_open() and battle.view_phase != "shop" and not battle.chest.active and not battle.tarot_ui.ceremony.active()
 	if not visible: return
-	if age < 0 and not queued.is_empty():
+	if age < 0 and not entrance.active() and not queued.is_empty():
 		if is_instance_valid(battle.soul_pickup) and battle.soul_pickup.counter_state().level < queued[0]: return
 		target_level = queued.pop_front()
+		transforming = form_index(target_level) != form_index(displayed_level)
+		if transforming: battle.player_animation.cancel_emote()
+		source_form = form_index(displayed_level)
+		source_frame = battle.player_animation.frame_number()
+		source_rect = Rect2()
 		age = 0
 		battle._sound("item/bell",0.8 if is_evolution() else 1.2,-12)
 	if age >= 0:
 		var previous := age
 		age += delta
 		if previous < reveal_time() and age >= reveal_time():
+			if is_evolution(): source_rect = battle._player_world_sprite_rect()
 			displayed_level = target_level
 			battle.player_animation.set_form(form_index(displayed_level))
-			if is_evolution(): battle._sound("enemy/bell",1.1,-10)
-		if age >= duration(): age = -1
+			if is_evolution():
+				entrance.start(form_index(displayed_level),true)
+				battle._sound("enemy/bell",1.1,-10)
+		if is_evolution() and age >= reveal_time(): entrance.advance(age-maxf(previous,reveal_time()))
+		if age >= duration():
+			battle.model.complete_level_heal(target_level)
+			battle.health_trails.sync(battle.model)
+			age = -1
+	else:
+		entrance.advance(delta)
 	queue_redraw()
+
+## Entrances and their preparation own the body until the summoning circle fades.
+func blocks_emote() -> bool:
+	return entrance.active() or (age >= 0 and is_evolution())
 
 ## Render the current form with an eased white silhouette at the transformation peak.
 func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
@@ -90,11 +136,25 @@ func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
 	var form: int = form_index(displayed_level)
 	battle.player_animation.set_form(form)
 	var frame: int = battle.player_animation.frame_number()
-	var body: Rect2 = battle.player_animation.firing_rect(rect,battle.reduced)
-	Sprite.paint_actor(canvas,rect,frame,battle.clock_time,tint,battle.reduced,form,body)
-	if age < 0: return
-	var glow: float = smoothstep(0.15,REVEAL,age)*(1-smoothstep(REVEAL,1.3,age)) if is_evolution() else sin(clampf(age/LEVEL_DURATION,0,1)*PI)*0.32
-	Sprite.paint(canvas,body,frame,Color(0.8,0.97,1,glow*0.95*tint.a),true,form)
+	var body: Rect2 = battle.player_animation.body_rect(rect,battle.reduced)
+	# A white-light crossfade preserves the authored silhouette instead of stretching it.
+	if age >= 0 and is_evolution() and age < REVEAL: body = rect
+	var entering: bool = entrance.active()
+	if entering:
+		body = rect
+		frame = entrance.frame_number(Sprite.idle_frame(maxf(0,entrance.age-entrance.clip_duration()),form))
+	entrance.paint_ground(canvas,rect,battle.reduced,tint)
+	Sprite.paint_actor(canvas,rect,frame,battle.clock_time,tint,battle.reduced,form,body,entrance.ring_alpha(),entrance.ring_flash())
+	var glow: float = 0
+	if entering: glow = entrance.white_alpha()
+	elif age >= 0:
+		if is_evolution() and age < REVEAL: glow = smoothstep(0.15,REVEAL-0.12,age)
+		elif not is_evolution(): glow = sin(clampf(age/LEVEL_DURATION,0,1)*PI)*0.32
+	if glow > 0: Sprite.paint(canvas,body,frame,Color(1,1,1,glow*tint.a),true,form)
+	# A short white crossfade bridges the outgoing silhouette and the new entrance pose.
+	if entering and entrance.evolved and source_rect.has_area() and entrance.age < 0.24:
+		Sprite.paint(canvas,source_rect,source_frame,Color(1,1,1,(1-smoothstep(0,0.24,entrance.age))*tint.a),true,source_form)
+	entrance.paint_release(canvas,rect,battle.reduced,tint)
 
 ## Exclude transparent sprite padding when placing character-attached UI.
 func visible_rect(rect: Rect2) -> Rect2:

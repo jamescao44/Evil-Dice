@@ -29,19 +29,20 @@ static func arrival_progress(battle, index: int) -> float:
 
 ## Reserve labels for settled reinforcements so sliding bars cannot cross another enemy's HUD.
 static func labels_visible(battle, index: int) -> bool:
-	return battle.model.is_enemy_alive(index) and arrival_progress(battle,index) >= 1.0 and battle.ARENA.grow(-6).encloses(battle._enemy_health_rect(index))
+	return battle._enemy_presented_alive(index) and arrival_progress(battle,index) >= 1.0 and battle.ARENA.grow(-6).encloses(battle._enemy_health_rect(index))
 
 ## Let lethal HP trails finish without retaining dead units' intent or status icons.
 static func health_visible(battle, index: int) -> bool:
-	return not battle.model.enemies[index].get("dismissed",false) and (battle.model.is_enemy_alive(index) or battle.health_trails.lingering(index)) and arrival_progress(battle,index) >= 1.0 and battle.ARENA.grow(-6).encloses(battle._enemy_health_rect(index))
+	return not battle.model.enemies[index].get("dismissed",false) and (battle._enemy_presented_alive(index) or battle.health_trails.lingering(index)) and arrival_progress(battle,index) >= 1.0 and battle.ARENA.grow(-6).encloses(battle._enemy_health_rect(index))
 
 ## Screen-space combat overlays never sit on shop, chest or inspection pages.
 static func overlays_visible(battle) -> bool:
-	return not battle._menus_open() and battle.inspecting_enemy < 0 and battle.view_phase not in ["shop","reward"]
+	return not battle._menus_open() and battle.inspecting_enemy < 0 and battle.view_phase not in ["shop","reward","over"]
 
 ## Keep each player's orbit grouped around that actor, with its counter above world sprites.
 static func paint(battle, canvas: CanvasItem) -> void:
 	for index in actor_order(battle):
 		if index < 0: battle._draw_player_actor(canvas)
 		else: battle._draw_human(index,canvas)
+	battle.relic_attacks.paint(canvas)
 	battle._draw_character_skill_counter(canvas)

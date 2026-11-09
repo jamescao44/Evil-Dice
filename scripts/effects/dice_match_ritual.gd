@@ -121,7 +121,7 @@ func play(group: Dictionary, token: int) -> bool:
 		for hit in hits: beam_targets.append(battle._enemy_impact_point(hit.target))
 		shot_age = 0
 		beam_strength = 1.0
-		battle.damage_feedback.show_attack(skill)
+		battle.damage_feedback.show_attack(skill,target)
 		battle.combat_motion.attack(-1)
 		battle._sound("player/slash",0.65 if count == 6 else 1.05+shot*0.055,-13)
 		if not await _animate("fire",SHOT_TIME*0.4,token,stamp): return false

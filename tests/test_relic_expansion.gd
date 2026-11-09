@@ -25,7 +25,7 @@ func losses(events: Array) -> Array:
 	return events.filter(func(e): return e.type in ["damage","shield_hit"] and e.target != -1)
 
 func roll_proc_checks() -> void:
-	for row in [["worn_bow",[1,2,3,4,5,6],false,1,5],["tissue_pack",[1,1,2,4,4,6],false,1,10],["magic_slingshot",[1,2,3,4,5,6],false,1,15],["pet_ghost",[1,2,3,4,5,6],false,3,20],["pet_dragon",[1,2,3,4,5,6],false,2,15],["spiked_helmet",[1,2,3,4,5,6],true,1,13]]:
+	for row in [["worn_bow",[1,2,3,4,5,6],false,1,5],["tissue_pack",[1,1,2,4,4,6],false,1,10],["magic_slingshot",[1,2,3,4,5,6],false,1,15],["pet_ghost",[1,2,3,4,5,6],false,3,20],["pet_dragon",[1,2,3,4,5,6],false,2,7],["spiked_helmet",[1,2,3,4,5,6],true,1,6]]:
 		var m = fresh([row[0]])
 		m.roll_pool(row[2],row[1])
 		var before: Array = m.dice_turn.values.duplicate()

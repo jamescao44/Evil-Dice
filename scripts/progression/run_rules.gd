@@ -12,6 +12,8 @@ signal reroll_progress_changed(previous: int, current: int)
 signal tarot_granted(item: Dictionary)
 signal tarot_expired(instances: Array)
 signal character_leveled(level: int)
+var defer_level_healing := false # Animated battles acknowledge each celebration; CLI resolves immediately.
+var pending_level_heals: Array[int] = []
 ## Already credited; the view animates a receipt, never owns the reward transaction.
 ## Nonnegative targets are enemies; -3-index identifies a defeated city troop.
 signal enemy_crystals_dropped(target: int, amount: int)
@@ -184,7 +186,7 @@ func _roll_enemy_gemstone_drop(enemy_index: int) -> void:
 
 ## Credit the gem before announcing its cosmetic pickup, including debug grants.
 func grant_gemstone(id: String, level: int = 1, enemy_index: int = -1) -> bool:
-	if not gemstones.add(id,level): return false
+	if not gemstones.add(id,level,1,true): return false
 	gemstone_granted.emit({"id":id,"level":level},enemy_index)
 	return true
 
@@ -262,6 +264,7 @@ func reset_run() -> void:
 	souls = 0
 	enemy_soul_remainder = 0.0
 	character_level = 1
+	pending_level_heals.clear()
 	wave_kind = WaveRewards.BATTLE_TYPES[reward_rng.randi_range(0,WaveRewards.BATTLE_TYPES.size()-1)]
 	wave_amount = 0
 	route_choices.clear()
@@ -492,6 +495,7 @@ func _load_wave() -> void:
 	relic_skills.queued.clear()
 	relic_skills.resume_phase = ""
 	shield = 0 # Straight shields last within this wave only.
+	relic_protection.wave_started(self)
 	city_immunity_clock = 0.0
 	enemies = Waves.create(stage,rng)
 	RelicFocus.sync(self)
@@ -578,16 +582,32 @@ func character_evolution_stage() -> int:
 func level_cost() -> int:
 	return LEVEL_COST_STEP*character_level
 
-## Spend XP on an uncapped level, compound character stats and fully heal.
+## Spend XP and update stats; animated battles apply the heal after the celebration.
 func level_up() -> bool:
 	var cost: int = level_cost()
 	if cost <= 0 or souls < cost or hp <= 0: return false
 	souls -= cost
 	character_level += 1
 	base_max_hp = Vitals.base_health(character_level)
-	hp = max_hp
+	request_level_heal(character_level)
 	character_leveled.emit(character_level)
 	return true
+
+## Keep level healing separate from ordinary healing bonuses and status restrictions.
+func request_level_heal(level: int) -> void:
+	if defer_level_healing:
+		if level not in pending_level_heals: pending_level_heals.append(level)
+		hp = mini(hp,max_hp)
+	elif hp > 0: hp = max_hp
+
+## A completed celebration heals once and cannot resurrect a defeated player.
+func complete_level_heal(level: int) -> int:
+	if level not in pending_level_heals: return 0
+	pending_level_heals.erase(level)
+	if hp <= 0: return 0
+	var previous: int = hp
+	hp = max_hp
+	return hp-previous
 
 func _record_relic_wave_clear() -> void:
 	expire_tarot_projections()

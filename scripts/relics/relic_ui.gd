@@ -215,7 +215,7 @@ func _draw() -> void:
 		if pickup.active and not pickup.landed and i == pickup.slot: continue
 		var rect: Rect2 = slot_rect(i)
 		var item: Dictionary = battle.model.relics.items[order[i]]
-		_paint_inventory_item(item,rect,false,pickup.inventory_scale(i,battle.reduced))
+		_paint_inventory_item(item,rect,false,pickup.inventory_scale(i,battle.reduced),battle.shop_ui.set_hint_for_owned(order[i]))
 	# A consumed Last Contract gets its brief activation before disappearing.
 	for id in activations:
 		if not battle.model.relics.has(id): _paint_inventory_item({"id":id},slot_rect(activations[id].slot))
@@ -232,7 +232,7 @@ func ready_glow(item: Dictionary) -> float:
 	if not Catalog.charged(item): return 0.0
 	return 0.9 if battle.reduced else 0.85+sin(ready_clock*4.5)*0.15
 
-func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, landing_scale: Vector2 = Vector2.ONE) -> void:
+func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, landing_scale: Vector2 = Vector2.ONE, hint: Vector3 = Vector3.ZERO) -> void:
 	var id: String = item.id
 	var strength: float = activation_strength(id)
 	var at: Vector2 = rect.get_center()
@@ -252,7 +252,8 @@ func _paint_inventory_item(item: Dictionary, rect: Rect2, held: bool = false, la
 		for i in range(4): draw_circle(at,radius*(1.15+i*0.22),Color(color,strength*(0.16-i*0.03)))
 		draw_arc(at,radius*1.18,0,TAU,32,Color(color,strength*0.85),2)
 	var scale_factor: float = 1.0 if battle.reduced else 1.0+strength*0.08
-	draw_set_transform(at,activation_tilt(id),landing_scale*scale_factor)
+	if hint.z > 0: Paint.Glow.paint(self,at,radius*1.05,Color("fff5ca"),Rect2(),hint.z*0.65)
+	draw_set_transform(at,activation_tilt(id)+hint.y,landing_scale*scale_factor*(1.0+hint.x))
 	Paint.paint(self,id,Vector2.ZERO,radius,held,item)
 	draw_set_transform(Vector2.ZERO)
 	_draw_counter(item,at,radius)

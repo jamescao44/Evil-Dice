@@ -43,6 +43,8 @@ const SkillBubble = preload("res://scripts/combat/skill_bubble.gd")
 const ScreenRipple = preload("res://scripts/effects/screen_ripple.gd")
 var screen_ripple: CanvasLayer
 const RelicOrbit = preload("res://scripts/relics/relic_orbit.gd")
+var relic_attacks = preload("res://scripts/relics/relic_attack_motion.gd").new()
+var warrior_companion = preload("res://scripts/relics/warrior_companion.gd").new()
 var witch_companion = preload("res://scripts/relics/witch_companion.gd").new()
 var pet_companions = preload("res://scripts/relics/pet_companions.gd").new()
 const RelicUI = preload("res://scripts/relics/relic_ui.gd")
@@ -251,6 +253,7 @@ var auto_claim_notice: Node2D
 @export var chest_pity_path: String = "" # Scene instances persist; isolated model tests do not.
 @export var relic_unlocks_path: String = ""
 @export var chapter_id: String = "chapter_1"
+@export var level_entrance_enabled: bool = false # Authored level scenes opt into the summon presentation.
 
 ## Build battle presentation nodes, load assets and connect model events to visual effects.
 func _ready() -> void:
@@ -332,6 +335,9 @@ func _ready() -> void:
 	relic_ui = RelicUI.new()
 	relic_ui.battle = self
 	add_child(relic_ui)
+	relic_attacks.battle = self
+	relic_attacks.cosmetic.randomize()
+	model.relic_attack_started.connect(relic_attacks.begin)
 	model.relic_activated.connect(relic_ui.activate)
 	model.relic_effect_activated.connect(_pet_effect_activated)
 	model.relic_cost_paid.connect(_relic_cost_paid)
@@ -364,6 +370,7 @@ func _ready() -> void:
 	inventory_page = preload("res://scripts/relics/inventory_page.gd").new()
 	inventory_page.battle = self
 	add_child(inventory_page)
+	model.gemstone_granted.connect(inventory_page.gemstone_received)
 	gemstone_pickup = preload("res://scripts/dice/gemstone_pickup.gd").new()
 	gemstone_pickup.battle = self
 	add_child(gemstone_pickup)
@@ -429,7 +436,7 @@ func _ready() -> void:
 	add_child(charge_audio)
 	_create_battlefield_view()
 	health_trails.reset(model)
-	_start_round()
+	_start_level()
 	if not start_snapshot.is_empty():
 		await get_tree().create_timer(0.6).timeout
 		await RenderingServer.frame_post_draw
@@ -439,7 +446,7 @@ func _ready() -> void:
 ## Advance battle presentation, city activity, charge audio and pointer feedback.
 func _process(delta: float) -> void:
 	fx.damage_stage = model.stage
-	health_trails.sync(model)
+	health_trails.sync(model,relic_attacks.health_states())
 	_update_battlefield_view(delta)
 	_update_enemy_hold(delta)
 	if not _menus_open() and inspecting_enemy < 0:
@@ -447,6 +454,10 @@ func _process(delta: float) -> void:
 		kill_slow_remaining = maxf(0, kill_slow_remaining - delta)
 		auto_claim_remaining = maxf(0, auto_claim_remaining - delta)
 	var world_delta: float = delta * _world_time_scale()
+	if not _menus_open() and inspecting_enemy < 0:
+		var waiting_for_relics: bool = relic_attacks.pending()
+		relic_attacks.advance(world_delta*_roll_speed())
+		if waiting_for_relics and not relic_attacks.pending() and view_phase != "resolving": _check_over()
 	if not _menus_open(): enemy_debris.advance(world_delta*speed,reduced)
 	if not _menus_open() and inspecting_enemy < 0:
 		enemy_dust.advance(world_delta,fx.attack_visuals_active() or match_ritual.beam_strength > 0)
@@ -458,6 +469,7 @@ func _process(delta: float) -> void:
 	if not _menus_open() and inspecting_enemy < 0:
 		pet_companions.advance(world_delta,model,view_phase == "transition",travel_direction,reduced)
 		witch_companion.advance(world_delta,model)
+		warrior_companion.advance(world_delta,model)
 	clock_time += world_delta
 	_update_charge()
 	shake = maxf(0, shake - delta * 24)
@@ -1405,7 +1417,7 @@ func _enemy_point(index: int) -> Vector2:
 
 func _enemy_impact_point(index: int) -> Vector2:
 	var point: Vector2 = _enemy_point(index)
-	if model.is_enemy_alive(index): return point
+	if _enemy_presented_alive(index): return point
 	var fall: float = minf(1,fallen.get(index,0.0)/0.3)
 	return point.lerp(battlefield_view.transform*(_enemy_world_feet(index)-Vector2(0,_enemy_unit_side(index)*0.08)),fall)
 
@@ -1415,6 +1427,7 @@ func _player_world_feet() -> Vector2:
 ## Synchronize new ownership before effects that can fire on the acquisition frame.
 func _pet_effect_activated(id: String) -> void:
 	witch_companion.activate(id)
+	warrior_companion.activate(id)
 	if not pet_companions.PETS.has(id): return
 	pet_companions.sync(model)
 	pet_companions.activate(id)
@@ -1423,7 +1436,8 @@ func _player_feet() -> Vector2:
 	return battlefield_view.transform*_player_world_feet()
 
 func _player_point() -> Vector2:
-	return battlefield_view.transform*evolution.visible_rect(_player_world_sprite_rect()).get_center()
+	var sprite := _player_world_sprite_rect()
+	return battlefield_view.transform*Vector2(evolution.Sprite.body_axis_x(sprite,_display_form()),evolution.visible_rect(sprite).get_center().y)
 
 ## Apply legacy squash/stretch only to characters or forms that opt into it.
 func _player_growth_scale() -> Vector2:
@@ -1433,15 +1447,16 @@ func _player_growth_scale() -> Vector2:
 func _player_cast_point() -> Vector2:
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	var rect: Rect2 = _player_world_sprite_rect(dx,player_animation.projectile_bob(monster_side,reduced))
-	rect = player_animation.firing_rect(rect,reduced)
+	rect = player_animation.body_rect(rect,reduced)
 	return battlefield_view.transform*(rect.position+player_animation.hand_uv()*rect.size)
 
 ## Character taps override only presentation, leaving modal controls and ice breaking first.
 func _player_emote_hit(point: Vector2) -> bool:
+	if evolution.blocks_emote(): return false
 	if _menus_open() or model.is_frozen() or view_phase in ["reward","shop","over"]: return false
 	if tarot_ui.blocks_battle() or tarot_quick.held or tarot_quick.next_open or tarot_quick.field_focus >= 0: return false
 	if inspecting_enemy >= 0 or skill_pressed or dice_selection.dragging: return false
-	var actor: Rect2 = evolution.visible_rect(player_animation.firing_rect(_player_world_sprite_rect(combat_motion.offset(-1,monster_side,clock_time,false,reduced),player_animation.projectile_bob(monster_side,reduced)),reduced))
+	var actor: Rect2 = evolution.visible_rect(player_animation.body_rect(_player_world_sprite_rect(combat_motion.offset(-1,monster_side,clock_time,false,reduced),player_animation.projectile_bob(monster_side,reduced)),reduced))
 	return ARENA.has_point(point) and actor.grow(8).has_point(battlefield_view.transform.affine_inverse()*point)
 
 func _player_sprite_rect(dx: float = 0, bob: float = 0) -> Rect2:
@@ -1461,6 +1476,17 @@ func _city_wall_point(section: float) -> Vector2:
 
 func _roll_speed() -> float:
 	return 2.0 if model.is_city() else speed
+
+## Complete the authored level summon before opening turn effects or dice input.
+func _start_level() -> void:
+	if level_entrance_enabled:
+		var token: int = run_id
+		view_phase = "entering"
+		evolution.start_entrance()
+		while evolution.entrance.active():
+			await get_tree().process_frame
+			if not _valid_turn(token): return
+	_start_round()
 
 ## Reset round presentation and expose the next player action.
 func _start_round() -> void:
@@ -1597,11 +1623,6 @@ func _roll(strength: float = 0.0, perfect: bool = false, free: bool = false) -> 
 
 ## Finish roll and formation procs before accepting the next player action.
 func _resolve_roll_triggers(token: int) -> bool:
-	while model.perfect_relic_ready:
-		var relic_speed: float = model.roll_relic_animation_speed()
-		_show_events(model.resolve_roll_relic_step())
-		if not await _wait(0.25/relic_speed,token): return false
-		if _check_over(): return false
 	while not model.roll_attacks.is_empty() and model.phase == "roll_attacks":
 		var group: Dictionary = model.roll_attacks[0]
 		var auto: MultiHitSkill = group.skill
@@ -1625,7 +1646,7 @@ func _resolve_roll_triggers(token: int) -> bool:
 			# Let the matching group bounce before the player starts firing.
 			if not await _wait(0.24,token): return false
 		var firing_die = dice[group.indices[auto.uses_spent % group.indices.size()]]
-		damage_feedback.show_attack(auto)
+		damage_feedback.show_attack(auto,target)
 		firing_die.pulse_auto_attack()
 		player_animation.begin("pair")
 		if not await _wait_player_launch(token): return false
@@ -1652,6 +1673,12 @@ func _resolve_roll_triggers(token: int) -> bool:
 		if _check_over(): return false
 		if not await _wait(AUTO_ATTACK_RECOVERY/hit_speed,token): return false
 	if damage_feedback.phase == "attack": damage_feedback.finish()
+	# Finish alike impacts and recovery before items attack in inventory order.
+	while model.perfect_relic_ready:
+		var relic_speed: float = model.roll_relic_animation_speed()
+		_show_events(model.resolve_roll_relic_step())
+		if not await _wait(0.25/relic_speed,token): return false
+		if _check_over(): return false
 	model.start_roll_chip_casts()
 	return not _check_over()
 
@@ -1663,7 +1690,7 @@ func _form_selected_skill() -> void:
 	view_phase = "forming"
 	var token: int = run_id
 	if not await _resolve_roll_triggers(token): return
-	_sound("dice/confirmation_002",1.1,-12)
+	match_announcement.CombinationAudio.play(formed.dice.size(),_sound)
 	_show_pending_skill(true)
 
 ## Restore the active skill bubble after rolling, cancellation or spending a skill.
@@ -2037,6 +2064,7 @@ func _show_chest(outcomes: Array, upgrades: bool = false, auto_open: bool = fals
 ## Record newly defeated enemies without duplicating death visuals.
 func _sync_corpses() -> void:
 	for i in range(model.enemies.size()):
+		if relic_attacks.holds(i): continue
 		if not model.is_enemy_alive(i) and not model.enemies[i].get("dismissed",false) and not fallen.has(i):
 			fallen[i] = 0.0
 			kill_slow_remaining = KILL_SLOW_DURATION
@@ -2049,6 +2077,7 @@ func _sync_corpses() -> void:
 
 ## Detect defeat or a cleared wave and start the matching reward transition.
 func _check_over() -> bool:
+	if relic_attacks.pending(): return false
 	# Finish both sides' status ticks before treating a damage-over-time kill as
 	# victory. Otherwise the relic screen can interrupt player burning midway.
 	if model.phase == "turn_end" and model.hp > 0: return false
@@ -2073,7 +2102,7 @@ func _check_over() -> bool:
 func _offer_wave_rewards(token: int) -> bool:
 	if model.at_shop: return _valid_turn(token)
 	view_phase = "collecting"
-	while enemy_dust.active() or crystal_pickup.pending_total > 0 or not soul_pickup.orbs.is_empty() or evolution.active() or tarot_ui.pickup.active():
+	while not relic_attacks.flights.is_empty() or enemy_dust.active() or crystal_pickup.pending_total > 0 or not soul_pickup.orbs.is_empty() or evolution.active() or tarot_ui.pickup.active():
 		await get_tree().process_frame
 		if not _valid_turn(token): return false
 	if not model.begin_wave_reward(): return _valid_turn(token)
@@ -2179,7 +2208,7 @@ func _advance_wave() -> void:
 	if not await _choose_next_route(token): return
 	active_human = -1
 	if not model.advance_wave(): return
-	health_trails.sync(model)
+	health_trails.sync(model,relic_attacks.health_states())
 	combat_motion.clear()
 	fallen.clear()
 	enemy_debris.clear()
@@ -2209,10 +2238,13 @@ func _advance_wave() -> void:
 
 ## Reset run state and all pending presentation at the requested wave.
 func _restart(wave_number: int = 0) -> void:
+	relic_attacks.clear()
 	focus_mark.cancel()
 	if is_instance_valid(one_shot_audio): one_shot_audio.clear()
 	if is_instance_valid(damage_feedback): damage_feedback.clear()
-	if is_instance_valid(inventory_page): inventory_page.close(false)
+	if is_instance_valid(inventory_page):
+		inventory_page.close(false)
+		inventory_page.clear_gem_notice()
 	if is_instance_valid(gemstone_pickup): gemstone_pickup.reset()
 	skill_counter_flash_until = 0
 	boss_break_until = 0
@@ -2259,6 +2291,7 @@ func _restart(wave_number: int = 0) -> void:
 	evolution.reset()
 	pet_companions.clear()
 	witch_companion.clear()
+	warrior_companion.clear()
 	background_offset = model.stage * 960
 	background_vertical_offset = 0
 	travel_direction = Vector2.RIGHT
@@ -2287,14 +2320,23 @@ func _restart(wave_number: int = 0) -> void:
 		dice[i].face = i + 1
 		dice[i].glow = 0
 		dice[i].marked = false
-	_start_round()
+	if wave_number == 0: _start_level()
+	else: _start_round()
 
 ## Format actual calculated damage while suppressing instant-kill numbers.
 static func _damage_popup(event: Dictionary) -> String:
 	return "" if event.get("instant_kill",false) else "-%d" % event.get("display_amount",event.amount)
 
-static func _event_font_size(event: Dictionary, stage: int = 0) -> int:
-	return Effects.damage_font_size(event.get("display_amount",event.amount),stage) if event.type in ["damage","burn","shield_hit"] else Effects.FLOAT_FONT_SIZE
+func _event_font_size(event: Dictionary, stage: int = 0) -> int:
+	if event.type not in ["damage","burn","shield_hit"]: return Effects.FLOAT_FONT_SIZE
+	var target: int = event.get("target",-2)
+	var target_health: float = 0.0
+	var boss: bool = false
+	if target >= 0 and target < model.enemies.size():
+		target_health = model.enemies[target].max_hp
+		boss = model.enemies[target].get("boss",false)
+	elif target == -1: target_health = model.max_hp
+	return Effects.damage_font_size(event.get("display_amount",event.amount),stage,target_health,boss)
 
 ## Show redirected HP loss on the servant that absorbed it, with a short protection link.
 func _damage_redirected(source: int, target: int, damage: int, loss: int) -> void:
@@ -2304,7 +2346,8 @@ func _damage_redirected(source: int, target: int, damage: int, loss: int) -> voi
 ## Translate model combat events into damage numbers, sounds and character effects.
 ## React to boss model changes even when a tarot, relic or status causes the phase change.
 func _boss_changed(index: int, event_type: String) -> void:
-	health_trails.sync(model)
+	if relic_attacks.defer_callback(index,_boss_changed.bind(index,event_type)): return
+	health_trails.sync(model,relic_attacks.health_states())
 	while hit_times.size() <= model.enemies.size(): hit_times.append(0.0)
 	if event_type in ["boss_summon","boss_phase"]: BattlefieldRender.register_arrivals(self)
 	if event_type == "boss_summon":
@@ -2359,10 +2402,17 @@ func _finish_relic_death() -> void:
 	_check_over()
 
 func _show_events(events: Array) -> void:
-	health_trails.sync(model)
+	health_trails.sync(model,relic_attacks.health_states())
 	var offsets: Dictionary = {}
 	for event in events:
+		if relic_attacks.defer_event(event): continue
 		if event.type in ["damage","burn"] and event.amount == 0 and event.target >= 0 and model.enemies[event.target].role == Rules.EnemyCatalog.Role.FANATIC: continue
+		if event.type in ["guardian_hit","guardian_return"]:
+			warrior_companion.activate(event.relic_id)
+			var guard_at: Vector2 = battlefield_view.transform*warrior_companion.sprite_rect(self).get_center()
+			fx.burst(guard_at,GOLD,6 if reduced else 14,65)
+			if event.type == "guardian_hit": fx.damage_number(guard_at-Vector2(0,14),"-%d" % event.amount,GOLD,22)
+			continue
 		if event.type == "counter":
 			combat_motion.attack(event.target)
 			fx.enemy_cast(model.enemies[event.target].role,_enemy_point(event.target),_player_point(),0.2)
@@ -2491,7 +2541,7 @@ func _wait(seconds: float, token: int = -1, real_time: bool = false, fixed_speed
 	var remaining: float = seconds
 	# The monotonic floor prevents smoothed frame deltas from compressing damage ticks.
 	var earliest: int = Time.get_ticks_usec()+ceili(minimum_real_seconds*1000000)
-	while remaining > 0 or Time.get_ticks_usec() < earliest:
+	while remaining > 0 or Time.get_ticks_usec() < earliest or relic_attacks.pending():
 		await get_tree().process_frame
 		if token != -1 and not _valid_turn(token): return false
 		if _menus_open(): continue
@@ -2512,7 +2562,7 @@ func _draw() -> void:
 	if view_phase == "over":
 		_draw_ending()
 		_draw_reward_progress(REWARD_CENTER,1.0)
-	if not _menus_open(): _draw_tooltips()
+	if not _menus_open() and view_phase != "over": _draw_tooltips()
 
 ## Draw translated pixel text with a shadow and an integer-aligned baseline.
 func _text(at: Vector2, value: String, size: int = 16, color: Color = CREAM, canvas: CanvasItem = null) -> void:
@@ -2725,13 +2775,13 @@ func _draw_player_actor(canvas: CanvasItem) -> void:
 	pet_companions.paint(canvas,self,pets,false)
 	RelicOrbit.paint(canvas,self,orbit,false)
 	_shadow(_player_world_feet(),monster_side*_player_growth_scale().x*0.48,0.27,canvas)
-	if model.shield > 0 or model.statuses[6].count > 0:
-		Pixel.circle(canvas,_player_world_feet()-Vector2(0,monster_side*0.48),monster_side*0.47,Color(TEAL,0.45),4)
+	# Shield and immunity stay in the vitals/status UI, without a permanent body ring.
 	var actor_rect: Rect2 = _player_world_sprite_rect(dx,bob)
 	var actor_tint := Color(Color.WHITE.lerp(RED,hurt*0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0)
 	evolution.draw_actor(canvas,actor_rect,actor_tint)
-	PlayerCastCircle.paint(canvas,player_animation.firing_rect(actor_rect,reduced),player_animation,reduced,actor_tint)
+	PlayerCastCircle.paint(canvas,player_animation.body_rect(actor_rect,reduced),player_animation,reduced,actor_tint)
 	RelicOrbit.paint(canvas,self,orbit,true)
+	warrior_companion.paint(canvas,self)
 	pet_companions.paint(canvas,self,pets,true)
 	_draw_player_afflictions(canvas)
 
@@ -2739,7 +2789,8 @@ func _draw_player_actor(canvas: CanvasItem) -> void:
 func _character_counter_center() -> Vector2:
 	var sprite := _player_world_sprite_rect()
 	var rect: Rect2 = evolution.visible_rect(sprite)
-	return Vector2(rect.get_center().x,rect.position.y-10)
+	var gap: float = 24 if fx.canvas_size.y > fx.canvas_size.x else 18
+	return Vector2(evolution.Sprite.body_axis_x(sprite,_display_form()),rect.position.y-gap)
 
 func _draw_character_skill_counter(canvas: CanvasItem) -> void:
 	var center: Vector2 = _character_counter_center()
@@ -2778,6 +2829,10 @@ func _enemy_world_sprite_rect(index: int) -> Rect2:
 	return Rect2(feet-Vector2(side/2,side)+Vector2(dx,bob),Vector2.ONE*side)
 
 ## Draw an enemy with elite lighting, motion, health, statuses and intent.
+## Flight impacts retain living sprites until their damage feedback lands.
+func _enemy_presented_alive(index: int) -> bool:
+	return model.is_enemy_alive(index) or relic_attacks.holds(index)
+
 func _draw_human(index: int, canvas: CanvasItem) -> void:
 	var human: Dictionary = model.enemies[index]
 	if human.get("dismissed",false): return
@@ -2786,7 +2841,7 @@ func _draw_human(index: int, canvas: CanvasItem) -> void:
 	var side: float = _enemy_unit_side(index)
 	var key: String = EnemyVisuals.art_key(human)
 	var selected: bool = attack_target == index and view_phase == "resolving"
-	if not model.is_enemy_alive(index):
+	if not _enemy_presented_alive(index):
 		if enemy_dust.bodies.has(index):
 			enemy_dust.draw(canvas,index)
 			return
@@ -3107,7 +3162,12 @@ func _draw_health_fill(inner: Rect2, hp: int, maximum: int, shield: int, color: 
 		draw_rect(Rect2(segment.position,Vector2(segment.size.x,minf(2,segment.size.y))),Color("e4f5ff"))
 
 func _draw_enemy_health(index: int) -> void:
-	var human: Dictionary = model.enemies[index]
+	var human: Dictionary = model.enemies[index].duplicate()
+	var held: Dictionary = relic_attacks.state_for(index)
+	if not held.is_empty():
+		human.hp = held.hp
+		human.shield = held.shield
+		human.max_hp = held.maximum
 	var bar: Rect2 = _enemy_health_rect(index)
 	var color: Color = _elite_color(human) if human.elite else RED
 	var size: int = 16 if model.enemies.size() < 4 else 12
@@ -3118,7 +3178,11 @@ func _draw_enemy_health(index: int) -> void:
 
 ## Levels sit above the left edge; HP and shield values remain inside the bar.
 func _draw_enemy_health_text(index: int, bar: Rect2, font_size: int) -> void:
-	var enemy: Dictionary = model.enemies[index]
+	var enemy: Dictionary = model.enemies[index].duplicate()
+	var held: Dictionary = relic_attacks.state_for(index)
+	if not held.is_empty():
+		enemy.hp = held.hp
+		enemy.shield = held.shield
 	var label: String = "LV.%d" % enemy.get("level",1)
 	var level_size: int = maxi(10,font_size-8)
 	var hp_text: String = str(enemy.hp)

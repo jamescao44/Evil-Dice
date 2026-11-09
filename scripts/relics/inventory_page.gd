@@ -25,6 +25,23 @@ var press_origin := Vector2.ZERO
 var pointer := Vector2.ZERO
 var sale_receipt: int = 0
 var sale_receipt_time: float = 0
+var new_gemstones: bool = false
+var gem_notice_age: float = 0.0
+
+## Pickups notify navigation only when the gemstone page is not already visible.
+func gemstone_received(_gem: Dictionary, _target: int) -> void:
+	if not new_gemstones: gem_notice_age = 0
+	new_gemstones = not (opened and tab == 1 and not battle.pause_menu.active())
+	queue_redraw()
+
+## Opening Gemstones clears navigation dots; individual gems require their own interaction.
+func clear_gem_notice() -> void:
+	new_gemstones = false
+	queue_redraw()
+
+## Dim gently without disappearing or changing size; reduced effects keep the dot steady.
+func gem_notice_brightness() -> float:
+	return 1.0 if battle.reduced else 0.89+0.11*cos(gem_notice_age*TAU/1.6)
 
 ## Cover held items while remaining below settings and help.
 func _ready() -> void:
@@ -195,11 +212,16 @@ func can_discard_incoming() -> bool:
 ## Swallow modal input; the shortcut opens before chest or shop hit handlers.
 func click(at: Vector2) -> bool:
 	if not opened:
-		if available() and button_rect().has_point(at): open(); return true
+		if available() and (button_rect().has_point(at) or (new_gemstones and gem_notice_hit(button_rect(),at))): open(); return true
 		return false
 	if close_rect().has_point(at): close(); return true
 	for i in range(2):
-		if tab_rect(i).has_point(at): tab = i; selected = -1; cancel_drag(); return true
+		if tab_rect(i).has_point(at) or (i == 1 and new_gemstones and gem_notice_hit(tab_rect(i),at)):
+			tab = i
+			if tab == 1: clear_gem_notice()
+			selected = -1
+			cancel_drag()
+			return true
 	if tab == 1: gem_page.click(at); return true
 	if selected < 0 and can_discard_incoming() and not incoming_relic().is_empty() and discard_rect().has_point(at):
 		_discard_incoming()
@@ -249,6 +271,9 @@ func incoming_relic() -> String:
 ## Refresh live item counters and the shortcut's enabled state.
 func _process(delta: float) -> void:
 	sale_receipt_time = maxf(0,sale_receipt_time-delta)
+	if new_gemstones and opened and tab == 1 and not battle.pause_menu.active(): clear_gem_notice()
+	if new_gemstones or (opened and tab == 1 and battle.model.gemstones.has_new()):
+		if not battle.pause_menu.active(): gem_notice_age = fmod(gem_notice_age+maxf(0,delta),1.6)
 	if opened and tab == 1: gem_page.advance(delta)
 	queue_redraw()
 
@@ -275,6 +300,7 @@ func _draw() -> void:
 	for i in range(2):
 		_button(tab_rect(i),"RELICS" if i == 0 else "GEMSTONES")
 		if tab == i: draw_line(tab_rect(i).position+Vector2(12,tab_rect(i).size.y-5),tab_rect(i).end-Vector2(12,5),GOLD,3)
+	_draw_gem_notice(tab_rect(1),new_gemstones)
 	if tab == 1: gem_page.draw(); return
 	if selected >= battle.model.relics.items.size(): selected = -1
 	if selected >= 0: _draw_item(); return
@@ -314,7 +340,27 @@ func _draw_shortcut() -> void:
 	var count: int = battle.model.relics.items.size()
 	if count > 0: _text(rect.size/2-Vector2(17,8),str(count),22 if portrait() else 16)
 	if not available(): Panels.panel(self,Rect2(-rect.size/2,rect.size),Color(0.06,0.06,0.07,0.45),Color.TRANSPARENT,14)
+	_draw_gem_notice(Rect2(-rect.size/2,rect.size),new_gemstones)
 	draw_set_transform(Vector2.ZERO)
+
+## Center markers on box corners instead of insetting them into the content.
+func gem_notice_center(rect: Rect2) -> Vector2:
+	return Vector2(rect.end.x,rect.position.y)
+
+func gem_notice_radius(small: bool = false) -> float:
+	return (7 if portrait() else 5) if small else (10 if portrait() else 7)
+
+## Include the outside half of a corner badge in its owner's touch area.
+func gem_notice_hit(rect: Rect2, at: Vector2, small: bool = false) -> bool:
+	return at.distance_to(gem_notice_center(rect)) <= gem_notice_radius(small)+2
+
+## Navigation and per-copy markers share a gentle blink but have independent visibility.
+func _draw_gem_notice(rect: Rect2, enabled: bool = true, small: bool = false) -> void:
+	if not enabled: return
+	var radius: float = gem_notice_radius(small)
+	var at: Vector2 = gem_notice_center(rect)
+	draw_circle(at,radius+2,Color("181b21"),true,-1,true)
+	draw_circle(at,radius,Color("ff8b73").darkened(1.0-gem_notice_brightness()),true,-1,true)
 
 ## Keep the new relic visible while players compare it with an owned item's details.
 func _draw_incoming(compact: bool) -> void:
@@ -349,7 +395,9 @@ func _draw_slot(index: int, item_index: int) -> void:
 	if not occupied:
 		draw_line(rect.get_center()-Vector2(12,0),rect.get_center()+Vector2(12,0),Color("42474b"),2)
 		return
-	Paint.paint(self,item.id,rect.get_center()-Vector2(0,16),48 if portrait() else 46,true,item)
+	var at: Vector2 = rect.get_center()-Vector2(0,16)
+	var radius: float = 48 if portrait() else 46
+	Paint.paint(self,item.id,at,radius,true,item)
 	var label: String = GameText.text(Catalog.RARITY_NAMES[Catalog.ITEMS[item.id].rarity])
 	_text(Vector2(rect.get_center().x,rect.end.y-14),label,19 if portrait() else 16,color)
 	var count: int = Catalog.counter_value(item)

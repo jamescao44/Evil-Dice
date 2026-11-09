@@ -11,6 +11,7 @@ const FADE_TIME := 0.36
 const FALL_TIME := 0.44
 const POP_TIME := 0.12
 const SETTLE_TIME := 0.20
+const CombinationAudio = preload("res://scripts/dice/combination_audio.gd")
 var battle
 var count: int = 2
 var age: float = -1.0
@@ -24,6 +25,7 @@ func play(alikes: int) -> void:
 	count = clampi(alikes, 2, 6)
 	age = 0.0
 	release_age = -1.0
+	CombinationAudio.play(count,battle._sound)
 	queue_redraw()
 
 ## Rare matches hold above the health bar until their full ritual has finished.
@@ -43,7 +45,8 @@ func _process(delta: float) -> void:
 	if battle.view_phase in ["over", "reward", "wave_reward", "collecting", "transition", "shop"]:
 		if age >= 0.0: clear()
 	visible = not battle._menus_open() and battle.inspecting_enemy < 0
-	if age < 0.0 or not visible: return
+	if not visible: return
+	if age < 0.0: return
 	age += delta
 	if age >= fade_start()+fade_duration(): age = -1.0
 	queue_redraw()

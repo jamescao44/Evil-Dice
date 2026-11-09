@@ -5,6 +5,7 @@ const Patterns = preload("res://scripts/dice/dice_patterns.gd")
 const Sequence = preload("res://scripts/relics/relic_sequence.gd")
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Attack = preload("res://scripts/relics/relic_attack.gd")
+const SPLIT_DAMAGE_FACTOR := 0.6
 var first_manual_used: bool = false
 var previous_skill: String = ""
 var queued: Array = []
@@ -104,14 +105,14 @@ func cast_finished(model, skill: MultiHitSkill) -> Array:
 	if skill.is_empty() or skill.cast_source == "relic" or skill.pattern in ["cleanup","match_auto"]: return []
 	var events: Array = []
 	for entry in Sequence.entries(model.relics.items):
-		var amount: float = Catalog.ITEMS[entry.item.id].get("after_skill_attack",0.0)
-		if amount <= 0 or model.hp <= 0: continue
+		var rule: Dictionary = Catalog.ITEMS[entry.item.id].get("after_skill_attack",{})
+		if rule.is_empty() or model.hp <= 0: continue
 		var targets: Array = [-2] if model.is_city() and model.city_hp > 0 else model.RelicFocus.targets(model).filter(func(i): return not model.enemies[i].get("phase_transition_pending",false))
 		if targets.is_empty(): break
 		Sequence.activate(model,entry)
 		if model.hp <= 0: break
 		var target: int = targets[model.rng.randi_range(0,targets.size()-1)]
-		events.append_array(Attack.apply(model,entry.item.id,amount,false,false,target))
+		events.append_array(Attack.apply(model,entry.item.id,rule.get("amount",0.0),false,false,target,Sequence.attack_options(entry,rule)))
 	return events
 
 ## Queue two independent Fireballs ahead of relic echoes, reusing the triggering skill's final whole-use damage.
@@ -119,7 +120,7 @@ func queue_character_fireballs(source: MultiHitSkill) -> void:
 	for i in range(2):
 		var fireball: MultiHitSkill = Patterns.classify([3,4,5])
 		fireball.cast_source = "character_bonus"
-		fireball.inherited_damage = source.calculated_damage_total*(2 if source.split_attack else 1)
+		fireball.inherited_damage = source.calculated_damage_total/(SPLIT_DAMAGE_FACTOR if source.split_attack else 1.0)
 		fireball.effect_multiplier = source.effect_multiplier
 		fireball.critical = source.critical
 		fireball.perfect = source.perfect

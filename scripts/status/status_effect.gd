@@ -12,6 +12,8 @@ const STUNNED := 102
 const DARKNESS := 103
 const CORROSION := 104
 const PLAGUE := 105
+const PLAGUE_HP_PERCENT := 5
+const BOSS_PLAGUE_HP_PERCENT := 2
 const HIDDEN := 106
 const IMMOBILIZED := 107
 const ENEMY_ACTION_LOCKS := [FROZEN, IMMOBILIZED]
@@ -55,3 +57,9 @@ func is_harmful() -> bool:
 ## Identify statuses whose incoming counts add instead of replacing.
 func is_stacking() -> bool:
 	return id in [BURNING, DARKNESS, CORROSION, PLAGUE]
+
+## Each stack removes a fixed share of uninfected max HP, with a one-HP floor.
+static func plague_max_hp(healthy_max_hp: int, stacks: int, boss: bool = false) -> int:
+	var percent: int = BOSS_PLAGUE_HP_PERCENT if boss else PLAGUE_HP_PERCENT
+	var remaining: int = maxi(0,100-maxi(0,stacks)*percent)
+	return maxi(1,roundi(float(healthy_max_hp)*remaining/100.0))

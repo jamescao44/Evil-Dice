@@ -5,6 +5,7 @@ const Sets = preload("res://scripts/relics/relic_sets.gd")
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Drops = preload("res://scripts/relics/relic_drop_table.gd")
 const Assist = preload("res://scripts/rewards/shop_sets.gd")
+const Stock = preload("res://scripts/rewards/shop_stock.gd")
 const Battle = preload("res://scripts/combat/battle.gd")
 const Portrait = preload("res://scripts/combat/battle_portrait.gd")
 const Session = preload("res://scripts/testing/playtest_session.gd")
@@ -75,6 +76,52 @@ func probabilities() -> void:
 		else: item_counts[id] += 1
 	check(absf(rare_count/60000.0-0.3) < 0.01,"Steering preserves the rolled rarity rates")
 	check(absf(float(item_counts.fries)/item_counts.bracelet-1.2) < 0.04,"Missing piece receives twenty percent more relative weight")
+
+## Six independent shelf checks stay at five percent, rather than multiplying with owned sets.
+func shelf_assistance() -> void:
+	var inventory = Inventory.new()
+	var rng := RandomNumberGenerator.new(); rng.seed = 810572
+	var before: int = rng.state
+	check(Assist.roll_stock_piece(rng,{},[],Catalog.RARITY_WEIGHTS).is_empty() and rng.state == before,"No started set leaves ordinary stock RNG unchanged")
+	for held in ["pet_bat","lemon_soda"]:
+		inventory.add(held)
+		var missing: Dictionary = Assist.item_weights(inventory)
+		var hits: Array = [0,0,0,0,0,0]
+		var valid := true
+		for sample in range(20000):
+			for slot in range(Stock.RELIC_COUNT):
+				var floor: int = Catalog.Rarity.RARE if slot == 0 else 0
+				var id: String = Assist.roll_stock_piece(rng,missing,[],Catalog.RARITY_WEIGHTS,floor)
+				if id.is_empty(): continue
+				hits[slot] += 1
+				valid = valid and missing.has(id) and inventory.can_add(id) and Catalog.ITEMS[id].rarity >= floor
+		check(valid,"Extra rolls offer only eligible missing pieces and respect the rarity floor")
+		for slot in range(Stock.RELIC_COUNT):
+			check(absf(hits[slot]/20000.0-0.05) < 0.006,"Each shelf position has one five-percent check with %d started sets" % (1 if held == "pet_bat" else 2))
+	var missing: Dictionary = Assist.item_weights(inventory)
+	var exhausted := true
+	for sample in range(1000):
+		exhausted = exhausted and Assist.roll_stock_piece(rng,missing,missing.keys(),Catalog.RARITY_WEIGHTS).is_empty()
+	check(exhausted,"Reserved gifts and already-listed unique ingredients cannot be drawn again")
+	var m = Run.new(72451)
+	m.relics.add("pet_bat"); m.relics.add("lemon_soda"); m.relics.add("armor")
+	m.stage = 2; m.shop.open_debug(m)
+	var valid_stock := true
+	var upgraded_guarantees := 0
+	for refresh in range(300):
+		if refresh > 0: m.shop.refresh(m)
+		var ids: Array = []
+		for slot in range(Stock.RELIC_COUNT):
+			var offer: Dictionary = m.shop.offers[slot]
+			valid_stock = valid_stock and not offer.id.is_empty() and m.relics.can_add(offer.id) and (offer.id == "codex_page" or offer.id not in ids)
+			ids.append(offer.id)
+			if not m.shop.gift.is_empty(): valid_stock = valid_stock and offer.id != m.shop.gift.id
+		var guaranteed: String = m.shop.offers[m.shop.guaranteed_slot].id
+		valid_stock = valid_stock and Catalog.ITEMS[guaranteed].rarity >= Catalog.Rarity.RARE
+		if Catalog.ITEMS[guaranteed].rarity > Catalog.Rarity.RARE: upgraded_guarantees += 1
+		valid_stock = valid_stock and m.shop.offers.slice(6,8).all(func(o): return o.kind == "tarot") and m.shop.offers[8].kind == "soul_bottle"
+	check(valid_stock,"Entry and paid refresh preserve eligibility, unique stock, keeper reservation and non-relic slots")
+	check(upgraded_guarantees > 0,"The guaranteed shelf slot also receives the extra set-piece roll")
 
 ## Create a real gift-bearing visit from seeded entry, never by repainting or refreshing.
 func gift_visit(m) -> void:
@@ -177,7 +224,12 @@ func scene(phone: bool) -> void:
 	g.queue_free(); await process_frame
 
 func run() -> void:
-	eligibility(); probabilities(); transactions()
+	if "--shelf-only" in OS.get_cmdline_user_args():
+		eligibility(); shelf_assistance()
+		print("Shop shelf sets: %d checks, %d failures" % [checks,failures])
+		quit(1 if failures else 0)
+		return
+	eligibility(); probabilities(); shelf_assistance(); transactions()
 	await scene(false); await scene(true)
 	print("Shop sets: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

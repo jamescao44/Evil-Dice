@@ -90,7 +90,7 @@ func scene(phone: bool) -> void:
 	check(pool.committed == [0,1,2] and pool.unused() == [3,4,5] and pool.rolls_left == rolls,"Automatic cast commits only the confirmed dice and preserves rerolls")
 	g._restart(); g.queue_free(); await process_frame
 
-## Total includes every use and pulse; previews keep modifiers intact and obey taunt ranges.
+## Total includes every use and pulse; descriptions ignore target statuses and protection.
 func totals() -> void:
 	GameText.set_language("en",false)
 	var m = Run.new(667)
@@ -101,15 +101,15 @@ func totals() -> void:
 	var storm: MultiHitSkill = m.make_straight_skill([1,2,3,4,5])
 	check(m.damage_caption(storm) == "35 damage (5 hits)","Storm shows all five rounded pulses")
 	m.apply_enemy_status(1,m.Status.BURNING,2)
-	check(m.damage_caption(storm) == "35–75 damage (5 hits)","Different target conditions show a total range")
+	check(m.damage_caption(storm) == "35 damage (5 hits)","Enemy Burning never inflates the skill description")
 	m.acquire_relic("split_arrow"); m.set_skill_use_multiplier("test",2)
 	var before: int = m.rng.state
 	check(m.damage_caption(fireball) == "36 damage (4 hits)","Split and extra uses are included once in the whole-skill total")
 	check(m.rng.state == before and not fireball.amplifier_locked,"Preview consumes no target RNG or next-skill charge")
-	check(m.damage_caption(storm) == "110–150 damage (10 hits)","A second Storm use includes Burning from the completed first use")
+	check(m.damage_caption(storm) == "70 damage (10 hits)","Descriptions never assume Burning from earlier uses")
 	m.pending = storm; m.phase = "player"
 	m.apply_player(0)
-	check(m.enemies[0].hp == 9890 and m.enemies[1].hp == 9850,"Two actual Storm uses match their direct-damage preview")
+	check(m.enemies[0].hp == 9890 and m.enemies[1].hp == 9850,"Actual Storm uses still apply enemy Burning bonuses")
 	var seen: Dictionary = {}
 	for seed_value in range(40):
 		m = Run.new(seed_value); m.begin_round()

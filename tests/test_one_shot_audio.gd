@@ -17,7 +17,7 @@ func run() -> void:
 	var data := PackedByteArray(); data.resize(44100); data.fill(128)
 	stream.data = data
 	var capped = audio.play("item/pluck_001",stream,20,-22)
-	check(is_equal_approx(capped.pitch_scale,audio.MAX_PITCH),"Extreme pitches are capped for every one-shot")
+	check(is_equal_approx(capped.pitch_scale,audio.MAX_PITCH),"Ordinary effects retain their existing pitch cap")
 	check(AudioServer.get_bus_effect_count(0) == 0,"Master preserves the original high end without global EQ or low-pass filtering")
 	audio.clear()
 	var first = audio.play("enemy/chop",stream,0.7,-15)

@@ -200,5 +200,55 @@
   "item/arcade_slot_roll2.wav": {
     "source": "User-provided outs-FXs/arcade_slot_roll2.wav",
     "sha256": "985729614ceb51e2de47b19da7a17b7cce6a9c8edf6fed72bbe1f23c8535e664"
+  },
+  "dice/combos_2.wav": {
+    "source": "User-provided outs-FXs/combos.wav",
+    "source_sha256": "02d777eff363ed4c2c08f69e10a7b79f14fb6d2cbc00e6a75d63c18c32dc2ef5",
+    "source_segment_seconds": [
+      0.0,
+      0.75
+    ],
+    "processing": "2 ms edge fades only; original pitch, tempo, gain and stereo PCM",
+    "sha256": "169fe884215819af408f62aab632d3003f2be51f1822bca8bd4b5dbd5c188edd"
+  },
+  "dice/combos_3.wav": {
+    "source": "User-provided outs-FXs/combos.wav",
+    "source_sha256": "02d777eff363ed4c2c08f69e10a7b79f14fb6d2cbc00e6a75d63c18c32dc2ef5",
+    "source_segment_seconds": [
+      0.75,
+      1.5
+    ],
+    "processing": "2 ms edge fades only; original pitch, tempo, gain and stereo PCM",
+    "sha256": "f77a273646e56fcf5084477fe66d06bf6b59e0e03fc1deb60a72a4712414c822"
+  },
+  "dice/combos_4.wav": {
+    "source": "User-provided outs-FXs/combos.wav",
+    "source_sha256": "02d777eff363ed4c2c08f69e10a7b79f14fb6d2cbc00e6a75d63c18c32dc2ef5",
+    "source_segment_seconds": [
+      1.5,
+      2.25
+    ],
+    "processing": "2 ms edge fades only; original pitch, tempo, gain and stereo PCM",
+    "sha256": "37fbf816e47ed5820317c13d3cfe37a03ac88d4a439f1bee3e1723a0f93d2784"
+  },
+  "dice/combos_5.wav": {
+    "source": "User-provided outs-FXs/combos.wav",
+    "source_sha256": "02d777eff363ed4c2c08f69e10a7b79f14fb6d2cbc00e6a75d63c18c32dc2ef5",
+    "source_segment_seconds": [
+      2.25,
+      3.375
+    ],
+    "processing": "2 ms edge fades only; original pitch, tempo, gain and stereo PCM",
+    "sha256": "c5219827aac8b63844296b78390c4254f9677b6f0564b2f09070e5ce9640f97b"
+  },
+  "dice/combos_6.wav": {
+    "source": "User-provided outs-FXs/combos.wav",
+    "source_sha256": "02d777eff363ed4c2c08f69e10a7b79f14fb6d2cbc00e6a75d63c18c32dc2ef5",
+    "source_segment_seconds": [
+      3.375,
+      4.5
+    ],
+    "processing": "2 ms edge fades only; original pitch, tempo, gain and stereo PCM",
+    "sha256": "7e3aa634cf865df02838842c963b0c56e3e6a482e7a24f859ad31265f3873b95"
   }
 }
