@@ -61,7 +61,7 @@ static func capture(model, state: Dictionary, cache_equivalent: bool = true) -> 
 				var extra_ticks: int = applied-current_burn+maxi(0,applied-1)-maxi(0,current_burn-1)
 				var burn_factor: float = pow(2,model.RelicEffects.repeat_sources(model.relics.items,"vodka").size())*model.RelicEffects.Conditions.target_factor(model,target)
 				if model.enemy_status_count(target,Status.CORROSION) > 0: burn_factor *= 1.5
-				row.damage.append({"target":target+1,"total":model.skill_preview_total(skill,target,model.area_damage_factor(target,guards) if skill.hits_all() else 1.0,model.skill_use_count(skill)),"burn_value":extra_ticks*model.Vitals.to_combat(model.Vitals.BURN_DAMAGE)*burn_factor})
+				row.damage.append({"target":target+1,"total":model.skill_damage_total(skill,target,model.area_damage_factor(target,guards) if skill.hits_all() else 1.0)*model.skill_use_count(skill),"burn_value":extra_ticks*model.Vitals.to_combat(model.Vitals.BURN_DAMAGE)*burn_factor})
 			row.counter_value = counter_value(model,state,skill)
 			row.score = utility(state,row)
 			row.mask = 0

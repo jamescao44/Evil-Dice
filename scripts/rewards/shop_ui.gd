@@ -3,6 +3,7 @@ extends Node2D
 const Stock = preload("res://scripts/rewards/shop_stock.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const RarityDisplay = preload("res://scripts/relics/relic_rarity_display.gd")
+const TypeTags = preload("res://scripts/relics/relic_type_tags.gd")
 const Cards = preload("res://scripts/tarot/tarot_paint.gd")
 const Icons = preload("res://scripts/rewards/reward_icons.gd")
 const Resonance = preload("res://scripts/rewards/shop_set_resonance.gd")
@@ -168,10 +169,10 @@ func selected_gift() -> bool:
 func offer_rect(slot: int) -> Rect2:
 	if portrait():
 		if slot == Stock.OFFER_COUNT-1: return Rect2(48,818,178,244)
-		if slot < 6: return Rect2(272+(slot%3)*160,310+(slot/3)*250,152,212)
+		if slot < 6: return Rect2(272+(slot%3)*160,310+(slot/3)*250,152,230)
 		return Rect2(310+(slot-6)*220,818,178,244)
 	if slot == Stock.OFFER_COUNT-1: return Rect2(68,464,200,164)
-	if slot < 6: return Rect2(350+(slot%3)*194,134+(slot/3)*164,180,150)
+	if slot < 6: return Rect2(350+(slot%3)*194,134+(slot/3)*172,180,162)
 	return Rect2(960+(slot-6)*138,226,126,222)
 
 ## Reserve separate artwork, name and price bands on each shelf.
@@ -188,7 +189,7 @@ func offer_art_rect(slot: int) -> Rect2:
 ## Leave enough room for two-line item names without covering the sprite.
 func offer_name_rect(slot: int) -> Rect2:
 	var rect: Rect2 = offer_rect(slot)
-	var top: float = rect.size.y-90 if slot >= 6 else 124 if portrait() else 74
+	var top: float = rect.size.y-90 if slot >= 6 else 104 if portrait() else 58
 	return Rect2(rect.position+Vector2(8,top),Vector2(rect.size.x-16,64 if portrait() else 48))
 
 ## Fit long translated names into two lines, leaving the price unobstructed.
@@ -198,7 +199,27 @@ func offer_name_size(slot: int, label: String) -> int:
 	if GameText.language == "en":
 		for word in label.split(" "):
 			while size > 14 and battle.description_font.get_string_size(word,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x > offer_name_rect(slot).size.x: size -= 1
+	if slot < Stock.RELIC_COUNT:
+		var offer: Dictionary = battle.model.shop.offer_at(slot)
+		var badge_height: float = TypeTags.height({"id":offer.id},battle.description_font,offer_name_rect(slot).size.x,offer_tag_size(slot)) if not offer.get("id","").is_empty() else 0.0
+		var available: float = offer_rect(slot).end.y-(35 if portrait() else 32)-offer_name_rect(slot).position.y-badge_height-6
+		while size > 12 and size*(1+(GameText.lines(GameText.text(label),battle.description_font,size,offer_name_rect(slot).size.x).size()-1)*1.3) > available: size -= 1
 	return size
+
+## Rare multi-type merchandise keeps its tags on one row above the price.
+func offer_tag_size(slot: int) -> int:
+	var size: int = 16 if portrait() else 14
+	var offer: Dictionary = battle.model.shop.offer_at(slot)
+	if offer.get("kind","") != "relic" or offer.get("id","").is_empty(): return size
+	var item := {"id":offer.id}
+	while size > 10 and TypeTags.height(item,battle.description_font,offer_name_rect(slot).size.x,size) > battle.description_font.get_height(size)+8.01: size -= 1
+	return size
+
+## Place shelf badges after the actual name lines instead of using a fixed two-line gap.
+func offer_tags_top(slot: int, label: String, point_size: int) -> Vector2:
+	var rect := offer_name_rect(slot)
+	var lines: int = GameText.lines(GameText.text(label),battle.description_font,point_size,rect.size.x).size()
+	return rect.position+Vector2(0,point_size*(1+maxi(0,lines-1)*1.3)+6)
 
 ## Keep the owned relic rail above the large purchase target.
 func inventory_rect() -> Rect2:
@@ -435,10 +456,10 @@ func _draw_stall() -> void:
 	keeper_sprite.scale = Vector2.ONE*side/KEEPER.get_width()
 	_shelf(at+Vector2(14,side-12),side-28)
 	if portrait():
-		for y in [526,776,1066]: _shelf(Vector2(270,y),486)
+		for y in [544,794,1066]: _shelf(Vector2(270,y),486)
 		_shelf(Vector2(48,1066),178)
 	else:
-		for y in [288,452]: _shelf(Vector2(346,y),584)
+		for y in [300,472]: _shelf(Vector2(346,y),584)
 		_shelf(Vector2(954,452),278)
 		_shelf(Vector2(68,632),200)
 
@@ -550,7 +571,9 @@ func _draw_offer(slot: int) -> void:
 		else:
 			Icons.paint(self,battle.chest.art,"soul_bottle",artwork)
 	var label := offer_name(offer)
-	_wrap(offer_name_rect(slot),label,offer_name_size(slot,label),color,true)
+	var name_size: int = offer_name_size(slot,label)
+	_wrap(offer_name_rect(slot),label,name_size,color,true)
+	if offer.kind == "relic": TypeTags.paint(self,{"id":offer.id},battle.description_font,offer_tags_top(slot,label,name_size),offer_name_rect(slot).size.x,offer_tag_size(slot))
 	_price(Vector2(rect.get_center().x,rect.end.y-(10 if portrait() else 14)),offer.price,battle.model.shop.can_afford(battle.model,offer.price))
 
 ## Keep inspection on the shop page, with explicit buy or replacement cancellation.
@@ -565,8 +588,13 @@ func _draw_detail() -> void:
 	var title := offer_name(offer)
 	var description := offer_description(offer)
 	var name_color := offer_color(offer)
-	_text(Vector2(rect.get_center().x,rect.position.y+38),title,30 if portrait() else 24,name_color)
-	var body := Rect2(rect.position+Vector2(20,50),Vector2(rect.size.x-40,rect.size.y-102))
+	_text(Vector2(rect.get_center().x,rect.position.y+(38 if portrait() else 26)),title,30 if portrait() else 24,name_color)
+	var top: float = 50 if portrait() else 34
+	var body := Rect2(rect.position+Vector2(20,top),Vector2(rect.size.x-40,rect.size.y-top-34))
+	if offer.kind == "relic":
+		var bottom: float = TypeTags.paint(self,{"id":offer.id},battle.description_font,body.position,body.size.x,22 if portrait() else 18)+10
+		body.size.y -= bottom-body.position.y
+		body.position.y = bottom
 	var size: int = 28 if portrait() else 23
 	while size > 18 and GameText.lines(description,battle.description_font,size,body.size.x).size()*size*1.3 > body.size.y: size -= 1
 	_wrap(body,description,size,Color("e7dfd1"))

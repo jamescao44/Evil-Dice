@@ -12,6 +12,48 @@ func rendered() -> void:
 	await process_frame
 	await RenderingServer.frame_post_draw
 
+## Count visible actor pixels through a deliberately opaque combat effect.
+func changed_pixels(before: Image, after: Image, rect: Rect2, scale: Vector2) -> int:
+	var region := Rect2i(rect.position*scale,rect.size*scale).intersection(Rect2i(Vector2i.ZERO,after.get_size()))
+	var count := 0
+	for y in range(region.position.y,region.end.y):
+		for x in range(region.position.x,region.end.x):
+			if before.get_pixel(x,y) != after.get_pixel(x,y): count += 1
+	return count
+
+## Actual player and orbit art must survive overlapping FX, while enemies remain behind them.
+func player_layers(phone: bool) -> void:
+	root.content_scale_size = Vector2i(804,1748) if phone else Vector2i(1280,800)
+	root.size = Vector2i(402,874) if phone else Vector2i(1280,800)
+	var g = Portrait.new() if phone else Battle.new()
+	root.add_child(g); g.muted = true; g.set_process_input(false)
+	g.model.character_level = 10; g.evolution.reset()
+	for id in ["bracelet","magic_sword","orange_stone","coin"]: g.model.acquire_relic(id)
+	g.view_phase = "ready"
+	g._process(0)
+	g.process_mode = Node.PROCESS_MODE_DISABLED
+	# Draw into the real spell canvas, not a test-only approximation of its layer.
+	g.fx.battlefield_canvas.draw.connect(func(): g.fx.battlefield_canvas.draw_rect(g.ARENA,Color.MAGENTA))
+	g.fx.battlefield_canvas.queue_redraw(); g.arena_player.queue_redraw()
+	await rendered(); await rendered()
+	var foreground: Image = root.get_texture().get_image()
+	g.arena_player.hide()
+	await rendered(); await rendered()
+	var covered: Image = root.get_texture().get_image()
+	var scale: Vector2 = Vector2(covered.get_size())/g.fx.canvas_size
+	check(changed_pixels(covered,foreground,g._player_sprite_rect(),scale) > 100,"Player remains visible above opaque skill FX")
+	for pose in g.RelicOrbit.poses(g):
+		var at: Vector2 = g.battlefield_view.transform*pose.at
+		var radius: float = pose.radius*g.battlefield_view.zoom
+		check(changed_pixels(covered,foreground,Rect2(at-Vector2.ONE*radius,Vector2.ONE*radius*2),scale) > 10,"Front and rear orbit relics remain above skill FX")
+	g.arena_actors.hide()
+	await rendered(); await rendered()
+	var no_enemies: Image = root.get_texture().get_image()
+	for index in g.model.living():
+		check(changed_pixels(covered,no_enemies,g._enemy_sprite_rect(index),scale) == 0,"Skill FX still cover enemy sprites")
+	check(g.arena_player.transform.is_equal_approx(g.arena_actors.transform),"Player foreground retains the battlefield camera transform")
+	g.queue_free(); await process_frame
+
 ## Even an opaque layer at the ultimate ripple's depth must not obscure damage text.
 func damage_overlay() -> void:
 	var viewport := SubViewport.new()
@@ -108,6 +150,7 @@ func run() -> void:
 	if DisplayServer.get_name() == "headless":
 		push_error("Combat FX bounds requires a rendering display"); quit(1); return
 	await particles(); await damage_overlay(); await ripple(false); await ripple(true)
+	await player_layers(false); await player_layers(true)
 	print("Combat FX bounds: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)
 func _initialize() -> void: call_deferred("run")

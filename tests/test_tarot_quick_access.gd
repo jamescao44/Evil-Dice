@@ -32,6 +32,27 @@ func focus(g,id: String) -> Vector2:
 	var at: Vector2 = q.pose(lane,index).at
 	check(q.card_at(at).get("item",{}).get("id","") == id,"The center of "+id+" selects that exact card")
 	return at
+
+## Real reroll-mode controls must not allow a left shortcut to start another dice edit.
+func check_reroll_shortcuts(g) -> void:
+	var q = g.tarot_quick
+	var cards: Array = g.model.tarots.items.duplicate(true)
+	for version in [g.ControlVersion.V1,g.ControlVersion.V2]:
+		g.debug_control_version = version
+		focus(g,"magician")
+		tap(g,g.DICE_CENTER); q._process(0.1)
+		check(g.dice_selection.reroll_mode,"Middle button enters the selected reroll mode")
+		var index: int = q.lanes.now.cards.find_custom(func(c): return c.id == "magician")
+		var p: Dictionary = q.pose("now",index)
+		check(q.lane_shown("now") and p.brightness < 0.5 and p.glow < 0.2,"Left tarot stays visible but dimmed during reroll selection")
+		g._handle_click(p.at); g._handle_motion(g.DICE_CENTER); g._handle_release(g.DICE_CENTER)
+		check(not g.tarot_cast.active() and not g.tarot_ui.external_drag and g.model.tarots.items == cards,"Disabled left cards cannot inspect, drag, or consume a tarot")
+		check(q.lane_enabled("field") and q.lane_enabled("next"),"Reroll selection leaves the other shortcut lanes unchanged")
+		tap(g,g.DICE_CENTER); q._process(0.1)
+		p = q.pose("now",index)
+		check(not g.dice_selection.reroll_mode and not q.card_at(p.at).is_empty() and p.brightness == 1.0,"Done immediately restores left tarot interaction and brightness")
+	g.debug_control_version = g.ControlVersion.V1
+
 func motion_checks() -> void:
 	var Swipe = preload("res://scripts/tarot/card_swipe.gd")
 	var slow = Swipe.new(); var fast = Swipe.new()
@@ -68,8 +89,8 @@ func run() -> void:
 		var prefix: String = "phone" if phone else "desktop"
 		for id in Catalog.ITEMS: g.model.tarots.add(id)
 		q.sync_inventory(); q._process(0.3)
-		check(q.lanes.field.cards.size() == 7 and q.lanes.now.cards.size() == 1 and q.lanes.next.cards.size() == 3,"Cards use explicit quick-access categories")
-		check(not q.lanes.now.cards.any(func(c): return c.id == "judgement") and q.lanes.next.cards.any(func(c): return c.id == "devil"),"Judgement waits for an eligible roll while Devil is ready")
+		check(q.lanes.field.cards.size() == 7 and q.lanes.now.cards.size() == 2 and q.lanes.next.cards.size() == 3,"Cards use explicit quick-access categories")
+		check(q.lanes.now.cards.any(func(c): return c.id == "judgement") and q.lanes.next.cards.any(func(c): return c.id == "devil"),"Judgement is eligible before rolling alongside Devil")
 		check(not q.lanes.field.cards.any(func(c): return c.id == "emperor"),"Reward cards remain in full inventory")
 		var rng: int = g.model.rng.state
 		var items: Array = g.model.tarots.items.duplicate(true)
@@ -143,6 +164,7 @@ func run() -> void:
 			check(q.lane_shown("now") and q.lane_shown("next"),"Connecting a skill keeps both side lanes visible")
 		g.dice_selection.cancel_gesture()
 		check(q.lane_shown("field"),"Deselecting restores the top row")
+		check_reroll_shortcuts(g)
 		at = focus(g,"magician")
 		g._handle_click(at); g._handle_motion(at+Vector2(60,0)); g._handle_motion(g.DICE_CENTER); g._handle_release(g.DICE_CENTER)
 		check(g.tarot_cast.choice_type == "magician","Dice shortcut opens real Magician options")
@@ -191,7 +213,7 @@ func run() -> void:
 		g.model.dice_turn.locked = [0,1,2]
 		g.model.dice_turn.committed = [0,1,2]
 		q.sync_inventory()
-		check(q.lanes.now.cards.size() == 5,"All five immediate tools can be eligible together")
+		check(q.lanes.now.cards.size() == 4 and not q.lanes.now.cards.any(func(c): return c.id == "hermit"),"All four enabled dice tools are eligible; Hermit stays disabled")
 		check(not q.lanes.next.cards.any(func(c): return c.id == "lovers"),"Lovers hides with fewer than four unused dice")
 		q._process(0.3)
 		check(is_equal_approx(q.arc_radius(),g.DICE_RADIUS*0.8),"Left arc uses eighty percent of dice radius")

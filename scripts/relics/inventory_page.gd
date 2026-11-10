@@ -3,6 +3,7 @@ extends Node2D
 const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Paint = preload("res://scripts/relics/relic_paint.gd")
 const Panels = preload("res://scripts/tarot/tarot_paint.gd")
+const TypeTags = preload("res://scripts/relics/relic_type_tags.gd")
 const GOLD := Color("dfc78d")
 const BACKPACK_PIXELS := [
 	"000000kkkkkk000000", "00000kk0000kk00000", "00000kl0000lk00000",
@@ -315,7 +316,8 @@ func _draw() -> void:
 		_draw_slot(i,order[i] if i < order.size() else -1)
 		_text(number_position(i),str(i+1),28 if portrait() else 22,Color("a9a39c"))
 	var message: String = "Tap to compare · Drag to reorder" if not replacement.is_empty() else "Tap to inspect · Drag to reorder"
-	Panels.wrap(self,battle.description_font,Rect2(48 if portrait() else 176,956 if portrait() else 620,708 if portrait() else 928,64),message,28 if portrait() else 22,Color("c4bba8"),true)
+	if portrait() or incoming_relic().is_empty():
+		Panels.wrap(self,battle.description_font,Rect2(48 if portrait() else 176,956 if portrait() else 620,708 if portrait() else 928,64),message,28 if portrait() else 22,Color("c4bba8"),true)
 	_draw_incoming(false)
 	if dragging and pressed >= 0 and pressed < battle.model.relics.items.size():
 		if destination >= 0:
@@ -370,14 +372,22 @@ func _draw_incoming(compact: bool) -> void:
 	var label: String = GameText.format("Incoming relic: %s",GameText.text(Catalog.ITEMS[id].name))
 	if compact:
 		Panels.wrap(self,battle.description_font,Rect2(66,238,672,128) if portrait() else Rect2(230,110,820,54),label,28 if portrait() else 21,color,true)
+		TypeTags.paint(self,{"id":id},battle.description_font,Vector2(66,315) if portrait() else Vector2(230,150),672 if portrait() else 820,20 if portrait() else 16)
 		return
-	var rect := Rect2(66,1060,672,350) if portrait() else Rect2(200,658,880,120)
+	var rect := Rect2(66,1060,672,350) if portrait() else Rect2(200,616,880,170)
 	Panels.panel(self,rect,Color(color,0.06),Color(color,0.45),12)
 	var center := rect.position+Vector2(82,88 if portrait() else 58)
 	Paint.paint(self,id,center,54 if portrait() else 42,true)
 	var text_rect := Rect2(rect.position+Vector2(162,16),rect.size-Vector2(180 if portrait() else 376,32))
-	var description: String = label+"\n"+Catalog.short_description(id,GameText.text,battle.model.relics.items)
-	var size: int = 28 if portrait() else 22
+	var description: String = Catalog.short_description(id,GameText.text,battle.model.relics.items)
+	var title_size: int = 24 if portrait() else 19
+	var title_lines := GameText.lines(label,battle.description_font,title_size,text_rect.size.x)
+	var title_height: float = title_size*(1+(title_lines.size()-1)*1.3)
+	Panels.wrap(self,battle.description_font,Rect2(text_rect.position,Vector2(text_rect.size.x,title_height)),label,title_size,color)
+	var body_top: float = TypeTags.paint(self,{"id":id},battle.description_font,text_rect.position+Vector2(0,title_height+6),text_rect.size.x,18 if portrait() else 14,false)+6
+	text_rect.size.y -= body_top-text_rect.position.y
+	text_rect.position.y = body_top
+	var size: int = 26 if portrait() else 20
 	while size > 18 and GameText.lines(description,battle.description_font,size,text_rect.size.x).size()*size*1.3 > text_rect.size.y: size -= 1
 	Panels.wrap(self,battle.description_font,text_rect,description,size,Color("eee4d2"),false)
 	if can_discard_incoming():
@@ -412,8 +422,12 @@ func _draw_item() -> void:
 	Paint.paint(self,item.id,Vector2(mid,550 if portrait() else 256),126 if portrait() else 90,true,item)
 	_text(Vector2(mid,775 if portrait() else 398),Catalog.ITEMS[item.id].name,40 if portrait() else 32,color)
 	_text(Vector2(mid,835 if portrait() else 442),Catalog.RARITY_NAMES[Catalog.ITEMS[item.id].rarity],26 if portrait() else 21,color)
+	var tag_bottom: float = TypeTags.paint(self,item,battle.description_font,Vector2(66,856) if portrait() else Vector2(228,454),672 if portrait() else 824,24 if portrait() else 19)
 	var rect := Rect2(66,916,672,500) if portrait() else Rect2(228,476,824,186)
-	var description: String = Catalog.description(item,GameText.text,battle.model.relics.items)
+	var body_top: float = maxf(rect.position.y,tag_bottom+14)
+	rect.size.y -= body_top-rect.position.y
+	rect.position.y = body_top
+	var description: String = Catalog.description(item,GameText.text,battle.model.relics.items,false)
 	var size: int = 34 if portrait() else 26
 	while size > 20 and GameText.lines(description,battle.description_font,size,rect.size.x).size()*size*1.3 > rect.size.y: size -= 1
 	Panels.wrap(self,battle.description_font,rect,description,size,Color("eee4d2"),true)

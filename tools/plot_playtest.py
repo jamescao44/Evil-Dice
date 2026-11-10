@@ -90,6 +90,10 @@ def power_points(run: dict) -> list[dict]:
         acquired = item_names(event["gained"])
         removed = item_names(event["sold"] or event["replaced"])
         reason = acquired or ("Remove " + removed if removed else "Reorder / inventory change")
+        awakened = [entry["id"].capitalize() for entry in run.get("awakenings", [])
+                    if entry["command"] == event["command"]]
+        if awakened:
+            reason = "Awaken "+", ".join(awakened)+(": "+acquired if acquired else "")
         points.append({"point": len(points)+1, "sample": event["sample"], "command": event["command"],
                        "wave": event["wave"], "reason": reason, "before": before, "after": after,
                        "gain_percent": (after/before-1)*100})

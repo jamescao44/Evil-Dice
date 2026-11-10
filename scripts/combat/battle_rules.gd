@@ -72,6 +72,8 @@ var max_hp: int:
 		return maxi(1, floori(value + 0.000001))
 	set(value): base_max_hp = value
 var relics = Relics.new()
+const SinProgress = preload("res://scripts/sins/sin_progress.gd")
+var sins = SinProgress.new()
 var perfect_relic_ready: bool = false
 var roll_relic_actions: Array = []
 var roll_chip_casts: Array = []
@@ -119,6 +121,7 @@ func _init(seed_value: int = -1) -> void:
 	reset()
 
 func reset() -> void:
+	sins.restore({})
 	enemy_reaction_events.clear()
 	gemstones = Gemstones.new()
 	relic_recovery = RelicRecovery.new()
@@ -291,14 +294,15 @@ func reroll_dice(indices: Array, forced: Array = []) -> Array:
 	if not dice_turn.can_reroll_dice(indices): return []
 	return roll_pool(false,forced,false,indices)
 
-## Only opening throws activate roll relics and matching attacks; tarot face rules still apply to corrections.
-func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false, requested: Array = []) -> Array:
+## Opening throws activate roll relics; explicit tarot rerolls can also activate matching attacks.
+func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false, requested: Array = [], trigger_matches: bool = false) -> Array:
 	if phase != "roll" or not pending.is_empty() or not outcome().is_empty(): return []
 	perfect = (perfect or forces_perfect()) if requested.is_empty() else false
 	var opening_throw: bool = not dice_turn.has_rolled()
 	var previous_values: Array = dice_turn.values.duplicate()
 	var changed: Array = dice_turn.roll(rng, perfect, forced, free, requested)
 	if changed.is_empty(): return []
+	if not opening_throw: sins.rerolled()
 	if not requested.is_empty():
 		for index in changed:
 			var raw_face: int = dice_turn.values[index]
@@ -309,15 +313,20 @@ func roll_pool(perfect: bool = false, forced: Array = [], free: bool = false, re
 	var cursed_sixes: bool = RelicRollRules.apply_curse(self) if opening_throw else false
 	if requested.is_empty(): tarot_effects.finish_roll()
 	record_perfect(perfect,free or not requested.is_empty(),opening_throw)
-	roll_attacks = Patterns.automatic_groups(dice_turn.values,range(DiceTurn.COUNT) if cursed_sixes else changed) if opening_throw else []
+	if opening_throw or trigger_matches: activate_dice_matches()
+	statuses[Status.STUNNED].consume()
+	return range(DiceTurn.COUNT) if cursed_sixes else changed
+
+## Reuse current unused dice for tarot-triggered matches without spending rolls or firing throw relics.
+func activate_dice_matches() -> void:
+	if phase != "roll" or not dice_turn.has_rolled() or not pending.is_empty() or not outcome().is_empty(): return
+	roll_attacks = Patterns.automatic_groups(dice_turn.values,dice_turn.unused())
 	for group in roll_attacks:
 		group.skill.socket_gems = gemstones.snapshot(group.indices)
 		group.skill.begin_cast(RelicEffects.use_modifiers(relics.items,group.skill,{}))
 	if not roll_attacks.is_empty():
 		phase = "roll_attacks"
-		perfect_relic_ready = false # Opening item attacks wait for every alike group.
-	statuses[Status.STUNNED].consume()
-	return range(DiceTurn.COUNT) if cursed_sixes else changed
+		perfect_relic_ready = false # Item attacks wait until every matching group has finished.
 
 ## Lock a valid combination and suspend the remaining dice until it resolves.
 func form_selected_skill() -> MultiHitSkill:
@@ -648,18 +657,18 @@ func regular_attack_power() -> float:
 	return regular_base_damage() + relic_base_damage()
 
 func relic_base_damage() -> float:
-	return RelicEffects.base_damage(relics.items,character_base_damage())
+	return sins.base_damage(self,character_base_damage()+RelicEffects.base_damage(relics.items,character_base_damage()))-character_base_damage()
 
 func damage_baseline() -> float:
 	return DAMAGE_MULTIPLIER * power
 
 ## Apply additive boons and ordered relics, then the independent Perfect factor and darkness.
 func damage_multiplier(result: MultiHitSkill = null) -> float:
-	var value: float = damage_baseline() + reward_damage_multiplier + (attack_multiplier() - 1.0)
+	var value: float = damage_baseline() + reward_damage_multiplier + (attack_multiplier() - 1.0) + sins.food_consumed
 	var skill: MultiHitSkill = pending if result == null else result
 	value = RelicEffects.damage_multiplier(relics.items,value,skill,self)
 	value *= GemEffects.factor(skill.socket_gems,"mult")*skill.gem_critical_factor
-	value *= combo_multiplier()
+	value *= combo_multiplier()*sins.skill_factor(skill)
 	if status_count(Status.DARKNESS) > 0: value *= 0.5
 	return value
 
@@ -675,6 +684,7 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 	var value: float = 1.0
 	var bonuses: Array = [
 		{"source":"baseline","amount":damage_baseline()-1.0},
+		{"source":"sin","amount":float(sins.food_consumed)},
 		{"source":"treasure","amount":reward_damage_multiplier},
 		{"source":"boon","amount":attack_multiplier()-1.0},
 	]
@@ -697,6 +707,11 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 		if not is_equal_approx(step.base_before,base):
 			step.note = "+%s BASE"
 			step.note_values = [str(snappedf(base-step.base_before,0.01))]
+	var sin_base: float = sins.base_damage(self,base)
+	if not is_equal_approx(base,sin_base):
+		steps.append({"source":"sin","id":"","slot":-1,"before":value,"after":value,"base_before":base,"base_after":sin_base,"note":""})
+		base = sin_base
+		base_bonus = base-(character_base_damage() if not result.pattern.is_empty() else regular_base_damage())
 	var gem_base: float = GemEffects.factor(result.socket_gems,"base")
 	if gem_base != 1.0:
 		steps.append({"source":"gem","id":"","slot":-1,"before":value,"after":value,"base_before":base,"base_after":base*gem_base,"note":""})
@@ -720,6 +735,10 @@ func attack_damage_steps(result: MultiHitSkill) -> Array:
 	if perfect_combo > 0:
 		steps.append({"source":"combo","id":"","slot":-1,"before":value,"after":value*combo_multiplier(),"base_before":base,"base_after":base,"note":""})
 		value *= combo_multiplier()
+	var sin_factor: float = sins.skill_factor(result)
+	if sin_factor != 1.0:
+		steps.append({"source":"sin","id":"","slot":-1,"before":value,"after":value*sin_factor,"base_before":base,"base_after":base,"note":""})
+		value *= sin_factor
 	if status_count(Status.DARKNESS) > 0:
 		steps.append({"source":"darkness","id":"","slot":-1,"before":value,"after":value*0.5,"base_before":base,"base_after":base,"note":""})
 	steps.back()["damage_ticks"] = result.damage_ticks
@@ -1161,7 +1180,7 @@ func direct_enemy_hp_damage(index: int, amount: int) -> int:
 
 ## Shared recovery modifier used before caps and in read-only previews.
 func modified_healing(amount: float) -> int:
-	return RelicEffects.healing_amount(relics.items,amount*relic_recovery.healing_factor)
+	return RelicEffects.healing_amount(relics.items,amount*relic_recovery.healing_factor*(2.0 if sins.has("lust") else 1.0))
 
 func heal(amount: int, modify: bool = true) -> int:
 	if hp <= 0 or status_count(Status.DARKNESS) > 0: return 0
@@ -1234,8 +1253,9 @@ func relic_immune(id: int) -> bool:
 func acquire_relic(id: String, replace_index: int = -1, allow_duplicate: bool = false) -> bool:
 	var old_max: int = max_hp
 	if not relics.add(id, replace_index, allow_duplicate): return false
+	sins.check(self)
 	refresh_relic_health(old_max)
-	RelicEffects.acquired(self,id)
+	if not (sins.has("gluttony") and Relics.Catalog.Types.stacks(relics._new_item(id),Relics.Catalog.ITEMS).get("food",0) > 0): RelicEffects.acquired(self,id)
 	return true
 
 func move_relic(from: int, to: int) -> bool:
@@ -1259,6 +1279,14 @@ func refresh_relic_health(old_max: int) -> void:
 		if relic_immune(status): statuses[status].count = 0
 	hp = clampi(hp + maxi(0, max_hp - old_max), 0, max_hp)
 
+## Central HP-loss hook also covers self-costs and damage over time.
+func lose_hp(amount: int) -> int:
+	var before: int = hp
+	var loss: int = clampi(amount,0,hp)
+	hp -= loss
+	sins.lost_hp(self,before,loss)
+	return loss
+
 ## Resolve incoming damage through player statuses, defenses and survival relics.
 func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> Array:
 	if not burning and status_count(Status.HIDDEN) > 0: return [event(-1,0,"relic","UNTARGETABLE")]
@@ -1279,8 +1307,7 @@ func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> A
 	var protection: Dictionary = relic_protection.absorb(self,loss) if not burning else {"damage":loss,"events":[],"counters":[]}
 	loss = protection.damage
 	var hit_damage: int = loss
-	loss = mini(hp, loss)
-	hp -= loss
+	loss = lose_hp(loss)
 	var events: Array = [damage_event(-1,loss,hit_damage,"burn" if burning else "damage")]
 	events.append_array(protection.events)
 	if hp <= 0: events.append_array(RelicEffects.prevent_death(self))
@@ -1288,6 +1315,7 @@ func receive_damage(amount: int, burning: bool = false, attacker: int = -1) -> A
 	if not burning:
 		events.append_array(RelicProtection.retaliate(self,attacker,protection.counters))
 		events.append_array(RelicEffects.retaliation(self,attacker))
+	events.append_array(sins.resolve_retaliations(self))
 	return events
 
 func _complete_relic_turn() -> Array:

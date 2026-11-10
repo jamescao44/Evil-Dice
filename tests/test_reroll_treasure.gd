@@ -60,7 +60,8 @@ func _initialize() -> void:
 	m = fresh(); m.stage = m.LAST_PLAYABLE_STAGE; m.reroll_progress = 16; m.enemies[0].hp = 1
 	m.roll_pool(false,[1,2,3,4,5,6]); form(m,range(6)); m.apply_player(0)
 	check(m.outcome() == "victory" and m.reroll_progress == 20,"Final victory counts unused throws")
-	check(m.auto_claim_victory_chest() == 0 and m.reroll_progress == 0,"Auto-claim sees final earned tier")
+	m.begin_wave_reward()
+	check(m.chest_tier() == 0 and m.reroll_progress == 20 and m.open_rewards.is_empty(),"Victory leaves earned treasure unopened")
 	m.reset_run(); check(m.reroll_progress == 0 and m.treasure_settled_turn == -1,"New run resets guard")
 	print("Reroll Treasure: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

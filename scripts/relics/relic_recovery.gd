@@ -54,7 +54,8 @@ static func full_turn_finished(model) -> Array:
 	for entry in Sequence.entries(model.relics.items):
 		if entry.item.id != "book_of_dead" or model.hp <= 1: continue
 		var loss := mini(model.hp-1,ceili(model.hp*0.3))
-		model.hp -= loss
+		model.lose_hp(loss)
 		Sequence.activate(model,entry)
 		events.append(model.damage_event(-1,loss,loss,"damage"))
+		events.append_array(model.sins.resolve_retaliations(model))
 	return events

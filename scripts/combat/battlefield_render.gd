@@ -39,10 +39,7 @@ static func health_visible(battle, index: int) -> bool:
 static func overlays_visible(battle) -> bool:
 	return not battle._menus_open() and battle.inspecting_enemy < 0 and battle.view_phase not in ["shop","reward","over"]
 
-## Keep each player's orbit grouped around that actor, with its counter above world sprites.
+## Enemy sprites keep ground-depth ordering; the player and relics use a separate foreground layer.
 static func paint(battle, canvas: CanvasItem) -> void:
 	for index in actor_order(battle):
-		if index < 0: battle._draw_player_actor(canvas)
-		else: battle._draw_human(index,canvas)
-	battle.relic_attacks.paint(canvas)
-	battle._draw_character_skill_counter(canvas)
+		if index >= 0: battle._draw_human(index,canvas)

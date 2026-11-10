@@ -35,6 +35,7 @@ const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const RelicPaint = preload("res://scripts/relics/relic_paint.gd")
 const RarityDisplay = preload("res://scripts/relics/relic_rarity_display.gd")
+const TypeTags = preload("res://scripts/relics/relic_type_tags.gd")
 const Glow = preload("res://scripts/shared/item_glow.gd")
 var symbols: Array = Catalog.ITEMS.duplicate(true)
 var scroll_symbols: Array = []
@@ -491,13 +492,16 @@ func _draw() -> void:
 		_text(Vector2(center.x,572 if portrait else 185),upgrade_hint(),22 if portrait else 18,gold)
 	if rewards.size() == 1 and focused >= 0 and not active and focused not in collected:
 		var item: Dictionary = symbols[rewards[focused]]
-		var info_y: float = 1175 if portrait else 205
+		var info_y: float = 1175 if portrait else 183
 		var title_size: int = 28 if portrait else 22
 		_text(Vector2(center.x,info_y),item.name,title_size,item.color)
+		var body_y: float = info_y+(36 if portrait else 30)
+		if item.has("relic_id"):
+			body_y = TypeTags.paint(self,{"id":item.relic_id},font,Vector2(50,info_y+12),size.x-100,22 if portrait else 16)+(30 if portrait else 22)
 		var description: String = Relics.short_description(item.relic_id,GameText.text,battle.model.relics.items) if item.has("relic_id") else GameText.text(item.text)
 		var lines := GameText.lines(description,font,24 if portrait else 17,size.x-100)
 		for line in range(mini(3 if portrait else 1,lines.size())):
-			_text(Vector2(center.x,info_y+(36 if portrait else 30)+line*(30 if portrait else 22)),lines[line],24 if portrait else 17,Color("eee0b9"))
+			_text(Vector2(center.x,body_y+line*(30 if portrait else 22)),lines[line],24 if portrait else 17,Color("eee0b9"))
 	var box_at := chest_point()
 	var chest_side: float = lerpf(closed_rect().size.x,260 if portrait else 154,smoothstep(0,OPEN_TIME,elapsed))
 	var opened_for: float = elapsed-OPEN_TIME

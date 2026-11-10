@@ -36,6 +36,7 @@ const TargetFeedback = preload("res://scripts/shared/cast_drag_feedback.gd")
 var battlefield_view = BattlefieldView.new()
 var arena_clip: Control
 var arena_actors: Node2D
+var arena_player: Node2D
 var arena_shade: Node2D
 const Rules = preload("res://scripts/combat/battle_rules.gd")
 const Run = preload("res://scripts/progression/run_rules.gd")
@@ -60,6 +61,9 @@ var tarot_quick: Node2D
 var dice_group: Node2D
 const DamageFeedback = preload("res://scripts/combat/damage_feedback.gd")
 var damage_feedback: Node2D
+const DamageTotal = preload("res://scripts/combat/damage_total.gd")
+var sin_view: Node2D
+var damage_total: Node2D
 const CombatMotion = preload("res://scripts/combat/combat_motion.gd")
 var combat_motion = CombatMotion.new()
 var health_trails = preload("res://scripts/combat/health_trails.gd").new()
@@ -245,11 +249,6 @@ const KILL_SLOW_OUT := 0.24
 const KILL_SLOW_SPEED := 0.10
 const KILL_SLOW_DURATION := KILL_SLOW_HOLD+KILL_SLOW_OUT
 var kill_slow_remaining: float = 0
-const AUTO_CLAIM_DURATION := 2.4
-const CHEST_NAMES := ["Normal", "Perfect", "Greed", "Ultra"]
-var auto_claim_tier: int = Run.Chests.NO_CHEST
-var auto_claim_remaining: float = 0
-var auto_claim_notice: Node2D
 @export var chest_pity_path: String = "" # Scene instances persist; isolated model tests do not.
 @export var relic_unlocks_path: String = ""
 @export var chapter_id: String = "chapter_1"
@@ -346,6 +345,9 @@ func _ready() -> void:
 	damage_feedback = DamageFeedback.new()
 	damage_feedback.battle = self
 	add_child(damage_feedback)
+	damage_total = DamageTotal.new()
+	damage_total.battle = self
+	fx.damage_canvas.add_child(damage_total)
 	var status_overlay := StatusOverlay.new()
 	status_overlay.battle = self
 	add_child(status_overlay)
@@ -399,10 +401,6 @@ func _ready() -> void:
 	tarot_quick = preload("res://scripts/tarot/tarot_quick_access.gd").new()
 	tarot_quick.battle = self
 	add_child(tarot_quick)
-	auto_claim_notice = Node2D.new()
-	auto_claim_notice.z_index = BattleLayers.NOTICE
-	add_child(auto_claim_notice)
-	auto_claim_notice.draw.connect(_draw_auto_claim)
 	chest.opened.connect(func():
 		crystal_pickup.enqueue_chest(chest.chest_point(),model.release_chest_crystals(chest.tier))
 		if not reduced: shake = 5+chest.tier*2
@@ -436,6 +434,12 @@ func _ready() -> void:
 	add_child(charge_audio)
 	_create_battlefield_view()
 	health_trails.reset(model)
+	var sin_canvas := CanvasLayer.new()
+	sin_canvas.layer = BattleLayers.SIN_CANVAS
+	add_child(sin_canvas)
+	sin_view = preload("res://scripts/sins/sin_view.gd").new()
+	sin_view.battle = self
+	sin_canvas.add_child(sin_view)
 	_start_level()
 	if not start_snapshot.is_empty():
 		await get_tree().create_timer(0.6).timeout
@@ -452,7 +456,6 @@ func _process(delta: float) -> void:
 	if not _menus_open() and inspecting_enemy < 0:
 		cinematic_remaining = maxf(0, cinematic_remaining - delta)
 		kill_slow_remaining = maxf(0, kill_slow_remaining - delta)
-		auto_claim_remaining = maxf(0, auto_claim_remaining - delta)
 	var world_delta: float = delta * _world_time_scale()
 	if not _menus_open() and inspecting_enemy < 0:
 		var waiting_for_relics: bool = relic_attacks.pending()
@@ -487,8 +490,6 @@ func _process(delta: float) -> void:
 	debug_page.sync_inputs()
 	menu_canvas.visible = menu_open or guide or debug_open
 	menu_canvas.queue_redraw()
-	auto_claim_notice.visible = not modal and view_phase == "over" and auto_claim_remaining > 0
-	auto_claim_notice.queue_redraw()
 	for index in range(dice.size()):
 		var die = dice[index]
 		die.socket_gem = model.gemstones.sockets[index]
@@ -588,6 +589,12 @@ func _create_battlefield_view() -> void:
 	arena_actors.name = "BattlefieldActors"
 	arena_clip.add_child(arena_actors)
 	arena_actors.draw.connect(_draw_world_actors)
+	arena_player = Node2D.new()
+	arena_player.name = "BattlefieldPlayer"
+	arena_player.z_as_relative = false
+	arena_player.z_index = BattleLayers.PLAYER
+	arena_clip.add_child(arena_player)
+	arena_player.draw.connect(_draw_world_player)
 	_update_battlefield_view(0)
 
 ## Recognize aimed skills and enemy-targeted tarot without zooming support actions.
@@ -618,11 +625,20 @@ func _update_battlefield_view(delta: float) -> void:
 	arena_actors.transform = projected
 	arena_actors.visible = not model.is_city()
 	arena_actors.queue_redraw()
+	arena_player.transform = projected
+	arena_player.visible = not model.is_city()
+	arena_player.queue_redraw()
 	arena_shade.queue_redraw()
 
 ## Draw world-space characters and fragments under the shared battlefield camera.
 func _draw_world_actors() -> void:
 	BattlefieldRender.paint(self,arena_actors)
+
+## Keep the player, companions and orbiting relics above spells under the same camera and clip.
+func _draw_world_player() -> void:
+	_draw_player_actor(arena_player)
+	relic_attacks.paint(arena_player)
+	_draw_character_skill_counter(arena_player)
 
 ## Restore the viewport transform after leaving the battle scene.
 func _exit_tree() -> void:
@@ -664,7 +680,7 @@ func _dice_area_tint() -> Color:
 
 ## Report modal pages and tarot ceremonies that suspend battle interaction.
 func _menus_open() -> bool:
-	return (is_instance_valid(tarot_quick) and tarot_quick.inspected >= 0) or (is_instance_valid(tarot_feedback) and is_instance_valid(tarot_feedback.inspection) and tarot_feedback.inspection.opened) or menu_open or guide or debug_open or (is_instance_valid(inventory_page) and inventory_page.opened) or (is_instance_valid(tarot_ui) and tarot_ui.ceremony.active())
+	return (is_instance_valid(sin_view) and sin_view.blocks_battle()) or (is_instance_valid(tarot_quick) and tarot_quick.inspected >= 0) or (is_instance_valid(tarot_feedback) and is_instance_valid(tarot_feedback.inspection) and tarot_feedback.inspection.opened) or menu_open or guide or debug_open or (is_instance_valid(inventory_page) and inventory_page.opened) or (is_instance_valid(tarot_ui) and tarot_ui.ceremony.active())
 
 ## Draw the active modal page above every battle sprite and held item.
 func _draw_menu_canvas() -> void:
@@ -1583,7 +1599,7 @@ func _reroll_dice(indices: Array) -> void:
 	if not await _resolve_roll_triggers(token): return
 	_show_pending_skill(false)
 
-func _roll(strength: float = 0.0, perfect: bool = false, free: bool = false) -> void:
+func _roll(strength: float = 0.0, perfect: bool = false, free: bool = false, trigger_matches: bool = false) -> void:
 	if view_phase not in ["ready", "skill"] or _menus_open() or not model.outcome().is_empty(): return
 	tarot_feedback.bind_effects()
 	tarot_feedback.star_roll = model.tarot_effects.star_throws > 0
@@ -1592,7 +1608,7 @@ func _roll(strength: float = 0.0, perfect: bool = false, free: bool = false) -> 
 	throw_perfect = perfect or debug_perfect or model.forces_perfect()
 	if throw_perfect: throw_power = 1.0
 	var forced: Array = _debug_values()
-	var changed: Array = model.roll_pool(throw_perfect, forced, free)
+	var changed: Array = model.roll_pool(throw_perfect, forced, free, [], trigger_matches)
 	if changed.is_empty(): return
 	view_phase = "rolling"
 	combo_flash_until = clock_time + 0.45 if throw_perfect else 0.0
@@ -1992,7 +2008,7 @@ func _resolve_turn_end(token: int) -> bool:
 ## Allow treasure claims only when no combat action is still resolving.
 func _can_claim_chest() -> bool:
 	if model.chest_tier() == Run.Chests.NO_CHEST or _menus_open(): return false
-	if view_phase == "over": return true
+	if view_phase == "over": return false # The victory screen preserves the saved treasure for continuation.
 	if view_phase == "wave_reward": return wave_chest.phase in ["closed","routes"] and model.open_rewards.is_empty()
 	# This also blocks claims between individual casts of a multi-use skill.
 	return view_phase == "ready" and model.pending.is_empty() and skill_bubble.roll.is_empty()
@@ -2020,16 +2036,14 @@ func _claim_chest_reward(index: int, replace_index: int = -1, discard: bool = fa
 	_sound("item/rumble" if item.id == "curse" else "item/confirmation_002", 0.65 if item.id == "curse" else 1.0, -12)
 	return true
 
-## Run the shared chest flow for reroll, wave, victory and debug rewards.
-func _reward_sequence(tier: int = 0, automatic: bool = false, bonus: bool = false, wave: bool = false) -> void:
+## Open treasure only on request, or as part of the selected wave reward.
+func _reward_sequence(tier: int = 0, bonus: bool = false, wave: bool = false) -> void:
 	if wave:
 		if view_phase != "wave_reward": return
-	elif automatic:
-		if view_phase != "over" or model.outcome() != "victory" or model.open_rewards.is_empty(): return
 	elif bonus:
 		if view_phase not in ["ready","skill"]: return
 	elif not _can_claim_chest(): return
-	var outcomes: Array = model.open_wave_chest() if wave else model.open_rewards.duplicate() if automatic else model.open_bonus_chest() if bonus else model.open_chest(tier)
+	var outcomes: Array = model.open_wave_chest() if wave else model.open_bonus_chest() if bonus else model.open_chest(tier)
 	if outcomes.is_empty(): return
 	await _show_chest(outcomes,wave,wave)
 
@@ -2123,7 +2137,7 @@ func _offer_wave_rewards(token: int) -> bool:
 			await get_tree().process_frame
 			if not _valid_turn(token): return false
 		wave_chest.cancel()
-		await _reward_sequence(0,false,false,true)
+		await _reward_sequence(0,false,true)
 	else:
 		var amount: int = model.claim_wave_resource()
 		wave_chest.reveal_amount(amount)
@@ -2160,21 +2174,11 @@ func _finish_victory(token: int) -> void:
 	view_phase = "over"
 	for die in dice: die.stop_charge()
 	active_human = -1
-	auto_claim_tier = model.auto_claim_victory_chest()
-	auto_claim_remaining = AUTO_CLAIM_DURATION if auto_claim_tier >= 0 else 0.0
 	fx.activate_circle(CITY_POINT, GOLD, 200, 1.5)
 	fx.burst(CITY_POINT, GOLD, 120, 320)
 	_sound("enemy/crash", 0.55, -8)
 	_sound("enemy/bell", 0.65, -12)
-	if auto_claim_tier >= 0: await _victory_rewards(token)
 	if token == run_id and is_inside_tree() and campaign_run: campaign.complete(model)
-
-func _victory_rewards(token: int) -> void:
-	# Let the success screen and claim notice land before opening the reels.
-	while auto_claim_remaining > 0 or _menus_open():
-		await get_tree().process_frame
-		if token != run_id or not is_inside_tree() or view_phase != "over": return
-	if token == run_id and is_inside_tree(): await _reward_sequence(0, true)
 
 ## Visit checkpoint shops after rewards, then resume the normal wave transition.
 func _visit_shop(token: int) -> bool:
@@ -2208,6 +2212,7 @@ func _advance_wave() -> void:
 	if not await _choose_next_route(token): return
 	active_human = -1
 	if not model.advance_wave(): return
+	damage_total.clear()
 	health_trails.sync(model,relic_attacks.health_states())
 	combat_motion.clear()
 	fallen.clear()
@@ -2238,10 +2243,12 @@ func _advance_wave() -> void:
 
 ## Reset run state and all pending presentation at the requested wave.
 func _restart(wave_number: int = 0) -> void:
+	if is_instance_valid(sin_view): sin_view.reset()
 	relic_attacks.clear()
 	focus_mark.cancel()
 	if is_instance_valid(one_shot_audio): one_shot_audio.clear()
 	if is_instance_valid(damage_feedback): damage_feedback.clear()
+	if is_instance_valid(damage_total): damage_total.clear()
 	if is_instance_valid(inventory_page):
 		inventory_page.close(false)
 		inventory_page.clear_gem_notice()
@@ -2262,8 +2269,6 @@ func _restart(wave_number: int = 0) -> void:
 	_clear_skill()
 	chest.cancel()
 	wave_chest.cancel()
-	auto_claim_tier = Run.Chests.NO_CHEST
-	auto_claim_remaining = 0
 	fx.z_index = BattleLayers.COMBAT
 	if transition_tween and transition_tween.is_valid(): transition_tween.kill()
 	if wave_number > 0:
@@ -2398,6 +2403,7 @@ func _finish_relic_death() -> void:
 	chest.cancel()
 	wave_chest.cancel()
 	damage_feedback.clear()
+	damage_total.clear()
 	view_phase = "ready"
 	_check_over()
 
@@ -2407,6 +2413,7 @@ func _show_events(events: Array) -> void:
 	for event in events:
 		if relic_attacks.defer_event(event): continue
 		if event.type in ["damage","burn"] and event.amount == 0 and event.target >= 0 and model.enemies[event.target].role == Rules.EnemyCatalog.Role.FANATIC: continue
+		var accumulated: bool = damage_total.add_event(event)
 		if event.type in ["guardian_hit","guardian_return"]:
 			warrior_companion.activate(event.relic_id)
 			var guard_at: Vector2 = battlefield_view.transform*warrior_companion.sprite_rect(self).get_center()
@@ -2460,8 +2467,9 @@ func _show_events(events: Array) -> void:
 			while city_corpses.size() > 24: city_corpses.pop_front()
 			continue
 		if event.type in ["shield_hit","shield_break"]:
-			fx.damage_number(point-Vector2(0,18), _damage_popup(event), PURPLE,_event_font_size(event,model.stage),event.target)
-			fx.floating(point-Vector2(0,41), event.text, PURPLE)
+			if not accumulated: fx.damage_number(point-Vector2(0,18), _damage_popup(event), PURPLE,_event_font_size(event,model.stage),event.target)
+			if not accumulated or event.text != _damage_popup(event):
+				fx.floating(point-Vector2(0,41), event.text, PURPLE)
 			fx.activate_circle(point, PURPLE, maxf(18,_enemy_side()*0.3), 0.3)
 			_sound("player/bell" if event.target == -1 else "enemy/bell", 0.7, -14)
 			continue
@@ -2474,7 +2482,8 @@ func _show_events(events: Array) -> void:
 			var status_text: String = event.text
 			if event.type == "burn": status_text = _damage_popup(event)
 			elif event.has("status"): status_text = GameText.format("%s +%d",[GameText.text(Statuses.ENTRIES[event.status].name),event.amount])
-			if event.type == "burn": fx.damage_number(point-Vector2(0,18),status_text,tint,_event_font_size(event,model.stage),event.target)
+			if event.type == "burn":
+				if not accumulated: fx.damage_number(point-Vector2(0,18),status_text,tint,_event_font_size(event,model.stage),event.target)
 			else: fx.floating(point-Vector2(0,45),status_text,tint,_event_font_size(event,model.stage))
 			if event.type == "burn":
 				if event.target >= -1: hit_times[event.target+1] = 0.35
@@ -2486,7 +2495,8 @@ func _show_events(events: Array) -> void:
 		var label: String = event.text if event.type == "immune" else _damage_popup(event) if event.type == "damage" else GameText.format("+%d SHIELD",event.amount) if event.type == "shield" else "+%d" % event.amount if event.type == "heal" else "DAZED" if event.type == "cancel" else "Charging..." if event.type == "charge" else "+ BOON"
 		var offset: int = offsets.get(event.target, 0)
 		if not label.is_empty():
-			if event.type == "damage": fx.damage_number(point-Vector2(0,18),label,color,_event_font_size(event,model.stage),event.target)
+			if event.type == "damage":
+				if not accumulated: fx.damage_number(point-Vector2(0,18),label,color,_event_font_size(event,model.stage),event.target)
 			else: fx.floating(point - Vector2(0, 45 + offset), label, color,_event_font_size(event,model.stage))
 			offsets[event.target] = offset + _event_font_size(event,model.stage)
 		if event.type == "damage":
@@ -2771,15 +2781,16 @@ func _draw_player_actor(canvas: CanvasItem) -> void:
 	var dx: float = combat_motion.offset(-1,monster_side,clock_time,false,reduced)
 	var orbit: Array = RelicOrbit.poses(self)
 	var pets: Array = pet_companions.poses(self)
+	var actor_rect: Rect2 = _player_world_sprite_rect(dx,bob)
+	var actor_tint := Color(Color.WHITE.lerp(RED,hurt*0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0)
+	PlayerCastCircle.paint(canvas,player_animation.body_rect(actor_rect,reduced),player_animation,reduced,actor_tint)
 	witch_companion.paint(canvas,self)
 	pet_companions.paint(canvas,self,pets,false)
 	RelicOrbit.paint(canvas,self,orbit,false)
 	_shadow(_player_world_feet(),monster_side*_player_growth_scale().x*0.48,0.27,canvas)
 	# Shield and immunity stay in the vitals/status UI, without a permanent body ring.
-	var actor_rect: Rect2 = _player_world_sprite_rect(dx,bob)
-	var actor_tint := Color(Color.WHITE.lerp(RED,hurt*0.6),0.32 if model.status_count(Status.HIDDEN) > 0 else 1.0)
+	if is_instance_valid(sin_view): sin_view.paint_aura(canvas,actor_rect)
 	evolution.draw_actor(canvas,actor_rect,actor_tint)
-	PlayerCastCircle.paint(canvas,player_animation.body_rect(actor_rect,reduced),player_animation,reduced,actor_tint)
 	RelicOrbit.paint(canvas,self,orbit,true)
 	warrior_companion.paint(canvas,self)
 	pet_companions.paint(canvas,self,pets,true)
@@ -3089,24 +3100,6 @@ func _chest_tier_at(point: Vector2) -> int:
 ## One continuous meter ends at the chest, lighting up once all points have arrived.
 func _draw_reward_progress(at: Vector2, scale_factor: float) -> void:
 	TreasureMeter.paint(self,at,scale_factor)
-
-func _draw_auto_claim() -> void:
-	if view_phase != "over" or auto_claim_tier == Run.Chests.NO_CHEST or auto_claim_remaining <= 0: return
-	var portrait: bool = fx.canvas_size.y > fx.canvas_size.x
-	var rect := Rect2(82,476,640,92) if portrait else Rect2(380,143,520,64)
-	var alpha: float = minf(1.0, minf((AUTO_CLAIM_DURATION-auto_claim_remaining)/0.12,auto_claim_remaining/0.35))
-	var color: Color = Run.Chests.COLORS[auto_claim_tier]
-	for i in range(3,0,-1): auto_claim_notice.draw_rect(rect.grow(i*4),Color(color,0.055*alpha))
-	auto_claim_notice.draw_rect(rect,Color(INK,0.97*alpha))
-	auto_claim_notice.draw_rect(rect,Color(color,alpha),false,3)
-	var side: float = 64 if portrait else 44
-	var icon_at := Vector2(rect.position.x+side*0.65,rect.get_center().y)
-	auto_claim_notice.draw_texture_rect(chest.art.chest_open,Rect2(icon_at-Vector2.ONE*side/2,Vector2.ONE*side),false,Color(1,1,1,alpha))
-	var label: String = GameText.format("%s chest auto claimed",GameText.text(CHEST_NAMES[auto_claim_tier]))
-	var font_size: int = 26 if portrait else 20
-	var width: float = pixel_font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
-	var baseline: Vector2 = (rect.get_center()+Vector2((side-width)/2,9 if portrait else 7)).round()
-	auto_claim_notice.draw_string(pixel_font,baseline,label,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,Color(color.lightened(0.35),alpha))
 
 func _damage_multiplier_label() -> String:
 	return damage_feedback.label() if is_instance_valid(damage_feedback) else ""

@@ -7,9 +7,21 @@ const Instance = preload("res://scripts/relics/relic_instance.gd")
 const Unlocks = preload("res://scripts/relics/relic_unlocks.gd")
 var unlocks = Unlocks.new()
 var items: Array = []
+var consume_food := false
+var consumed_food_ids: Array = []
 
 func clear() -> void:
 	items.clear()
+	consume_food = false
+	consumed_food_ids.clear()
+
+## Remember eaten relics and their Food ingredients until the chapter build resets.
+func record_consumed_food(item: Dictionary) -> void:
+	var ids: Array = [item.id]
+	for id in Sets.ingredients(item):
+		if Catalog.ITEMS.get(id,{}).get("type","") == "food": ids.append(id)
+	for id in ids:
+		if id not in consumed_food_ids: consumed_food_ids.append(id)
 
 func remove(index: int) -> Dictionary:
 	if index < 0 or index >= items.size(): return {}
@@ -49,6 +61,7 @@ func draw_one(rng: RandomNumberGenerator, excluded: Array = [], rarity_weights: 
 
 ## An ingredient can fuse into an existing meal even with all inventory slots occupied.
 func needs_slot(id: String) -> bool:
+	if consume_food and Catalog.Types.stacks(_new_item(id),Catalog.ITEMS).get("food",0) > 0: return false
 	if id == "codex_page" and has(id): return false
 	return has(id) or not Sets.can_merge(items,id)
 

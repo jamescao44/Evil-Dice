@@ -469,3 +469,11 @@ Single-die rerolls share a run-wide `same_pip_rerolls` count. Every second natur
 The first 24 encounters are preserved; 16 authored encounters extend the chapter to five eight-wave levels. Finale entries at waves 32/40 use `random_roles` to draw uniformly from the three bosses using combat RNG, with fixed LV.26/LV.32 and LV.1 Commander guards. Map previews show a crown without consuming RNG. `Campaign.valid()` accepts every internal level boundary; the home map shows three rows around the next level. Scenery keyframe timing is independent of campaign length.
 
 `ShopStock.ITEM_PRICE_INCREASE` adds 100 to paid relic, tarot and bottle offers. Bottle souls derive from the original price roll, so the surcharge grants no extra XP. Free gifts and the 50 × 1.5 refresh sequence are unchanged. `RARITY_APPROACH_RATE = 0.02` slows only shop rarity growth; chest rarity/pity and salvage remain unchanged. Shared chest gem payouts are halved. `test_five_level_campaign.gd`, campaign/checkpoint, shop and growth tests cover the expanded route.
+
+## Six-level pressure curve (November 10, 2026)
+
+The chapter now has 48 battles: establish → commit → main test → breakthrough → shorter test → payoff. `WaveCatalog.LEVEL_PRESSURE` holds the ordinary-wave targets against expected kill-only XP; `tools/wave_progression.gd -- <output.json> --plan` calculates them sequentially. Authored rosters remain fixed, so extra souls and strong builds keep their advantage. Enemy levels never decrease within a level; the gap eases as the player gains XP. Shops still follow battles 3 and 6.
+
+Boss levels/mechanics remain unchanged. The sixth finale reuses the existing random LV.32 boss as a placeholder, outside this balancing pass. Checkpoints carry the complete build into level six; scenery timing stays independent of chapter length. Comparison runs use the same six seeds, 70% Perfect throws, all prizes and the same tactical CLI policy; boss results are separated from ordinary-wave pressure.
+
+Level 4's fourth encounter uses an elite High Priest and an archer. A low-damage build took 17 turns against the previous elite cannon even after removing its cleric companion; the lighter roster preserves the same soul reward without that durability wall in the relief section.

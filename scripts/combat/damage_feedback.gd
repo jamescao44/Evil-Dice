@@ -157,8 +157,12 @@ func anchor() -> Vector2:
 	var portrait: bool = battle.fx.canvas_size.y > battle.fx.canvas_size.x
 	return battle.ARENA.position+Vector2(24 if portrait else 18,50 if portrait else 44)
 
+## Share the standard HUD font with other damage readouts.
+func base_text_size() -> int:
+	return 30 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 24
+
 func text_size() -> int:
-	var size: int = 30 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 24
+	var size: int = base_text_size()
 	var available: float = battle.ARENA.size.x - 64
 	var width: float = battle.pixel_font.get_string_size(formula_label(),HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
 	var fitted_width: float = width*1.35
@@ -422,7 +426,7 @@ func _draw_result(opacity: float) -> void:
 func _draw_standing(opacity: float) -> void:
 	var standing: Vector2 = battle.model.standing_damage_values()
 	var text: String = "DMG %s x %s" % [number(standing.x),number(standing.y,true)]
-	var size: int = 30 if battle.fx.canvas_size.y > battle.fx.canvas_size.x else 24
+	var size: int = base_text_size()
 	var width: float = battle.pixel_font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x*1.35
 	size = maxi(14,floori(size*minf(1.0,(battle.ARENA.size.x-64)/maxf(1,width))))
 	draw_string(battle.pixel_font,anchor()+Vector2(2,2),text,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Color(0.04,0.06,0.05,opacity))

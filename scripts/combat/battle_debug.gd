@@ -2,10 +2,12 @@ extends RefCounted
 ## One tabbed debug layout drives drawing, hit testing and numeric fields in both screen sizes.
 const Enemies = preload("res://scripts/enemies/enemy_debug.gd")
 const Character = preload("res://scripts/player/character_debug.gd")
-const TABS := ["骰子","战斗","奖励"]
+const Sins = preload("res://scripts/sins/sin_catalog.gd")
+const SIN_LABELS := {"gluttony":"暴食","lust":"色欲","wrath":"暴怒","sloth":"怠惰","envy":"嫉妒","greed":"贪婪","pride":"傲慢"}
+const TABS := ["骰子","战斗","奖励","七宗罪"]
 const CHEST_LABELS := ["生成普通宝箱","生成完美宝箱","生成贪婪宝箱","生成究极宝箱"]
 const CONTROL_HINTS := ["V1：单骰即点即重掷。","V2：多选后在中间确认重掷。","V3：中间投掷／取消，左侧重掷／结束，右侧确认。","V4：连击保留左侧，中间投掷／确认，右侧重掷／结束。"]
-enum Page { DICE, BATTLE, REWARDS }
+enum Page { DICE, BATTLE, REWARDS, SINS }
 var battle
 var page: int = Page.DICE
 var portrait: bool = false
@@ -40,7 +42,9 @@ func chest_option_rect(tier: int) -> Rect2:
 	return reward_rect(4+tier)
 
 func tab_rect(index: int) -> Rect2:
-	return Rect2(40+index*249,262,226,88) if portrait else Rect2(136+index*344,176,316,48)
+	var gap: float = 16 if portrait else 28
+	var width: float = ((724.0 if portrait else 1004.0)-gap*(TABS.size()-1))/TABS.size()
+	return Rect2(Vector2(40 if portrait else 136,262 if portrait else 176)+Vector2(index*(width+gap),0),Vector2(width,88 if portrait else 48))
 
 ## Equal checkbox hit areas share a single mutually exclusive mode value.
 func control_rect(version: int) -> Rect2:
@@ -91,6 +95,7 @@ func apply_character_level(value: String) -> void:
 	battle.evolution.queue_debug_level(battle.model.character_level)
 	battle.health_trails.reset(battle.model)
 	battle.damage_feedback.clear()
+	battle.damage_total.clear()
 	battle.dice_selection._refresh_preview()
 	battle._cancel_enemy_hold()
 	battle.debug_wave_error = "角色已设为 LV.%d · 形态%d。" % [battle.model.character_level,battle.evolution.form_index(battle.model.character_level)+1]
@@ -109,6 +114,17 @@ func apply_level(value: String) -> void:
 		battle._cancel_enemy_hold()
 		battle.queue_redraw()
 
+## Satisfy selected awakening checks without replacing the player's current inventory.
+func apply_sin(id: String) -> void:
+	if not battle.debug_open or page != Page.SINS: return
+	var ids: Array = Sins.ORDER if id == "all" else [id]
+	var old_max: int = battle.model.max_hp
+	if battle.model.sins.awaken(battle.model,ids) == 0: return
+	battle.model.refresh_relic_health(old_max)
+	battle.dice_selection._refresh_preview()
+	battle.debug_wave_error = "已满足觉醒条件，关闭菜单后播放。"
+	battle.queue_redraw()
+
 ## Each row is a visible button, its action and its current availability.
 func buttons() -> Array:
 	if page == Page.DICE:
@@ -117,6 +133,15 @@ func buttons() -> Array:
 		return rows
 	if page == Page.BATTLE:
 		return [[battle.DEBUG_WAVE_LOAD,"载入关卡","wave",true],[apply_rect,"应用等级","level",Enemies.can_apply(battle.model)],[character_apply_rect,"设置角色等级","character_level",can_apply_character_level()],[battle.DEBUG_SHOP,"商店 · 无限血宝石","_debug_open_shop",battle._can_debug_shop()]]
+	if page == Page.SINS:
+		var rows: Array = []
+		for i in range(Sins.ORDER.size()):
+			var id: String = Sins.ORDER[i]
+			var ready: bool = battle.model.sins.has(id)
+			var label: String = SIN_LABELS[id]+(" · 待觉醒" if id in battle.sin_view.queue else " · 已觉醒" if ready else " · 满足条件")
+			rows.append([reward_rect(i),label,"sin",not ready,id])
+		rows.append([reward_rect(Sins.ORDER.size()),"满足全部觉醒条件","sin",Sins.ORDER.any(func(id): return not battle.model.sins.has(id)),"all"])
+		return rows
 	var rows: Array = [[battle.DEBUG_TAROTS,"获得全部22张塔罗牌","_debug_give_tarots",true],[battle.DEBUG_TAROT_DRAW,"抽取塔罗牌","_debug_draw_tarot",true],[battle.DEBUG_TREASURE,"充满重投宝箱进度","_debug_charge_treasure",true],[battle.DEBUG_GEMS,"获得全部种类宝石","_debug_give_gemstones",true]]
 	for tier in range(CHEST_LABELS.size()):
 		rows.append([chest_option_rect(tier),CHEST_LABELS[tier],"chest",battle._can_debug_chest(),tier])
@@ -149,6 +174,7 @@ func click(point: Vector2) -> void:
 			"wave": battle._debug_load_wave(battle.debug_wave_input.text)
 			"level": apply_level(level_input.text)
 			"character_level": apply_character_level(character_input.text)
+			"sin": apply_sin(row[4])
 			"chest": battle._debug_spawn_chest(row[4])
 			_: battle.call(row[2])
 		return
@@ -182,6 +208,8 @@ func paint(canvas: CanvasItem) -> void:
 		battle._text(Vector2(40,620) if portrait else Vector2(136,386),"敌人等级",28 if portrait else 22,battle.GOLD,canvas)
 		battle._text(Vector2(40,796) if portrait else Vector2(136,486),"角色等级",28 if portrait else 22,battle.GOLD,canvas)
 		battle._wrapped(Vector2(40,1128) if portrait else Vector2(136,608),"敌人：保留生命比例、状态和蓄力。\n角色：同步进化，回满生命，当前经验归零。",724 if portrait else 1000,battle.MUTED,26 if portrait else 18,canvas)
+	elif page == Page.SINS:
+		battle._wrapped(Vector2(40,1100) if portrait else Vector2(136,602),"可选择多个。关闭调试和菜单后，依次播放觉醒动画。",724 if portrait else 1000,battle.MUTED,26 if portrait else 18,canvas)
 	battle._wrapped(Vector2(40,1560) if portrait else Vector2(136,676 if page == Page.BATTLE else 650),battle.debug_wave_error,724 if portrait else 1000,battle.GOLD,26 if portrait else 18,canvas)
 
 ## A visible tick marks the active version; clicking it again leaves it selected.

@@ -161,7 +161,6 @@ func error(model, id: String, choice: Dictionary = {}, repeating: bool = false, 
 	if id == "magician" and (not model.dice_turn.has_rolled() or model.dice_turn.unused().is_empty()): return "Roll first, then choose an unused die."
 	if id == "lovers" and model.dice_turn.unused().size() < 4: return "Lovers needs at least four unused dice."
 	if id == "devil" and model.dice_turn.unused().size() < 3: return "Devil needs at least three unused dice."
-	if id == "judgement" and (not model.dice_turn.has_rolled() or model.Patterns.has_combination(model.dice_turn.unused().map(func(i): return model.dice_turn.values[i]))): return "Judgement needs unused dice with no straight."
 	if id == "temperance" and not model.dice_turn.has_rolled(): return "Roll before using Temperance."
 	if id == "justice" and (not model.dice_turn.has_rolled() or not (model.dice_turn.can_roll(true) or model.dice_turn.has_pending_group())): return "Roll first and finish the summoned skill before using this card."
 	if id in ["magician","hermit","high_priestess","temperance"] and model.dice_turn.has_pending_group(): return "Use or cancel the summoned skill first."
@@ -227,6 +226,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			var replacements: Array = []
 			var rerolled = model.Relics.new()
 			rerolled.unlocks = model.relics.unlocks
+			rerolled.consumed_food_ids = model.relics.consumed_food_ids.duplicate()
 			for i in range(original.size()):
 				var replacement: String = Drops.draw(model.reward_rng,pool.filter(func(key): return model.RelicEffects.Conditions.loot_allowed(rerolled,key)),model.relic_drop_weights())
 				if replacement.is_empty(): return {"error":"No eligible relic is available."}
@@ -237,8 +237,10 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			var old_max: int = model.max_hp
 			model.relics.items = replacements
 			model.relics._fuse()
+			model.sins.check(model)
 			model.refresh_relic_health(old_max)
-			for item in replacements: model.RelicEffects.acquired(model,item.id,true)
+			for item in replacements:
+				if not (model.sins.has("gluttony") and Relics.Types.stacks(item,Relics.ITEMS).get("food",0) > 0): model.RelicEffects.acquired(model,item.id,true)
 		"magician":
 			model.dice_turn.values[choice.die] = choice.face
 			model.dice_turn.selected.clear()
@@ -296,7 +298,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 			model.dice_turn.rolls_left = 0
 			pending_turn_end = true
 		"death": events.append_array(_execute(model,choice.target))
-		"judgement": model.dice_turn.rolls_left += 2
+		"judgement": model.dice_turn.rolls_left += 3
 		"chariot":
 			model.shield += Vitals.CHARIOT_SHIELD
 			events.append(model.event(-1,Vitals.CHARIOT_SHIELD,"shield","SHIELD +%d" % Vitals.CHARIOT_SHIELD))
@@ -311,6 +313,7 @@ func cast(model, instance_id: int, choice: Dictionary = {}) -> Dictionary:
 	if repeating: dismiss_repeat()
 	else: model.tarots.remove_instance(instance_id)
 	if not repeats.is_empty(): pending_repeat = {"id":id,"instance_id":-absi(instance_id),"sources":repeats,"carry":carry}
+	if id in ["magician","high_priestess"]: model.activate_dice_matches()
 	if pending_steps.is_empty(): _finish_effect(model,events)
 	return {"id":id,"events":events,"relic":reward,"repeated":repeating,"reroll":id == "justice"}
 
@@ -358,7 +361,8 @@ func _tower(model) -> Array:
 		var loss: int = model.direct_enemy_hp_damage(target,50)
 		events.append(model.damage_event(target,loss,50))
 	var loss: int = mini(model.hp,Vitals.TOWER_SELF_DAMAGE)
-	model.hp -= loss
+	model.lose_hp(loss)
 	events.append(model.damage_event(-1,loss,Vitals.TOWER_SELF_DAMAGE))
 	if model.hp <= 0: events.append_array(model.RelicEffects.prevent_death(model))
+	events.append_array(model.sins.resolve_retaliations(model))
 	return events

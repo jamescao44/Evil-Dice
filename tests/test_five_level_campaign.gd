@@ -13,13 +13,13 @@ func check(ok: bool, label: String) -> void:
 
 ## Every possible random finale is a real two-phase boss with the authored level.
 func roster_checks() -> void:
-	check(Run.PLAYABLE_WAVES == 40 and Waves.SQUADS.size() == 40 and Run.Campaign.LEVEL_COUNT == 5,"Five complete eight-wave levels")
-	check(Run.WAVE_NAMES.size() == Waves.COUNT and Waves.CITY_STAGE == 40,"Names, debug bounds and dormant city stay aligned")
-	for stage in range(24,40):
+	check(Run.PLAYABLE_WAVES == 48 and Waves.SQUADS.size() == 48 and Run.Campaign.LEVEL_COUNT == 6,"Six complete eight-wave levels")
+	check(Run.WAVE_NAMES.size() == Waves.COUNT and Waves.CITY_STAGE == 48,"Names, debug bounds and dormant city stay aligned")
+	for stage in range(24,Run.PLAYABLE_WAVES):
 		check(Waves.is_boss_stage(stage) == ((stage+1)%8 == 0),"Only the eighth battle is a boss")
 		check(Waves.has_shop_after(stage) == (stage%8+1 in [3,6]),"New levels retain both fixed shop stops")
 		check(Waves.display_stage(stage) == 11,"Extended campaign retains the capped scenery")
-	for stage in [31,39]:
+	for stage in [31,39,47]:
 		var counts := {}
 		for seed_value in range(600):
 			var first := RandomNumberGenerator.new(); first.seed = seed_value
@@ -34,16 +34,16 @@ func roster_checks() -> void:
 			var state: int = first.state
 			check(Waves.map_marker(stage).art == "crown" and first.state == state,"Map previews cannot reroll or reveal the undecided boss")
 		check(counts.size() == 3 and counts.values().all(func(n): return absf(n/600.0-1.0/3.0) < 0.06),"Boss choices are approximately uniform across seeds")
-	for stage in [-1,0,7,9,39,40,"24"]:
+	for stage in [-1,0,7,9,39,47,48,"24"]:
 		check(not Run.Campaign.valid({"stage":stage}),"Invalid checkpoint boundaries remain rejected")
 
-## New levels retain fixed gaps against mean kill-only XP; boss choice never rescales waves.
+## Ordinary waves follow chapter pressure; fixed boss budgets stay outside this pass.
 func progression_checks() -> void:
 	var m = Run.new(1)
 	var previous := 1
-	for stage in range(40):
+	for stage in range(Run.PLAYABLE_WAVES):
 		if stage%8 == 0: previous = 1
-		var expected: int = maxi(previous,m.character_level+Waves.reference_level_gap(stage))
+		var expected: int = Waves.reference_enemy_level(stage,m.character_level,previous)
 		var xp := 0.0
 		for entry in Waves.SQUADS[stage].units:
 			check(entry.level == expected,"Sequential XP produces the intended fixed wave level")
@@ -55,7 +55,7 @@ func progression_checks() -> void:
 			xp += roundi(per_entry/roles.size())
 		previous = expected
 		m.gain_souls(int(xp))
-	check(m.character_level == 27 and m.souls == 188,"Mean kill-only XP reaches the expected final level")
+	check(m.character_level == 29 and m.souls == 220,"Mean kill-only XP reaches the expected final level")
 
 ## Shared payout logic halves chest gems without changing route gems or salvage values.
 func economy_checks() -> void:
@@ -83,5 +83,5 @@ func economy_checks() -> void:
 
 func _initialize() -> void:
 	roster_checks(); progression_checks(); economy_checks()
-	print("Five-level campaign: %d checks, %d failures" % [checks,failures])
+	print("Chapter campaign: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

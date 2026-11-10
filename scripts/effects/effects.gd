@@ -77,6 +77,8 @@ func clip_battlefield(rect: Rect2) -> void:
 	battlefield_rect = rect
 	var clip := Control.new()
 	clip.name = "CombatEffectsClip"
+	clip.z_as_relative = false
+	clip.z_index = BattleLayers.SKILL_FX
 	clip.position = rect.position; clip.size = rect.size
 	clip.clip_contents = true
 	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE

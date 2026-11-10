@@ -764,8 +764,8 @@ All enemies; 2x against Burning.,All enemies; 2x against Burning.,全体 · 对�
 All; 2x vs Burning; +2 Burning.,All; 2x vs Burning; +2 Burning.,全体 · 燃烧翻倍／＋2层
 Destroy all enemies.,Destroy all enemies.,消灭所有敌人
 Incoming relic: %s,Incoming relic: %s,待领取法具：%s
-Change one unused rolled die to a different face. Cancel without consuming the card.,Change one unused rolled die to a different face. Cancel without consuming the card.,选择一枚已投掷且未使用的骰子，改为其他点数。取消不消耗此牌。
-"Add 1 to unused dice now and all rolls this turn, up to 6. Repeated uses add another 1.","Add 1 to unused dice now and all rolls this turn, up to 6. Repeated uses add another 1.",未使用骰子及本回合后续投掷点数+1，上限6。重复使用可叠加。
+"Change one unused rolled die to a different face, then activate matching attacks. Cancel without consuming the card.","Change one unused rolled die to a different face, then activate matching attacks. Cancel without consuming the card.",选择一枚未使用骰子改为其他点数，并触发同点数自动攻击。取消不消耗此牌。
+"Add 1 to unused dice now and all rolls this turn, up to 6. Activate matching attacks now. Repeated uses stack.","Add 1 to unused dice now and all rolls this turn, up to 6. Activate matching attacks now. Repeated uses stack.",未使用骰子及本回合后续投掷点数+1，上限6，并立即触发同点数自动攻击。重复使用可叠加。
 Receive a random eligible relic. Every eligible relic has an equal chance.,Receive a random eligible relic. Every eligible relic has an equal chance.,随机获得一件合格法具，每件获得概率相同。
 Remove all harmful statuses from the player.,Remove all harmful statuses from the player.,解除玩家所有异常状态。
 The next eligible roll guarantees a straight of at least four dice.,The next eligible roll guarantees a straight of at least four dice.,至少有四枚未使用骰子时可用。下次合格投掷必有四顺子。
@@ -776,7 +776,7 @@ End this turn and carry unused rolls into the next turn.,End this turn and carry
 The next throw includes at least three sixes; repeated uses guarantee one more six.,The next throw includes at least three sixes; repeated uses guarantee one more six.,下次投掷至少有三个六；每次重复使用多保证一个六。
 Break every enemy shield. Deal 50 fixed damage to all enemies and 300 to yourself.,Break every enemy shield. Deal 50 fixed damage to all enemies and 300 to yourself.,破坏所有敌方护盾，所有敌人直接损失50生命，自己损失300生命。
 The next three throws are Perfect. Using this again resets the count to three.,The next three throws are Perfect. Using this again resets the count to three.,接下来三次投掷必定Perfect，重复使用重置为三次。
-"If currently unused dice cannot form a straight, gain 2 rerolls.","If currently unused dice cannot form a straight, gain 2 rerolls.",若当前未使用骰子无法组成顺子，获得2次重掷。
+Immediately gain 3 rerolls.,Immediately gain 3 rerolls.,立即获得3次重掷。
 Choose a die to change,Choose a die to change,选择要更改的骰子
 Use Hierophant to clear freezing first.,Use Hierophant to clear freezing first.,先使用教皇解除冰冻。
 "Roll first, then choose an unused die.","Roll first, then choose an unused die.",先投掷，再选择未使用的骰子。
@@ -793,7 +793,7 @@ Choose a face. Tap the die to go back.,Choose a face. Tap the die to go back.,�
 DISCARD,DISCARD,放弃
 "Cancel any formed skill, then immediately reroll all unused dice for free.","Cancel any formed skill, then immediately reroll all unused dice for free.",取消已形成的技能，解锁其骰子，然后免费重掷所有未使用骰子。
 Extra Skill,Extra Skill,额外技能
-"Cancel any formed skill, restore spent dice, and reroll all six dice for free.","Cancel any formed skill, restore spent dice, and reroll all six dice for free.",取消已形成的技能并恢复已用骰子，立即免费重掷全部六枚骰子。
+"Cancel any formed skill, restore spent dice, and reroll all six dice for free. Activate matching attacks.","Cancel any formed skill, restore spent dice, and reroll all six dice for free. Activate matching attacks.",取消已形成的技能并恢复已用骰子，免费重掷全部六枚骰子，并触发同点数自动攻击。
 Lemon Soda,Lemon Soda,柠檬汽水
 Cookie Sundae,Cookie Sundae,曲奇圣代
 Fried Chicken,Fried Chicken,炸鸡
@@ -1257,3 +1257,34 @@ Companion HP: %d / %d.,Companion HP: %d / %d.,同伴生命：%d / %d。
 "Base damage +10. Every 4 completed turns, store a 3x critical for the next attack skill and all its hits.","Base damage +10. Every 4 completed turns, store a 3x critical for the next attack skill and all its hits.",基础伤害+10；每完成4回合，储存一次3倍暴击，作用于下个攻击技能的全部命中。
 "After an initial throw with no straight, attack a random enemy for 1x base damage.","After an initial throw with no straight, attack a random enemy for 1x base damage.",首掷后无可用顺子时，对随机敌人造成1倍基础伤害。
 Single-target attacks repeat 30% damage on a random living enemy. Area attacks do not trigger this.,Single-target attacks repeat 30% damage on a random living enemy. Area attacks do not trigger this.,单体攻击后，以本次伤害的30%攻击随机存活敌人；范围攻击不触发。
+Food,Food,食物
+Biotic,Biotic,生物
+Weapon,Weapon,武器
+Treasure,Treasure,宝物
+Artefact,Artefact,法具
+Untyped,Untyped,无类别
+Type: %s,Type: %s,类别：%s
+Gluttony,Gluttony,暴食
+Lust,Lust,色欲
+Wrath,Wrath,暴怒
+Sloth,Sloth,怠惰
+Envy,Envy,嫉妒
+Pride,Pride,傲慢
+SIN AWAKENED,SIN AWAKENED,罪性觉醒
+AWAKENED SIN,AWAKENED SIN,已觉醒的罪性
+Tap to continue,Tap to continue,点击任意位置继续
+Own 10 Food stacks at once.,Own 10 Food stacks at once.,同时持有10份食物。
+Own 10 Biotic stacks at once.,Own 10 Biotic stacks at once.,同时持有10份生物。
+Own 10 Weapon stacks at once.,Own 10 Weapon stacks at once.,同时持有10份武器。
+Own 10 Treasure stacks at once.,Own 10 Treasure stacks at once.,同时持有10份宝物。
+Clear a whole level without rerolling.,Clear a whole level without rerolling.,整关通关期间不重掷。
+Use 12 tarot cards in this chapter.,Use 12 tarot cards in this chapter.,本章节累计使用12张塔罗牌。
+Own 3 completed sets at once.,Own 3 completed sets at once.,同时持有3套完整套装。
+"Consume all Food, including future acquisitions. Each consumed Food stack grants +10 base damage and +1 multiplier, replacing its original effects.","Consume all Food, including future acquisitions. Each consumed Food stack grants +10 base damage and +1 multiplier, replacing its original effects.",吞噬所有食物，包括之后获得的食物。每份食物失去原效果，改为永久增加10基础伤害与1伤害乘数。
+"Healing and lifesteal are doubled. Whenever HP is lost, strike all enemies for base damage plus 100 × the fraction of HP lost.","Healing and lifesteal are doubled. Whenever HP is lost, strike all enemies for base damage plus 100 × the fraction of HP lost.",恢复与吸血翻倍。每次失去生命时反击全体敌人，伤害为基础伤害＋100×本次损失生命占受伤前生命的比例。
+"After each initial throw, every Weapon relic attacks a random enemy for 2× base damage.","After each initial throw, every Weapon relic attacks a random enemy for 2× base damage.",每回合首掷后，每件武器额外攻击随机敌人，造成2倍基础伤害。
+Automatic attack damage ×3.,Automatic attack damage ×3.,自动攻击伤害×3。
+All skill damage ×2.25.,All skill damage ×2.25.,所有技能伤害×2.25。
+Every 20 Blood Gems currently held grants +1 base damage.,Every 20 Blood Gems currently held grants +1 base damage.,每持有20血宝石，基础伤害＋1。
+Gain base damage equal to your remaining HP percentage × the greater of 100 or your base damage.,Gain base damage equal to your remaining HP percentage × the greater of 100 or your base damage.,增加的基础伤害＝剩余生命百分比×当前基础伤害（最低按100计算）。
+Total Damage,Total Damage,总伤害

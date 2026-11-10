@@ -47,6 +47,8 @@ static func capture(model) -> Dictionary:
 	var run: Dictionary = {}
 	for key in RUN_FIELDS: run[key] = model.get(key)
 	run["gemstones"] = model.gemstones.save()
+	run["sins"] = model.sins.save()
+	run["consumed_food_ids"] = model.relics.consumed_food_ids.duplicate()
 	run["relic_discoveries"] = {"chapter":model.relics.unlocks.chapter,"items":model.relics.unlocks.chapters.get(model.relics.unlocks.chapter,[]).duplicate()}
 	return {"health_growth":LevelCurve.HEALTH_GROWTH,"health_scale":Vitals.SCALE,"stage":model.level_number()*WAVES_PER_LEVEL,"run":run.duplicate(true),"relics":model.relics.items.duplicate(true),"tarots":model.tarots.items.filter(func(card): return not card.get("projection",false)).duplicate(true),"next_tarot":model.tarots.next_instance,"banned_tarots":model.tarot_effects.banned.duplicate(),"rng":model.rng.state,"reward_rng":model.reward_rng.state}
 
@@ -67,6 +69,9 @@ static func restore(model, data: Dictionary) -> bool:
 		var old_base: int = roundi(Vitals.STARTING_HEALTH*pow(saved_growth,model.character_level-1))
 		model.base_max_hp = maxi(1,model.base_max_hp-old_base+Vitals.base_health(model.character_level))
 	model.relics.items = data.relics.duplicate(true)
+	model.sins.restore(data.run.get("sins",{}))
+	model.relics.consume_food = model.sins.has("gluttony")
+	model.relics.consumed_food_ids = data.run.get("consumed_food_ids",[]).filter(func(id): return model.relics.Catalog.ITEMS.has(id))
 	# Replaying an earlier level must also rewind Banana's replacement pool.
 	model.relics.unlocks.restore(discoveries.get("items",[]))
 	# Builds saved before chapter unlocks already earned their gated relics.

@@ -154,6 +154,10 @@ func lane_shown(id: String) -> bool:
 func available() -> bool:
 	return shown() and not battle.tarot_cast.active() and battle.tarot_ui.available() and not battle._menus_open() and not battle.dice_selection.dragging and not battle.skill_pressed
 
+## Dice-changing shortcuts wait until reroll mode and the dice animation have ended.
+func lane_enabled(id: String) -> bool:
+	return id != "now" or (not battle.dice_selection.reroll_mode and battle.view_phase != "rolling")
+
 func card_size(id: String) -> Vector2: return layout.card_size(id)
 func arc_radius() -> float: return layout.radius()
 func arc_step() -> float: return layout.step()
@@ -165,7 +169,7 @@ func card_at(point: Vector2) -> Dictionary:
 	var picked: Dictionary = {}
 	var nearest: float = INF
 	for id in LANES:
-		if not lane_shown(id) or lanes[id].visibility < 0.85: continue
+		if not lane_shown(id) or not lane_enabled(id) or lanes[id].visibility < 0.85: continue
 		if next_open and id != "next": continue
 		for index in visible_indices(id):
 			var p := pose(id,index)
@@ -212,7 +216,7 @@ func click(point: Vector2) -> bool:
 
 func motion(point: Vector2) -> bool:
 	if not held: return inspected >= 0 or (next_open and not battle.tarot_ui.external_drag)
-	if not shown(): cancel_gesture(); return false
+	if not shown() or not lane_enabled(lane): cancel_gesture(); return false
 	var delta := point-press_at
 	if lane == "field" and layout.field_zone().has_point(point):
 		gesture = "browse"
@@ -274,6 +278,10 @@ func _tick_scroll(moving: bool) -> void:
 func _process(delta: float) -> void:
 	sync_inventory()
 	clock += delta
+	if not lane_enabled("now"):
+		if held and lane == "now": cancel_gesture()
+		if lanes.now.cards.any(func(card): return card.instance_id == inspected): inspected = -1
+		lanes.now.swipe.velocity = 0
 	if battle.tarot_cast.active():
 		field_focus = -1; inspected = -1; next_open = false
 	if not lane_shown("field"): field_focus = -1
@@ -284,8 +292,8 @@ func _process(delta: float) -> void:
 	if not shown(): inspected = -1; next_open = false; cancel_gesture()
 	if not lane_shown("next"): next_open = false
 	next_expansion = move_toward(next_expansion,1.0 if next_open else 0.0,delta*5.5)
-	var moving: bool = shown() and absf(lanes.now.swipe.velocity) > 0.15
-	if shown() and not battle._menus_open() and not held and not next_open:
+	var moving: bool = shown() and lane_enabled("now") and absf(lanes.now.swipe.velocity) > 0.15
+	if shown() and lane_enabled("now") and not battle._menus_open() and not held and not next_open:
 		lanes.now.swipe.advance(delta,true)
 		_tick_scroll(moving)
 	for id in LANES:

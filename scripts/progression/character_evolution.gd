@@ -130,9 +130,8 @@ func _process(delta: float) -> void:
 func blocks_emote() -> bool:
 	return entrance.active() or (age >= 0 and is_evolution())
 
-## Render the current form with an eased white silhouette at the transformation peak.
-func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
-	if forms.is_empty(): return
+## Share the exact authored pose between the character and silhouette-based effects.
+func actor_pose(rect: Rect2) -> Dictionary:
 	var form: int = form_index(displayed_level)
 	battle.player_animation.set_form(form)
 	var frame: int = battle.player_animation.frame_number()
@@ -143,6 +142,16 @@ func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
 	if entering:
 		body = rect
 		frame = entrance.frame_number(Sprite.idle_frame(maxf(0,entrance.age-entrance.clip_duration()),form))
+	return {"form":form,"frame":frame,"body":body}
+
+## Render the current form with an eased white silhouette at the transformation peak.
+func draw_actor(canvas: CanvasItem, rect: Rect2, tint: Color) -> void:
+	if forms.is_empty(): return
+	var pose: Dictionary = actor_pose(rect)
+	var form: int = pose.form
+	var frame: int = pose.frame
+	var body: Rect2 = pose.body
+	var entering: bool = entrance.active()
 	entrance.paint_ground(canvas,rect,battle.reduced,tint)
 	Sprite.paint_actor(canvas,rect,frame,battle.clock_time,tint,battle.reduced,form,body,entrance.ring_alpha(),entrance.ring_flash())
 	var glow: float = 0

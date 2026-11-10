@@ -8,6 +8,7 @@ const RANDOM_STATUSES := [Status.BURNING,Status.FROZEN,Status.DARKNESS,Status.CO
 
 ## Gate conditional loot consistently in chests, shops, tarot grants and reel strips.
 static func loot_allowed(inventory, id: String) -> bool:
+	if id in inventory.consumed_food_ids: return false
 	if Catalog.ITEMS.get(id,{}).get("requires_unlock",false) and not inventory.unlocks.has(id): return false
 	var exclusion: String = Catalog.ITEMS.get(id,{}).get("excluded_after_unlock","")
 	if not exclusion.is_empty() and inventory.unlocks.has(exclusion): return false

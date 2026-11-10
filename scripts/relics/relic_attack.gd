@@ -54,6 +54,8 @@ static func apply(model, source: String, amount: float, fixed: bool = false, all
 		else: loss = model.hit_enemy(index,hit_damage)
 		var actual: int = shield_before-model.enemies[index].shield if blocked else loss
 		var hit: Dictionary = model.damage_event(index,actual,hit_damage,"shield_hit" if blocked else "damage")
+		if options.has("sin"): hit.sin = options.sin
+		if source == "sin_lust": hit.sin = "lust"
 		if blocked: hit.text = "SHIELD BREAK" if model.enemies[index].shield == 0 else "BLOCKED"
 		events.append(hit)
 		if loss > 0: events.append_array(model._attack_relic_effects(index,loss,skill))

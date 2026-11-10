@@ -40,9 +40,10 @@ static func activate(model, entry: Dictionary) -> void:
 static func pay_retrigger_cost(model, activators: Array) -> void:
 	if TENTACLE not in activators or model.hp <= 0: return
 	var loss: int = mini(model.hp,maxi(1,ceili(model.max_hp*0.01)))
-	model.hp -= loss
+	model.lose_hp(loss)
 	var events: Array = [model.damage_event(-1,loss,loss)]
 	if model.hp <= 0: events.append_array(model.RelicEffects.prevent_death(model))
+	events.append_array(model.sins.resolve_retaliations(model))
 	model.relic_cost_paid.emit(events)
 
 ## Notify presentation without applying effects or advancing counters a second time.

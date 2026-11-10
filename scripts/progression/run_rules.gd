@@ -26,7 +26,7 @@ var tarot_choices: Array = []
 var tarot_source: String = ""
 var tarot_slot: int = -1
 const Waves = preload("res://scripts/progression/wave_catalog.gd")
-const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "MAGE PATROL", "CROSSROADS", "HOLY ESCORT", "SHADOW PATROL", "THE CHAMPION", "THE COMMANDER", "GOLDEN GUARD", "ELITE COMPANY", "THE HIGH PRIEST", "ARCANE BATTERY", "SACRED ALLIANCE", "FORBIDDEN RITE", "THE INNER SANCTUM", "THE SPELLSWORD", "ASHEN GATE", "COVEN ESCORT", "OBSIDIAN WATCH", "ABYSSAL GUARD", "DARK PROCESSION", "CATHEDRAL GUARD", "THE LAST WATCH", "THE FANATIC", "OBSIDIAN WATCH", "ELITE COMPANY", "FORBIDDEN RITE", "ARCANE BATTERY", "HOLY ESCORT", "CATHEDRAL GUARD", "THE INNER SANCTUM", "THE CHAMPION", "GOLDEN GUARD", "SHADOW PATROL", "DARK PROCESSION", "ABYSSAL GUARD", "SACRED ALLIANCE", "COVEN ESCORT", "THE LAST WATCH", "THE CHAMPION", "THE CITY"]
+const WAVE_NAMES := ["OUTSKIRTS", "OLD ROAD", "MAGE PATROL", "CROSSROADS", "HOLY ESCORT", "SHADOW PATROL", "THE CHAMPION", "THE COMMANDER", "GOLDEN GUARD", "ELITE COMPANY", "THE HIGH PRIEST", "ARCANE BATTERY", "SACRED ALLIANCE", "FORBIDDEN RITE", "THE INNER SANCTUM", "THE SPELLSWORD", "ASHEN GATE", "COVEN ESCORT", "OBSIDIAN WATCH", "ABYSSAL GUARD", "DARK PROCESSION", "CATHEDRAL GUARD", "THE LAST WATCH", "THE FANATIC", "OBSIDIAN WATCH", "ELITE COMPANY", "FORBIDDEN RITE", "ARCANE BATTERY", "HOLY ESCORT", "CATHEDRAL GUARD", "THE INNER SANCTUM", "THE CHAMPION", "GOLDEN GUARD", "SHADOW PATROL", "DARK PROCESSION", "ABYSSAL GUARD", "SACRED ALLIANCE", "COVEN ESCORT", "THE LAST WATCH", "THE CHAMPION", "MAGE PATROL", "SHADOW PATROL", "HOLY ESCORT", "ARCANE BATTERY", "GOLDEN GUARD", "SACRED ALLIANCE", "THE LAST WATCH", "THE CHAMPION", "THE CITY"]
 static var WAVE_COUNTS: Array = Waves.counts()
 static var WAVE_BOOSTS: Array = range(Waves.COUNT).map(func(stage): return 1.0 if stage < 2 else 1.5 if stage == 2 else 2.25)
 const CITY_FEVER_ENABLED := false
@@ -138,6 +138,8 @@ func replacement_gem_preview(id: String, replace_index: int) -> int:
 	if replace_index < 0 or replace_index >= relics.items.size() or not relics.needs_slot(id): return 0
 	var candidate = Relics.new()
 	candidate.unlocks = relics.unlocks
+	candidate.consume_food = relics.consume_food
+	candidate.consumed_food_ids = relics.consumed_food_ids.duplicate()
 	candidate.items = relics.items.duplicate(true)
 	if not candidate.add(id,replace_index,true): return 0
 	var removed: Dictionary = relics.items[replace_index]
@@ -463,16 +465,6 @@ func close_chest() -> bool:
 	guaranteed_slot = -1
 	return true
 
-func auto_claim_victory_chest() -> int:
-	if outcome() != "victory" or not open_rewards.is_empty(): return Chests.NO_CHEST
-	_bank_unused_rolls()
-	var tier: int = chest_tier()
-	if tier == Chests.NO_CHEST: return Chests.NO_CHEST
-	# Claim the chest automatically, but leave its locked gifts for the reels
-	# and individual player pickups, just like a manually opened chest.
-	open_chest(tier)
-	return tier
-
 func is_city() -> bool:
 	return stage == Waves.CITY_STAGE
 
@@ -487,6 +479,7 @@ func damage_cap(kind: int, target: int) -> int:
 	return maxi(1, floori(enemies[target].max_hp * numerator * WAVE_BOOSTS[stage] / 3.0))
 
 func _load_wave() -> void:
+	sins.enter_wave(self)
 	at_shop = false
 	enemy_reaction_events.clear()
 	relic_skills.wave_started()
@@ -523,9 +516,9 @@ func level_wave() -> int:
 func has_next_level() -> bool:
 	return level_number() < Campaign.LEVEL_COUNT
 
-## Do not carry a build forward until field and automatic treasure prizes are settled.
+## Settle open rewards before continuing; unopened reroll treasure carries into the next level.
 func level_rewards_complete() -> bool:
-	return outcome() == "victory" and wave_chest_stage == stage and wave_reward_resolved and open_rewards.is_empty() and tarot_source.is_empty() and chest_tier() == Chests.NO_CHEST
+	return outcome() == "victory" and wave_chest_stage == stage and wave_reward_resolved and open_rewards.is_empty() and tarot_source.is_empty()
 
 ## Visit a scheduled shop first, then choose between two distinct battle rewards.
 func offer_routes() -> Array:
@@ -614,6 +607,7 @@ func _record_relic_wave_clear() -> void:
 	_bank_unused_rolls() # Tarot and other immediate kills may bypass the normal turn-end path.
 	if relic_reward_stage == stage: return
 	relic_reward_stage = stage
+	sins.wave_cleared(self)
 	gain_blood_gems(RelicEffects.wave_cleared(self))
 
 ## Commit the wave chest and its upgrade chain once per completed wave.

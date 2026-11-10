@@ -200,71 +200,36 @@ func scene_checks(portrait: bool) -> void:
 	check(g.model.stage == 6 and g.model.pending.is_empty() and g.view_phase == "ready","Wave load invalidates the old roll coroutine")
 	g.model.stage = Waves.CITY_STAGE
 	g.model.city_hp = 0
-	g.model.reroll_progress = 15
+	g.model.reroll_progress = g.Run.Chests.REROLL_COST
 	g.model.wave_chest_stage = g.model.stage
 	g.model.wave_reward_resolved = true
 	g._check_over()
 	await process_frame
 	await process_frame
-	check(g.auto_claim_tier == 3 and not g.model.open_rewards.is_empty(),"Victory reserves the largest chest")
+	check(g.model.reroll_progress == g.Run.Chests.REROLL_COST and g.model.open_rewards.is_empty(),"Victory preserves a ready treasure")
 	g._handle_click(g.MENU_RECT.get_center())
-	g.auto_claim_remaining = 0
 	await process_frame
 	await process_frame
-	check(g.menu_open and g.view_phase == "over" and not g.chest.visible,"Expired victory notice still waits for an open menu to close")
+	check(g.menu_open and g.view_phase == "over" and not g.chest.visible,"Victory stays visible while the menu is open")
 	g._handle_click(g.MENU_RESUME.get_center())
 	await process_frame
 	await process_frame
-	check(not g._menus_open() and g.view_phase == "reward","Resuming victory starts its pending reward sequence")
+	check(not g._menus_open() and g.view_phase == "over" and not g.chest.visible,"Resuming victory keeps treasure unopened")
 	g._restart(5)
 	await create_timer(0.05).timeout
 	check(g.model.stage == 4 and g.model.open_rewards.is_empty() and not g.chest.visible,"Loading a wave cancels a pending victory chest")
 	if "--capture" in OS.get_cmdline_user_args():
 		g._restart(Waves.COUNT)
 		g.model.city_hp = 0
-		g.model.reroll_progress = 15
+		g.model.reroll_progress = g.Run.Chests.REROLL_COST
 		g.model.wave_chest_stage = g.model.stage
 		g.model.wave_reward_resolved = true
 		g._check_over()
 		await process_frame
 		await process_frame
-		g._process(0.3)
-		await snapshot(g,"victory-notice",portrait)
-		g._process(g.AUTO_CLAIM_DURATION)
-		var deadline: int = Time.get_ticks_msec()+4000
-		while not g.chest.visible and Time.get_ticks_msec() < deadline: await process_frame
-		check(g.chest.visible,"Victory automatically reveals its chest")
-		g.chest.open_chest()
-		g.chest.request_stop()
-		g.chest.set_process(false)
-		g.chest.audio_clock_enabled = false
-		g.chest._process(1)
-		g.chest.queue_redraw()
-		await snapshot(g,"victory-reels",portrait)
-		g.chest._process(5.5)
-		g.chest.queue_redraw()
-		await snapshot(g,"victory-pickups",portrait)
-		for slot in range(g.chest.rewards.size()):
-			g._handle_click(g.chest.reel_rect(slot).get_center())
-			if g.tarot_ui.ceremony.active():
-				var draw = g.tarot_ui.ceremony
-				for delta in [draw.shuffle_duration()+0.01,0.5,0.6]: g.tarot_ui._process(delta)
-				for i in range(3):
-					var remaining: Array = draw.fan_order().filter(func(index): return index not in draw.removed)
-					remaining.sort_custom(func(a,b): return absf(draw.fan_pose(a).step) < absf(draw.fan_pose(b).step))
-					var point: Vector2 = draw.fan_pose(remaining[0]).at
-					g._handle_click(point)
-					g._handle_release(point)
-					g.tarot_ui._process(0.6)
-				g.tarot_ui._process(1.1)
-				for point in [draw.row_point(0),draw.keep_rect().get_center()]:
-					g._handle_click(point)
-					g._handle_release(point)
-				g.tarot_ui._process(1.0)
-			g.relic_ui._process(0.7)
-		deadline = Time.get_ticks_msec()+4000
-		while g.view_phase != "over" and Time.get_ticks_msec() < deadline: await process_frame
-		check(g.view_phase == "over" and g.model.reward_history.size() == 5,"Victory returns after every gift is picked up")
+		await snapshot(g,"victory-preserved-treasure",portrait)
+		check(not g.chest.visible and g.model.reroll_progress == g.Run.Chests.REROLL_COST,"Victory never starts the treasure animation")
+
 	g.queue_free()
 	await process_frame
 

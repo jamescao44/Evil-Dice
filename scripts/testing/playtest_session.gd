@@ -6,6 +6,7 @@ const Character = preload("res://scripts/combat/flamelings_skills.gd")
 const Relics = preload("res://scripts/relics/relic_catalog.gd")
 const Tarot = preload("res://scripts/tarot/tarot_catalog.gd")
 const Statuses = preload("res://scripts/status/status_catalog.gd")
+const CatalogTypes = preload("res://scripts/relics/relic_types.gd")
 const Metrics = preload("res://scripts/testing/playtest_metrics.gd")
 var metrics = Metrics.new()
 var model
@@ -28,6 +29,7 @@ func _init(run_seed: int = 1) -> void:
 	model.tarot_granted.connect(_tarot_received)
 	model.tarot_expired.connect(func(instances): events.append({"type":"tarot_expired","instances":instances}))
 	model.character_leveled.connect(_leveled)
+	model.sins.awakened.connect(func(id): events.append({"type":"sin_awakened","id":id}))
 	model.boss_changed.connect(_boss_changed)
 	model.damage_redirected.connect(func(source,target,damage,loss): events.append({"type":"redirect","source":source,"target":target,"amount":loss,"display_amount":damage}))
 	model.relic_cost_paid.connect(func(costs):
@@ -39,6 +41,7 @@ func _init(run_seed: int = 1) -> void:
 
 ## Release session callbacks after a probe or interactive run, without touching GUI saves.
 func close() -> void:
+	for connection in model.sins.get_signal_connection_list("awakened"): model.sins.disconnect("awakened",connection.callable)
 	for info in model.get_signal_list():
 		for connection in model.get_signal_connection_list(info.name): model.disconnect(info.name,connection.callable)
 
@@ -251,7 +254,7 @@ func _cast_tarot(instance: int, options: Dictionary) -> String:
 	while not model.tarot_effects.pending_steps.is_empty():
 		_record(model.tarot_effects.resolve_next_step(model).get("events",[]))
 	if result.get("reroll",false) and model.outcome().is_empty():
-		if not model.roll_pool(false,[],true).is_empty(): stats.rolls += 1
+		if not model.roll_pool(false,[],true,[],true).is_empty(): stats.rolls += 1
 	return ""
 
 ## Observe one shared-model cast without confusing bonus casts, extra uses or damage ticks.
@@ -304,11 +307,7 @@ func _settle() -> void:
 			if not model.at_shop and model.wave_chest_stage != model.stage:
 				if model.begin_wave_reward(): chest_source = "wave_closed"
 				return
-			if model.outcome() == "victory":
-				if model.auto_claim_victory_chest() >= 0:
-					chest_source = "victory"
-					model.release_chest_crystals()
-				return
+			if model.outcome() == "victory": return
 			model.offer_routes()
 			return
 		if model.tarot_effects.pending_turn_end:
@@ -344,6 +343,9 @@ func snapshot() -> Dictionary:
 		"player":{"hp":model.hp,"max_hp":model.max_hp,"shield":model.shield,"level":model.character_level,"xp":model.souls,"xp_needed":model.level_cost(),"base_damage":model.character_base_damage(),"combo_multiplier":model.combo_multiplier(),"blood_gems":model.blood_gems,"fireball_charges":model.character_passive.charge,"fireball_threshold":model.character_passive.charge_limit(model.character_evolution_stage()),"statuses":_statuses(model.statuses)},
 		"dice":[],"rolls_left":model.dice_turn.rolls_left,"same_pip_rerolls":model.same_pip_rerolls,"has_rolled":model.dice_turn.has_rolled(),"manual_skills_left":maxi(0,model.dice_turn.MANUAL_SKILLS_PER_TURN-model.dice_turn.manual_casts),"bonus_turns":model.bonus_turn_count,"leftover_heal":model.leftover_total_healing() if model.dice_turn.has_rolled() else 0,
 		"enemies":[],"relics":[],"tarots":[],"combinations":[],"treasure":{"progress":model.reroll_progress,"tier":model.chest_tier()},"actions":[],"totals":stats.duplicate(),"wave_history":history.duplicate(true)}
+	state.sins = model.sins.save()
+	state.relic_types = CatalogTypes.owned(model.relics.items,Relics.ITEMS)
+	state.completed_sets = CatalogTypes.completed_sets(model.relics.items)
 	state.gemstones = {"bag":range(model.gemstones.order.size()).map(func(i): return model.gemstones.bag_gem(i)),"sockets":model.gemstones.sockets.duplicate(true)}
 	for i in range(6): state.dice.append({"slot":i+1,"face":model.dice_turn.values[i] if model.dice_turn.has_rolled() else null,"spent":i in model.dice_turn.committed,"locked":i in model.dice_turn.locked})
 	for i in model.living():

@@ -66,7 +66,7 @@ func run() -> void:
 		check(g._event_font_size(g.Rules.damage_event(0,200,200),0) < 48,"Ordinary enemies retain the full-health threshold")
 		var rng_state: int = g.model.rng.state
 		g._show_events([g.Rules.damage_event(0,25,25),g.Rules.damage_event(-1,15,15),g.Rules.event(0,5,"burn","BURN"),g.Rules.event(0,3,"shield_hit","SHIELD")])
-		check(g.fx.floats.filter(func(f): return f.has("velocity")).size() == 4,"Enemy, player, Burning and shield damage all use arcs")
+		check(g.fx.floats.filter(func(f): return f.has("velocity")).size() == 2 and g.damage_total.total == 28,"Direct and shield hits accumulate; Burning and incoming player damage retain separate arcs")
 		check(g.model.rng.state == rng_state,"Number trajectories never consume gameplay randomness")
 		if "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless":
 			g.fx.clear()

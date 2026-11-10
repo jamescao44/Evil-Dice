@@ -20,6 +20,7 @@ func use(m, id: String, choice: Dictionary = {}) -> Dictionary:
 	var result: Dictionary = m.tarot_effects.cast(m,card.instance_id,choice)
 	check(not result.has("error"),"Cast %s: %s" % [id,result.get("error","")])
 	check(m.tarots.find_instance(card.instance_id) == -1,"Consume exactly the cast instance: "+id)
+	while not m.roll_attacks.is_empty(): m.resolve_roll_attack_step()
 	return result
 func roll(m, values: Array = [1,2,3,4,5,6], free: bool = false) -> void:
 	check(not m.roll_pool(false,values,free).is_empty(),"Accept valid throw")
@@ -47,14 +48,16 @@ func _initialize() -> void:
 	var budget: int = m.dice_turn.rolls_left
 	check(not m.tarot_effects.cast(m,card.instance_id,{"die":0,"face":6}).has("error"),"Magician edits a rolled unused die")
 	check(m.dice_turn.values == [6,2,3,4,5,6] and m.dice_turn.selected.is_empty(),"Magician changes only the chosen die and clears stale selections")
-	check(m.roll_attacks.is_empty() and m.enemies.map(func(e): return e.hp) == hp and m.dice_turn.rolls_left == budget,"Changing dice causes no new auto attack or budget cost")
+	check(m.roll_attacks.size() == 1 and m.dice_turn.rolls_left == budget,"Magician queues the new match without spending rerolls")
+	while not m.roll_attacks.is_empty(): m.resolve_roll_attack_step()
+	check(m.enemies.map(func(e): return e.hp) != hp,"Magician matching attacks deal damage")
 	spend(m,[1,2,3])
 	card = m.tarots.add("magician")
 	check(m.tarot_effects.cast(m,card.instance_id,{"die":1,"face":6}).has("error"),"Spent die cannot be edited")
 	m = fresh(); roll(m); hp = m.enemies.map(func(e): return e.hp)
 	use(m,"high_priestess"); use(m,"high_priestess")
 	check(m.dice_turn.values == [3,4,5,6,6,6] and m.tarot_effects.dice_boost == 2,"Priestess stacks before the skill and caps at six")
-	check(m.enemies.map(func(e): return e.hp) == hp and m.roll_attacks.is_empty(),"Priestess does not retrigger matches")
+	check(m.enemies.map(func(e): return e.hp) != hp and m.roll_attacks.is_empty(),"Priestess resolves matching attacks after each use")
 	roll(m,[1,2,3,4,5,6]); check(m.dice_turn.values == [3,4,5,6,6,6],"Future corrections receive the turn boost")
 	m._prepare_player_turn(); check(m.tarot_effects.dice_boost == 0,"New pool expires Priestess")
 	card = m.tarots.add("hermit")
@@ -80,7 +83,7 @@ func _initialize() -> void:
 	use(m,"star"); m.tarot_effects.star_throws = 1; use(m,"star")
 	check(m.tarot_effects.star_throws == 3,"Repeated Star refreshes three")
 	m = fresh(); roll(m,[1,1,2,4,4,6]); use(m,"judgement")
-	check(m.dice_turn.rolls_left == 6 and m.can_end_dice_turn(),"Judgement adds two rolls without losing rolled state")
+	check(m.dice_turn.rolls_left == 7 and m.can_end_dice_turn(),"Judgement adds three rolls without losing rolled state")
 	use(m,"justice"); budget = m.dice_turn.rolls_left
 	m.perfect_combo = 5
 	roll(m,[1,2,3,4,5,6],true)
@@ -89,7 +92,8 @@ func _initialize() -> void:
 	roll(m)
 	check(m.perfect_combo == 0,"A subsequent missed manual throw still breaks the streak")
 	card = m.tarots.add("judgement")
-	check(m.tarot_effects.cast(m,card.instance_id).has("error"),"Judgement rejects playable unused straights")
+	budget = m.dice_turn.rolls_left
+	check(not m.tarot_effects.cast(m,card.instance_id).has("error") and m.dice_turn.rolls_left == budget+3,"Judgement works even with a playable straight")
 	m = fresh(); roll(m,[1,2,3,4,4,6]); spend(m,[0,1,2]); card = m.tarots.add("judgement")
 	check(m.tarot_effects.cast(m,card.instance_id).has("error"),"After the manual skill, enemy phase cannot be extended with Judgement")
 	m = fresh(); roll(m)

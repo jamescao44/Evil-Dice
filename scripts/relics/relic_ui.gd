@@ -3,6 +3,7 @@ const Catalog = preload("res://scripts/relics/relic_catalog.gd")
 const Paint = preload("res://scripts/relics/relic_paint.gd")
 const Pixel = preload("res://scripts/shared/pixel_paint.gd")
 const Pickup = preload("res://scripts/relics/relic_pickup.gd")
+const TypeTags = preload("res://scripts/relics/relic_type_tags.gd")
 var pickup = Pickup.new()
 var battle
 var pressed: int = -1
@@ -283,7 +284,8 @@ func _draw_chest_replacement() -> void:
 	_center(Vector2(mid,320 if portrait() else 118),"INVENTORY FULL",32,Color("dfb866"))
 	if not pickup.active: Paint.paint(self,item.relic_id,Vector2(mid,620 if portrait() else 280),80)
 	_center(Vector2(mid,790 if portrait() else 418),item.name,26,item.color)
-	_wrap(Vector2(64 if portrait() else 310,880 if portrait() else 464),Catalog.short_description(item.relic_id,GameText.text,battle.model.relics.items),676 if portrait() else 660,28 if portrait() else 22,Color("eee0b9"))
+	var tag_bottom: float = TypeTags.paint(self,{"id":item.relic_id},battle.description_font,Vector2(64,808) if portrait() else Vector2(310,430),676 if portrait() else 660,24 if portrait() else 18)
+	_wrap(Vector2(64 if portrait() else 310,maxf(880 if portrait() else 464,tag_bottom+30)),Catalog.short_description(item.relic_id,GameText.text,battle.model.relics.items),676 if portrait() else 660,28 if portrait() else 22,Color("eee0b9"))
 	_center(Vector2(mid,1290 if portrait() else 565),"CHOOSE A RELIC TO REPLACE",24 if portrait() else 18,Color("dfb866"))
 	_frame(skip_rect(),Color("dd7e6b"))
 	_center(skip_rect().get_center()+Vector2(0,10),"LEAVE RELIC",28 if portrait() else 22,Color("e998a4"))
@@ -297,11 +299,13 @@ func _draw_tooltip() -> void:
 	var rect: Rect2 = tooltip_rect(index)
 	_frame(rect,Catalog.rarity_color(item.id),true)
 	_text(rect.position+Vector2(20,36),Catalog.ITEMS[item.id].name,26 if portrait() else 20,Catalog.rarity_color(item.id))
-	_wrap(rect.position+Vector2(20,78),Catalog.description(item,GameText.text,battle.model.relics.items),rect.size.x-40,30 if portrait() else 24,Color("fff1ca"))
+	var tag_bottom: float = TypeTags.paint(self,item,battle.description_font,rect.position+Vector2(20,48),rect.size.x-40,22 if portrait() else 17,false)
+	_wrap(Vector2(rect.position.x+20,tag_bottom+38),Catalog.description(item,GameText.text,battle.model.relics.items,false),rect.size.x-40,30 if portrait() else 24,Color("fff1ca"))
 
 func tooltip_rect(index: int) -> Rect2:
 	var width: float = 728 if portrait() else 540
 	var size: int = 30 if portrait() else 24
-	var lines := GameText.lines(Catalog.description(battle.model.relics.items[index],GameText.text,battle.model.relics.items),battle.description_font,size,width-40)
-	var height: float = 94+(size+8)*lines.size()
+	var item: Dictionary = battle.model.relics.items[index]
+	var lines := GameText.lines(Catalog.description(item,GameText.text,battle.model.relics.items,false),battle.description_font,size,width-40)
+	var height: float = 104+TypeTags.height(item,battle.description_font,width-40,22 if portrait() else 17)+(size+8)*lines.size()
 	return Rect2(38,inventory_rect().position.y-height-18,width,height)

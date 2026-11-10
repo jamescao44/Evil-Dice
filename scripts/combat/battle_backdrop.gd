@@ -31,8 +31,8 @@ func _draw() -> void:
 func _draw_landscape() -> void:
 	draw_rect(battle.ARENA, Color("a5a182"))
 	var tile: int = roundi(battle._stage_size(battle.PAVING_SIZES))
-	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), battle._display_stage() / float(battle.Run.WAVE_NAMES.size()-1))
-	var scenery_stage: float = battle._display_stage() / float(battle.Run.WAVE_NAMES.size()-1) * 4
+	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), battle._display_stage() / battle.Run.Waves.TERRAIN_BLEND_SPAN)
+	var scenery_stage: float = battle._display_stage() / battle.Run.Waves.TERRAIN_BLEND_SPAN * 4
 	var city_blend: float = clampf(scenery_stage - 3, 0, 1)
 	var field_blend: float = clampf((scenery_stage-1)/2.0,0,1)
 	_draw_extended_ground(tile,tint)
@@ -65,7 +65,7 @@ func _draw_landscape() -> void:
 func _draw_portrait() -> void:
 	draw_rect(battle.ARENA, Color("a5a182"))
 	var tile: int = roundi(battle._stage_size(battle.PAVING_SIZES))
-	var progress: float = battle._display_stage() / float(battle.Run.WAVE_NAMES.size()-1)
+	var progress: float = battle._display_stage() / battle.Run.Waves.TERRAIN_BLEND_SPAN
 	var tint: Color = Color("b6b8a0").lerp(Color("c3a889"), progress)
 	var field: float = clampf((progress * 4 - 1) / 2.0, 0, 1)
 	_draw_extended_ground(tile,tint)
@@ -158,7 +158,7 @@ func _draw_extended_ground(tile: float, tint: Color) -> void:
 	var bounds: Rect2 = battle.ARENA.grow(maxf(512,battle.ARENA.size.x))
 	var origin: Vector2 = battle.ARENA.position-Vector2(fposmod(battle.background_offset,tile),fposmod(battle.background_vertical_offset,tile))
 	var tiled := Rect2((bounds.position-origin)/scale_factor,bounds.size/scale_factor)
-	var field: float = clampf((battle._display_stage()/float(battle.Run.WAVE_NAMES.size()-1)*4-1)/2,0,1)
+	var field: float = clampf((battle._display_stage()/battle.Run.Waves.TERRAIN_BLEND_SPAN*4-1)/2,0,1)
 	draw_set_transform(origin,0,Vector2.ONE*scale_factor)
 	draw_texture_rect(battle.art.floor0,tiled,true,tint)
 	if field > 0: draw_texture_rect(battle.art.grass,tiled,true,Color(0.76,0.83,0.66,field))

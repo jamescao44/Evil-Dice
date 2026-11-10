@@ -102,5 +102,6 @@ func pose(id: String, index: int) -> Dictionary:
 	if id == "field": at.y += (1-visible)*(165 if phone() else 105)
 	else: at.x += (1-visible)*(-screen().x*0.55 if id == "now" else screen().x*0.55)
 	alpha *= visible
-	return {"at":at,"size":size,"angle":angle,"alpha":alpha,"glow":motion.z,"brightness":brightness}
+	var enabled: bool = ui.lane_enabled(id)
+	return {"at":at,"size":size,"angle":angle,"alpha":alpha,"glow":motion.z*(1.0 if enabled else 0.15),"brightness":brightness*(1.0 if enabled else 0.35)}
 

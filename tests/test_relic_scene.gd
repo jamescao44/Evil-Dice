@@ -272,12 +272,12 @@ func run() -> void:
 	check(game.view_phase == "reward" and game.model.wave_chest_stage == game.model.stage and game.model.hp == 85 and game.model.status_count(game.Status.BURNING) == 2,"Enemy burn victory waits for every player burn tick before the wave chest")
 	check(game.model.relics.items[0].charges == 1,"A status-effect victory completes the sixth relic turn")
 	game._restart(Waves.COUNT)
-	game.model.city_hp = 0; game.model.reroll_progress = 15
+	game.model.city_hp = 0; game.model.reroll_progress = game.Run.Chests.REROLL_COST
 	game.model.wave_chest_stage = game.model.stage
 	game.model.wave_reward_resolved = true
 	game._check_over()
 	await until_phase("over")
-	check(game.model.open_rewards.size() == 5 and game.auto_claim_tier == 3,"Victory preserves banked Ultra chest")
+	check(game.model.open_rewards.is_empty() and game.model.reroll_progress == game.Run.Chests.REROLL_COST,"Victory preserves unopened reroll treasure")
 	game._restart()
 	check(game.model.relics.items.is_empty() and game.model.open_rewards.is_empty(),"Restart clears inventory and pending choices")
 	game.queue_free(); await process_frame

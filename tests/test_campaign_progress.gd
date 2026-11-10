@@ -14,7 +14,6 @@ func finish_level(m, stage: int = 7) -> void:
 	m.stage = stage; m.enemies.clear(); m.pending = m.Skill.new(); m.phase = "finished"; m.wave_kind = "relic"
 	m.wave_chest_stage = -1; m.wave_reward_resolved = true
 	m.begin_wave_reward(); m.open_wave_chest(); m.discard_unclaimed_rewards(); m.close_chest(); m.finish_wave_reward()
-	if m.auto_claim_victory_chest() >= 0: m.discard_unclaimed_rewards(); m.close_chest()
 
 func capture(view, name: String) -> void:
 	if DisplayServer.get_name() == "headless": return
@@ -42,7 +41,40 @@ func check_replayed_level(saved: Dictionary) -> void:
 	items = replay.relics.items.duplicate(true); cards = replay.tarots.items.duplicate(true)
 	check(campaign.complete(replay) and campaign.checkpoint.relics == items and campaign.checkpoint.tarots == cards,"Reusing a model for a fresh run can save the same level again")
 
+## Both partial and ready treasure survive every level checkpoint, including a restart.
+func check_treasure_continuation() -> void:
+	for level in range(1,Run.Campaign.LEVEL_COUNT):
+		for progress in [7,Run.Chests.REROLL_COST]:
+			var m = Run.new(740+level)
+			m.reroll_progress = progress
+			finish_level(m,level*Run.Campaign.WAVES_PER_LEVEL-1)
+			var pity: Array = m.chest_pity.misses.duplicate()
+			var reward_state: int = m.reward_rng.state
+			var campaign = Run.Campaign.new()
+			var path := "user://test-treasure-continuation-%s.dat" % Time.get_ticks_usec()
+			campaign.configure(path)
+			check(m.level_rewards_complete() and campaign.complete(m),"Unopened treasure does not block next level")
+			check(m.reroll_progress == progress and m.open_rewards.is_empty(),"Completing a level does not roll or consume treasure")
+			check(m.chest_pity.misses == pity and m.reward_rng.state == reward_state,"Saving unopened treasure does not spend pity or reward RNG")
+			var reopened = Run.Campaign.new(); reopened.configure(path)
+			reopened.start(m)
+			check(m.stage == level*Run.Campaign.WAVES_PER_LEVEL and m.reroll_progress == progress,"Saved treasure survives relaunch at every level boundary")
+			if progress == Run.Chests.REROLL_COST:
+				check(not m.open_chest(Run.Chests.REROLL_TIER).is_empty() and m.reroll_progress == 0,"Carried ready treasure opens when explicitly claimed")
+				m.discard_unclaimed_rewards(); m.close_chest()
+				check(m.open_chest(Run.Chests.REROLL_TIER).is_empty(),"Carried treasure can only be spent once")
+			DirAccess.remove_absolute(path)
+	for progress in [7,Run.Chests.REROLL_COST]:
+		var session = Session.new(912)
+		session.model.reroll_progress = progress
+		finish_level(session.model)
+		session._settle()
+		check(session.snapshot().phase == "level_complete" and session.model.open_rewards.is_empty(),"CLI settlement never auto-opens victory treasure")
+		check(session.command({"action":"start"}).ok and session.model.reroll_progress == progress,"CLI carries treasure into the next level")
+		session.close()
+
 func run() -> void:
+	check_treasure_continuation()
 	var m = Run.new(451)
 	for stage in range(Run.PLAYABLE_WAVES):
 		m.stage = stage; m.enemies.clear(); m.phase = "finished"
@@ -58,7 +90,7 @@ func run() -> void:
 	campaign.configure(path)
 	check(not campaign.complete(m),"An unfinished level cannot create a checkpoint")
 	finish_level(m)
-	check(m.level_rewards_complete() and campaign.complete(m),"All field and reroll rewards settle before checkpoint")
+	check(m.level_rewards_complete() and campaign.complete(m),"Field rewards settle without requiring reroll treasure claims")
 	var saved: Dictionary = campaign.checkpoint.duplicate(true)
 	m.hp = 1
 	check(campaign.complete(m) and campaign.checkpoint == saved,"Duplicate success callbacks cannot replace saved build")
@@ -73,6 +105,7 @@ func run() -> void:
 	check(reopened.next_level() == 2 and reopened.checkpoint == saved,"Checkpoint survives file reload")
 	var second = Run.new(9); reopened.start(second)
 	check(second.stage == 8 and second.phase == "new" and second.hp == second.max_hp,"Next level starts at its first wave fully healed")
+	check(second.reroll_progress == 10,"Partial reroll treasure survives saving and next-level restoration")
 	check(second.character_level == saved.run.character_level and second.souls == saved.run.souls and second.blood_gems == saved.run.blood_gems,"Level XP and currency carry exactly")
 	check(second.relics.items == saved.relics and second.relics.items[1].charges == 2,"Order, fused food, stored charges and savings survive")
 	check(second.tarots.items == saved.tarots and second.tarots.next_instance == saved.next_tarot,"Tarot copies and IDs survive without replaying pickup gifts")
@@ -98,7 +131,7 @@ func run() -> void:
 	var third_build = second.relics.items.duplicate(true)
 	second.hp = 0; reopened.start(second)
 	check(second.stage == 16 and second.relics.items == third_build,"Third-level defeat retries its entry build")
-	for completed in [3,4]:
+	for completed in range(3,Run.Campaign.LEVEL_COUNT):
 		var build: Array = second.relics.items.duplicate(true)
 		var cards: Array = second.tarots.items.duplicate(true)
 		finish_level(second,completed*8-1)
@@ -109,8 +142,8 @@ func run() -> void:
 		check(second.stage == completed*8 and second.relics.items == build and second.tarots.items == cards,"New levels retain the exact inventory and tarots")
 		second.hp = 0; reloaded.start(second)
 		check(second.stage == completed*8 and second.hp == second.max_hp,"New level defeat retries its own entry build")
-	finish_level(second,39); check(reopened.complete(second) and reopened.next_level() == 1,"Chapter completion clears the next-level checkpoint")
-	reopened.start(second); check(second.stage == 0 and second.character_level == 1 and second.relics.items.is_empty(),"Start after all five levels begins a fresh chapter")
+	finish_level(second,Run.PLAYABLE_WAVES-1); check(reopened.complete(second) and reopened.next_level() == 1,"Chapter completion clears the next-level checkpoint")
+	reopened.start(second); check(second.stage == 0 and second.character_level == 1 and second.relics.items.is_empty(),"Start after all chapter levels begins a fresh chapter")
 	DirAccess.remove_absolute(path)
 	var session = Session.new(12)
 	finish_level(session.model); session._settle()
@@ -125,8 +158,22 @@ func run() -> void:
 		await capture(home,"home-level2-"+str(phone))
 		home.start_battle(); await process_frame
 		home.battle.model.chest_pity.save_path = ""
-		check(home.battle.model.stage == 8 and home.battle.view_phase == "ready","Home Start opens level two in both layouts")
+		check(home.battle.model.stage == 8 and home.battle.view_phase == "entering" and home.battle.evolution.entrance.active(),"Home Start opens level two with its entrance in both layouts")
 		check(home.battle.visual_stage == 8,"Restored battlefield has the correct world and character size")
+		home.battle.evolution.reset()
+		home.battle.model.reroll_progress = Run.Chests.REROLL_COST
+		finish_level(home.battle.model,15)
+		home.battle._check_over()
+		await process_frame
+		check(home.battle.view_phase == "over" and not home.battle.chest.visible and home.battle.model.open_rewards.is_empty(),"Victory UI stays open without auto-opening treasure")
+		check(home.campaign.checkpoint.run.reroll_progress == Run.Chests.REROLL_COST,"Victory checkpoint preserves a ready chest")
+		check(not home.battle._can_claim_chest(),"Victory overlay cannot consume the saved treasure through hidden controls")
+		home.battle._handle_click(home.battle.REPLAY_RECT.get_center())
+		await process_frame
+		check(home.battle.model.stage == 16 and home.battle.treasure_pickup.displayed_progress() == Run.Chests.REROLL_COST,"Next Level restores the full treasure meter in both layouts")
+		home.battle.evolution.reset(); home.battle.view_phase = "ready"
+		check(home.battle._can_claim_chest(),"Carried treasure is manually claimable after the next entrance")
+		home.campaign.checkpoint = saved.duplicate(true); home.campaign.cleared_level = 1
 		home.battle.model.hp = 0; home.battle._check_over()
 		await capture(home.battle,"retry-level2-"+str(phone))
 		home.battle._restart(); await process_frame

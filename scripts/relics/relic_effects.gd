@@ -75,7 +75,9 @@ static func _grant_generator_tarot(model, id: String) -> bool:
 
 ## Tarot activation grants shields only on a committed card effect.
 static func tarot_used(model, grow_eye: bool = true) -> Array:
-	if grow_eye: Conditions.tarot_used(model)
+	if grow_eye:
+		Conditions.tarot_used(model)
+		model.sins.tarot_used(model)
 	var events: Array = []
 	for entry in repeat_sources(model.relics.items,"bookmark"):
 		model.shield += Vitals.BOOKMARK_SHIELD
@@ -281,7 +283,7 @@ static func after_hit(model, target: int, damage: int, skill: MultiHitSkill) -> 
 		if item.id == "runestone": extra_stacks += 1; runestones.append(entry)
 		if item.id == "pet_lizard": extra_burning += 4 if Sets.collection_complete(model.relics.items,"pets") else 2; runestones.append(entry)
 		if item.id == "bloodstone":
-			var cap: int = floori(model.max_hp*(0.05 if skill.is_combo_attack() or skill.pattern == "cleanup" else 0.1))
+			var cap: int = floori(model.max_hp*(0.05 if skill.is_combo_attack() or skill.pattern == "cleanup" else 0.1)*(2.0 if model.sins.has("lust") else 1.0))
 			var budget: String = str(entry.activators)
 			var attempted: int = mini(maxi(0,cap-model.lifesteal_budgets.get(budget,0)),model.modified_healing(damage*0.2*Vitals.SCALE))
 			var restored: int = model.heal(attempted,false)
@@ -526,11 +528,13 @@ static func roll_actions(model, perfect: bool) -> Array:
 			"pet_ghost": rule = {"amount":20.0,"fixed":true,"area":true}
 			"pet_dragon":
 				if Sets.collection_complete(model.relics.items,"pets"): rule.count = 3
-		if rule.is_empty(): continue
-		var options: Dictionary = {}
-		if rule.has("base_scale"): options.base_scale = rule.base_scale
-		for i in range(rule.get("count",1)):
-			actions.append({"id":item.id,"activation":entry,"amount":rule.get("amount",0.0),"fixed":rule.get("fixed",false),"area":rule.get("area",false),"options":options.duplicate()})
+		if not rule.is_empty():
+			var options: Dictionary = {}
+			if rule.has("base_scale"): options.base_scale = rule.base_scale
+			for i in range(rule.get("count",1)):
+				actions.append({"id":item.id,"activation":entry,"amount":rule.get("amount",0.0),"fixed":rule.get("fixed",false),"area":rule.get("area",false),"options":options.duplicate()})
+		if model.sins.has("wrath") and Catalog.Types.stacks(item,Catalog.ITEMS).get("weapon",0) > 0:
+			actions.append({"id":item.id,"activation":entry,"amount":0.0,"fixed":false,"area":false,"options":{"base_scale":2.0,"sin":"wrath"}})
 	return actions
 
 ## Roll-trigger relics no longer trigger a second time when a skill is formed.

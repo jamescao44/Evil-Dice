@@ -14,15 +14,14 @@ func _initialize() -> void:
 	var reference = Run.new(181)
 	var boss_levels: Array = []
 	var previous_level := 1
-	for stage in range(24): # Preserve the established first three levels exactly.
+	for stage in range(24): # The first three bosses retain their established budgets.
 		if stage%8 == 0: previous_level = 1
-		var gap: int = Waves.reference_level_gap(stage)
-		var level: int = maxi(previous_level,reference.character_level+gap)
+		var level: int = Waves.reference_enemy_level(stage,reference.character_level,previous_level)
 		var rng := RandomNumberGenerator.new(); rng.seed = 181+stage
 		var enemies: Array = Waves.create(stage,rng)
 		check(enemies.all(func(e): return e.level == level),"Every enemy matches its fixed monotonic reference at wave %d" % (stage+1))
-		var authored_levels := [1,1,1,4,5,5,7,9,8,8,8,11,11,11,14,15,14,14,14,16,16,16,19,21]
-		check(level == authored_levels[stage],"Only the requested boss gaps and later-level +1 increase change the roster")
+		var authored_levels := [1,1,1,2,3,3,4,9,7,8,9,10,10,10,10,15,13,15,16,17,17,17,17,21]
+		check(level == authored_levels[stage],"Opening relief builds toward the third-level pressure peak")
 		check(level >= previous_level,"Enemy levels never fall within a level")
 		previous_level = level
 		var xp := 0
@@ -30,7 +29,7 @@ func _initialize() -> void:
 			xp += Enemy.soul_reward(enemy)
 			if enemy.get("boss",false):
 				boss_levels.append(enemy.level)
-				check(enemy.level-reference.character_level == 5,"Every boss is five levels above expected entry level")
+				check(enemy.level == [9,15,21][stage/8],"Boss levels remain unchanged during ordinary-wave tuning")
 				check(enemy.max_hp == Enemy.phase_health(enemy,1),"Boss keeps its independently scaled phase health")
 			if enemy.role == Enemy.Role.COMMANDER:
 				xp += 2*Enemy.soul_reward(Enemy.make(Enemy.Role.PALADIN,enemy.reinforcement_level))
@@ -40,7 +39,7 @@ func _initialize() -> void:
 		check(boosted.enemies.all(func(e): return e.level == level),"Extra XP and health gear never rescale an authored encounter")
 		reference.gain_souls(xp)
 	check(boss_levels == [9,15,21],"Sequential XP budgets produce the three fixed boss levels")
-	check(reference.character_level == 17 and reference.souls == 31,"All updated kill rewards, including guards, produce the expected final reference XP")
+	check(reference.character_level == 17 and reference.souls == 18,"All updated kill rewards, including guards, produce the expected final reference XP")
 	var commander = Run.new(181)
 	commander.load_debug_wave(8)
 	commander.hit_enemy(0,999999,true)

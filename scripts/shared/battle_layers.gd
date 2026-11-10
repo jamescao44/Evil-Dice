@@ -1,9 +1,11 @@
 class_name BattleLayers
 extends RefCounted
 ## Absolute canvas-item depths: world < combat < rewards < inspection < held < pages.
-const SURROUND := -3
-const WORLD := -2
-const BACKDROP := -1
+const SURROUND := -5
+const WORLD := -4
+const BACKDROP := -1 # Relative to WORLD, behind its actors.
+const SKILL_FX := -3
+const PLAYER := -2
 const COMBAT := 0
 const TAROT_QUICK := 10
 const DICE := 20
@@ -39,3 +41,6 @@ const MENU_SHORTCUT := MENU-1
 const RIPPLE_CANVAS := 128
 const DAMAGE_CANVAS := 129
 const DISPLAY_CANVAS := 200
+
+## Awakenings pause all lower canvases, including reward and menu pages.
+const SIN_CANVAS := 210

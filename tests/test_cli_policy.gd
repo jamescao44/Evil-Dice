@@ -104,9 +104,9 @@ func _initialize() -> void:
 	check(ordered[-1].id == "ancient_tentacle","Tentacle follows the payload and Mask")
 	check(ordered.find_custom(func(i): return i.id == "disguise_mask") > 0,"Mask has a valid left-hand payload")
 	inventory = Inventory.new()
-	for id in ["mithril_blade","fries"]: inventory.add(id)
+	for id in ["tempura","bracelet"]: inventory.add(id)
 	ordered = Order.optimize(inventory.items,20)
-	check(ordered[0].id == "fries","Additive multiplier comes before multiplicative sword")
+	check(ordered[0].id == "bracelet","Additive multiplier comes before multiplicative Tempura")
 	var state := {"actions":["reorder"],"player":{"level":8,"base_damage":20},"relics":[]}
 	var mover = Order.new()
 	var moves := 0
@@ -115,6 +115,6 @@ func _initialize() -> void:
 		choice = mover.action(state)
 		if choice.is_empty(): break
 		inventory.move(choice.from-1,choice.to-1); moves += 1
-	check(moves == 1 and inventory.items[0].id == "fries","Plan terminates through legal one-based reorder commands")
+	check(moves == 1 and inventory.items[0].id == "bracelet","Plan terminates through legal one-based reorder commands")
 	print("CLI policy: %d checks, %d failures" % [checks,failures])
 	quit(1 if failures else 0)

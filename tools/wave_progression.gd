@@ -37,15 +37,15 @@ func _initialize() -> void:
 		var gap: int = Waves.reference_level_gap(stage)
 		if stage%Waves.WAVES_PER_LEVEL == 0: previous_level = 1
 		if plan:
-			for entry in entries: entry.level = maxi(previous_level,player_before+gap)
+			for entry in entries: entry.level = Waves.reference_enemy_level(stage,player_before,previous_level)
 		previous_level = entries.map(func(entry): return entry.level).max()
 		var xp: int = wave_souls(entries)
-		var row := {"wave":"%d-%d" % [stage/Waves.WAVES_PER_LEVEL+1,stage%Waves.WAVES_PER_LEVEL+1],"kill_souls":xp,"player_before":player_before,"target_gap":gap,"shop_after":Waves.has_shop_after(stage),"enemies":entries.map(func(u): return {"name":" / ".join(u.get("random_roles",[u.role]).map(func(role): return Enemy.ITEMS[role].name)),"elite":u.get("elite",false),"level":u.level})}
+		var row := {"wave":"%d-%d" % [stage/Waves.WAVES_PER_LEVEL+1,stage%Waves.WAVES_PER_LEVEL+1],"kill_souls":xp,"player_before":player_before,"target_gap":gap if not Waves.is_boss_stage(stage) else null,"pressure":Waves.LEVEL_PRESSURE[stage/Waves.WAVES_PER_LEVEL].name,"shop_after":Waves.has_shop_after(stage),"enemies":entries.map(func(u): return {"name":" / ".join(u.get("random_roles",[u.role]).map(func(role): return Enemy.ITEMS[role].name)),"elite":u.get("elite",false),"level":u.level})}
 		total += xp
 		row["total_souls"] = total; row["player_after"] = level_at(total)
 		rows.append(row)
 		print("%s enemy LV.%d; XP +%d = %d; player %d -> %d%s" % [row.wave,entries[0].level,xp,total,row.player_before,row.player_after,"; shop next" if row.shop_after else ""])
 	if not args.is_empty():
 		var file := FileAccess.open(args[0],FileAccess.WRITE)
-		file.store_string(JSON.stringify({"planned":plan,"assumptions":"Kill-only XP; no soul chests, bottles or Soul Vessel. Five eight-wave levels; shops after local waves 3/6 grant no combat XP. Commander LV.1 guards pay once; Fanatic summons pay nothing. The final two bosses are uniform draws from the three bosses; their XP is averaged for this fixed-level planning reference. Actual player levels can vary slightly by boss. Bosses target expected player level +5; levels only fall immediately after a boss.","rows":rows},"\t"))
+		file.store_string(JSON.stringify({"planned":plan,"assumptions":"Kill-only XP; no soul chests, bottles or Soul Vessel. Six eight-wave levels; shops after local waves 3/6 grant no combat XP. Commander LV.1 guards pay once; Fanatic summons pay nothing. The final three bosses are uniform draws from the three bosses; their XP is averaged for this fixed-level planning reference. Actual player levels can vary slightly by boss. Bosses retain authored levels 9/15/21/26/32, with a level-32 placeholder in level six. Ordinary waves follow chapter pressure targets; levels only fall after a boss. No live player-level matching.","rows":rows},"\t"))
 	quit()

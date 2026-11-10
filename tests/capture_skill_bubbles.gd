@@ -129,17 +129,17 @@ func run() -> void:
 	game.throw_meter.elapsed = game.ThrowMeter.PERIOD*0.225
 	game.charge_stamp = Time.get_ticks_usec()
 	await shot("short-meter")
-	for tier in range(1,4):
-		game._restart()
-		game.model.stage = Waves.CITY_STAGE
-		game.model._load_wave()
-		game.model.city_hp = 0
-		game.model.reroll_progress = tier*3
-		game.visual_stage = Waves.CITY_STAGE
-		game.evolution.reset()
-		game._check_over()
-		game.auto_claim_remaining = 2.0
-		await shot("auto-claim-"+game.CHEST_NAMES[tier].to_lower())
+	game._restart()
+	game.model.stage = Waves.CITY_STAGE
+	game.model._load_wave()
+	game.model.city_hp = 0
+	game.model.reroll_progress = game.Run.Chests.REROLL_COST
+	game.model.wave_chest_stage = game.model.stage
+	game.model.wave_reward_resolved = true
+	game.visual_stage = Waves.CITY_STAGE
+	game.evolution.reset()
+	game._check_over()
+	await shot("victory-preserved-treasure")
 	game.queue_free()
 	await process_frame
 	quit()

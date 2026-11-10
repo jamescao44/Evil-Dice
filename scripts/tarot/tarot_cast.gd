@@ -215,7 +215,13 @@ func _cast(selection: Dictionary) -> void:
 		battle.dice_selection.cancel_gesture()
 		battle.tarot_ui.close_inventory()
 		battle.view_phase = "ready"
-		await battle._roll(0,false,true)
+		await battle._roll(0,false,true,true)
+		if not battle._valid_turn(token): return
+		resume_phase = "ready"
+	elif not battle.model.roll_attacks.is_empty():
+		battle.tarot_ui.close_inventory()
+		battle.fx.z_index = BattleLayers.COMBAT
+		await battle._resolve_roll_triggers(token)
 		if not battle._valid_turn(token): return
 		resume_phase = "ready"
 	while battle.relic_ui.pickup.active:
@@ -292,7 +298,7 @@ func _finish_cast() -> void:
 		battle.skill_bubble.roll = battle.result.duplicate()
 	while not battle.model.tarot_effects.bonus_chests.is_empty() and battle.view_phase in ["ready","skill"]:
 		battle.tarot_ui.close_inventory()
-		await battle._reward_sequence(0,false,true)
+		await battle._reward_sequence(0,true)
 		if not battle._valid_turn(token): return
 
 func _resolve_steps(token: int) -> bool:

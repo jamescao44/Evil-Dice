@@ -267,7 +267,7 @@ func scene_checks(portrait: bool) -> void:
 	g.view_phase = "resolving"
 	var panel = g.damage_feedback
 	g._show_events([Rules.damage_event(0,1,1234)])
-	check(g.fx.floats.back().text == "-1234" and g.fx.floats.back().size == 43,"Battle renderer uses full hit damage for both the number and its logarithmic size")
+	check(g.damage_total.total == 1234,"Battle renderer sends full calculated hit damage to the accumulating total")
 	if "--visual" in OS.get_cmdline_user_args():
 		g.fx.floating(g._player_point()-Vector2(0,45),"-10",g.RED,g.fx.damage_font_size(10))
 		await capture(g,"hit-sizes")

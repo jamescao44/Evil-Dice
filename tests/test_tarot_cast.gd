@@ -71,11 +71,15 @@ func scene_checks(game) -> void:
 		tap(game,cast_ui.magician_choice.selected_center(game))
 		check(cast_ui.magician_choice.selected == -1,"Tap chosen die again deselects only the die")
 	tap(game,game.DICE_POSITIONS[0]); await capture(game,"magician-ring")
+	var health_before: int = game.model.enemies.reduce(func(total,e): return total+e.hp,0)
 	tap(game,cast_ui.magician_choice.face_center(game,6)); await settle(game)
 	check(game.model.dice_turn.values[0] == 6 and game.dice[0].face == 6 and game.model.tarots.find_instance(magician.instance_id) == -1,"Face choice commits and updates visible die")
-	check(game.model.roll_attacks.is_empty() and game.view_phase == "ready","Magician returns controls without auto attacks")
+	check(game.model.roll_attacks.is_empty() and game.view_phase == "ready","Magician finishes matching attacks and returns controls")
+	check(game.model.enemies.reduce(func(total,e): return total+e.hp,0) < health_before,"Animated Magician deals matching attack damage")
+	health_before = game.model.enemies.reduce(func(total,e): return total+e.hp,0)
 	give_front(game,"high_priestess"); drag(game,drop); await settle(game)
 	check(game.dice[1].face == 3 and game.dice[5].face == 6,"Priestess synchronizes visible faces")
+	check(game.model.enemies.reduce(func(total,e): return total+e.hp,0) < health_before and game.model.phase == "roll","Animated Priestess resolves matches and restores dice controls")
 	give_front(game,"hanged_man"); drag(game,drop)
 	var ban: String = cast_ui.options()[0]
 	var columns: int = 4 if ui.portrait() else 6
@@ -92,11 +96,11 @@ func scene_checks(game) -> void:
 	check(game.view_phase == "ready" and game.model.dice_turn.unused().size() == 6,"Justice rerolls unlocked dice and restores control")
 	check(game.model.dice_turn.rolls_left == justice_budget and game.model.tarots.find_instance(justice.instance_id) == -1,"Justice consumes its card but no roll")
 	check(game.model.perfect_combo == 5,"Animated Justice preserves the Perfect combo")
-	game._restart(); tough_enemies(game); prepare_roll(game); game.model.hp = 20
+	game._restart(); tough_enemies(game); prepare_roll(game); game.model.hp = game.model.max_hp
 	give_front(game,"temperance"); drag(game,drop)
 	var deadline: int = Time.get_ticks_msec()+10000
 	while (cast_ui.busy or game.model.round_number < 2 or game.view_phase != "ready") and Time.get_ticks_msec() < deadline: await process_frame
-	check(game.view_phase == "ready" and game.model.dice_turn.rolls_left == 5,"Temperance completes healing/enemies and resumes with five throws")
+	check(game.view_phase == "ready" and game.model.dice_turn.rolls_left == 9,"Temperance completes the turn and restores five throws plus four carried rolls")
 	check(game.model.reroll_progress == 0,"Transferred throws do not reward the old turn")
 	game._restart(); tough_enemies(game); prepare_roll(game)
 	game.model.acquire_relic("ancient_prophecy")
@@ -107,8 +111,16 @@ func scene_checks(game) -> void:
 	check(game.model.dice_turn.values == [2,6,3,4,5,6] and game.view_phase == "ready","Second edit finishes independently")
 	game.model.perfect_combo = 5
 	give_front(game,"justice"); drag(game,drop); await settle(game)
-	check(game.model.dice_turn.rolls_made == 3 and game.model.dice_turn.rolls_left == 2 and game.view_phase == "ready","Repeated Justice animates two complete free rolls")
+	check(game.model.dice_turn.rolls_made == 3 and game.model.dice_turn.rolls_left == 4 and game.view_phase == "ready","Repeated Justice animates two complete free rolls")
 	check(game.model.perfect_combo == 5,"Prophecy repeating Justice also preserves the Perfect combo")
+	game._restart(); tough_enemies(game)
+	var budget: int = game.model.dice_turn.rolls_left
+	give_front(game,"judgement"); drag(game,drop); await settle(game)
+	check(game.model.dice_turn.rolls_left == budget+3 and not game.model.dice_turn.has_rolled(),"Judgement grants three immediately before throwing")
+	game._restart(); tough_enemies(game); prepare_roll(game)
+	game.model.acquire_relic("ancient_prophecy")
+	give_front(game,"high_priestess"); drag(game,drop); await settle(game)
+	check(game.model.tarot_effects.dice_boost == 2 and game.model.roll_attacks.is_empty() and game.model.tarot_effects.pending_repeat.is_empty() and game.view_phase == "ready","Repeated Priestess resolves each matching attack before returning controls")
 	game._restart(); tough_enemies(game)
 	game.model.apply_affliction(game.Status.FROZEN,1); game.model._prepare_player_turn(); game.view_phase = "frozen"
 	give_front(game,"hierophant"); drag(game,drop); await settle(game)
